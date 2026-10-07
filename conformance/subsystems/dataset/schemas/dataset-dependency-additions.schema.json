@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/dataset-dependency-additions.schema.json",
+  "title": "Dataset conformance dependency additions",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "target_subsystem", "edges"],
+  "properties": {
+    "schema_version": { "const": "mainframe-env.dataset-dependency-additions@1" },
+    "target_subsystem": { "const": "dataset.data" },
+    "edges": {
+      "const": [
+        ["mainframe-env-conformance", "mainframe-env-coverage"],
+        ["mainframe-env-conformance", "mainframe-env-store-api"]
+      ]
+    }
+  }
+}

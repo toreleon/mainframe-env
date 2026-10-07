@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Emit original typed MQCMIT/MQBACK effects from a live admitted-frame local-UOW lookup, preserve reviewed status outputs, and protect unusable post-dispatch MQI reply envelopes as unknown."

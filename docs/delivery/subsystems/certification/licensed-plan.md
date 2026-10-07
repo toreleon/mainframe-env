@@ -2,14 +2,13 @@
 
 Subsystem: **certification**
 Phase: **licensed**
-Target release: **0.17.0**
 
 Status: **Proposed**
 Start gate: full z/OSMF profile and cross-resource semantics accepted
 Completion dependencies: zosmf.rest, integration.transactions
 Estimate: 12–20 engineer-months
 
-The [common release contract](../README.md#common-release-contract) and
+The [common release contract](../README.md#shared-validation-contract) and
 [hardened slice acceptance](../../../prompts/subsystems/README.md#hardened-slice-acceptance)
 apply, including early participant-contract and licensed-harness preparation.
 These requirements do not themselves certify implementation or waive an exit gate.
@@ -25,17 +24,17 @@ and rehearse the complete evidence, migration, rollback, and release process.
   topology, test data, authority model, and environment receipts.
 - Run differential oracles for COBOL, JCL/JES, RACF/SAF, datasets/VSAM/AMS,
   CICS API/SPI/FEPI, z/OSMF, Db2, IMS, MQ, and cross-resource journeys.
-- Run the deferred 0.5 RACF/SAF campaign for all 34 command-family and 14
+- Run the deferred racf.security RACF/SAF campaign for all 34 command-family and 14
   RACROUTE rows; independent simulation is development assurance and supplies
   no licensed differential credit.
-- Consume the 0.4 COBOL handoff at differential 0/153 pending and run its real
+- Consume the cobol.execution COBOL handoff at differential 0/153 pending and run its real
   licensed Enterprise COBOL 6.5 153-row campaign; the approved GnuCOBOL
   reference campaign is not an IBM oracle receipt and cannot increment the
   differential numerator.
-- Consume the 0.6 dataset/VSAM/AMS handoff at differential 0/36 pending and run
-  its real licensed 36-row campaign; the 0.6 reference simulation is not an
+- Consume the dataset.data dataset/VSAM/AMS handoff at differential 0/36 pending and run
+  its real licensed 36-row campaign; the dataset.data reference simulation is not an
   oracle receipt and cannot increment the differential numerator.
-- Consume the 0.8 JES2 handoff at differential 0/16 pending and run its real
+- Consume the jes.execution JES2 handoff at differential 0/16 pending and run its real
   licensed z/OS 3.2/JES2 16-scenario campaign; Hercules, MVS 3.8J, local models,
   and CardDemo are not oracle receipts and cannot increment the differential
   numerator.
@@ -96,12 +95,12 @@ and release rehearsal are serialized on one unchanged source identity.
   result artifacts, normalizers, and source/artifact digests.
 - The deferred RACF/SAF differential advances from 0/48 pending only through a
   real pinned licensed z/OS 3.2 campaign receipt accepted by the shared runner.
-- The deferred 0.4 COBOL campaign passes 153/153 on the unchanged candidate
+- The deferred cobol.execution COBOL campaign passes 153/153 on the unchanged candidate
   with a reviewed licensed Enterprise COBOL 6.5 receipt; GnuCOBOL remains zero-
   credit development assurance.
-- The deferred 0.6 dataset/VSAM/AMS campaign passes 36/36 on the unchanged
+- The deferred dataset.data dataset/VSAM/AMS campaign passes 36/36 on the unchanged
   candidate with a reviewed licensed z/OS 3.2 receipt.
-- The deferred 0.8 JES2 campaign passes 16/16 on the unchanged candidate with a
+- The deferred jes.execution JES2 campaign passes 16/16 on the unchanged candidate with a
   reviewed licensed z/OS 3.2/JES2 receipt.
 - Architecture, de-hardcoding, dependency, license, advisory, fuzz, load, soak,
   recovery, migration, backup/restore, and rollback gates pass.

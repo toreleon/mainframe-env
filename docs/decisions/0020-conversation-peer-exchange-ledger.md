@@ -1,9 +1,9 @@
 # ADR-0020: Persist explicit conversation peer frames with protocol state
 
-Status: **Proposed for v0.9 development**
+Status: **Proposed for cics.application-api development**
 Owner: **CICS provider and execution maintainers**
 Scope: **CIC-905 conversation-open CONVERSE and sibling exchange commands**
-Applies from: **mainframe-env 0.9.0 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Context
 
@@ -11,7 +11,7 @@ IBM CICS TS 6.x CONVERSE sends application data and receives a partner
 response. Its length, truncation, EOC, FMH, SIGNAL, and STATE results depend on
 the actual peer frame. Successful local delivery or an MQ acknowledgement
 cannot establish those results. The source baseline, rows, topic paths and
-SHA-256 identities are recorded in the [0.9 status ledger](../delivery/subsystems/cics/application-api-status.md).
+SHA-256 identities are recorded in the [cics.application-api status ledger](../delivery/subsystems/cics/application-api-status.md).
 
 ## Decision
 

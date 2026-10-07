@@ -1,9 +1,9 @@
 # ADR-0017: Resolve immediate START targets from installed durable definitions
 
-Status: **Proposed for v0.9 development; command rows pending**
+Status: **Proposed for cics.application-api development; command rows pending**
 Owner: **CICS and server maintainers**
 Scope: **START ATTACH and START BREXIT transaction admission**
-Applies from: **mainframe-env 0.9.0 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Context
 

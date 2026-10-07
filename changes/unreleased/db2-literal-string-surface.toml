@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Expose reviewed owned Db2 Unicode UTF-8 character/X and BX binary literal proofs with independent public decoding, encoding, empty/NULL, original-location and resource-bound regressions; assignment, other ordinary values, catalog binding, execution and licensed differential remain pending."

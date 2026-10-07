@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added source-reviewed checked MQLONG options/version adapters for basic local MQOPEN/MQCLOSE/MQGET/MQPUT/MQPUT1 intent, preserving browse, finite wait, truncation and independently admitted syncpoint semantics while failing closed for unrepresented forms."

@@ -1,9 +1,9 @@
 # ADR-0014: Keep named counters in one versioned pool authority
 
-Status: **Proposed for v0.9 development**
+Status: **Proposed for cics.application-api development**
 Owner: **CICS provider and execution maintainers**
 Scope: **twelve COUNTER and DCOUNTER application rows, typed plans, and durable replay**
-Applies from: **mainframe-env 0.9.0 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Context
 
@@ -12,7 +12,7 @@ IBM CICS TS 6.x application-command rows 0034/0035, 0044/0045, 0087/0088,
 UPDATE must advance or compare a value atomically across workers. QUERY must
 observe the same current value, including the one-past-maximum limit state.
 The exact offline source baseline, catalog rows, topics, and SHA-256 values
-are recorded in the [0.9 status ledger](../delivery/subsystems/cics/application-api-status.md).
+are recorded in the [cics.application-api status ledger](../delivery/subsystems/cics/application-api-status.md).
 
 The integrated CICS service, product, and interpreter roots have frozen
 production-line budgets. Growing any of those roots to hold counter state or

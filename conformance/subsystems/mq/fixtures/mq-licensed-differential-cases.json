@@ -1,0 +1,252 @@
+{
+  "schema_version": "mainframe-env.mq-licensed-differential-fixtures@1",
+  "target_subsystem": "mq.programming",
+  "work_package": "MQ-1506.licensed-harness-contract",
+  "baseline_id": "ibm-mq-9.4-mqi-2026-08-31",
+  "unit": "mqi-calls-unique",
+  "independent_fixture_authority": {
+    "kind": "reviewed-external-fixture-bundle",
+    "product_output_derived": false,
+    "oracle_output_embedded": false,
+    "raw_fixture_bytes_retained": false,
+    "external_bundle_digest_required": true
+  },
+  "case_count": 26,
+  "cases_per_call": 1,
+  "cases": [
+    {
+      "case_id": "mq.mqi.mqback.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0001",
+      "call": "MQBACK",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101690_.html",
+      "input_profile": "independent-mqi.syncpoint-backout.v1",
+      "fixture_bundle_member": "mqi/mqback.json",
+      "observation_profile": "mq-normalized-observation@1"
+    },
+    {
+      "case_id": "mq.mqi.mqbegin.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0002",
+      "call": "MQBEGIN",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101700_.html",
+      "input_profile": "independent-mqi.syncpoint-begin.v1",
+      "fixture_bundle_member": "mqi/mqbegin.json",
+      "observation_profile": "mq-normalized-observation@1"
+    },
+    {
+      "case_id": "mq.mqi.mqbufmh.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0003",
+      "call": "MQBUFMH",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101710_.html",
+      "input_profile": "independent-mqi.buffer-to-message-handle.v1",
+      "fixture_bundle_member": "mqi/mqbufmh.json",
+      "observation_profile": "mq-normalized-observation@1"
+    },
+    {
+      "case_id": "mq.mqi.mqcb.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0004",
+      "call": "MQCB",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101720_.html",
+      "input_profile": "independent-mqi.callback-register-manage.v1",
+      "fixture_bundle_member": "mqi/mqcb.json",
+      "observation_profile": "mq-normalized-observation@1"
+    },
+    {
+      "case_id": "mq.mqi.mqcb_function.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0005",
+      "call": "MQCB_FUNCTION",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101730_.html",
+      "input_profile": "independent-mqi.callback-dispatch.v1",
+      "fixture_bundle_member": "mqi/mqcb_function.json",
+      "observation_profile": "mq-normalized-observation@1"
+    },
+    {
+      "case_id": "mq.mqi.mqclose.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0006",
+      "call": "MQCLOSE",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101740_.html",
+      "input_profile": "independent-mqi.object-close.v1",
+      "fixture_bundle_member": "mqi/mqclose.json",
+      "observation_profile": "mq-normalized-observation@1"
+    },
+    {
+      "case_id": "mq.mqi.mqcmit.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0007",
+      "call": "MQCMIT",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101750_.html",
+      "input_profile": "independent-mqi.syncpoint-commit.v1",
+      "fixture_bundle_member": "mqi/mqcmit.json",
+      "observation_profile": "mq-normalized-observation@1"
+    },
+    {
+      "case_id": "mq.mqi.mqconn.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0008",
+      "call": "MQCONN",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101760_.html",
+      "input_profile": "independent-mqi.queue-manager-connect.v1",
+      "fixture_bundle_member": "mqi/mqconn.json",
+      "observation_profile": "mq-normalized-observation@1"
+    },
+    {
+      "case_id": "mq.mqi.mqconnx.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0009",
+      "call": "MQCONNX",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101770_.html",
+      "input_profile": "independent-mqi.extended-connect-options.v1",
+      "fixture_bundle_member": "mqi/mqconnx.json",
+      "observation_profile": "mq-normalized-observation@1"
+    },
+    {
+      "case_id": "mq.mqi.mqcrtmh.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0010",
+      "call": "MQCRTMH",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101780_.html",
+      "input_profile": "independent-mqi.message-handle-create.v1",
+      "fixture_bundle_member": "mqi/mqcrtmh.json",
+      "observation_profile": "mq-normalized-observation@1"
+    },
+    {
+      "case_id": "mq.mqi.mqctl.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0011",
+      "call": "MQCTL",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101790_.html",
+      "input_profile": "independent-mqi.callback-control.v1",
+      "fixture_bundle_member": "mqi/mqctl.json",
+      "observation_profile": "mq-normalized-observation@1"
+    },
+    {
+      "case_id": "mq.mqi.mqdisc.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0012",
+      "call": "MQDISC",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101800_.html",
+      "input_profile": "independent-mqi.queue-manager-disconnect.v1",
+      "fixture_bundle_member": "mqi/mqdisc.json",
+      "observation_profile": "mq-normalized-observation@1"
+    },
+    {
+      "case_id": "mq.mqi.mqdltmh.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0013",
+      "call": "MQDLTMH",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101810_.html",
+      "input_profile": "independent-mqi.message-handle-delete.v1",
+      "fixture_bundle_member": "mqi/mqdltmh.json",
+      "observation_profile": "mq-normalized-observation@1"
+    },
+    {
+      "case_id": "mq.mqi.mqdltmp.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0014",
+      "call": "MQDLTMP",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101820_.html",
+      "input_profile": "independent-mqi.message-property-delete.v1",
+      "fixture_bundle_member": "mqi/mqdltmp.json",
+      "observation_profile": "mq-normalized-observation@1"
+    },
+    {
+      "case_id": "mq.mqi.mqget.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0015",
+      "call": "MQGET",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101830_.html",
+      "input_profile": "independent-mqi.message-get.v1",
+      "fixture_bundle_member": "mqi/mqget.json",
+      "observation_profile": "mq-normalized-observation@1"
+    },
+    {
+      "case_id": "mq.mqi.mqinq.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0016",
+      "call": "MQINQ",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101840_.html",
+      "input_profile": "independent-mqi.object-attributes-inquire.v1",
+      "fixture_bundle_member": "mqi/mqinq.json",
+      "observation_profile": "mq-normalized-observation@1"
+    },
+    {
+      "case_id": "mq.mqi.mqinqmp.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0017",
+      "call": "MQINQMP",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101850_.html",
+      "input_profile": "independent-mqi.message-property-inquire.v1",
+      "fixture_bundle_member": "mqi/mqinqmp.json",
+      "observation_profile": "mq-normalized-observation@1"
+    },
+    {
+      "case_id": "mq.mqi.mqmhbuf.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0018",
+      "call": "MQMHBUF",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101860_.html",
+      "input_profile": "independent-mqi.message-handle-to-buffer.v1",
+      "fixture_bundle_member": "mqi/mqmhbuf.json",
+      "observation_profile": "mq-normalized-observation@1"
+    },
+    {
+      "case_id": "mq.mqi.mqopen.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0019",
+      "call": "MQOPEN",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101870_.html",
+      "input_profile": "independent-mqi.object-open.v1",
+      "fixture_bundle_member": "mqi/mqopen.json",
+      "observation_profile": "mq-normalized-observation@1"
+    },
+    {
+      "case_id": "mq.mqi.mqput.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0020",
+      "call": "MQPUT",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101880_.html",
+      "input_profile": "independent-mqi.message-put.v1",
+      "fixture_bundle_member": "mqi/mqput.json",
+      "observation_profile": "mq-normalized-observation@1"
+    },
+    {
+      "case_id": "mq.mqi.mqput1.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0021",
+      "call": "MQPUT1",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101890_.html",
+      "input_profile": "independent-mqi.message-put-one.v1",
+      "fixture_bundle_member": "mqi/mqput1.json",
+      "observation_profile": "mq-normalized-observation@1"
+    },
+    {
+      "case_id": "mq.mqi.mqset.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0022",
+      "call": "MQSET",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101900_.html",
+      "input_profile": "independent-mqi.object-attributes-set.v1",
+      "fixture_bundle_member": "mqi/mqset.json",
+      "observation_profile": "mq-normalized-observation@1"
+    },
+    {
+      "case_id": "mq.mqi.mqsetmp.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0023",
+      "call": "MQSETMP",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101910_.html",
+      "input_profile": "independent-mqi.message-property-set.v1",
+      "fixture_bundle_member": "mqi/mqsetmp.json",
+      "observation_profile": "mq-normalized-observation@1"
+    },
+    {
+      "case_id": "mq.mqi.mqstat.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0024",
+      "call": "MQSTAT",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101920_.html",
+      "input_profile": "independent-mqi.status-retrieval.v1",
+      "fixture_bundle_member": "mqi/mqstat.json",
+      "observation_profile": "mq-normalized-observation@1"
+    },
+    {
+      "case_id": "mq.mqi.mqsub.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0025",
+      "call": "MQSUB",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101930_.html",
+      "input_profile": "independent-mqi.subscription-register.v1",
+      "fixture_bundle_member": "mqi/mqsub.json",
+      "observation_profile": "mq-normalized-observation@1"
+    },
+    {
+      "case_id": "mq.mqi.mqsubrq.licensed-differential",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0026",
+      "call": "MQSUBRQ",
+      "source_topic_path": "SSFKSJ_9.4.0/refdev/q101940_.html",
+      "input_profile": "independent-mqi.subscription-request.v1",
+      "fixture_bundle_member": "mqi/mqsubrq.json",
+      "observation_profile": "mq-normalized-observation@1"
+    }
+  ]
+}

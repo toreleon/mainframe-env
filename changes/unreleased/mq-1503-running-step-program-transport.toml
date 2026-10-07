@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add opaque revocable Running-step observations from the genuine Batch CAS path and default-refused Program-only scoped context transport without granting JES, core or MQ authority."

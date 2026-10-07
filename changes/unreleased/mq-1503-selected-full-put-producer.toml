@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a finite private original selected complete MQPUT/MQPUT1 producer with explicit synchronous PMO/context intent, same-catalog native metadata, checked physical GMT and trusted batch-context sources, and one audited delivery/UOW/receipt publication. Complete producer feedback uses the sole strict result codec at version 5; legacy bytes remain exact. Installed/JES provenance, generated IDs, defaults, priority, finite expiry and remaining MQ acceptance are still required."

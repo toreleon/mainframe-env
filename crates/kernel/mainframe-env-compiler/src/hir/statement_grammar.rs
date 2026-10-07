@@ -2179,7 +2179,7 @@ fn validate_json_ignoring(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
 /// The tie is only to the forms, and it costs something. `COUNT`, `SUPPRESS`,
 /// `WITH` and `CONVERTING` are reserved, but `NAME` and `IGNORING` are merely
 /// context-sensitive and `ENCODING` and `INDICATING` are in neither list in
-/// `conformance/0.3/cobol/reserved-words.json` -- they are published only in
+/// `conformance/subsystems/cobol/structure/cobol/reserved-words.json` -- they are published only in
 /// these rows' syntax. Treating all eight as phrase openers means a data item
 /// named `ENCODING`, `IGNORING`, `INDICATING` or `NAME` can no longer be an
 /// operand of this statement's own `NAME` or `SUPPRESS` list, which

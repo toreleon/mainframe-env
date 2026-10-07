@@ -2,14 +2,13 @@
 
 Subsystem: **mq**
 Phase: **programming**
-Target release: **0.15.0**
 
 Status: **Proposed**
-Start gate: 0.4 host-extension ABI and 0.5 SAF/principal contracts frozen
+Start gate: cobol.execution host-extension ABI and racf.security SAF/principal contracts frozen
 Completion dependencies: cobol.execution, racf.security
 Estimate: 16–26 engineer-months
 
-The [common release contract](../README.md#common-release-contract) and
+The [common release contract](../README.md#shared-validation-contract) and
 [hardened slice acceptance](../../../prompts/subsystems/README.md#hardened-slice-acceptance)
 apply, including early participant-contract and licensed-harness preparation.
 These requirements do not themselves certify implementation or waive an exit gate.
@@ -44,7 +43,7 @@ object, message, transaction, security, and recovery semantics.
 | MQ-1506 | SAF, concurrency, overload, compatibility, and IBM differentials |
 
 Recovery state and bounded feature slices are tracked in the
-[0.15.0 implementation status](programming-status.md). The recovered MQ-1501 slice
+[mq.programming implementation status](programming-status.md). The recovered MQ-1501 slice
 freezes the 26-call denominator and exact 27-row source-list provenance without
 claiming behavioral coverage.
 
@@ -74,8 +73,8 @@ Catalog/structures, object lifecycle, point-to-point, pub/sub, and recovery can
 run in parallel after handle, status, and message contracts freeze. All object
 mutation and delivery paths use one queue-manager authority and lock order.
 
-0.15 can run alongside 0.8–0.14. Its transaction and failure semantics become
-an input to 0.16; no application topology is embedded in the provider.
+mq.programming can run alongside jes.execution–ims.programming. Its transaction and failure semantics become
+an input to integration.transactions; no application topology is embedded in the provider.
 
 ## Exit gate
 

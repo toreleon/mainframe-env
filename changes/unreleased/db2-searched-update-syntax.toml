@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add bounded owned Db2 searched UPDATE syntax with unique decoded assignment names, expression/DEFAULT/NULL values, structural WHERE predicates, original-source spans and aggregate budgets; aggregate-family binding, mutation and official row credit remain pending."

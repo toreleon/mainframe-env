@@ -1,0 +1,27 @@
+{
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "target_subsystem": "mq.programming",
+  "baseline_id": "ibm-mq-9.4-message-handle-sources-2026-09-12",
+  "subsystem": "mq",
+  "product": "SSFKSJ_9.4.0",
+  "book_label": "IBM MQ 9.4 message-handle constants source-review scope",
+  "book_href": "SSFKSJ_9.4.0/refdev/q091560_.html",
+  "snapshot_date": "2026-09-12",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/SSFKSJ_9.4.0?lang=en",
+  "toc_sha256": "5b23147424db490f5292bd56afe1a0dd2a6ccdde3a08388a79d599998e002bd4",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "topic_count": 1,
+  "total_bytes": 2409,
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topic_manifest_digest": "22bf0aaec21fc919bd5e53713d3cbeffc3e3c4673bad42b444e9d22f27e6091b",
+  "coverage_credit": 0,
+  "retained_in_repository": false,
+  "topics": [
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q091560_.html",
+      "sha256": "72f96585920e26aeab0f567a42a3959cdb58e4016d907600ef820d077db80baa",
+      "bytes": 2409,
+      "last_modified": "2026-05-18"
+    }
+  ]
+}

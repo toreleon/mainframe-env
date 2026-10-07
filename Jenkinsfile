@@ -14,20 +14,13 @@ pipeline {
     }
 
     parameters {
-        choice(name: 'RUN_MODE', choices: ['auto', 'full', 'release'],
-               description: 'auto selects changed-path gates; full runs all assurance gates including disposable PostgreSQL 18 parity; release also verifies artifacts.')
+        choice(name: 'RUN_MODE', choices: ['auto', 'full'],
+               description: 'auto selects changed-path gates; full runs all subsystem assurance gates including disposable PostgreSQL 18 parity.')
         string(name: 'JENKINS_VOLUME', defaultValue: '/Volumes/MainframeEnvJenkins',
                description: 'Mounted filesystem with a hard capacity no larger than 10 GiB.')
         string(name: 'BASE_SHA', defaultValue: '',
                description: 'Optional full comparison SHA. Jenkins PR and previous-build metadata are used when empty.')
-        string(name: 'RELEASE_TAG', defaultValue: '',
-               description: 'Existing post-migration mainframe-env-vX.Y.Z tag containing this Jenkins pipeline and its helpers.')
-        string(name: 'RELEASE_TARGET', defaultValue: '',
-               description: 'Supported target: aarch64-apple-darwin or x86_64-unknown-linux-gnu; empty selects the host only when it is one of those two.')
-        booleanParam(name: 'PUBLISH_GITHUB_RELEASE', defaultValue: false,
-                     description: 'Explicitly publish the generated offline Cargo bundle to the existing GitHub release.')
-        string(name: 'GITHUB_CREDENTIAL_ID', defaultValue: 'mainframe-env-github-token',
-               description: 'Jenkins Secret Text credential used only when publication is enabled.')
+
     }
 
     environment {
@@ -74,45 +67,6 @@ pipeline {
                 sh 'mkdir -p "$TMPDIR"'
                 sh '''#!/bin/bash
                     set -euo pipefail
-                    if [[ "$RUN_MODE" == release && -n "$RELEASE_TAG" ]]; then
-                      [[ "$RELEASE_TAG" =~ ^mainframe-env-v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$ ]] || {
-                        echo "invalid release tag: $RELEASE_TAG" >&2
-                        exit 1
-                      }
-                      git fetch --quiet --tags --force origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
-                      required_paths=(
-                        Jenkinsfile
-                        tools/ci_assurance.py
-                        tools/supply_chain.py
-                        tools/ci-inputs.lock.json
-                        tools/jenkins/controller-plugins.lock.json
-                        config/release-attestation-policy.json
-                        conformance/standards/cyclonedx/1.6/README.md
-                        conformance/standards/cyclonedx/1.6/bom-1.6.schema.json.gz.b64
-                        conformance/standards/cyclonedx/1.6/jsf-0.82.schema.json.gz.b64
-                        conformance/standards/cyclonedx/1.6/spdx.schema.json.gz.b64
-                        docs/architecture/RELEASE-BUILDER.md
-                        docs/contracts/RELEASE-BUILD-V1.md
-                        tools/dataset_mutations.py
-                        tools/jenkins/disk_guard.py
-                        tools/jenkins/postgres_parity.sh
-                        tools/assurance-gates.json
-                        tools/assurance_gates.py
-                        tools/run_coverage_baseline.sh
-                        tools/run_fuzz_assurance.sh
-                        tools/run_model_assurance.sh
-                        tools/run_tooling_tests.py
-                        fuzz/Cargo.toml
-                        tools/package_offline_cargo_bundle.sh
-                      )
-                      for required_path in "${required_paths[@]}"; do
-                        git cat-file -e "$RELEASE_TAG:$required_path" 2>/dev/null || {
-                          echo "$RELEASE_TAG predates the Jenkins migration or lacks $required_path" >&2
-                          exit 1
-                        }
-                      done
-                      git checkout --quiet --detach "$RELEASE_TAG"
-                    fi
                     git rev-parse HEAD
                 '''
             }
@@ -184,17 +138,7 @@ pipeline {
             steps {
                 script {
                     def timed = !currentBuild.getBuildCauses('hudson.triggers.TimerTrigger$TimerTriggerCause').isEmpty()
-                    def tag = params.RELEASE_TAG?.trim()
-                    if (!tag && env.TAG_NAME) {
-                        tag = env.TAG_NAME
-                    }
-                    if (!tag && env.BRANCH_NAME?.startsWith('mainframe-env-v')) {
-                        tag = env.BRANCH_NAME
-                    }
-
-                    if (params.RUN_MODE == 'release' || tag) {
-                        env.MAINFRAME_ENV_CI_EVENT = 'tag'
-                    } else if (params.RUN_MODE == 'full') {
+                    if (params.RUN_MODE == 'full') {
                         env.MAINFRAME_ENV_CI_EVENT = 'manual'
                     } else if (timed) {
                         env.MAINFRAME_ENV_CI_EVENT = 'schedule'
@@ -204,10 +148,7 @@ pipeline {
                         env.MAINFRAME_ENV_CI_EVENT = 'push'
                     }
 
-                    if (env.MAINFRAME_ENV_CI_EVENT == 'tag') {
-                        env.MAINFRAME_ENV_RELEASE_TAG = tag ?: ''
-                        env.MAINFRAME_ENV_CI_REF = "refs/tags/${env.MAINFRAME_ENV_RELEASE_TAG}"
-                    } else if (env.MAINFRAME_ENV_CI_EVENT == 'pull_request') {
+                    if (env.MAINFRAME_ENV_CI_EVENT == 'pull_request') {
                         env.MAINFRAME_ENV_CI_REF = "refs/pull/${env.CHANGE_ID}/merge"
                     } else {
                         env.MAINFRAME_ENV_CI_REF = "refs/heads/${env.BRANCH_NAME ?: 'main'}"
@@ -345,9 +286,6 @@ pipeline {
                     if [[ "$CI_ARCHITECTURE" == true && "$CI_FULL" != true ]]; then
                       "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate architecture-fast -- cargo xtask architecture-fast --check
                     fi
-                    if [[ "$CI_EVIDENCE" == true && "$CI_FULL" != true ]]; then
-                      "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate evidence-fast -- cargo xtask evidence-fast --check
-                    fi
                     if [[ "$CI_MUTATION" == true ]]; then
                       "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate mutation -- "$MAINFRAME_ENV_PYTHON" -B tools/dataset_mutations.py --output "$out/dataset-mutations" --timeout 300
                     fi
@@ -363,23 +301,11 @@ pipeline {
                     out="$CARGO_TARGET_DIR/ci-assurance"
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate conformance -- cargo xtask conformance --check
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate certification -- cargo xtask certification
-                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate evidence-seal -- cargo xtask evidence seal --check
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate runtime-architecture -- cargo xtask runtime-architecture --check
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate model-check --expect-tests -- tools/run_model_assurance.sh
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate fuzz-smoke -- tools/run_fuzz_assurance.sh smoke
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate fuzz-periodic -- tools/run_fuzz_assurance.sh periodic
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate coverage-baseline -- tools/run_coverage_baseline.sh
-                    archive_source="$CARGO_TARGET_DIR/archive-reproduction-source"
-                    rm -rf "$archive_source"
-                    mkdir -p "$archive_source" "$out/archive-reproduction"
-                    git archive --format=tar HEAD | tar -xf - -C "$archive_source"
-                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record \
-                      --output "$out" --gate archive-reproduction -- \
-                      "$MAINFRAME_ENV_PYTHON" -B tools/reproducible_archive.py \
-                        --source "$archive_source" \
-                        --output "$out/archive-reproduction/mainframe-env-source.tar.gz" \
-                        --root-name mainframe-env-source
-                    rm -rf "$archive_source"
                 '''
             }
         }
@@ -404,68 +330,6 @@ pipeline {
             when { expression { env.CI_STORE_REQUIRED == 'true' } }
             steps {
                 sh 'tools/jenkins/postgres_parity.sh run'
-            }
-        }
-
-        stage('Release verification and offline Cargo bundle') {
-            when { expression { env.MAINFRAME_ENV_CI_EVENT == 'tag' } }
-            steps {
-                withCredentials([file(credentialsId: 'mainframe-env-release-ed25519-pkcs8', variable: 'MAINFRAME_ENV_RELEASE_SIGNING_KEY')]) {
-                    sh '''#!/bin/bash
-                        set -euo pipefail
-                        tag="${MAINFRAME_ENV_RELEASE_TAG:-}"
-                        [[ "$tag" =~ ^mainframe-env-v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$ ]] || {
-                          echo "release mode requires an existing mainframe-env-vX.Y.Z tag" >&2
-                          exit 1
-                        }
-                        version="${tag#mainframe-env-v}"
-                        [[ "$(tr -d '[:space:]' < VERSION)" == "$version" ]] || {
-                          echo "VERSION does not match $tag" >&2
-                          exit 1
-                        }
-                        [[ "$(git rev-parse HEAD)" == "$(git rev-parse --verify "refs/tags/$tag^{commit}")" ]] || {
-                          echo "HEAD is not the release tag commit" >&2
-                          exit 1
-                        }
-                        target="$RELEASE_TARGET"
-                        [[ -n "$target" ]] || target="$(rustc -vV | awk '/^host: /{print $2}')"
-                        case "$target" in
-                          aarch64-apple-darwin|x86_64-unknown-linux-gnu) ;;
-                          *) echo "unsupported release target: $target" >&2; exit 1 ;;
-                        esac
-                        export MAINFRAME_ENV_RELEASE_INVOCATION_ID="${BUILD_URL:?Jenkins BUILD_URL is required for signed provenance}"
-                        "$MAINFRAME_ENV_PYTHON" -B tools/supply_chain.py check --runtime release
-                        cargo xtask release --target "$target"
-                        git diff --exit-code -- "release/$version/targets/$target"
-                        cargo xtask release --check --target "$target"
-                        tools/package_offline_cargo_bundle.sh --tag "$tag" --out "$CARGO_TARGET_DIR/jenkins-artifacts"
-                    '''
-                }
-            }
-        }
-
-        stage('Publish existing GitHub release') {
-            when {
-                allOf {
-                    expression { env.MAINFRAME_ENV_CI_EVENT == 'tag' }
-                    expression { params.PUBLISH_GITHUB_RELEASE }
-                }
-            }
-            steps {
-                withCredentials([string(credentialsId: params.GITHUB_CREDENTIAL_ID, variable: 'GH_TOKEN')]) {
-                    sh '''#!/bin/bash
-                        set -euo pipefail
-                        command -v gh >/dev/null || { echo 'gh is required for publication' >&2; exit 1; }
-                        tag="${MAINFRAME_ENV_RELEASE_TAG:-}"
-                        version="${tag#mainframe-env-v}"
-                        archive="$CARGO_TARGET_DIR/jenkins-artifacts/mainframe-env-${version}-cargo-vendor.tar.gz"
-                        if ! gh release view "$tag" >/dev/null 2>&1; then
-                          gh release create "$tag" --verify-tag --title "mainframe-env $version" --generate-notes
-                        fi
-                        "$MAINFRAME_ENV_PYTHON" -B tools/publish_release_assets.py \
-                          --tag "$tag" "$archive" "$archive.sha256"
-                    '''
-                }
             }
         }
 
@@ -500,7 +364,7 @@ pipeline {
                     --gates "${gates[@]}"
                 fi
             ''')
-            archiveArtifacts artifacts: 'target/ci-assurance/**/*,target/ci-backend/**/*,target/coverage/**/*,target/fuzz-artifacts-*/*,target/jenkins-artifacts/**/*,.postgres/postgres.log,release/*/targets/**/*',
+            archiveArtifacts artifacts: 'target/ci-assurance/**/*,target/ci-backend/**/*,target/coverage/**/*,target/fuzz-artifacts-*/*,target/jenkins-artifacts/**/*,.postgres/postgres.log',
                              allowEmptyArchive: true, fingerprint: false
             script {
                 if (env.CARGO_TARGET_DIR) {

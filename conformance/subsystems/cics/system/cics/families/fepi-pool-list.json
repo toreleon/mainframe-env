@@ -1,0 +1,663 @@
+{
+  "schema_version": "mainframe-env.cics-system-family@1",
+  "family": "fepi-pool-list",
+  "runtime_binding": "private-unregistered",
+  "commands": [
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0035",
+      "label": "FEPI SET POOLLIST",
+      "operation_id": "fepi-set-poollist",
+      "source": {
+        "topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp73f.html",
+        "sha256": "sha256:071cd96104473c10555b5475d359bf53477f5842f573bb20cb635e762fe933eb",
+        "baseline": "ibm-cics-ts-6x-fepi-command-bodies-2026-09-12",
+        "lines": [
+          1,
+          2,
+          5,
+          35
+        ]
+      },
+      "grammar": {
+        "options": [
+          {
+            "name": "INSERVICE",
+            "value_shape": "flag",
+            "direction": "none",
+            "source_max_value_bytes": null,
+            "source_lines": [
+              5
+            ]
+          },
+          {
+            "name": "NOHANDLE",
+            "value_shape": "flag",
+            "direction": "none",
+            "source_max_value_bytes": null,
+            "source_lines": [
+              35
+            ]
+          },
+          {
+            "name": "OUTSERVICE",
+            "value_shape": "flag",
+            "direction": "none",
+            "source_max_value_bytes": null,
+            "source_lines": [
+              5
+            ]
+          },
+          {
+            "name": "POOL",
+            "value_shape": "value",
+            "direction": "input",
+            "source_max_value_bytes": 8,
+            "source_lines": [
+              14,
+              16
+            ]
+          },
+          {
+            "name": "POOLLIST",
+            "value_shape": "value",
+            "direction": "input",
+            "source_max_value_bytes": 2048,
+            "source_lines": [
+              17,
+              18
+            ]
+          },
+          {
+            "name": "POOLNUM",
+            "value_shape": "value",
+            "direction": "input",
+            "source_max_value_bytes": null,
+            "source_lines": [
+              19,
+              20
+            ]
+          },
+          {
+            "name": "RESP",
+            "value_shape": "value",
+            "direction": "output",
+            "source_max_value_bytes": null,
+            "source_lines": [
+              35
+            ]
+          },
+          {
+            "name": "RESP2",
+            "value_shape": "value",
+            "direction": "output",
+            "source_max_value_bytes": null,
+            "source_lines": [
+              35
+            ]
+          },
+          {
+            "name": "SERVSTATUS",
+            "value_shape": "value",
+            "direction": "input",
+            "source_max_value_bytes": 4,
+            "source_lines": [
+              21,
+              31
+            ]
+          },
+          {
+            "name": "USERDATA",
+            "value_shape": "value",
+            "direction": "input",
+            "source_max_value_bytes": 64,
+            "source_lines": [
+              32,
+              34
+            ]
+          }
+        ],
+        "required": [
+          "POOLLIST",
+          "POOLNUM"
+        ],
+        "exclusive": [
+          [
+            "INSERVICE",
+            "OUTSERVICE",
+            "SERVSTATUS"
+          ],
+          [
+            "POOL",
+            "POOLLIST"
+          ],
+          [
+            "POOL",
+            "POOLNUM"
+          ]
+        ],
+        "dependencies": [
+          {
+            "option": "POOLLIST",
+            "requires": [
+              "POOLNUM"
+            ]
+          },
+          {
+            "option": "POOLNUM",
+            "requires": [
+              "POOLLIST"
+            ]
+          },
+          {
+            "option": "RESP2",
+            "requires": [
+              "RESP"
+            ]
+          }
+        ],
+        "alternative_groups": [
+          {
+            "members": [
+              "POOL",
+              "POOLLIST"
+            ],
+            "required": true
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "SERVSTATUS",
+            "values": [
+              "INSERVICE",
+              "OUTSERVICE"
+            ],
+            "source_lines": [
+              21,
+              24,
+              26,
+              31
+            ]
+          }
+        ]
+      },
+      "responses": [
+        {
+          "condition": "INVREQ",
+          "resp": 16,
+          "resp2": 11,
+          "trigger": "FEPI not installed or active.",
+          "source_lines": [
+            38,
+            39
+          ]
+        },
+        {
+          "condition": "INVREQ",
+          "resp": 16,
+          "resp2": 110,
+          "trigger": "SERVSTATUS invalid.",
+          "source_lines": [
+            40,
+            41
+          ]
+        },
+        {
+          "condition": "INVREQ",
+          "resp": 16,
+          "resp2": 115,
+          "trigger": "Selected pool unknown.",
+          "source_lines": [
+            42,
+            43
+          ]
+        },
+        {
+          "condition": "INVREQ",
+          "resp": 16,
+          "resp2": 119,
+          "trigger": "At least one selected list item failed; applies to POOLLIST form.",
+          "source_lines": [
+            44,
+            45
+          ]
+        },
+        {
+          "condition": "INVREQ",
+          "resp": 16,
+          "resp2": 132,
+          "trigger": "POOLNUM outside 1..256; applies to POOLLIST form.",
+          "source_lines": [
+            46,
+            47
+          ]
+        },
+        {
+          "condition": "INVREQ",
+          "resp": 16,
+          "resp2": 10,
+          "trigger": "User exit bypassed the command. [SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html sha256:ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712 parser lines 69-71; cics-fepi-context-candidates; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12]",
+          "source_lines": [
+            35
+          ]
+        },
+        {
+          "condition": "INVREQ",
+          "resp": 16,
+          "resp2": 12,
+          "trigger": "Shutdown disallows this command. [SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html sha256:ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712 parser lines 76-78; cics-fepi-context-candidates; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12]",
+          "source_lines": [
+            35
+          ]
+        },
+        {
+          "condition": "INVREQ",
+          "resp": 16,
+          "resp2": 13,
+          "trigger": "FEPI is unavailable. [SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html sha256:ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712 parser lines 79-81; cics-fepi-context-candidates; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12]",
+          "source_lines": [
+            35
+          ]
+        },
+        {
+          "condition": "INVREQ",
+          "resp": 16,
+          "resp2": 14,
+          "trigger": "FEPI is busy or cannot obtain storage. [SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html sha256:ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712 parser lines 82-85; cics-fepi-context-candidates; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12]",
+          "source_lines": [
+            35
+          ]
+        },
+        {
+          "condition": "INVREQ",
+          "resp": 16,
+          "resp2": 15,
+          "trigger": "Unknown command. [SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html sha256:ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712 parser lines 86-88; cics-fepi-context-candidates; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12]",
+          "source_lines": [
+            35
+          ]
+        },
+        {
+          "condition": "INVREQ",
+          "resp": 16,
+          "resp2": 16,
+          "trigger": "Internal FEPI error. [SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html sha256:ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712 parser lines 89-91; cics-fepi-context-candidates; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12]",
+          "source_lines": [
+            35
+          ]
+        },
+        {
+          "condition": "INVREQ",
+          "resp": 16,
+          "resp2": 17,
+          "trigger": "Storage for the user exit cannot be obtained. [SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html sha256:ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712 parser lines 92-95; cics-fepi-context-candidates; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12]",
+          "source_lines": [
+            35
+          ]
+        },
+        {
+          "condition": "INVREQ",
+          "resp": 16,
+          "resp2": 18,
+          "trigger": "Operator or system action caused failure. [SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html sha256:ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712 parser lines 96-98; cics-fepi-context-candidates; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12]",
+          "source_lines": [
+            35
+          ]
+        },
+        {
+          "condition": "NOTAUTH",
+          "resp": 70,
+          "resp2": 100,
+          "trigger": "Caller is not authorized for this command. [SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html sha256:ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712 parser lines 99-104; cics-fepi-context-candidates; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12]",
+          "source_lines": [
+            35
+          ]
+        }
+      ],
+      "lifecycle": {
+        "resource_authority": "Extend the existing mainframe-env-cics service::State/provider authority through the existing shared CICS compiler/registry. Pool, property-set, node, target, connection and browse projections must share that owner; no shadow database, dispatcher or coordinator.",
+        "preconditions": [
+          "FEPI must be installed and active. Command-specific INVREQ 16/11 is retained.",
+          "FEPI translation is required; SP translation is not required for these FEPI SPI commands. The documented addressing modes are 24 and 31 bit, with code above or below 16 MB. Only EIBRESP, EIBRESP2, EIBFN and EIBRCODE carry FEPI interface information. [SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html sha256:ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712 parser lines 12-19; cics-fepi-context-candidates; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12]",
+          "Primary addressing mode, home/primary address-space identity and primary-space parameters follow the existing application format authority. [SSJL4D_6.x/reference-applications/commands-api/dfhp4_apiformat.html sha256:d88e2001f397f2f9577ce6321b28aeae209cb072ee85b66469e21a4e5efa4425 parser lines 97-105; cics-application-api-sources-b; baseline ibm-cics-ts-6x-application-api-sources-b-2026-09-10]",
+          "Source_lines arrays always locate this command body. Common option/condition facts have separate exact citations in prose; their arrays anchor the body conditions section. RESP and RESP2 are output fullword-binary areas; NOHANDLE is a flag. RESP implies NOHANDLE; RESP2 requires RESP using the existing application projection conformance/subsystems/cics/application/generated/cics-application-command-contracts.json eib_response.condition_policy.resp2_requires_resp. [SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html sha256:ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712 parser lines 5-8,46-60; cics-fepi-context-candidates; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12] [SSJL4D_6.x/reference-applications/commands-api/dfhp4_apiformat.html sha256:d88e2001f397f2f9577ce6321b28aeae209cb072ee85b66469e21a4e5efa4425 parser lines 53-96; cics-application-api-sources-b; baseline ibm-cics-ts-6x-application-api-sources-b-2026-09-10]",
+          "Character operands use the stated fixed CICS character fields. List arguments are input data-areas despite their syntax spelling. A 2048-byte list ceiling derives from 256 entries of eight characters, never a total resource population cap. Null byte ceilings preserve unstated byte counts for binary/CVDA operands. [SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html sha256:ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712 parser lines 20-32; cics-fepi-context-candidates; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12]",
+          "Input CVDAs use the finite option-specific domain; bare aliases and valued forms project through the existing application convention. Output CVDAs require fullword-binary areas. [SSJL4D_6.x/system-programming/intro/dfha80x.html sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25 parser lines 7-27; cics-application-api-sources-b; baseline ibm-cics-ts-6x-application-api-sources-b-2026-09-10]",
+          "Synchronous error preserves resources and resource output operands except the documented list partial-success rule; RESP/RESP2 and EIB reporting are separate. [SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html sha256:ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712 parser lines 61-104,112-121; cics-fepi-context-candidates; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12]",
+          "Before observation or mutation the existing principal/capability and typed SAF authority must authorize the command. A reviewed command name or fixture identity is not permission (docs/architecture/PLUGIN-AND-SECURITY.md).",
+          "Official row 0035 is the list variant: require POOLLIST with POOLNUM. Complete shared-body selector options are retained, but exclusive selectors plus the row-required form prohibit accepting the other variant through this row. Never merge official rows by shared EIBFN or source bytes.",
+          "POOL is eight characters; POOLLIST is contiguous eight-character names and POOLNUM is fullword 1..256 for the list variant.",
+          "SERVSTATUS accepts INSERVICE/OUTSERVICE or one bare alias. INSERVICE allows conversation use; OUTSERVICE prohibits new conversations but leaves existing ones running, with GOINGOUT until they end. Omission leaves service state unchanged. USERDATA optionally replaces 64 opaque characters."
+        ],
+        "mutations": [
+          "Apply the same requested state to every selected list item; command returns immediately while settings may be attained later [primary parser lines 8-12].",
+          "Replace USERDATA only when present; preserve omitted service/acquire fields. Keep the requested service/acquire transition distinct from USERDATA replacement and eventual asynchronous work."
+        ],
+        "implicit_syncpoint": "unresolved",
+        "rollback": "unresolved",
+        "recovery_obligations": [
+          "The reviewed bodies do not establish implicit syncpoint, caller-UOW rollback, compensation, task-end/abend or region/process restart semantics. Leave them unresolved; do not assume caller rollback removes successful list items.",
+          "Use existing CICS state/provider ownership and canonical effect identity, finite deadline, live cancellation, fenced replay and explicit post-dispatch UnknownOutcome. Never automatically redispatch a mutation to resolve uncertainty. These are repository integration obligations, not IBM restart evidence (docs/architecture/EXECUTION-AND-DURABILITY.md; docs/contracts/EFFECT-CANONICAL-V1.md; docs/contracts/TRANSACTION-PARTICIPANT-V1.md).",
+          "Manager must define bounded state codecs/version compatibility, migration/downgrade, retention, backup/restore and concurrent snapshot/transition rules in the existing provider store. This contract installs no store namespace or recovered pass (docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md; docs/contracts/DURABLE-STORAGE-PROFILE.md).",
+          "Admission/completion of the command does not prove eventual state attainment. A failure of later initiated work cannot retroactively become its synchronous exception: use the documented TD diagnostic and CSZL message path. [SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html sha256:ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712 parser lines 105-111; cics-fepi-context-candidates; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12]",
+          "List failure can retain successes. INVREQ 16/119 reports one or more failed items; emit a diagnostic for each failed item. The overview also permits partial success when all list items fail and other operands are valid; its specific INSTALL POOL example does not establish extra mutation for every list command. [SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html sha256:ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712 parser lines 112-121; cics-fepi-context-candidates; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12]",
+          "Route actual event kinds: CSZX receives ACQFAIL, DISCARDFAIL, INSTALLFAIL, SESSION and SETFAIL; the pool EXCEPTIONQ receives ADDFAIL, DELETEFAIL, SESSIONFAIL and SESSIONLOST. No EXCEPTIONQ means no pool record; an absent or recoverable appropriate TD queue loses the record. TD is not durable audit. [SSJL4D_6.x/reference-applications/commands-fepi/dfhp73i.html sha256:84bb27ff6cf3b282754001015db6c4d871c872e4687ceab8c456f31af1e5f3b1 parser lines 10-15,91-147; cics-fepi-context-candidates; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12]",
+          "ACQFAIL EVENTVALUE is zero; DISCARDFAIL/INSTALLFAIL/SETFAIL values use the corresponding command RESP2. Session failure/loss values are 182..199. A nonzero acquire/session failure count means retry; zero means no further retry. Exact retry thresholds/timing are unstated. [SSJL4D_6.x/reference-applications/commands-fepi/dfhp73i.html sha256:84bb27ff6cf3b282754001015db6c4d871c872e4687ceab8c456f31af1e5f3b1 parser lines 64-88,117-147; cics-fepi-context-candidates; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12]"
+        ],
+        "lock_order": [
+          "Repository order, not IBM isolation: coordinator intent -> existing CICS state fence -> resource locks in deterministic identity order -> participant/replay publication -> coordinator result (docs/contracts/TRANSACTION-PARTICIPANT-V1.md).",
+          "Manager chooses actual bounded graph/browse lock/CAS identities. Do not hold resource locks through asynchronous session work or user waits; no IBM lock ordering is inferred."
+        ]
+      },
+      "authorization": {
+        "intent": "unresolved",
+        "resource_class": null,
+        "resource_pattern": null,
+        "audit_obligations": [
+          "Platform policy requires actor, command/resource intent, authorization decision and canonical effect/audit correlation, including denial and failure. Missing security authority, audit saturation and journal failure cannot become success (docs/architecture/PLUGIN-AND-SECURITY.md; docs/prompts/subsystems/README.md).",
+          "IBM NOTAUTH is RESP 70/RESP2 100. Command/resource SAF class, profile and access level remain unresolved; fields below are null rather than invented. [SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html sha256:ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712 parser lines 99-104; cics-fepi-context-candidates; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12]",
+          "IBM explicitly does not audit this SET command [primary parser line 12].",
+          "The source statement does not waive platform audit and must not be turned into a claimed IBM command-audit record. TD diagnostics are a separate event channel."
+        ]
+      },
+      "obligations": [
+        {
+          "id": "fepi-set-poollist.grammar",
+          "gates": [
+            "recognized",
+            "validated"
+          ],
+          "cases": [
+            {
+              "id": "service-alias-conflict",
+              "input": {
+                "POOLLIST": "P0000001",
+                "POOLNUM": 1,
+                "INSERVICE": true,
+                "OUTSERVICE": true
+              },
+              "expected": "Reject conflicting alternative CVDA flags before dispatch; no mutation.",
+              "source_lines": [
+                5
+              ]
+            },
+            {
+              "id": "wrong-row-selector",
+              "input": {
+                "POOL": "P0000001",
+                "OUTSERVICE": true
+              },
+              "expected": "This official row owns only its reviewed list variant; the other form belongs to its distinct official row, despite shared body/EIBFN. Reject wrong-row form in this row projection, not the entire FEPI command family.",
+              "source_lines": [
+                5
+              ]
+            },
+            {
+              "id": "userdata-width",
+              "input": {
+                "POOLLIST": "P0000001",
+                "POOLNUM": 1,
+                "USERDATA": "UUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU"
+              },
+              "expected": "Reject typed 65-byte value against the 64-character field before dispatch; no replacement. A larger source area still binds only its defined field width.",
+              "source_lines": [
+                32,
+                34
+              ]
+            }
+          ]
+        },
+        {
+          "id": "fepi-set-poollist.behavior",
+          "gates": [
+            "executed",
+            "differential"
+          ],
+          "cases": [
+            {
+              "id": "minimal",
+              "input": {
+                "POOLLIST": "P0000001",
+                "POOLNUM": 1,
+                "OUTSERVICE": true,
+                "fixture": "FEPI active; caller authorized; selected resource installed with no active conversation"
+              },
+              "expected": "Request OUTSERVICE for the selected list of pools. Return immediately; do not infer attained state or change omitted user/acquire fields.",
+              "source_lines": [
+                8,
+                11,
+                21,
+                31
+              ]
+            },
+            {
+              "id": "active-conversation-preserved",
+              "input": {
+                "POOLLIST": "P0000001",
+                "POOLNUM": 1,
+                "OUTSERVICE": true,
+                "fixture": "Installed selected resource is used by an existing conversation"
+              },
+              "expected": "Block new conversations; retain existing conversations and GOINGOUT until they end. No forced session shutdown or target acquire state.",
+              "source_lines": [
+                21,
+                29
+              ]
+            },
+            {
+              "id": "userdata-only",
+              "input": {
+                "POOLLIST": "P0000001",
+                "POOLNUM": 1,
+                "USERDATA": "UUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU",
+                "fixture": "Selected installed resource; acquire/service settings preseeded"
+              },
+              "expected": "Replace exactly the opaque 64-character user data; preserve omitted service and acquire settings. FEPI does not interpret this field.",
+              "source_lines": [
+                32,
+                34
+              ]
+            },
+            {
+              "id": "maximum-list",
+              "input": {
+                "POOLLIST": "P0000001P0000002P0000003P0000004P0000005P0000006P0000007P0000008P0000009P0000010P0000011P0000012P0000013P0000014P0000015P0000016P0000017P0000018P0000019P0000020P0000021P0000022P0000023P0000024P0000025P0000026P0000027P0000028P0000029P0000030P0000031P0000032P0000033P0000034P0000035P0000036P0000037P0000038P0000039P0000040P0000041P0000042P0000043P0000044P0000045P0000046P0000047P0000048P0000049P0000050P0000051P0000052P0000053P0000054P0000055P0000056P0000057P0000058P0000059P0000060P0000061P0000062P0000063P0000064P0000065P0000066P0000067P0000068P0000069P0000070P0000071P0000072P0000073P0000074P0000075P0000076P0000077P0000078P0000079P0000080P0000081P0000082P0000083P0000084P0000085P0000086P0000087P0000088P0000089P0000090P0000091P0000092P0000093P0000094P0000095P0000096P0000097P0000098P0000099P0000100P0000101P0000102P0000103P0000104P0000105P0000106P0000107P0000108P0000109P0000110P0000111P0000112P0000113P0000114P0000115P0000116P0000117P0000118P0000119P0000120P0000121P0000122P0000123P0000124P0000125P0000126P0000127P0000128P0000129P0000130P0000131P0000132P0000133P0000134P0000135P0000136P0000137P0000138P0000139P0000140P0000141P0000142P0000143P0000144P0000145P0000146P0000147P0000148P0000149P0000150P0000151P0000152P0000153P0000154P0000155P0000156P0000157P0000158P0000159P0000160P0000161P0000162P0000163P0000164P0000165P0000166P0000167P0000168P0000169P0000170P0000171P0000172P0000173P0000174P0000175P0000176P0000177P0000178P0000179P0000180P0000181P0000182P0000183P0000184P0000185P0000186P0000187P0000188P0000189P0000190P0000191P0000192P0000193P0000194P0000195P0000196P0000197P0000198P0000199P0000200P0000201P0000202P0000203P0000204P0000205P0000206P0000207P0000208P0000209P0000210P0000211P0000212P0000213P0000214P0000215P0000216P0000217P0000218P0000219P0000220P0000221P0000222P0000223P0000224P0000225P0000226P0000227P0000228P0000229P0000230P0000231P0000232P0000233P0000234P0000235P0000236P0000237P0000238P0000239P0000240P0000241P0000242P0000243P0000244P0000245P0000246P0000247P0000248P0000249P0000250P0000251P0000252P0000253P0000254P0000255P0000256",
+                "POOLNUM": 256,
+                "OUTSERVICE": true,
+                "fixture": "256 distinct installed resources"
+              },
+              "expected": "Request the same OUTSERVICE setting for all 256 entries/2048 bytes, without truncation or treating this as a population cap.",
+              "source_lines": [
+                17,
+                18,
+                19,
+                20
+              ]
+            },
+            {
+              "id": "missing-exceptionq-later-sessionloss",
+              "input": {
+                "POOLLIST": "P0000001",
+                "POOLNUM": 1,
+                "OUTSERVICE": true,
+                "fixture": "Pool has existing conversation; no EXCEPTIONQ; after SET returns, an independent SESSIONLOST occurs"
+              },
+              "expected": "OUTSERVICE leaves the existing conversation unaffected by SET. The later SESSIONLOST has no pool TD record when EXCEPTIONQ is unspecified; it cannot be reported as a retroactive command exception or durable audit. [SSJL4D_6.x/reference-applications/commands-fepi/dfhp73i.html sha256:84bb27ff6cf3b282754001015db6c4d871c872e4687ceab8c456f31af1e5f3b1 parser lines 10-15,106-147; cics-fepi-context-candidates; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12]",
+              "source_lines": [
+                8,
+                11,
+                21,
+                31
+              ]
+            },
+            {
+              "id": "recoverable-exceptionq-loss",
+              "input": {
+                "POOLLIST": "P0000001",
+                "POOLNUM": 1,
+                "OUTSERVICE": true,
+                "fixture": "Pool EXCEPTIONQ Q001 exists but is recoverable; later independent SESSIONFAIL occurs"
+              },
+              "expected": "Do not substitute CSZX for this pool SESSIONFAIL event: its appropriate recoverable queue loses the record. No durable audit or restart proof follows from the TD attempt. [SSJL4D_6.x/reference-applications/commands-fepi/dfhp73i.html sha256:84bb27ff6cf3b282754001015db6c4d871c872e4687ceab8c456f31af1e5f3b1 parser lines 10-15,106-147; cics-fepi-context-candidates; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12]",
+              "source_lines": [
+                8,
+                11,
+                21,
+                31
+              ]
+            },
+            {
+              "id": "missing-cszx-partial-list",
+              "input": {
+                "POOLLIST": "P0000001MISSING1",
+                "POOLNUM": 2,
+                "OUTSERVICE": true,
+                "fixture": "First pool installed; second absent; CSZX queue absent; pool EXCEPTIONQ Q001 exists"
+              },
+              "expected": "List error 16/119 can retain the first OUTSERVICE request. Failed-item SETFAIL belongs to CSZX and its absent queue loses the record; do not redirect it to Q001 or silently erase platform audit. [SSJL4D_6.x/reference-applications/commands-fepi/dfhp73i.html sha256:84bb27ff6cf3b282754001015db6c4d871c872e4687ceab8c456f31af1e5f3b1 parser lines 10-15,91-105; cics-fepi-context-candidates; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12]",
+              "source_lines": [
+                8,
+                11,
+                44,
+                45
+              ]
+            }
+          ]
+        },
+        {
+          "id": "fepi-set-poollist.conditions",
+          "gates": [
+            "conditioned"
+          ],
+          "cases": [
+            {
+              "id": "service-invalid",
+              "input": {
+                "POOLLIST": "P0000001",
+                "POOLNUM": 1,
+                "SERVSTATUS": "INVALID"
+              },
+              "expected": "INVREQ 16/110; preserve resource state (subject to explicitly documented list processing, never generic success).",
+              "source_lines": [
+                40,
+                41
+              ]
+            },
+            {
+              "id": "unknown-resource",
+              "input": {
+                "POOLLIST": "MISSING1",
+                "POOLNUM": 1,
+                "OUTSERVICE": true,
+                "fixture": "Selected name is not installed"
+              },
+              "expected": "Command body identifies INVREQ 16/115; no unrelated resource changes. Singleton list/item versus 119 precedence remains unresolved.",
+              "source_lines": [
+                42,
+                43
+              ]
+            },
+            {
+              "id": "partial-list",
+              "input": {
+                "POOLLIST": "P0000001MISSING1",
+                "POOLNUM": 2,
+                "OUTSERVICE": true,
+                "fixture": "First resource installed; second absent"
+              },
+              "expected": "INVREQ 16/119 can retain the valid OUTSERVICE request. SETFAIL for the failed item uses CSZX, regardless of pool association; do not infer caller rollback. [SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html sha256:ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712 parser lines 112-121; cics-fepi-context-candidates; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12] [SSJL4D_6.x/reference-applications/commands-fepi/dfhp73i.html sha256:84bb27ff6cf3b282754001015db6c4d871c872e4687ceab8c456f31af1e5f3b1 parser lines 91-105; cics-fepi-context-candidates; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12]",
+              "source_lines": [
+                44,
+                45
+              ]
+            },
+            {
+              "id": "count-0",
+              "input": {
+                "POOLLIST": "P0000001",
+                "POOLNUM": 0,
+                "OUTSERVICE": true
+              },
+              "expected": "INVREQ 16/132; do not change resources for an invalid count.",
+              "source_lines": [
+                46,
+                47
+              ]
+            },
+            {
+              "id": "count-257",
+              "input": {
+                "POOLLIST": "P0000001",
+                "POOLNUM": 257,
+                "OUTSERVICE": true
+              },
+              "expected": "INVREQ 16/132; do not change resources for an invalid count.",
+              "source_lines": [
+                46,
+                47
+              ]
+            },
+            {
+              "id": "inactive-no-mutation",
+              "input": {
+                "POOLLIST": "P0000001",
+                "POOLNUM": 1,
+                "OUTSERVICE": true,
+                "fixture": "FEPI not installed or inactive; output areas seeded with sentinel values"
+              },
+              "expected": "INVREQ 16/11; no resource mutation or resource output replacement. RESP/EIB may report the condition.",
+              "source_lines": [
+                35
+              ]
+            },
+            {
+              "id": "unauthorized-no-observation",
+              "input": {
+                "POOLLIST": "P0000001",
+                "POOLNUM": 1,
+                "OUTSERVICE": true,
+                "fixture": "FEPI active; issuer lacks command authorization"
+              },
+              "expected": "NOTAUTH 70/100 through existing condition policy; do not mutate resources or disclose resource outputs; retain platform denial audit. [SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html sha256:ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712 parser lines 99-104; cics-fepi-context-candidates; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12]",
+              "source_lines": [
+                35
+              ]
+            }
+          ]
+        },
+        {
+          "id": "fepi-set-poollist.recovery",
+          "gates": [
+            "recovered"
+          ],
+          "cases": [
+            {
+              "id": "uncertain-result-no-redispatch",
+              "input": {
+                "POOLLIST": "P0000001",
+                "POOLNUM": 1,
+                "OUTSERVICE": true,
+                "fixture": "Authorized request; provider may have applied the requested mutation, but result publication is interrupted"
+              },
+              "expected": "Repository proof candidate: preserve explicit UnknownOutcome under the original canonical effect identity; inspect the existing provider authority before reconciliation, without applying the requested mutation again. IBM restart/rollback outcome is unresolved; recovered remains pending (docs/contracts/EFFECT-CANONICAL-V1.md).",
+              "source_lines": [
+                35
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Private Wave A source preparation, runtime_binding=private-unregistered. All six gates are pending with zero credit. Candidates are independent source expectations, not executable Conformance IR, registered drivers or verdicts.",
+        "Pinned product is CICS TS 6.x; it does not fix a licensed point release or environment. No licensed execution or parent SPI-1001/application acceptance is claimed.",
+        "Exact command-security/resource-security SAF class/profile/access mapping is not established here. Read/change/control describe proposed platform effects, not IBM access levels; authorization.intent remains unresolved.",
+        "DPL/subordinate/EXCI contexts, threadsafety, other addressing modes, cancellation races and backend parity require additional authority/proof. Unknown contexts are not inapplicable.",
+        "Source does not establish IBM lock order, graph snapshot isolation, browse visibility during concurrent install/discard/set, persistence encoding, retention or restart. These remain manager integration gaps.",
+        "The @1 schema cannot condition operand direction on named/NEXT browse mode, express CVDA-value compatibility, or encode all context predicates. Explicit variant/value rules below require bounded extensions in the existing compiler; this artifact is not Frozen-ready.",
+        "Numeric source_lines only locate this body. Inherited facts use separately cited path/pin/parser lines, and condition numeric identities reuse cics-eibresp-condition-name@1 from the existing application contracts. No second response mapper.",
+        "Shared-body list-only responses are preserved with explicit applicability; valid named forms cannot supply the list count. @1 lacks a first-class official-row variant descriptor, so compiler projection must preserve these reviewed identities.",
+        "Pending CVDA ABI and runtime binding for SERVSTATUS: the extent 4 records only the source fullword binary CVDA representation, joined through the FEPI SPI common-command rules and this command's own CVDA option paragraphs. It does not establish native C long size, host ABI, alignment, endian, numeric encoding, aliases, receiver binding, or source-case execution. Closed membership does not settle existing form/optional-output, device/applicability, requested-versus-attained state, response-precedence, UOW or recovery gaps. [Common CVDA SSJL4D_6.x/system-programming/intro/dfha80x.html sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25; baseline ibm-cics-ts-6x-application-api-sources-b-2026-09-10; parser 7-15. FEPI SPI SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html sha256:ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12; parser 3-7]. All behavioral gates remain Pending with credit 0."
+      ]
+    }
+  ],
+  "target_subsystem": "cics.system-api"
+}

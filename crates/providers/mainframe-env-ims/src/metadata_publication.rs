@@ -84,6 +84,7 @@ impl ImsService {
         validate_generation_identity(generation, package_identity)?;
         let validated = catalog
             .map(|catalog| {
+                self.validate_secondary_metadata(catalog)?;
                 validate_ims_metadata(catalog, ImsMetadataLimits::default())
                     .map(|identity| (catalog.clone(), identity.digest))
                     .map_err(|_| HostProblem::Malformed)

@@ -13,12 +13,12 @@ secrets are resolved only inside an authentication scope and cleared after
 use; audits are bounded and redacted. The v2 database is one bounded CAS-updated
 provider-state snapshot, so mixed security mutations can commit atomically
 without adding a second store or transaction authority. Its normative Draft
-2020-12 schemas are under `conformance/0.5/schemas`. Verify with
+2020-12 schemas are under `conformance/subsystems/racf/schemas`. Verify with
 `cargo test -p mainframe-env-racf`, `cargo xtask schemas --check`, and the
 focused `racf-saf` Conformance IR gate once command/SAF bindings are installed.
 
 The generated command registry is sourced from
-`conformance/0.5/racf/command-language.json` and checked with
+`conformance/subsystems/racf/racf/command-language.json` and checked with
 `cargo xtask racf-catalog --check`. The bounded parser recognizes all 34 frozen
 families without retaining command secrets in public DTOs. SEC-502 command
 execution covers the 21 user, group, connection, dataset/general-resource,
@@ -28,7 +28,7 @@ identity families remain assigned to their later named work packages rather
 than receiving generic-success handlers.
 
 The same generator reads the reviewed publication-difference contract in
-`conformance/0.5/racf/operand-dispositions.json`. Each command descriptor carries
+`conformance/subsystems/racf/racf/operand-dispositions.json`. Each command descriptor carries
 separate inventories for deliberately unimplemented top-level operands and for
 syntax-only tokens with their command/parent-operand contexts. The former return
 diagnostic `MERSEC1015E` at command level; the latter return it only in the
@@ -132,3 +132,7 @@ evidence has outlived the stricter audit/idempotency lifetime and is pruned, its
 old transaction key denotes a new operation. Archive inspection and permanent
 deletion use the platform retention APIs and whole-batch rules described by the
 [durable retention contract](../../../docs/contracts/RETENTION-LIFECYCLE-V1.md).
+
+## Documentation
+
+[Documentation portal](../../../docs/README.md) · [Current package map](../../../docs/architecture/PACKAGE-MAP.md) · [Embedding guide](../../../docs/guides/EMBEDDING.md) · [Contribution and verification](../../../CONTRIBUTING.md)

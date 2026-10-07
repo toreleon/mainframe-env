@@ -3,7 +3,7 @@
 Status: **Accepted by repository owner**
 Owner: **architecture maintainers**
 Scope: **Rust production-module size, crate facades, generated sources, and CICS family growth**
-Applies from: **mainframe-env 0.9.0 development**
+Applies from: **mainframe-env current subsystem contracts**
 Supersedes: **the soft 800–1,200-line review trigger in the architecture overview and implementation prompt**
 
 ## Context
@@ -25,12 +25,12 @@ The soft trigger is replaced by a **hard limit of 1,200 physical production
 lines** for every new or non-exempt Rust module below `crates/`.
 
 The machine authority is
-[`conformance/0.9/inventory/module-budgets.json`](../../conformance/0.9/inventory/module-budgets.json).
+[`conformance/subsystems/cics/application/inventory/module-budgets.json`](../../conformance/subsystems/cics/application/inventory/module-budgets.json).
 `python3 -B tools/check_module_boundaries.py` validates that inventory and is a
 blocking part of `cargo xtask architecture-fast --check`.
 
 The recorded ceilings are the final pre-adoption baseline after the other
-pre-0.9 review fixes, including their bounded retention and readiness work.
+subsystem review fixes, including their bounded retention and readiness work.
 The one-time `--refresh` used to adopt this decision therefore captures that
 integrated state. Any later increase requires a superseding decision; an
 ordinary feature or repair may only preserve, lower, or remove a ceiling.
@@ -66,7 +66,7 @@ Every `src/lib.rs` is a crate facade. It may contain crate documentation,
 attributes, module declarations, public re-exports, and small contract identity
 constants, but not functions, data types, traits, implementations, private
 imports, or macros. The application and conformance crate roots are facades in
-the accepted 0.9 candidate.
+the accepted cics.application-api candidate.
 
 The checker discovered one earlier exception in
 `mainframe-env-coverage/src/lib.rs`. Its exact count and stable extraction
@@ -74,7 +74,7 @@ boundary are recorded as non-growing debt. No other facade exception is
 permitted, and that row disappears when the ledger model moves to its own
 module.
 
-### CICS 0.9 family layout
+### CICS application API family layout
 
 The existing CICS `service.rs` pilot is frozen at its exact accepted production
 count. The 263-command expansion may not append command descriptions or new

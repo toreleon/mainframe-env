@@ -23,153 +23,6 @@ pub(super) struct TargetStage {
     checkpoint_digest: String,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::cobol::hardening::parent;
-    use serde_json::{Value, json};
-
-    fn row() -> ProviderStateRecord {
-        let caller = parent();
-        let key = "a".repeat(64);
-        let mut receipt = Receipt {
-            schema_version: 4, replay_key: key.clone(), fingerprint: "b".repeat(64),
-            child_execution: format!("online-call-execution-{key}"),
-            owner_execution: caller.execution_id.as_str().into(),
-            owner_run_unit: caller.run_unit_id.as_str().into(),
-            owner_principal: caller.principal.id().as_str().into(),
-            protocol_key: protocol_key(caller.run_unit_id.as_str()),
-            run_state_key: run_state_key(caller.run_unit_id.as_str(), caller.principal.id().as_str()),
-            metadata_digest: String::new(), completion_tick: None, reply: None,
-            transfer: Some(serde_json::from_value(json!({
-                "selector":"EXIT", "schema":"mainframe-env.cics.payload@1", "bytes":[],
-                "source_selector":"program:MID", "source_artifact":format!("sha256:{}", "1".repeat(64)),
-                "source_attempt":1, "source_version":6, "checkpoint_digest":"2".repeat(64),
-                "checkpoint_sequence":3, "checkpoint_machine_schema":1,
-                "checkpoint_schema":"mainframe-env.reference-machine-checkpoint@12"
-            })).unwrap()), target: None,
-        };
-        let identity = format!("sha256:{}", "3".repeat(64));
-        let mut invocation = caller;
-        invocation.parent_execution_id =
-            Some(ExecutionId::new(&receipt.child_execution, InvocationLimits::default()).unwrap());
-        invocation.execution_id = ExecutionId::new(
-            format!(
-                "online-transfer-execution-{}",
-                target_identity(&receipt, 1, &identity)
-            ),
-            InvocationLimits::default(),
-        )
-        .unwrap();
-        invocation.selector = Selector::new("program:EXIT", InvocationLimits::default()).unwrap();
-        invocation.artifact = ArtifactRef::new(
-            format!("sha256:{}", "4".repeat(64)),
-            InvocationLimits::default(),
-        )
-        .unwrap();
-        let saved = StagedInvocation::capture(&invocation).unwrap();
-        // A syntax-only retention fixture, deliberately not an executable image.
-        // The product route independently checks a real constructor checkpoint.
-        let checkpoint = b"MECP0012syntax-only";
-        receipt.target = Some(TargetStage {
-            selector: "program:EXIT".into(),
-            artifact: invocation.artifact.as_str().into(),
-            generation: 1,
-            content_identity: identity,
-            context_digest: saved.digest().unwrap(),
-            invocation: saved,
-            checkpoint_schema: "mainframe-env.reference-machine-checkpoint@12".into(),
-            checkpoint: STANDARD.encode(checkpoint),
-            checkpoint_digest: format!("{:x}", Sha256::digest(checkpoint)),
-        });
-        receipt.metadata_digest = receipt_metadata_digest(&receipt);
-        ProviderStateRecord {
-            namespace: CALL_REPLAY_NAMESPACE.into(),
-            key,
-            version: 3,
-            payload: serde_json::to_vec(&receipt).unwrap(),
-        }
-    }
-
-    #[test]
-    fn transfer_target_identity_and_metadata_have_independent_frozen_vectors() {
-        let mut receipt: Receipt = serde_json::from_slice(&row().payload).unwrap();
-        assert_eq!(
-            target_identity(&receipt, 1, &format!("sha256:{}", "3".repeat(64))),
-            "bd640697bcb979888ef57f2f27c64e1759fba15c0a9f70e138ea82c2e786d209"
-        );
-        let target = receipt.target.as_mut().unwrap();
-        target.context_digest = "5".repeat(64);
-        target.checkpoint_digest = "6".repeat(64);
-        assert_eq!(
-            target.metadata_digest(),
-            "062e4ba2e0d4fd60e79387080a4f031f3ec758e869c984ff61594a45b751e0c3"
-        );
-    }
-
-    #[test]
-    fn transfer_target_reader_preserves_active_retention_and_rejects_rehashed_invalid_phases() {
-        let good = row();
-        assert!(decode_receipt(&good).is_ok());
-        assert_eq!(
-            describe_call_replay_row(&good).unwrap().state,
-            CobolRetentionState::Active
-        );
-        for case in 0..13 {
-            let mut receipt: Receipt = serde_json::from_slice(&good.payload).unwrap();
-            let mut version = 3;
-            match case {
-                0 => version = 2,
-                1 => receipt.schema_version = 3,
-                2 => receipt.target = None,
-                3 => receipt.transfer = None,
-                4 => receipt.completion_tick = Some(9),
-                5 => {
-                    receipt.reply = Some(Reply {
-                        schema: "reply@1".into(),
-                        bytes: Vec::new(),
-                    })
-                }
-                6 => receipt.target.as_mut().unwrap().generation = 0,
-                7 => receipt.target.as_mut().unwrap().selector = "program:OTHER".into(),
-                8 => receipt.target.as_mut().unwrap().artifact = "artifact".into(),
-                9 => receipt.target.as_mut().unwrap().checkpoint.push('\n'),
-                10 => {
-                    receipt.target.as_mut().unwrap().checkpoint_schema =
-                        "mainframe-env.reference-machine-checkpoint@11".into()
-                }
-                11 => receipt.target.as_mut().unwrap().context_digest = "0".repeat(64),
-                _ => receipt.target.as_mut().unwrap().checkpoint_digest = "0".repeat(64),
-            }
-            receipt.metadata_digest = receipt_metadata_digest(&receipt);
-            assert!(
-                decode_receipt(&ProviderStateRecord {
-                    version,
-                    payload: serde_json::to_vec(&receipt).unwrap(),
-                    ..good.clone()
-                })
-                .is_err(),
-                "case {case}"
-            );
-        }
-        for path in ["target", "invocation"] {
-            let mut value: Value = serde_json::from_slice(&good.payload).unwrap();
-            if path == "target" {
-                value["target"]["extra"] = json!(true);
-            } else {
-                value["target"]["invocation"]["extra"] = json!(true);
-            }
-            assert!(
-                decode_receipt(&ProviderStateRecord {
-                    payload: serde_json::to_vec(&value).unwrap(),
-                    ..good.clone()
-                })
-                .is_err()
-            );
-        }
-    }
-}
-
 fn target_invocation(
     source: &Invocation,
     receipt: &Receipt,
@@ -432,5 +285,152 @@ impl CobolProgram {
         store
             .put_provider_state(staged, Some(2))
             .map_err(|_| HostProblem::UnknownOutcome)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cobol::hardening::parent;
+    use serde_json::{Value, json};
+
+    fn row() -> ProviderStateRecord {
+        let caller = parent();
+        let key = "a".repeat(64);
+        let mut receipt = Receipt {
+            schema_version: 4, replay_key: key.clone(), fingerprint: "b".repeat(64),
+            child_execution: format!("online-call-execution-{key}"),
+            owner_execution: caller.execution_id.as_str().into(),
+            owner_run_unit: caller.run_unit_id.as_str().into(),
+            owner_principal: caller.principal.id().as_str().into(),
+            protocol_key: protocol_key(caller.run_unit_id.as_str()),
+            run_state_key: run_state_key(caller.run_unit_id.as_str(), caller.principal.id().as_str()),
+            metadata_digest: String::new(), completion_tick: None, reply: None,
+            transfer: Some(serde_json::from_value(json!({
+                "selector":"EXIT", "schema":"mainframe-env.cics.payload@1", "bytes":[],
+                "source_selector":"program:MID", "source_artifact":format!("sha256:{}", "1".repeat(64)),
+                "source_attempt":1, "source_version":6, "checkpoint_digest":"2".repeat(64),
+                "checkpoint_sequence":3, "checkpoint_machine_schema":1,
+                "checkpoint_schema":"mainframe-env.reference-machine-checkpoint@12"
+            })).unwrap()), target: None,
+        };
+        let identity = format!("sha256:{}", "3".repeat(64));
+        let mut invocation = caller;
+        invocation.parent_execution_id =
+            Some(ExecutionId::new(&receipt.child_execution, InvocationLimits::default()).unwrap());
+        invocation.execution_id = ExecutionId::new(
+            format!(
+                "online-transfer-execution-{}",
+                target_identity(&receipt, 1, &identity)
+            ),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        invocation.selector = Selector::new("program:EXIT", InvocationLimits::default()).unwrap();
+        invocation.artifact = ArtifactRef::new(
+            format!("sha256:{}", "4".repeat(64)),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let saved = StagedInvocation::capture(&invocation).unwrap();
+        // A syntax-only retention fixture, deliberately not an executable image.
+        // The product route independently checks a real constructor checkpoint.
+        let checkpoint = b"MECP0012syntax-only";
+        receipt.target = Some(TargetStage {
+            selector: "program:EXIT".into(),
+            artifact: invocation.artifact.as_str().into(),
+            generation: 1,
+            content_identity: identity,
+            context_digest: saved.digest().unwrap(),
+            invocation: saved,
+            checkpoint_schema: "mainframe-env.reference-machine-checkpoint@12".into(),
+            checkpoint: STANDARD.encode(checkpoint),
+            checkpoint_digest: format!("{:x}", Sha256::digest(checkpoint)),
+        });
+        receipt.metadata_digest = receipt_metadata_digest(&receipt);
+        ProviderStateRecord {
+            namespace: CALL_REPLAY_NAMESPACE.into(),
+            key,
+            version: 3,
+            payload: serde_json::to_vec(&receipt).unwrap(),
+        }
+    }
+
+    #[test]
+    fn transfer_target_identity_and_metadata_have_independent_frozen_vectors() {
+        let mut receipt: Receipt = serde_json::from_slice(&row().payload).unwrap();
+        assert_eq!(
+            target_identity(&receipt, 1, &format!("sha256:{}", "3".repeat(64))),
+            "bd640697bcb979888ef57f2f27c64e1759fba15c0a9f70e138ea82c2e786d209"
+        );
+        let target = receipt.target.as_mut().unwrap();
+        target.context_digest = "5".repeat(64);
+        target.checkpoint_digest = "6".repeat(64);
+        assert_eq!(
+            target.metadata_digest(),
+            "062e4ba2e0d4fd60e79387080a4f031f3ec758e869c984ff61594a45b751e0c3"
+        );
+    }
+
+    #[test]
+    fn transfer_target_reader_preserves_active_retention_and_rejects_rehashed_invalid_phases() {
+        let good = row();
+        assert!(decode_receipt(&good).is_ok());
+        assert_eq!(
+            describe_call_replay_row(&good).unwrap().state,
+            CobolRetentionState::Active
+        );
+        for case in 0..13 {
+            let mut receipt: Receipt = serde_json::from_slice(&good.payload).unwrap();
+            let mut version = 3;
+            match case {
+                0 => version = 2,
+                1 => receipt.schema_version = 3,
+                2 => receipt.target = None,
+                3 => receipt.transfer = None,
+                4 => receipt.completion_tick = Some(9),
+                5 => {
+                    receipt.reply = Some(Reply {
+                        schema: "reply@1".into(),
+                        bytes: Vec::new(),
+                    })
+                }
+                6 => receipt.target.as_mut().unwrap().generation = 0,
+                7 => receipt.target.as_mut().unwrap().selector = "program:OTHER".into(),
+                8 => receipt.target.as_mut().unwrap().artifact = "artifact".into(),
+                9 => receipt.target.as_mut().unwrap().checkpoint.push('\n'),
+                10 => {
+                    receipt.target.as_mut().unwrap().checkpoint_schema =
+                        "mainframe-env.reference-machine-checkpoint@11".into()
+                }
+                11 => receipt.target.as_mut().unwrap().context_digest = "0".repeat(64),
+                _ => receipt.target.as_mut().unwrap().checkpoint_digest = "0".repeat(64),
+            }
+            receipt.metadata_digest = receipt_metadata_digest(&receipt);
+            assert!(
+                decode_receipt(&ProviderStateRecord {
+                    version,
+                    payload: serde_json::to_vec(&receipt).unwrap(),
+                    ..good.clone()
+                })
+                .is_err(),
+                "case {case}"
+            );
+        }
+        for path in ["target", "invocation"] {
+            let mut value: Value = serde_json::from_slice(&good.payload).unwrap();
+            if path == "target" {
+                value["target"]["extra"] = json!(true);
+            } else {
+                value["target"]["invocation"]["extra"] = json!(true);
+            }
+            assert!(
+                decode_receipt(&ProviderStateRecord {
+                    payload: serde_json::to_vec(&value).unwrap(),
+                    ..good.clone()
+                })
+                .is_err()
+            );
+        }
     }
 }

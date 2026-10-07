@@ -1,14 +1,15 @@
 use crate::{TaskResult, canonical_evidence_digest, json, require, validate_schema_instance};
-use serde_json::{Map, Value};
+use serde_json::Value;
 use std::collections::BTreeSet;
 use std::path::Path;
 
-const V1_PATH: &str = "conformance/0.8/evidence/carddemo-base-batch.json";
-const V2_PATH: &str = "conformance/0.8/evidence/carddemo-base-batch@2.json";
-const V1_SCHEMA: &str = "conformance/0.8/schemas/carddemo-base-batch-evidence.schema.json";
-const V2_SCHEMA: &str = "conformance/0.8/schemas/carddemo-base-batch-evidence@2.schema.json";
-const REFERENCE_PATH: &str = "conformance/0.8/oracles/carddemo-tranrept-reference@1.json";
-const REFERENCE_SCHEMA: &str = "conformance/0.8/schemas/carddemo-tranrept-reference.schema.json";
+const V1_PATH: &str = "fixture-carddemo-base-batch-v1.json";
+const V2_PATH: &str = "fixture-carddemo-base-batch-v2.json";
+
+const REFERENCE_PATH: &str =
+    "conformance/subsystems/jes/oracles/carddemo-tranrept-reference@1.json";
+const REFERENCE_SCHEMA: &str =
+    "conformance/subsystems/jes/schemas/carddemo-tranrept-reference.schema.json";
 const REFERENCE_ID: &str = "mainframe-env.carddemo-tranrept-reference@1";
 
 fn sha256_text(value: &Value) -> bool {
@@ -84,8 +85,8 @@ fn validate_reference_manifest(root: &Path, manifest: &Value) -> TaskResult<()> 
         require(
             matches!(
                 relative,
-                "conformance/0.8/oracles/carddemo-tranrept-input@1.bin"
-                    | "conformance/0.8/oracles/carddemo-tranrept-sort@1.cbl"
+                "conformance/subsystems/jes/oracles/carddemo-tranrept-input@1.bin"
+                    | "conformance/subsystems/jes/oracles/carddemo-tranrept-sort@1.cbl"
                     | "conformance/tools/carddemo_tranrept_reference.py"
             ),
             &format!("reference {label} path is not approved"),
@@ -102,22 +103,8 @@ fn validate_reference_manifest(root: &Path, manifest: &Value) -> TaskResult<()> 
 pub(super) struct CreditSummary {
     pub total: usize,
     pub self_recorded: usize,
-    pub unattributed: usize,
     pub licensed_pending: usize,
     pub conformance: usize,
-}
-
-impl CreditSummary {
-    pub fn print(&self) {
-        println!(
-            "conformance credit: {} of {} assertions ({} self-recorded, {} unattributed, {} licensed pending)",
-            self.conformance,
-            self.total,
-            self.self_recorded,
-            self.unattributed,
-            self.licensed_pending
-        );
-    }
 }
 
 fn correctness_paths(receipt: &Value) -> TaskResult<BTreeSet<String>> {
@@ -151,7 +138,7 @@ fn correctness_paths(receipt: &Value) -> TaskResult<BTreeSet<String>> {
 pub(super) fn validate_carddemo_provenance(v2: &Value, v1: &Value) -> TaskResult<CreditSummary> {
     require(
         v2["schema_version"] == "mainframe-env.carddemo-base-batch-version-evidence@2"
-            && v2["target_version"] == "0.8.0"
+            && v2["target_subsystem"] == "jes.execution"
             && v2["supersedes"] == V1_PATH
             && v2["historical_receipt_rewritten"] == false,
         "0.8 CardDemo v2 evidence header is invalid",
@@ -249,62 +236,10 @@ pub(super) fn validate_carddemo_provenance(v2: &Value, v1: &Value) -> TaskResult
     Ok(summary)
 }
 
-pub(super) fn read_carddemo_evidence(
-    root: &Path,
-    historical_receipt: &Map<String, Value>,
-) -> TaskResult<(Value, CreditSummary)> {
-    let v1_path = root.join(V1_PATH);
-    let v2_path = root.join(V2_PATH);
-    if !v1_path.is_file() {
-        require(
-            !v2_path.is_file(),
-            "CardDemo v2 evidence requires the v1 source artifact",
-        )?;
-        let receipt = Value::Object(historical_receipt.clone());
-        let total = correctness_paths(&receipt)?.len();
-        return Ok((
-            receipt,
-            CreditSummary {
-                total,
-                unattributed: total,
-                ..CreditSummary::default()
-            },
-        ));
-    }
-    let v1 = json(&v1_path)?;
-    validate_schema_instance(&json(&root.join(V1_SCHEMA))?, &v1, &v1_path)?;
-    let v1_receipt = v1["receipt"]
-        .as_object()
-        .ok_or("0.8 CardDemo v1 receipt is malformed")?;
-    let v1_digest = canonical_evidence_digest(v1_receipt)?;
-    require(
-        v1["evidence_digest"].as_str() == Some(&v1_digest),
-        "0.8 CardDemo v1 evidence digest differs",
-    )?;
-    if !v2_path.is_file() {
-        let receipt = Value::Object(v1_receipt.clone());
-        let total = correctness_paths(&receipt)?.len();
-        return Ok((
-            receipt,
-            CreditSummary {
-                total,
-                unattributed: total,
-                ..CreditSummary::default()
-            },
-        ));
-    }
-    let v2 = json(&v2_path)?;
-    validate_schema_instance(&json(&root.join(V2_SCHEMA))?, &v2, &v2_path)?;
-    let summary = validate_carddemo_provenance(&v2, &v1)?;
-    Ok((v2["receipt"].clone(), summary))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::{Value, json};
-    use std::fs;
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn fixture() -> (Value, Value) {
         let receipt = json!({
@@ -322,8 +257,8 @@ mod tests {
         let digest = crate::canonical_evidence_digest(receipt.as_object().unwrap()).unwrap();
         let v1 = json!({
             "schema_version": "mainframe-env.carddemo-base-batch-version-evidence@1",
-            "target_version": "0.8.0",
-            "supersedes": "conformance/0.1.1/evidence/issues/CD-023.json",
+            "target_subsystem": "jes.execution",
+            "supersedes": "conformance/profiles/carddemo/evidence/issues/CD-023.json",
             "historical_receipt_rewritten": false,
             "transition_justification": ["fixture"],
             "evidence_digest": digest,
@@ -360,7 +295,7 @@ mod tests {
             .collect();
         let v2 = json!({
             "schema_version": "mainframe-env.carddemo-base-batch-version-evidence@2",
-            "target_version": "0.8.0",
+            "target_subsystem": "jes.execution",
             "supersedes": V1_PATH,
             "historical_receipt_rewritten": false,
             "transition_justification": ["fixture"],
@@ -429,7 +364,7 @@ mod tests {
         let (v1, mut v2) = fixture();
         let entry = &mut v2["expected_value_provenance"][0];
         entry["source"] = json!("independent-reference");
-        entry["source_id"] = json!("conformance/0.8/oracles/missing.json#1");
+        entry["source_id"] = json!("conformance/subsystems/jes/oracles/missing.json#1");
         entry["source_digest"] = json!(format!("sha256:{}", "0".repeat(64)));
         entry["source_locator"] = json!("/results/status");
         assert!(validate_carddemo_provenance(&v2, &v1).is_err());
@@ -438,14 +373,10 @@ mod tests {
     #[test]
     fn carddemo_base_batch_provenance_mismatched_independent_binding_fails() {
         let root = crate::repository_root().unwrap();
-        let v1 = crate::json(&root.join(V1_PATH)).unwrap();
-        let mut v2 = crate::json(&root.join(V2_PATH)).unwrap();
-        let position = v2["expected_value_provenance"]
-            .as_array_mut()
-            .unwrap()
-            .iter()
-            .position(|entry| entry["source"] == "independent-reference")
-            .unwrap();
+        let (v1, mut v2) = fixture();
+        let position = 0;
+        v2["expected_value_provenance"][position]["source"] = json!("independent-reference");
+        v2["expected_value_provenance"][position]["source_id"] = json!(REFERENCE_ID);
         v2["expected_value_provenance"][position]["source_digest"] =
             json!(format!("sha256:{}", "0".repeat(64)));
         assert!(validate_carddemo_provenance(&v2, &v1).is_err());
@@ -471,74 +402,14 @@ mod tests {
         let (_, mut v2) = fixture();
         v2["expected_value_provenance"][0]["credit"] = json!(1);
         let root = crate::repository_root().unwrap();
-        let schema = crate::json(
-            &root.join("conformance/0.8/schemas/carddemo-base-batch-evidence@2.schema.json"),
-        )
-        .unwrap();
+        let schema =
+            crate::json(&root.join(
+                "conformance/subsystems/jes/schemas/carddemo-base-batch-evidence@2.schema.json",
+            ))
+            .unwrap();
         assert!(
             crate::validate_schema_instance(&schema, &v2, std::path::Path::new("fixture-v2.json"))
                 .is_err()
-        );
-    }
-
-    #[test]
-    fn carddemo_provenance_reader_keeps_v1_unattributed_and_prefers_v2() {
-        let (v1, v2) = fixture();
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let root = std::env::temp_dir().join(format!(
-            "carddemo-provenance-{}-{nonce}",
-            std::process::id()
-        ));
-        let repository = crate::repository_root().unwrap();
-        for relative in [V1_SCHEMA, V2_SCHEMA] {
-            let target = root.join(relative);
-            fs::create_dir_all(target.parent().unwrap()).unwrap();
-            fs::copy(repository.join(relative), target).unwrap();
-        }
-        let v1_path = root.join(V1_PATH);
-        fs::create_dir_all(v1_path.parent().unwrap()).unwrap();
-        fs::write(&v1_path, serde_json::to_vec(&v1).unwrap()).unwrap();
-        let historical = v1["receipt"].as_object().unwrap();
-        let (_, old_credit) = read_carddemo_evidence(&root, historical).unwrap();
-        assert_eq!(old_credit.unattributed, 15);
-        assert_eq!(old_credit.conformance, 0);
-        fs::write(root.join(V2_PATH), serde_json::to_vec(&v2).unwrap()).unwrap();
-        let (expected, new_credit) = read_carddemo_evidence(&root, historical).unwrap();
-        assert_eq!(expected, v2["receipt"]);
-        assert_eq!(new_credit.self_recorded, 15);
-        assert_eq!(new_credit.conformance, 0);
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn carddemo_provenance_checked_in_v2_covers_every_pin() {
-        let root = crate::repository_root().unwrap();
-        let v1 = crate::json(&root.join(V1_PATH)).unwrap();
-        let v2 = crate::json(&root.join(V2_PATH)).unwrap();
-        let summary = validate_carddemo_provenance(&v2, &v1).unwrap();
-        assert_eq!(summary.total, 90);
-        assert_eq!(summary.self_recorded, 86);
-        assert_eq!(summary.conformance, 4);
-        let source_for = |path| {
-            v2["expected_value_provenance"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .find(|entry| entry["assertion_path"] == path)
-                .unwrap()["source"]
-                .as_str()
-                .unwrap()
-        };
-        assert_eq!(
-            source_for("/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.DALY.G0001V00"),
-            "independent-reference"
-        );
-        assert_eq!(
-            source_for("/dataset_sha256/AWS.M2.CARDDEMO.TRANREPT.G0001V00"),
-            "independent-reference"
         );
     }
 }

@@ -1,0 +1,33 @@
+{
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "target_subsystem": "ims.programming",
+  "baseline_id": "ibm-ims-15.6-status-explanations-2026-09-11",
+  "subsystem": "ims",
+  "product": "SSEPH2_15.6.0",
+  "book_label": "IMS 15.6 DA/DJ status explanation source supplement",
+  "book_href": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/msgs/da.htm",
+  "snapshot_date": "2026-09-11",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/ims/15.6.0?lang=en",
+  "toc_sha256": "aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "topic_count": 2,
+  "total_bytes": 4889,
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topic_manifest_digest": "7d4d6f9d5431bae8a438e9fa40c32f371325cd0956c282df7a4920514ee9c509",
+  "coverage_credit": 0,
+  "retained_in_repository": false,
+  "topics": [
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/msgs/da.htm",
+      "sha256": "2cdd75d8c8b15e6ca28deecbc28b458fe57cb7bedaf72ac48b24cf5ba825201d",
+      "bytes": 1804,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/msgs/dj.htm",
+      "sha256": "61eb932d71cf9d009e0e6652d24840945ba51ed6a3bc98e676dac54164e18c82",
+      "bytes": 3085,
+      "last_modified": "not-recorded-in-retained-archive"
+    }
+  ]
+}

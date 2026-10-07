@@ -3,9 +3,9 @@
 Status: **Accepted by repository owner**
 Owner: **repository owner**
 Scope: **product charter, initial boundary, and governance invariants**
-Applies from: **mainframe-env 0.1.0**
+Applies from: **mainframe-env current subsystem contracts**
 Program identity: **mainframe-env**
-Initial release line: **0.1**
+Management model: **named subsystems and phases**
 Delivery mode: **Greenfield rewrite with executable-oracle compatibility**
 
 ## Objective
@@ -32,14 +32,14 @@ modules, and migration paths that are difficult to reason about independently.
 The rewrite is intended to remove those structural constraints rather than
 copying them into cleaner filenames.
 
-## 0.1 scope
+## Base profile scope
 
-The 0.1 product scope is limited to:
+The platform.runtime-integration product scope is limited to:
 
 - COBOL source, preprocessing, parsing, semantic analysis, HIR/MIR, compilation,
   and reference execution;
 - typed CICS terminal, file, program-control, condition, transaction, and
-  security interactions required by accepted 0.1 fixtures;
+  security interactions required by accepted platform.runtime-integration fixtures;
 - JCL parsing and execution through JES job, step, spool, DD, and condition
   lifecycle;
 - dataset behavior required by COBOL, CICS, JCL, JES, and z/OSMF fixtures;
@@ -49,7 +49,7 @@ The 0.1 product scope is limited to:
   routes;
 - execution, compiler, host-service, artifact, configuration, store,
   observability, and compatibility infrastructure required by those paths; and
-- deterministic conformance tooling for the 0.1 surface.
+- deterministic conformance tooling for the platform.runtime-integration surface.
 
 Every current selector within this scope receives one explicit disposition:
 
@@ -57,15 +57,15 @@ Every current selector within this scope receives one explicit disposition:
 - **port algorithm** behind a new owned boundary without retaining old
   architecture;
 - **replace** with a new provider; or
-- **retire** from the 0.1 public surface through an explicit compatibility
+- **retire** from the platform.runtime-integration public surface through an explicit compatibility
   decision.
 
 No in-scope selector or fixture is silently omitted. Unsupported in-scope
 behavior remains explicit and diagnostic.
 
-## Explicitly out of scope for 0.1
+## Outside the base profile
 
-The following current areas may be ignored completely and create no 0.1
+The following current areas may be ignored completely and create no platform.runtime-integration
 compatibility, packaging, build, documentation, or migration obligation:
 
 - PL/I, REXX, CLIST, HLASM, Easytrieve, Natural, FOCUS, and other language
@@ -79,7 +79,7 @@ compatibility, packaging, build, documentation, or migration obligation:
 - migration of a current crate solely because it exists.
 
 An out-of-scope component is added later only through a new versioned product
-decision. 0.1 must not contain speculative abstractions whose only consumer is an
+decision. platform.runtime-integration must not contain speculative abstractions whose only consumer is an
 out-of-scope future component.
 
 ## Non-negotiable invariants
@@ -98,7 +98,7 @@ out-of-scope future component.
    fingerprint, not by unstable serialization bytes.
 8. Executable IR is verified and fully legalized before publication and again
    at trust boundaries where required.
-9. 0.1 uses statically linked, reviewed Rust implementations. Any later external
+9. platform.runtime-integration uses statically linked, reviewed Rust implementations. Any later external
    plugin system has no ambient authority and does not use the native Rust
    dynamic-library ABI as a stable contract.
 10. One observable authority exists for each selector, protocol state,
@@ -123,15 +123,15 @@ Public and durable types are owned by mainframe-env. External library types do
 not cross stable boundaries. Frameworks may be upgraded or replaced without
 changing mainframe semantics.
 
-### Static 0.1
+### Static base profile
 
 Built-in Rust implementations establish the contracts and reference behavior.
-Wasm components and supervised process plugins are not 0.1 deliverables.
+Wasm components and supervised process plugins are not platform.runtime-integration deliverables.
 
 ### Reference interpreter before optimization
 
-The deterministic interpreter is the 0.1 semantic oracle. Other execution
-backends are outside the 0.1 product.
+The deterministic interpreter is the platform.runtime-integration semantic oracle. Other execution
+backends are outside the platform.runtime-integration product.
 
 ### Compatibility is observable
 
@@ -149,7 +149,7 @@ mainframe-env is ready for product cutover only when:
 - the compiler and execution kernels pass deterministic replay, malformed
   input, resource, cancellation, failure, and compatibility gates;
 - durable work survives the declared worker, coordinator, and store failures;
-- every 0.1 package has ownership, support, versioning, and retirement policy;
+- every platform.runtime-integration package has ownership, support, versioning, and retirement policy;
   and
 - the superseded default implementation is removed from the production
   workspace.

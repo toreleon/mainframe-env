@@ -1,4 +1,4 @@
-# Documentation portal
+# mainframe-env documentation
 
 This portal separates current operating guidance from normative architecture,
 subsystem delivery records, and historical research. If two normative documents
@@ -7,17 +7,54 @@ silently choosing one.
 
 ## Start here
 
+New to the framework? Follow [getting started](guides/GETTING-STARTED.md),
+then check [capabilities and limitations](guides/CAPABILITIES.md) against your
+workload. The [glossary](guides/GLOSSARY.md) explains terms used throughout
+the documentation. The [README](../README.md#project-status) describes the current source distribution
+and subsystem management model.
+
+```mermaid
+flowchart LR
+    start["Start here"] --> evaluate["Run a local program"]
+    evaluate --> scope["Check workload capabilities"]
+    scope --> embed["Embed in Rust"]
+    scope --> operate["Operate the development server"]
+    scope --> contribute["Contribute and verify"]
+    contribute --> release["Review public distribution"]
+```
+
 | Goal | Document |
 |---|---|
+| Run a local COBOL program | [Getting started](guides/GETTING-STARTED.md) |
+| Evaluate workload support | [Capabilities and limitations](guides/CAPABILITIES.md) |
+| Embed the framework in Rust | [Embedding guide](guides/EMBEDDING.md) |
 | Understand the product boundary | [Project charter](CHARTER.md) |
 | Understand the system | [Architecture overview](architecture/OVERVIEW.md) |
 | Build or test the workspace | [Verification strategy](delivery/VERIFICATION-STRATEGY.md) |
 | Operate the development server | [Core-server operations](runbooks/OPERATIONS.md) |
-| Understand the current release | [0.8 release notes](releases/0.8.md) |
 | Track implementation progress | [Subsystem progress](delivery/IMPLEMENTATION-STATUS.md) |
 | Prepare CICS application API work | [CICS application API progress](delivery/subsystems/cics/application-api-status.md) |
-| Review pre-0.9 risks | [Pre-0.9 deep review](reviews/PRE-0.9.0-DEEP-REVIEW.md) |
+| Review subsystem risks | [Subsystem engineering review](reviews/SUBSYSTEM-REVIEW.md) |
 | Contribute or report security issues | [Contribution guide](../CONTRIBUTING.md) and [security policy](../SECURITY.md) |
+| Prepare public distribution | [Source distribution guide](guides/DISTRIBUTION.md) |
+
+## Browse by subject
+
+| Collection | What you will find |
+|---|---|
+| [Guides](guides/README.md) | Onboarding, capabilities, embedding, terminology and source distribution |
+| [Architecture](architecture/README.md) | System boundaries, compiler/runtime flows and provider ownership |
+| [Contracts](contracts/README.md) | Versioned persistence, transaction, effect interfaces |
+| [Decisions](decisions/README.md) | Accepted design decisions and their superseding relationships |
+| [Delivery](delivery/README.md) | Current subsystem plans/status, verification and compatibility policy |
+| [Runbooks](runbooks/README.md) | Configuration, operations, recovery and environment-specific procedures |
+| [Reviews](reviews/README.md) | Candidate-specific findings and follow-up boundaries |
+| [Research](research/README.md) | Source coverage proposals and conformance investigations |
+| [Implementation prompts](prompts/README.md) | Maintainer work instructions scoped to their original phases |
+
+The generated navigation below is the complete registered contract/phase index.
+Guides explain how to use those authorities; research, reviews and historical
+records retain their original scope and do not silently redefine current support.
 
 ## Normative precedence
 
@@ -25,16 +62,35 @@ silently choosing one.
 2. Accepted or frozen architecture documents in [`architecture/`](architecture)
 3. Versioned contracts in [`contracts/`](contracts)
 4. Accepted architecture decisions in [`decisions/`](decisions)
-5. Delivery, verification, and release contracts in [`delivery/`](delivery)
+5. Delivery, verification contracts in [`delivery/`](delivery)
 6. Subsystem implementation prompts in [`prompts/`](prompts)
-7. Runbooks, release notes, research, and historical status records
+7. Runbooks, research, and status records
 
-Machine-readable schemas, catalogs, and evidence under `conformance/` remain
+Machine-readable schemas, catalogs, and specifications under `conformance/` remain
 authoritative for the exact identities and counts they own. Prose must not
 silently override them. A later ADR overrides an earlier authority only when it
 explicitly names that authority as superseded.
 
 <!-- BEGIN GENERATED DOCUMENTATION NAVIGATION -->
+## User and maintainer guides
+
+- [Executable sandbox and agent setup](guides/MAINFRAME-SANDBOX.md)
+- [Capabilities and limitations](guides/CAPABILITIES.md)
+- [Embed mainframe-env in Rust](guides/EMBEDDING.md)
+- [Getting started](guides/GETTING-STARTED.md)
+- [Framework glossary](guides/GLOSSARY.md)
+- [Review public source distribution](guides/DISTRIBUTION.md)
+- [User and maintainer guides](guides/README.md)
+
+## Documentation collections
+
+- [Architecture reference](architecture/README.md)
+- [Versioned contracts](contracts/README.md)
+- [Delivery and verification](delivery/README.md)
+- [Operations and verification runbooks](runbooks/README.md)
+- [Research and source investigations](research/README.md)
+- [Implementation prompts](prompts/README.md)
+
 ## Architecture and contracts
 
 - [Project charter](CHARTER.md)
@@ -49,6 +105,7 @@ explicitly names that authority as superseded.
 - [Dataset, VSAM, and AMS](architecture/DATASET-VSAM-AMS.md)
 - [JES execution](architecture/JES-EXECUTION.md)
 - [IBM MQ programming surface](architecture/MQ-PROGRAMMING-SURFACE.md)
+- [MQ inquiry attribute source boundary](delivery/subsystems/mq/inquiry-source-boundary.md)
 - [Application packages](architecture/APPLICATION-PACKAGES.md)
 - [Batch controller registry](architecture/BATCH-CONTROLLER-REGISTRY.md)
 - [CICS command routing](architecture/CICS-COMMAND-ROUTING.md)
@@ -56,24 +113,20 @@ explicitly names that authority as superseded.
 - [Db2 application catalog](architecture/DB2-APPLICATION-CATALOG.md)
 - [Host ABI source libraries](architecture/HOST-ABI-SOURCE-LIBRARIES.md)
 - [Program and route registries](architecture/PROGRAM-AND-ROUTE-REGISTRIES.md)
-- [Proposed named PROGRAM STATUS boundary](contracts/CICS-NAMED-PROGRAM-STATUS-V1.md)
 - [Durable storage profile](contracts/DURABLE-STORAGE-PROFILE.md)
 - [Canonical effect encoding](contracts/EFFECT-CANONICAL-V1.md)
 - [Provider object-row persistence](contracts/PROVIDER-ROW-PERSISTENCE-V1.md)
 - [Durable retention lifecycle](contracts/RETENTION-LIFECYCLE-V1.md)
-- [Target release build type](contracts/RELEASE-BUILD-V1.md)
 - [Transaction participant contract](contracts/TRANSACTION-PARTICIPANT-V1.md)
-- [Release builder security model](architecture/RELEASE-BUILDER.md)
+- [Proposed named PROGRAM STATUS boundary](contracts/CICS-NAMED-PROGRAM-STATUS-V1.md)
 
 ## Architecture decisions
 
 - [ADR-0001: Technology stack](decisions/0001-technology-stack.md)
 - [ADR-0002: Deterministic core](decisions/0002-deterministic-core.md)
 - [ADR-0003: Contract serialization](decisions/0003-contract-serialization.md)
-- [ADR-0004: Versioning and release policy](decisions/0004-versioning-release-policy.md)
 - [ADR-0005: Historical package consolidation](decisions/0005-package-consolidation.md)
-- [ADR-0006: CardDemo 0.1.1 profile](decisions/0006-carddemo-0.1.1-profile.md)
-- [ADR-0007: CardDemo 0.1.1 release](decisions/0007-carddemo-0.1.1-release.md)
+- [ADR-0006: CardDemo workload profile](decisions/0006-carddemo-profile.md)
 - [ADR-0008: ICU license compliance](decisions/0008-icu-license-compliance.md)
 - [ADR-0009: Current package topology](decisions/0009-current-package-topology.md)
 - [ADR-0010: Rust module review budgets](decisions/0010-rust-module-review-budgets.md)
@@ -94,10 +147,46 @@ explicitly names that authority as superseded.
 - [ADR-0025: Licence and provenance policy for IBM oracle evidence](decisions/0025-licence-and-provenance-policy.md)
 - [ADR-0026: CardDemo run bundle](decisions/0026-run-bundle.md)
 - [ADR-0027: CICS task ownership across logical program frames](decisions/0027-cics-logical-program-frames.md)
+- [ADR-0028: Db2 typed catalog evolution](decisions/0028-db2-typed-catalog-evolution.md)
+- [ADR-0028: Shared MQ handle-family kernel](decisions/0028-mq-shared-handle-kernel.md)
+- [ADR-0029: Audited provider publication under a retained intent](decisions/0029-audited-provider-publication.md)
+- [ADR-0029: Db2 core participant evolution](decisions/0029-db2-core-participant-evolution.md)
+- [ADR-0030: Private MQ host lifecycle directory](decisions/0030-mq-host-lifecycle-directory.md)
+- [ADR-0031: One selected MQ service authority](decisions/0031-mq-selected-service-authority.md)
+- [ADR-0032: MQ program-to-machine frame handoff](decisions/0032-mq-program-machine-frame.md)
+- [ADR-0033: Complete MQMD value primitive](decisions/0033-mq-full-md-value.md)
+- [ADR-0033: MQ historical handle observation](decisions/0033-mq-historical-handle-observation.md)
+- [ADR-0034: MQ root publication framework](decisions/0034-mq-root-terminal-publication.md)
+- [ADR-0035: Volatile task-root MQI ABI aliases](decisions/0035-mq-root-scoped-abi-aliases.md)
+- [ADR-0036: Explicit pending Conformance IR obligations](decisions/0036-conformance-pending-obligations.md)
+- [Decision index and template](decisions/README.md)
+- [ADR-0034: Bounded GSAM logical record addresses](decisions/0034-gsam-logical-address.md)
+- [ADR-0031: IMS TM recovery publication and work settlement](decisions/0031-ims-tm-recovery-publication.md)
+- [ADR-0035: Versioned selected database PCB feedback](decisions/0035-selected-pcb-feedback.md)
+- [ADR-0037: Private IMS recovery retention fence](decisions/0037-private-ims-recovery-retention-fence.md)
+- [ADR-0038: Real logical child physical-path key feedback](decisions/0038-logical-child-physical-key-feedback.md)
+- [ADR-0039: Last remaining direct child SSA selection](decisions/0039-last-direct-child-ssa-selection.md)
+- [ADR-0040: Private primary level witnesses and search boundary](decisions/0040-primary-level-position-search-boundary.md)
+- [ADR-0041: First direct child SSA selection](decisions/0041-first-direct-child-ssa-selection.md)
+- [ADR-0042: Private IMS TM output identity and local completion order](decisions/0042-ims-tm-output-identity-local-order.md)
+- [ADR-0043: Checked provider read publication](decisions/0043-inquiry-checked-read-publication.md)
+- [ADR-0044: Checked inquiry replay refusal settlement](decisions/0044-checked-inquiry-replay-refusal.md)
+- [ADR-0033: Raw COBOL DL/I CALL and PCB binding contract](decisions/0033-cobol-dli-call-boundary.md)
+- [ADR-0030: GSAM application record formats and owned length](decisions/0030-gsam-application-record-formats.md)
+- [ADR-0032: Selected secondary checkpoint positions](decisions/0032-selected-secondary-checkpoint-position.md)
+- [ADR-0036: Literal null SSA command slots](decisions/0036-null-ssa-command-slots.md)
+- [ADR-0037: Running-step Program context transport](decisions/0037-running-step-program-transport.md)
+- [ADR-0038: Private coordinator original dispatch extraction](decisions/0038-coordinator-original-dispatch-extraction.md)
+- [ADR-0040: Batch run stop containment](decisions/0040-batch-run-stop-containment.md)
+- [ADR-0043: Batch contained all-effect loan](decisions/0043-batch-contained-all-effect-loan.md)
+- [ADR-0045: Batch prepared-selection observation](decisions/0045-batch-prepared-selection-plan.md)
+- [ADR-0046: Bounded provider namespace prefetch](decisions/0046-batch-bounded-provider-prefetch.md)
+- [ADR-0047: CardDemo participant ownership and batch completion](decisions/0047-carddemo-participant-completion.md)
+- [ADR-0048: Persistent interactive CardDemo composition](decisions/0048-carddemo-interactive-application.md)
+- [Executable application sandbox and agent boundary](decisions/0049-executable-agent-sandbox.md)
 - [ADR-0028: Explicit BTS SET loan lifetime](decisions/0028-explicit-bts-set-loan-lifetime.md)
 - [ADR-0029: COBOL storage-entry identity](decisions/0029-cobol-storage-entry-identity.md)
 - [ADR-0030: Common CICS source condition authority](decisions/0030-cics-source-condition-authority.md)
-- [Decision index and template](decisions/README.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.
 
@@ -107,10 +196,9 @@ ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immuta
 - [Implementation status](delivery/IMPLEMENTATION-STATUS.md)
 - [Verification strategy](delivery/VERIFICATION-STRATEGY.md)
 - [Compatibility and cutover](delivery/COMPATIBILITY-AND-CUTOVER.md)
-- [Versioning and releases](delivery/VERSIONING-AND-RELEASES.md)
 - [z/OSMF compatibility API](delivery/ZOSMF-API.md)
 
-Implementation progress is organized by subsystem and phase. Release versions identify compatibility and historical evidence.
+Implementation progress is organized by subsystem and phase. Contract revisions and pinned IBM product baselines identify compatibility.
 
 ## Subsystem progress
 
@@ -118,7 +206,7 @@ Implementation progress is organized by subsystem and phase. Release versions id
 - [Subsystem dependencies and concurrency](delivery/subsystems/DEPENDENCIES.md)
 - [Workload-profile track](delivery/subsystems/PROFILE-TRACK.md)
 - [Subsystem implementation prompts](prompts/subsystems/README.md)
-- [Project coordination and release history](delivery/subsystems/GITHUB-PROJECT.md)
+- [Subsystem project coordination](delivery/subsystems/GITHUB-PROJECT.md)
 - [Coverage and conformance — Coverage authority](delivery/subsystems/coverage/foundation-status.md)
 - [COBOL — Grammar and types](delivery/subsystems/cobol/structure-status.md)
 - [COBOL — Execution semantics](delivery/subsystems/cobol/execution-status.md)
@@ -135,7 +223,6 @@ Implementation progress is organized by subsystem and phase. Release versions id
 - [IBM MQ — MQI programming surface](delivery/subsystems/mq/programming-status.md)
 - [Cross-resource integration — Transactions and recovery](delivery/subsystems/integration/transactions-status.md)
 - [Licensed certification — Differential certification](delivery/subsystems/certification/licensed-status.md)
-- [Licensed certification — Stable release promotion](delivery/subsystems/certification/stable-release-plan.md)
 
 ## Operations
 
@@ -146,12 +233,11 @@ Implementation progress is organized by subsystem and phase. Release versions id
 - [CardDemo operator guide](runbooks/CARDDEMO-OPERATOR.md)
 - [CardDemo READACCT run bundle](runbooks/CARDDEMO-READACCT-BUNDLE.md)
 - [CICS licensed pilot](runbooks/cics-licensed-pilot.md)
-- [Conformance family rollout](runbooks/conformance-family-rollout.md)
+- [Conformance family rollout](runbooks/CONFORMANCE-FAMILY-ROLLOUT.md)
 
-## Releases, reviews, and research
+## Reviews and research
 
-- [0.8 release notes](releases/0.8.md)
-- [Pre-0.9 deep review](reviews/PRE-0.9.0-DEEP-REVIEW.md)
+- [Subsystem engineering review](reviews/SUBSYSTEM-REVIEW.md)
 - [Review index](reviews/README.md)
 - [IBM official coverage roadmap](research/IBM-OFFICIAL-COVERAGE-ROADMAP.md)
 - [Publication source probe](research/publication-source-probe.md)

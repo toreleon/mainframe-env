@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Migrated the pinned CardDemo IMS acceptance profile to signed corpus packages and generic metadata-selected database execution, with exact Memory/SQLite observations and reopen/replay checks; licensed IMS credit remains pending."

@@ -4,8 +4,10 @@
 
 mod ams;
 mod controller;
+mod db2_tso;
 mod dd;
 mod dd_hydration;
+mod ims_launcher;
 mod jcl;
 mod jcl_catalog;
 mod jcl_expand;
@@ -19,6 +21,10 @@ mod jes;
 mod jes_children;
 mod program;
 mod service;
+
+pub use service::{
+    BatchEffectOccurrence, BatchRunControl, BatchRunExit, RunningStepAdmission, RunningStepView,
+};
 
 pub use controller::{
     BATCH_CONTROLLER_REGISTRY_CONTRACT, BatchControllerDefinition, BatchControllerGeneration,

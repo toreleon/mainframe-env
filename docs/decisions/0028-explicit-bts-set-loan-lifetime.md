@@ -3,7 +3,7 @@
 Status: **Proposed; bounded root proofs recorded; parent acceptance pending**
 Owner: **Interpreter and selected execution maintainers**
 Scope: **explicit BTS GET CONTAINER SET in one root machine**
-Applies from: **mainframe-env 0.9.0 development**
+Applies from: **mainframe-env development**
 
 ## Context and decision
 

@@ -125,24 +125,22 @@ COBOL_MOVE_MUTATIONS = (
         'if layout.digits > 0\n'
         '        && digits.len() > layout.digits\n'
         '        && layout.category != LayoutCategory::NumericEdited\n'
+        '        && !(layout.category == LayoutCategory::Binary && layout.native_binary)\n'
         '    {',
-        'if layout.digits > 0 && digits.len() > layout.digits {',
+        'if layout.digits > 0 && digits.len() > layout.digits\n'
+        '        && !(layout.category == LayoutCategory::Binary && layout.native_binary) {',
     ),
     Mutation(
         'cobol-ignore-floating-capacity',
         'Treat every floating-sign position as a numeric digit and lose the reviewed truncation boundary',
-        'if floating_sign.is_some() {\n        let numeric_capacity = layout',
-        'if false {\n        let numeric_capacity = layout',
+        'if floating_symbol.is_some() {\n        let numeric_capacity = digit_positions',
+        'if false {\n        let numeric_capacity = digit_positions',
     ),
     Mutation(
         'cobol-drop-floating-minus',
         'Suppress the negative sign produced by the product numeric-edited MOVE path',
-        "if floating_sign_slot == Some(digit_index) {\n"
-        "                    output.push(if value.coefficient < 0 {\n"
-        "                        b'-'",
-        "if floating_sign_slot == Some(digit_index) {\n"
-        "                    output.push(if value.coefficient < 0 {\n"
-        "                        b' '",
+        "            _ if value.coefficient < 0 => Some(b'-'),",
+        "            _ if value.coefficient < 0 => Some(b' '),",
     ),
 )
 
@@ -239,13 +237,25 @@ TYPED_ARITHMETIC_MUTATIONS = (
         '    let mut staged = Vec::with_capacity(plan.assignments.len());\n'
         '    let mut receiver_size_error = false;\n'
         '    for (assignment, value) in plan.assignments.iter().zip(evaluated) {\n'
-        '        match stage_receiver(machine, operation, &assignment.receiver, value) {\n'
+        '        match stage_receiver(\n'
+        '            machine,\n'
+        '            operation,\n'
+        '            &assignment.receiver,\n'
+        '            value,\n'
+        '            preserve_failed_receiver,\n'
+        '        ) {\n'
         '            Ok(write) => staged.push(write),',
         '    let mut staged = Vec::with_capacity(plan.assignments.len());\n'
         '    let mut receiver_size_error = false;\n'
         '    for assignment in &plan.assignments {\n'
         '        let value = evaluate(machine, operation, &plan, &assignment.expression)?;\n'
-        '        match stage_receiver(machine, operation, &assignment.receiver, value) {\n'
+        '        match stage_receiver(\n'
+        '            machine,\n'
+        '            operation,\n'
+        '            &assignment.receiver,\n'
+        '            value,\n'
+        '            preserve_failed_receiver,\n'
+        '        ) {\n'
         '            Ok(write) => {\n'
         '                let (view, bytes) = &write;\n'
         '                machine.bases[view.base][view.offset..view.offset + view.length]\n'
@@ -293,12 +303,33 @@ def digest(data: bytes) -> str:
     return 'sha256:' + hashlib.sha256(data).hexdigest()
 
 
+def split_test_code(source: str) -> tuple[str, str]:
+    """Skip test-only imports and external module declarations as boundaries."""
+    marker = '#[cfg(test)]'
+    for match in re.finditer(re.escape(marker), source):
+        tail = source[match.end():].lstrip()
+        if re.match(r'(?:pub(?:\([^)]*\))?\s+)?use\b', tail):
+            continue
+        if re.match(r'(?:pub(?:\([^)]*\))?\s+)?mod\s+\w+\s*;', tail):
+            continue
+        return source[:match.start()], source[match.start():]
+    return source, ''
+
+
 def apply_mutation(source: str, mutation: Mutation) -> str:
-    implementation, marker, tests = source.partition('#[cfg(test)]')
+    implementation, tests = split_test_code(source)
     if implementation.count(mutation.old) != 1 or mutation.old == mutation.new:
         raise ValueError('mutation anchor must match exactly once in implementation, not tests')
-    changed = implementation.replace(mutation.old, mutation.new, 1) + marker + tests
-    if marker and changed.partition(marker)[2] != tests:
+    anchor_start = implementation.index(mutation.old)
+    anchor_end = anchor_start + len(mutation.old)
+    for imported in re.finditer(
+        r'#\[cfg\(test\)\]\s*(?:pub(?:\([^)]*\))?\s+)?(?:use\b[^;]*|mod\s+\w+\s*);',
+        implementation,
+    ):
+        if anchor_start < imported.end() and anchor_end > imported.start():
+            raise ValueError('mutation anchor overlaps a test-only declaration')
+    changed = implementation.replace(mutation.old, mutation.new, 1) + tests
+    if split_test_code(changed)[1] != tests:
         raise ValueError('mutation changed ordinary test code')
     return changed
 

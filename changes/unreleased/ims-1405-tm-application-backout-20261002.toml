@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Documented the shared work/effect publication and settlement contract required for IMS TM application backout, with signed scheduled-TM rejection and Memory/SQLite authority-gap witnesses; actual TM recovery remains unsupported."

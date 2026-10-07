@@ -1,17 +1,17 @@
-# 0.1 Security and Capability Architecture
+# platform.runtime-integration Security and Capability Architecture
 
 Status: **Accepted by repository owner**
 Owner: **security and architecture maintainers**
 Scope: **capability, provider, plugin, secret, and transport boundaries**
-Applies from: **mainframe-env 0.1.0**
+Applies from: **mainframe-env current subsystem contracts**
 
-## 0.1 boundary
+## platform.runtime-integration boundary
 
-0.1 uses statically linked, reviewed Rust implementations only. Wasm components,
+platform.runtime-integration uses statically linked, reviewed Rust implementations only. Wasm components,
 native dynamic plugins, supervised process plugins, remote workers, plugin
 marketplaces, and distributed generation lifecycle are explicitly out of scope.
 
-The 0.1 capability model is still explicit so production code does not depend on
+The platform.runtime-integration capability model is still explicit so production code does not depend on
 global state and later releases can add isolation without changing mainframe
 semantics.
 
@@ -24,7 +24,7 @@ Authentication produces an immutable `Principal`. Authorization occurs at:
 3. every sensitive dataset, JES, CICS, and security host operation; and
 4. administrative lifecycle operations.
 
-RACF/SAF is the authoritative 0.1 security provider. Policy errors and missing
+RACF/SAF is the authoritative platform.runtime-integration security provider. Policy errors and missing
 profiles fail closed. No authorization result is inferred from HTTP routing,
 possession of a Rust handle, or successful capability lookup.
 
@@ -98,11 +98,11 @@ catalog lock, JES state map, or CICS provider internals.
 
 The RACF provider owns:
 
-- user and group identities required by 0.1 fixtures;
+- user and group identities required by platform.runtime-integration fixtures;
 - authentication results and stable failure categories;
 - dataset and general-resource profiles;
 - SAF authorization requests and decisions;
-- administrative mutation transactions admitted by 0.1;
+- administrative mutation transactions admitted by platform.runtime-integration;
 - audit events and redaction; and
 - versioned persistence and configuration.
 
@@ -169,9 +169,9 @@ not enter execution or security contracts.
 - Contract packages keep minimal dependency surfaces and expose no third-party
   public types.
 
-## Post-0.1 rule
+## Post-platform.runtime-integration rule
 
 External plugin support requires a new ADR and threat model. It must use a
 language-neutral sandboxed or supervised boundary and cannot make native Rust
 dynamic libraries a stable ABI. This rule creates no external-plugin work in
-0.1.
+platform.runtime-integration.

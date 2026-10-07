@@ -1,0 +1,22 @@
+{
+  "schema_version": "mainframe-env.platform-scope@1",
+  "product": "mainframe-env",
+  "objective": "Provide bounded, deterministic authorities for supported COBOL, CICS, JCL/JES, dataset, RACF/SAF, and selected z/OSMF workloads; each subsystem owns its capabilities and verification requirements.",
+  "profiles": [
+    "core-server",
+    "conformance"
+  ],
+  "included_domains": [
+    "cobol",
+    "cics",
+    "jcl-jes",
+    "datasets",
+    "racf-saf",
+    "zosmf-information-authentication-datasets-jobs-console",
+    "required-compiler-execution-host-store-configuration-observability"
+  ],
+  "delivery": "at-least-once",
+  "default_authority_policy": "exactly-one",
+  "resource_policy": "all-owned-resources-bounded",
+  "compatibility_oracle": "out-of-process OpenMainframe only"
+}

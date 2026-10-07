@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add bounded common Db2 CREATE INDEX syntax with preserved uniqueness and key ordering, without execution or whole-row recognition credit."

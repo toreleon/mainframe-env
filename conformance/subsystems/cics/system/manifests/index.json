@@ -1,0 +1,52 @@
+{
+  "schema_version": "mainframe-env.topic-manifest-registry@1",
+  "semantic_authority": false,
+  "coverage_credit": 0,
+  "manifests": [
+    {
+      "scope_id": "cics-spi-command-bodies",
+      "subsystem": "cics",
+      "baseline_id": "ibm-cics-ts-6x-spi-command-bodies-2026-09-12",
+      "manifest": "conformance/subsystems/cics/system/manifests/cics-spi-command-topics.json",
+      "manifest_sha256": "sha256:fb716bc36103fa1fbed3e9979fd31b74ae1903127c42c0ea9f9cfae2d03d816f",
+      "topic_count": 277,
+      "topic_manifest_sha256": "sha256:84b948d0ae566171c52b907939e933ff33bafe43460217a6a17258a5292b7609",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "cics-fepi-command-bodies",
+      "subsystem": "cics",
+      "baseline_id": "ibm-cics-ts-6x-fepi-command-bodies-2026-09-12",
+      "manifest": "conformance/subsystems/cics/system/manifests/cics-fepi-command-topics.json",
+      "manifest_sha256": "sha256:7fa4536fe4c9227f6ef75c517706a1c01bf35826369f4ddd12bbcd6df7c65868",
+      "topic_count": 36,
+      "topic_manifest_sha256": "sha256:86de6d98be911824c2cccc9933d87d296cb3f77973b6ee1a5762e22910e95bc2",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "cics-fepi-context-candidates",
+      "subsystem": "cics",
+      "baseline_id": "ibm-cics-ts-6x-fepi-context-candidates-2026-09-12",
+      "manifest": "conformance/subsystems/cics/system/manifests/cics-fepi-context-topics.json",
+      "manifest_sha256": "sha256:2a0bc719bc9e29eff053e96dd986befe2cc876ddcc54f6190aa454182381df9d",
+      "topic_count": 9,
+      "topic_manifest_sha256": "sha256:0b8515c30d5e18747b00dab9853bed716b568fe3a079604611861a0a6af39594",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "cics-fepi-retained-context-additions",
+      "subsystem": "cics",
+      "baseline_id": "ibm-cics-ts-6x-fepi-retained-context-additions-2026-09-12",
+      "manifest": "conformance/subsystems/cics/system/manifests/cics-fepi-retained-context-topics.json",
+      "manifest_sha256": "sha256:13b9122c9b8ede1b92f9952ac74330d773df8a1d50504b60cedfbbda6a41dac0",
+      "topic_count": 3,
+      "topic_manifest_sha256": "sha256:449705790944425162c33d8a4056b061b376d01cd582c15e3779218c99838397",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    }
+  ],
+  "target_subsystem": "cics.system-api"
+}

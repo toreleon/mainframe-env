@@ -2,8 +2,8 @@
 
 Status: **Proposed**
 Owner: **conformance and xtask maintainers**
-Scope: **0.8 READACCT batch regression evidence**
-Applies from: **mainframe-env 0.8 run bundle v1**
+Scope: **jes.execution READACCT batch regression evidence**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Context
 

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added Mainframe Sandbox executable profiles, isolated application generations, structured CLI and MCP agent operations, editable CardDemo deployment, readiness, pinned container packaging and a Cube template integration contract."

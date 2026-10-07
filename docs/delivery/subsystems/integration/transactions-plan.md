@@ -2,14 +2,13 @@
 
 Subsystem: **integration**
 Phase: **transactions**
-Target release: **0.16.0**
 
 Status: **Proposed**
 Start gate: accepted JES, CICS, Db2, IMS, and MQ provider state/UOW contracts
 Completion dependencies: jes.execution, cics.system-api, db2.programming, ims.programming, mq.programming
 Estimate: 14–22 engineer-months
 
-The [common release contract](../README.md#common-release-contract) and
+The [common release contract](../README.md#shared-validation-contract) and
 [hardened slice acceptance](../../../prompts/subsystems/README.md#hardened-slice-acceptance)
 apply, including early participant-contract and licensed-harness preparation.
 These requirements do not themselves certify implementation or waive an exit gate.
@@ -46,11 +45,11 @@ recovery across batch, CICS, datasets, Db2, IMS, and MQ without hidden fallback.
 ## Early participant handoff and coherent restore
 
 The common early participant-contract rule applies before dependent provider
-adapters integrate. INT-1601 reviews and completes that accepted boundary; 0.16
+adapters integrate. INT-1601 reviews and completes that accepted boundary; integration.transactions
 is not the first time CICS, Db2, IMS and MQ agree on transaction ownership,
 capabilities, prepare applicability, compensation limits, fencing, idempotency,
 lock order or recovery ownership. Record early slices under the existing parent;
-they neither complete 0.16 nor expose unfinished mixed-resource behavior.
+they neither complete integration.transactions nor expose unfinished mixed-resource behavior.
 
 INT-1605 must restore a coherent mixed-resource recovery boundary, with compatible
 provider/schema generations and valid journal, checkpoint, artifact, replay and
@@ -67,7 +66,7 @@ can run in parallel. The public UOW state machine, effect ordering, lock order,
 durable log schema, and final candidate merge each have one owner.
 
 Provider adapters may be developed incrementally as their contracts freeze, but
-0.16 cannot complete until all five dependency versions are accepted.
+integration.transactions cannot complete until all five dependency versions are accepted.
 
 ## Exit gate
 

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Register ten immutable IMS 15.6 DEDB subset-pointer prerequisite sources for offline review with zero coverage credit; W runtime admission, metadata/context/framing owners and broader IMS acceptance remain pending."

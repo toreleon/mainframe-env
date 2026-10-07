@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added source-reviewed MQIA_Q_TYPE identity and a checked adequate-buffer normal-local inquiry contract, preserving pending selectors and historical canonical bytes without enabling MQINQ dispatch."

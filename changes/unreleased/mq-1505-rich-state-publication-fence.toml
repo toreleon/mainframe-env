@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added bounded private MQ rich delivery publication and checked next-fence plans with exact marker/metadata/catalog CAS dependencies, replay preservation and Memory/SQLite audited rollback and reopen proofs; public runtime and participant integration remain pending."

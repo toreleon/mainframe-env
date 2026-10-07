@@ -36,10 +36,11 @@ class SupplyChainTests(unittest.TestCase):
             ci_lock["tracked_remote_inputs"],
             {
                 "github_actions": [],
-                "container_images": [],
+                "container_images": ci_lock["tracked_remote_inputs"]["container_images"],
                 "package_install_commands": [],
             },
         )
+        self.assertEqual(len(ci_lock["tracked_remote_inputs"]["container_images"]), 2)
         tracked = set(supply_chain.tracked_files(ROOT))
         self.assertTrue(set(ci_lock["unsupported_local_inputs"]).isdisjoint(tracked))
 
@@ -72,6 +73,20 @@ class SupplyChainTests(unittest.TestCase):
                 observed["package_install_commands"],
                 ["tools/jenkins/setup.sh:2:brew install jenkins-lts"],
             )
+
+    def test_docker_stages_require_immutable_external_bases(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / "tools/sandbox/Dockerfile"
+            path.parent.mkdir(parents=True)
+            image = "registry.example/runtime@sha256:" + "a" * 64
+            path.write_text(f"FROM {image} AS build\nFROM build AS runtime\n")
+            observed = supply_chain.scan_external_inputs(root, ["tools/sandbox/Dockerfile"])
+            self.assertEqual(observed["container_images"], [image])
+            for source in ("FROM runtime:latest\n", "FROM ${BASE}\n"):
+                path.write_text(source)
+                with self.assertRaises(supply_chain.SupplyChainError):
+                    supply_chain.scan_external_inputs(root, ["tools/sandbox/Dockerfile"])
 
     def test_jenkins_artifacts_are_hash_version_and_closure_bound(self):
         with tempfile.TemporaryDirectory() as temporary:

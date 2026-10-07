@@ -6,7 +6,12 @@ rust-version.workspace = true
 license.workspace = true
 publish = false
 
+[[bin]]
+name = "mainframe-sandbox-runtime"
+path = "src/sandbox_main.rs"
+
 [dependencies]
+clap.workspace = true
 mainframe-env-coverage.workspace = true
 mainframe-env-source.workspace = true
 mainframe-env-diagnostics.workspace = true

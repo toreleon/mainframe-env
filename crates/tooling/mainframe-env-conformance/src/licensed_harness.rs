@@ -6,24 +6,30 @@ use std::collections::{BTreeMap, BTreeSet};
 const MAX_MANIFEST_BYTES: usize = 1024 * 1024;
 const MAX_REGISTRY_BYTES: usize = 1024 * 1024;
 const MAX_RECEIPT_BYTES: usize = 4 * 1024 * 1024;
-const ENVIRONMENT_SCHEMA: &str =
-    include_str!("../../../../conformance/0.17/schemas/licensed-environment-manifest.schema.json");
-const REGISTRY_SCHEMA: &str =
-    include_str!("../../../../conformance/0.17/schemas/oracle-harness-registry.schema.json");
-const RECEIPT_SCHEMA: &str =
-    include_str!("../../../../conformance/0.17/schemas/oracle-harness-receipt.schema.json");
+const ENVIRONMENT_SCHEMA: &str = include_str!(
+    "../../../../conformance/subsystems/certification/schemas/licensed-environment-manifest.schema.json"
+);
+const REGISTRY_SCHEMA: &str = include_str!(
+    "../../../../conformance/subsystems/certification/schemas/oracle-harness-registry.schema.json"
+);
+const RECEIPT_SCHEMA: &str = include_str!(
+    "../../../../conformance/subsystems/certification/schemas/oracle-harness-receipt.schema.json"
+);
 const COBOL_RECEIPT_SCHEMA: &str = include_str!(
     "../../../../conformance/spec/schemas/cobol-licensed-differential-receipt.schema.json"
 );
-const RACF_RECEIPT_SCHEMA: &str =
-    include_str!("../../../../conformance/0.5/schemas/racf-oracle-campaign.schema.json");
-const DATASET_RECEIPT_SCHEMA: &str =
-    include_str!("../../../../conformance/0.6/schemas/dataset-oracle-receipt.schema.json");
-const JES_RECEIPT_SCHEMA: &str = include_str!(
-    "../../../../conformance/0.8/schemas/jes-licensed-differential-receipt.schema.json"
+const RACF_RECEIPT_SCHEMA: &str = include_str!(
+    "../../../../conformance/subsystems/racf/schemas/racf-oracle-campaign.schema.json"
 );
-const CICS_RECEIPT_SCHEMA: &str =
-    include_str!("../../../../conformance/0.9/schemas/cics-oracle-capture.schema.json");
+const DATASET_RECEIPT_SCHEMA: &str = include_str!(
+    "../../../../conformance/subsystems/dataset/schemas/dataset-oracle-receipt.schema.json"
+);
+const JES_RECEIPT_SCHEMA: &str = include_str!(
+    "../../../../conformance/subsystems/jes/schemas/jes-licensed-differential-receipt.schema.json"
+);
+const CICS_RECEIPT_SCHEMA: &str = include_str!(
+    "../../../../conformance/subsystems/cics/application/schemas/cics-oracle-capture.schema.json"
+);
 const REQUIRED_SLOTS: [&str; 10] = [
     "cobol",
     "racf-saf",
@@ -97,7 +103,6 @@ impl OracleHarnessRegistry {
         &self.digest
     }
 
-    #[must_use]
     pub fn slot_ids(&self) -> impl Iterator<Item = &str> {
         self.slots.keys().map(String::as_str)
     }
@@ -707,13 +712,17 @@ fn normalization_policy_digest(policy_id: &str, rules: &[Value]) -> Result<Strin
 mod tests {
     use super::*;
 
-    const ENVIRONMENT: &[u8] =
-        include_bytes!("../../../../conformance/0.17/fixtures/synthetic-environment.json");
-    const LEGACY_CAPTURE: &[u8] =
-        include_bytes!("../../../../conformance/0.17/fixtures/synthetic-cics-capture.json");
-    const RECEIPT: &[u8] =
-        include_bytes!("../../../../conformance/0.17/fixtures/synthetic-receipt.json");
-    const REGISTRY: &[u8] = include_bytes!("../../../../conformance/0.17/oracles/harnesses.json");
+    const ENVIRONMENT: &[u8] = include_bytes!(
+        "../../../../conformance/subsystems/certification/fixtures/synthetic-environment.json"
+    );
+    const LEGACY_CAPTURE: &[u8] = include_bytes!(
+        "../../../../conformance/subsystems/certification/fixtures/synthetic-cics-capture.json"
+    );
+    const RECEIPT: &[u8] = include_bytes!(
+        "../../../../conformance/subsystems/certification/fixtures/synthetic-receipt.json"
+    );
+    const REGISTRY: &[u8] =
+        include_bytes!("../../../../conformance/subsystems/certification/oracles/harnesses.json");
 
     fn expectation() -> OracleCandidateExpectation {
         OracleCandidateExpectation {
@@ -730,7 +739,7 @@ mod tests {
                 "sha256:fccd2a8e5cc24dd08aeb32754daf14ed80e9f1b20b5d9e762a1b0cfe429ceeba".into(),
             )]),
             conformance_spec_digest:
-                "sha256:e599fd3e9a59134207abc7b4075242f3ae6a459ffb3e7faf9a0eddc6adf320d8".into(),
+                "sha256:c156b4c4f76035f1d41ee1fe988e38d2847cdb2f1dacf388f1c5200fd0a7f66b".into(),
             fixture_digest:
                 "sha256:5cce953c42c1ddeca1166750f5b7a1bffb2765c4db40f289c64d8af1567b5a5b".into(),
             oracle_adapter_digest:
@@ -742,7 +751,9 @@ mod tests {
 
     #[test]
     fn checked_in_registry_is_complete_and_zero_credit() {
-        let bytes = include_bytes!("../../../../conformance/0.17/oracles/harnesses.json");
+        let bytes = include_bytes!(
+            "../../../../conformance/subsystems/certification/oracles/harnesses.json"
+        );
         let registry = validate_oracle_harness_registry(bytes).unwrap();
         assert_eq!(registry.slot_ids().count(), 10);
         assert!(registry.digest().starts_with("sha256:"));
@@ -750,7 +761,9 @@ mod tests {
 
     #[test]
     fn registry_rejects_a_pending_slot_relabelled_as_ready() {
-        let bytes = include_bytes!("../../../../conformance/0.17/oracles/harnesses.json");
+        let bytes = include_bytes!(
+            "../../../../conformance/subsystems/certification/oracles/harnesses.json"
+        );
         let mut value: Value = serde_json::from_slice(bytes).unwrap();
         let db2 = value["slots"]
             .as_array_mut()

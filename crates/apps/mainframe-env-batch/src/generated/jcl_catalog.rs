@@ -5,9 +5,9 @@ pub const JCL_OFFICIAL_CATALOG_SHA256: &str =
 pub const JCL_PLAN_SCHEMA_SHA256: &str =
     "sha256:4c7c382dc06c33ee7622c5108a85fe96cf5f0a9f139e2827c0c2e966b47d57a5";
 pub const JCL_PLANNER_SEMANTICS_SHA256: &str =
-    "sha256:d26274c9d06a778228420fef38254da3b6090fa9b516cb35846d614ad2b4ece6";
+    "sha256:edc9b107c1b681ee50c199fd8d918f70115e3ceeabbd2ed0dad11eb5411ad507";
 pub const JCL_GENERATED_CATALOG_SHA256: &str =
-    "sha256:67d0022f3083b44426d1c6138af1f416238d0260824f0cde21407b733de7afde";
+    "sha256:17c3d97c976f75f2231d97949d62264da1ffcdf45f29c8c83cad93ff1b20c15f";
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum JclCatalogSupport {

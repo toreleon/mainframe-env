@@ -3,7 +3,7 @@
 Status: **Proposed for the incremental CIC-904.bts-lifecycle slice**
 Owner: **CICS provider and execution maintainers**
 Scope: **shared BTS process/activity state for 23 lifecycle application rows**
-Applies from: **mainframe-env 0.9.0 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Context
 
@@ -316,4 +316,4 @@ catalog rows `0002`/`0003` (`dfhp4_acquire.html`, SHA-256
 and `0037` (`dfhp4_defineprocess.html`, SHA-256
 `a31702315bb8d6cb0ac499858593eed0e2d4c2e3b65145474e95a39ecbd71f56`).
 The manifest pins and external raw HTML matched and were parsed offline with
-`ibm_docs.py`. The full assigned source map is in the 0.9.0 status.
+`ibm_docs.py`. The full assigned source map is in the cics.application-api status.

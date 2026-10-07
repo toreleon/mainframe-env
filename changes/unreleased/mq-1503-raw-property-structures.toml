@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a separately reviewed owned MQIMPO1/CHARV null-slot raw-property projection with complete bounded byte capture and atomic defined inquiry writeback, preserving historical MQ identities."

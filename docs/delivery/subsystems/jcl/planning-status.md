@@ -2,13 +2,12 @@
 
 Subsystem: **jcl**
 Phase: **planning**
-Target release: **0.7.0**
 
-Status: **JCL-701 through JCL-706 complete; minor exit gate passed**
+Status: **JCL-701 through JCL-706 complete; phase exit gate passed**
 
 The isolated implementation lane starts from accepted CI-300 repair commit
 `7d50310381a44878c23c51c38aed841e3a70347f` on branch `impl/0.7.0`. The
-accepted 0.2.0 catalog, diagnostic, source-provenance, application-package,
+accepted coverage.foundation catalog, diagnostic, source-provenance, application-package,
 generated identity, and coverage authorities remain frozen. The shared
 Conformance IR v1, typed registries, obligation verdict runner, `ScenarioSpec`,
 shard/cache identity, and derived ledger are reused without an incompatible
@@ -25,14 +24,11 @@ contract change.
 | JCL-705 | pass | All 13 JES2 JECL forms recognized, validated, source-ordered, and annotated with deferred runtime capabilities |
 | JCL-706 | pass | Shared-IR bindings, malformed/recovery/scale/determinism/compatibility matrices, CardDemo, and differential adapter |
 
-## Dependency receipts
+## Subsystem dependencies
 
-- Implementation baseline: `7d50310381a44878c23c51c38aed841e3a70347f`.
-- Frozen JCL/JES2 source baseline:
-  `ibm-zos-3.2-jcl-jes2-2026-06`, catalog digest
-  `sha256:640b6bf949b6feefa6ba2d762286500798d3157794c728c360f4a46fc260fba4`.
-- The accepted 0.2.0 evidence and generation receipts will be verified before
-  the first completion commit and again at the unchanged-candidate exit gate.
+JCL consumes the shared coverage catalogs, dataset contracts, and COBOL execution
+surface. Validate the current source inputs and generated contracts before
+integration; historical generation receipts are removed.
 
 ## Decisions and risks
 
@@ -43,7 +39,7 @@ contract change.
   parser framework or subsystem-local Conformance IR.
 - Catalog-derived statement and parameter identities will drive validation,
   documentation, coverage bindings, and planner-closure checks.
-- DD allocation vocabulary must remain compatible with the 0.6 lane. If an
+- DD allocation vocabulary must remain compatible with the dataset.data lane. If an
   additive shared vocabulary change proves necessary, this lane will stop and
   report it before editing the shared boundary.
 - Licensed IBM differential results cannot be fabricated. Differential
@@ -94,7 +90,7 @@ warnings; they are not treated as executed runtime semantics. The generated
 catalog digest is
 `sha256:1066a5b3dc378d37deecfdb1f5c67fb194e4d026d00973816a62dbddfea262d4`,
 planner-semantics digest is
-`sha256:d26274c9d06a778228420fef38254da3b6090fa9b516cb35846d614ad2b4ece6`,
+`sha256:edc9b107c1b681ee50c199fd8d918f70115e3ceeabbd2ed0dad11eb5411ad507`,
 and plan-schema digest is
 `sha256:4c7c382dc06c33ee7622c5108a85fe96cf5f0a9f139e2827c0c2e966b47d57a5`.
 
@@ -142,7 +138,7 @@ the historical semantic projection remains unchanged.
 ## Affected path and contract gate map
 
 The machine-readable fail-closed map is
-`conformance/0.7/inventory/jcl-path-gate-map.json`. Its six mappings bind
+`conformance/subsystems/jcl/inventory/jcl-path-gate-map.json`. Its six mappings bind
 converter/planner, catalog generation, shared-IR bindings, CardDemo
 compatibility, schema/oracle inventory, and workspace integration paths to
 their required gates. Ambiguous affected scope is a failure.
@@ -155,7 +151,7 @@ Draft 2020-12 schema checks; dependency and runtime architecture checks; shared
 spec compilation; generated JCL catalog and fixture drift checks; aggregate and
 focused JCL conformance; the complete JCL-706 exit matrix; and the pinned
 CardDemo JCL compatibility gate. No scheduling, spool, utility, dataset
-mutation, or JES runtime semantics are credited to 0.7.0.
+mutation, or JES runtime semantics are credited to jcl.planning.
 
 ## Controller review 1 repairs
 

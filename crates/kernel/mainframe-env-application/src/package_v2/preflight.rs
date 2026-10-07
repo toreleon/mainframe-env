@@ -1,3 +1,4 @@
+//! Unchanged package footprint and preflight bounds.
 use super::*;
 
 pub(super) fn validate_aggregate_bounds(
@@ -198,7 +199,7 @@ pub(super) fn validate_aggregate_bounds(
     })
 }
 
-fn validate_preflight_text(
+pub(super) fn validate_preflight_text(
     package: &ApplicationPackageV2,
     limits: PackageLimits,
 ) -> Result<(), InstallProblem> {
@@ -277,7 +278,9 @@ fn validate_preflight_text(
     Ok(())
 }
 
-fn metadata_nested_items(metadata: Option<&ImsMetadataCatalog>) -> Result<usize, InstallProblem> {
+pub(super) fn metadata_nested_items(
+    metadata: Option<&ImsMetadataCatalog>,
+) -> Result<usize, InstallProblem> {
     let Some(metadata) = metadata else {
         return Ok(0);
     };
@@ -321,7 +324,7 @@ fn metadata_nested_items(metadata: Option<&ImsMetadataCatalog>) -> Result<usize,
         .ok_or(InstallProblem::LimitExceeded)
 }
 
-fn bounded_values(
+pub(super) fn bounded_values(
     values: &BTreeMap<String, String>,
     limits: PackageLimits,
 ) -> Result<(), InstallProblem> {
@@ -335,7 +338,7 @@ fn bounded_values(
     Ok(())
 }
 
-fn bounded_text(value: &str, maximum: usize) -> Result<(), InstallProblem> {
+pub(super) fn bounded_text(value: &str, maximum: usize) -> Result<(), InstallProblem> {
     if value.len() > maximum {
         Err(InstallProblem::LimitExceeded)
     } else {
@@ -343,7 +346,9 @@ fn bounded_text(value: &str, maximum: usize) -> Result<(), InstallProblem> {
     }
 }
 
-fn section_text_lengths(package: &ApplicationPackageV2) -> impl Iterator<Item = usize> + '_ {
+pub(super) fn section_text_lengths(
+    package: &ApplicationPackageV2,
+) -> impl Iterator<Item = usize> + '_ {
     let sections = &package.sections;
     [
         package.base.manifest.name.len(),
@@ -415,7 +420,7 @@ fn section_text_lengths(package: &ApplicationPackageV2) -> impl Iterator<Item = 
     }))
 }
 
-fn bounded_sum(
+pub(super) fn bounded_sum(
     values: impl IntoIterator<Item = usize>,
     maximum: usize,
 ) -> Result<usize, InstallProblem> {

@@ -2,7 +2,7 @@ use super::*;
 
 impl ReferenceMachine {
     pub(super) fn checkpoint_bytes(&self) -> Option<Vec<u8>> {
-        if self.pending.is_some() {
+        if self.pending.is_some() || self.mqi.is_some() {
             return None;
         }
         snapshot_codec::encode_snapshot(&self.snapshot())

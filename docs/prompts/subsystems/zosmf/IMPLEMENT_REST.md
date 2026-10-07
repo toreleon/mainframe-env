@@ -3,7 +3,6 @@
 Subsystem: **zosmf**
 Phase: **rest**
 
-Target version: **0.11.0**
 Completion dependencies: racf.security, dataset.data, jes.execution, cics.system-api
 
 Use this prompt from the repository root. The
@@ -15,15 +14,15 @@ requirements alongside the version-specific boundaries below.
 
 ---
 
-You are implementing **mainframe-env 0.11.0: complete z/OSMF 3.2 REST
+You are implementing **mainframe-env zosmf.rest: complete z/OSMF 3.2 REST
 portfolio** for all 27 pinned service families.
 
 ## Read and verify first
 
 Read `docs/prompts/subsystems/README.md`,
 `docs/delivery/subsystems/zosmf/rest-plan.md`, the generated route/operation/error
-catalog, gateway/security/protocol contracts, and accepted evidence for 0.5.0,
-0.6.0, 0.8.0, and 0.10.0. Verify required backend capability versions and route
+catalog, gateway/security/protocol contracts, and accepted evidence for racf.security,
+dataset.data, jes.execution, and cics.system-api. Verify required backend capability versions and route
 closure before advertising any operation.
 
 Route catalog/schema and private adapters may be prepared earlier in an isolated

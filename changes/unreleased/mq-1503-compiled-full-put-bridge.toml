@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added finite compiled MQPUT/MQPUT1 forwarding through the existing opaque point profiles and root-shared typed aliases, with complete checked MQMD1/2 and MQPMO1 inputs and atomic writeback of actual Produced context/resolved-name observations. Existing canonical, replay and checkpoint identities remain unchanged; installed source/provider/root-terminal and full MQ acceptance remain required."

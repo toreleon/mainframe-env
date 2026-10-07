@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Enabled private child-first default nonshared MQCONN through checked same-task batch lineage, retaining logical UOW provenance and actual child effect/audit/receipt identity across ordinary nonfinal CALL return; task-end recovery and public installed-host readiness remain pending."

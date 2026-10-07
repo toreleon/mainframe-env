@@ -1,0 +1,569 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/ims-metadata@1",
+  "title": "mainframe-env IMS DBD and PSB metadata contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "databases",
+    "psbs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mainframe-env.ims-metadata@1"
+    },
+    "databases": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "$ref": "#/$defs/database"
+      }
+    },
+    "psbs": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "$ref": "#/$defs/psb"
+      }
+    }
+  },
+  "$defs": {
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9]{1,8}$"
+    },
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "offset",
+        "length",
+        "sequence",
+        "unique"
+      ],
+      "properties": {
+        "name": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/name"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "length": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sequence": {
+          "type": "boolean"
+        },
+        "unique": {
+          "type": "boolean"
+        }
+      },
+      "x-ims-source-topics": [
+        {
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_fieldstmt.htm",
+          "sha256": "94455fbdc9d5f7404c89c0fd73a813fee237fb851fc0d2348a96ba1ce9d36fcb"
+        }
+      ]
+    },
+    "segment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "parent",
+        "min_length",
+        "max_length",
+        "fields"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "parent": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/name"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "min_length": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32768
+        },
+        "max_length": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32768
+        },
+        "fields": {
+          "type": "array",
+          "maxItems": 255,
+          "items": {
+            "$ref": "#/$defs/field"
+          }
+        }
+      },
+      "x-ims-source-topics": [
+        {
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_segmstmt.htm",
+          "sha256": "014bf18fd4c89941bd6bafe3dccd66e607daf0523e618648334ca251eb2824d9"
+        }
+      ]
+    },
+    "secondary_index": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "target_segment",
+        "source_segment",
+        "source_fields"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "target_segment": {
+          "$ref": "#/$defs/name"
+        },
+        "source_segment": {
+          "$ref": "#/$defs/name"
+        },
+        "source_fields": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/name"
+          }
+        }
+      },
+      "x-ims-source-topics": [
+        {
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_xdfldstmt.htm",
+          "sha256": "1954204faddc7fc6f55e5942342c3edbd2114781c136e4c0276794dc1818fce8"
+        }
+      ]
+    },
+    "logical_relationship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parent_database",
+        "parent_segment",
+        "child_database",
+        "child_segment",
+        "paired"
+      ],
+      "properties": {
+        "parent_database": {
+          "$ref": "#/$defs/name"
+        },
+        "parent_segment": {
+          "$ref": "#/$defs/name"
+        },
+        "child_database": {
+          "$ref": "#/$defs/name"
+        },
+        "child_segment": {
+          "$ref": "#/$defs/name"
+        },
+        "paired": {
+          "type": "boolean"
+        }
+      },
+      "x-ims-source-topics": [
+        {
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_lchildstmt.htm",
+          "sha256": "518642c5f4fdbddb5f8a9ebc35dc609e5aeffa16b4951e99c2e655e285fcb9f8"
+        }
+      ]
+    },
+    "database": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "organization",
+        "segments",
+        "secondary_indexes",
+        "logical_relationships"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "organization": {
+          "enum": [
+            "DEDB",
+            "GSAM",
+            "HDAM",
+            "HIDAM",
+            "HISAM",
+            "HSAM",
+            "INDEX",
+            "MSDB",
+            "PHDAM",
+            "PHIDAM",
+            "PSINDEX",
+            "SHISAM",
+            "SHSAM"
+          ]
+        },
+        "segments": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 255,
+          "items": {
+            "$ref": "#/$defs/segment"
+          }
+        },
+        "secondary_indexes": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": {
+            "$ref": "#/$defs/secondary_index"
+          }
+        },
+        "logical_relationships": {
+          "type": "array",
+          "maxItems": 255,
+          "items": {
+            "$ref": "#/$defs/logical_relationship"
+          }
+        },
+        "gsam_format": {
+          "$ref": "#/$defs/gsam_format"
+        }
+      },
+      "x-ims-source-topics": [
+        {
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_dbdgenstmt.htm",
+          "sha256": "ae672b28c57e88f04a51ca54c152196f5f86eba67af3f91e99277b9d3676d53a"
+        },
+        {
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_dbdstmt.htm",
+          "sha256": "ce1b4b70aa0b5803d25e5d72a71004cffb071361fcbc93a658bd3ce4e17cf7cd"
+        }
+      ],
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "gsam_format"
+            ]
+          },
+          "then": {
+            "properties": {
+              "organization": {
+                "const": "GSAM"
+              },
+              "segments": {
+                "maxItems": 1
+              },
+              "secondary_indexes": {
+                "maxItems": 0
+              },
+              "logical_relationships": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "sensitive_segment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "parent",
+        "processing_options"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "parent": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/name"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "processing_options": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Z]{1,4}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "x-ims-source-topics": [
+        {
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_psbgensensegstmt.htm",
+          "sha256": "baf8ed5e7ad87faf1ba02801da3479385ba5b4b5fc74474ca051d32d3014ebf4"
+        }
+      ]
+    },
+    "database_pcb": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "name",
+        "database",
+        "database_version",
+        "processing_options",
+        "sensitive_segments"
+      ],
+      "properties": {
+        "kind": {
+          "const": "database"
+        },
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "database": {
+          "$ref": "#/$defs/name"
+        },
+        "secondary_index": {
+          "oneOf": [
+            { "$ref": "#/$defs/name" },
+            { "type": "null" }
+          ]
+        },
+        "database_version": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483647
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "processing_options": {
+          "type": "string",
+          "pattern": "^[A-Z]{1,4}$"
+        },
+        "sensitive_segments": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 30000,
+          "items": {
+            "$ref": "#/$defs/sensitive_segment"
+          }
+        }
+      },
+      "x-ims-source-topics": [
+        {
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_psbgendlipcbstmt.htm",
+          "sha256": "0dad54edd1a9940ca9a6988e06412836ff35a706cc2e1f7fbd36eb14fa02cfba"
+        }
+      ]
+    },
+    "alternate_terminal_pcb": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "name",
+        "destination",
+        "modifiable",
+        "express",
+        "same_terminal",
+        "response_mode"
+      ],
+      "properties": {
+        "kind": {
+          "const": "alternate-terminal"
+        },
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "destination": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/name"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "modifiable": {
+          "type": "boolean"
+        },
+        "express": {
+          "type": "boolean"
+        },
+        "same_terminal": {
+          "type": "boolean"
+        },
+        "response_mode": {
+          "type": "boolean"
+        }
+      },
+      "x-ims-source-topics": [
+        {
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_psbgenaltpcbstmt.htm",
+          "sha256": "89b117adcbc8ee2c9c114ce98258df1068548b3b88e0fac1e19892ffa8aba2a1"
+        }
+      ]
+    },
+    "pcb": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/database_pcb"
+        },
+        {
+          "$ref": "#/$defs/alternate_terminal_pcb"
+        }
+      ],
+      "x-ims-source-topics": [
+        {
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_psbgendlipcbstmt.htm",
+          "sha256": "0dad54edd1a9940ca9a6988e06412836ff35a706cc2e1f7fbd36eb14fa02cfba"
+        },
+        {
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_psbgenaltpcbstmt.htm",
+          "sha256": "89b117adcbc8ee2c9c114ce98258df1068548b3b88e0fac1e19892ffa8aba2a1"
+        }
+      ]
+    },
+    "psb": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "database_level",
+        "pcbs"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "database_level": {
+          "enum": [
+            "current",
+            "base"
+          ]
+        },
+        "pcbs": {
+          "type": "array",
+          "maxItems": 2500,
+          "items": {
+            "$ref": "#/$defs/pcb"
+          }
+        }
+      },
+      "x-ims-source-topics": [
+        {
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_psbgenpsbgenstmt.htm",
+          "sha256": "b373ee39a66431d4217f96809f90f4e4b648813dd0e484fbe8c87eccb3895d0c"
+        }
+      ]
+    },
+    "gsam_format": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "record_format",
+        "access_method",
+        "block_size",
+        "control"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "record_format": {
+          "enum": [
+            "F",
+            "V",
+            "U"
+          ]
+        },
+        "access_method": {
+          "enum": [
+            "Bsam",
+            "Vsam"
+          ]
+        },
+        "block_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32760
+        },
+        "control": {
+          "enum": [
+            "None",
+            "Asa",
+            "Machine"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "record_format": {
+                "const": "U"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "access_method": {
+                "const": "Bsam"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "x-ims-source-topics": [
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_dbdgenstmt.htm",
+      "sha256": "ae672b28c57e88f04a51ca54c152196f5f86eba67af3f91e99277b9d3676d53a"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_psbgenpsbgenstmt.htm",
+      "sha256": "b373ee39a66431d4217f96809f90f4e4b648813dd0e484fbe8c87eccb3895d0c"
+    }
+  ]
+}

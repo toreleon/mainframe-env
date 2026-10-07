@@ -3,7 +3,7 @@
 use super::*;
 
 fn inputs(root: &Path) -> TaskResult<(String, Vec<OfficialCatalogRow>, Value)> {
-    let index_path = root.join("conformance/0.2/catalogs/index.json");
+    let index_path = root.join("conformance/subsystems/coverage/catalogs/index.json");
     let catalog_digest = format!("sha256:{}", file_digest(&index_path)?);
     let spec_path = root.join("conformance/spec/v1/spec.json");
     let mut spec_value = json(&spec_path)?;

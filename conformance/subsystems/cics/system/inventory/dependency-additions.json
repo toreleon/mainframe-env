@@ -1,0 +1,10 @@
+{
+  "schema_version": "mainframe-env.conformance-dependency-additions@1",
+  "edges": [
+    [
+      "xtask",
+      "mainframe-env-ir"
+    ]
+  ],
+  "target_subsystem": "cics.system-api"
+}

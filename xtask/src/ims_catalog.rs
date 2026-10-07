@@ -1,17 +1,19 @@
 use super::*;
 
-const SOURCE_PATH: &str = "conformance/0.2/catalogs/ims.json";
-const MANIFEST_PATH: &str = "conformance/0.2/manifests/ims-topics.json";
+const SOURCE_PATH: &str = "conformance/subsystems/coverage/catalogs/ims.json";
+const MANIFEST_PATH: &str = "conformance/subsystems/coverage/manifests/ims-topics.json";
 const GENERATED_PATH: &str =
     "crates/foundation/mainframe-env-ir/src/generated/ims_call_registry.rs";
-const SSA_RULES_PATH: &str = "conformance/0.14/ims/ssa-rules.json";
-const SSA_SCHEMA_PATH: &str = "conformance/0.14/schemas/ims-ssa-rules.schema.json";
-const SSA_MANIFEST_PATH: &str = "conformance/0.14/manifests/ims-programming-contracts-topics.json";
+const SSA_RULES_PATH: &str = "conformance/subsystems/ims/ims/ssa-rules.json";
+const SSA_SCHEMA_PATH: &str = "conformance/subsystems/ims/schemas/ims-ssa-rules.schema.json";
+const SSA_MANIFEST_PATH: &str =
+    "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json";
 const GENERATED_SSA_PATH: &str =
     "crates/contracts/mainframe-env-host-api/src/generated/ims_ssa_rules.rs";
-const PCB_STATUS_RULES_PATH: &str = "conformance/0.14/ims/pcb-status-rules.json";
-const PCB_STATUS_SCHEMA_PATH: &str = "conformance/0.14/schemas/ims-pcb-status-rules.schema.json";
-const METADATA_SCHEMA_PATH: &str = "conformance/0.14/schemas/ims-metadata.schema.json";
+const PCB_STATUS_RULES_PATH: &str = "conformance/subsystems/ims/ims/pcb-status-rules.json";
+const PCB_STATUS_SCHEMA_PATH: &str =
+    "conformance/subsystems/ims/schemas/ims-pcb-status-rules.schema.json";
+const METADATA_SCHEMA_PATH: &str = "conformance/subsystems/ims/schemas/ims-metadata.schema.json";
 const GENERATED_PCB_PATH: &str =
     "crates/contracts/mainframe-env-host-api/src/generated/ims_pcb_masks.rs";
 const GENERATED_STATUS_PATH: &str =
@@ -157,6 +159,34 @@ fn validate_metadata_schema(root: &Path) -> TaskResult {
     bad_name["databases"][0]["segments"][0]["name"] = json!("TOO-LONG");
     let mut bad_kind = instance.clone();
     bad_kind["psbs"][0]["pcbs"][1]["kind"] = json!("io");
+    let mut format = instance.clone();
+    format["databases"][0] = json!({"name":"AUTHDB", "version":7, "organization":"GSAM",
+        "segments":[{"name":"RECORD", "parent":null, "min_length":12, "max_length":16, "fields":[]}],
+        "secondary_indexes":[], "logical_relationships":[],
+        "gsam_format":{"version":1, "record_format":"U", "access_method":"Bsam",
+            "block_size":16, "control":"None"}});
+    require(
+        validator.is_valid(&format),
+        "IMS metadata schema rejected explicit GSAM format",
+    )?;
+    for (field, value) in [
+        ("version", json!(2)),
+        ("access_method", json!("Vsam")),
+        ("block_size", json!(0)),
+        ("raw_pcb", json!([0, 0, 0, 12])),
+    ] {
+        let mut bad = format.clone();
+        bad["databases"][0]["gsam_format"][field] = value;
+        require(
+            !validator.is_valid(&bad),
+            &format!("IMS metadata schema accepted invalid format {field}"),
+        )?;
+    }
+    format["databases"][0]["organization"] = json!("HIDAM");
+    require(
+        !validator.is_valid(&format),
+        "IMS metadata schema accepted non-GSAM format",
+    )?;
     let mut bad_bound = instance;
     bad_bound["databases"][0]["segments"][0]["max_length"] = json!(32769);
     for (label, mutation) in [
@@ -377,7 +407,7 @@ fn render_ssa(root: &Path) -> TaskResult<Vec<u8>> {
     validate_schema_instance(&json(&schema_path)?, &rules, &rules_path)?;
     require(
         rules["schema_version"] == Value::String("mainframe-env.ims-ssa-rules@1".into())
-            && rules["target_version"] == Value::String("0.14.0".into())
+            && rules["target_subsystem"] == Value::String("ims.programming".into())
             && rules["source_scope"] == Value::String("ims-programming-contracts".into())
             && rules["segment_name_bytes"].as_u64() == Some(8)
             && rules["field_name_bytes"].as_u64() == Some(8)
@@ -425,6 +455,11 @@ fn render_ssa(root: &Path) -> TaskResult<Vec<u8>> {
         )?;
     }
 
+    let null_command = hex_byte(text(&rules, "null_command_encoding", &rules_path)?)?;
+    require(
+        null_command == b'-',
+        "IMS SSA null-command encoding drifted",
+    )?;
     let expected_codes = [
         "A", "C", "D", "F", "G", "L", "M", "N", "O", "P", "Q", "R", "S", "U", "V", "W", "Z",
     ];
@@ -525,6 +560,7 @@ fn render_ssa(root: &Path) -> TaskResult<Vec<u8>> {
          pub const IMS_SSA_SEGMENT_NAME_BYTES: usize = 8;\n\
          pub const IMS_SSA_FIELD_NAME_BYTES: usize = 8;\n\
          pub const IMS_SSA_RELATIONAL_OPERATOR_BYTES: usize = 2;\n\n\
+         const IMS_SSA_NULL_COMMAND: u8 = {null_command};\n\n\
          pub const IMS_SSA_COMMAND_CODES: &[ImsSsaCommandCodeDescriptor] = &[\n",
         format!("sha256:{}", file_digest(&rules_path)?),
         format!(
@@ -569,7 +605,7 @@ fn render_pcb_status(root: &Path) -> TaskResult<(Vec<u8>, Vec<u8>)> {
     validate_schema_instance(&json(&schema_path)?, &rules, &rules_path)?;
     require(
         rules["schema_version"] == Value::String("mainframe-env.ims-pcb-status-rules@1".into())
-            && rules["target_version"] == Value::String("0.14.0".into())
+            && rules["target_subsystem"] == Value::String("ims.programming".into())
             && rules["source_scope"] == Value::String("ims-programming-contracts".into()),
         "IMS PCB/status rule identity drifted",
     )?;

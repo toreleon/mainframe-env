@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Extract the coordinator's original HostCall branch into one private borrowed implementation while preserving machine, journal, control, replay and audit behavior without activating a Batch controller."

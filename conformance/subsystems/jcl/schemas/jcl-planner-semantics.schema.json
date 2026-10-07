@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.example/schemas/jcl-planner-semantics.schema.json",
+  "title": "JCL planner semantic validation catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "target_subsystem", "source_catalog", "generated_coverage_credit", "families"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.jcl-planner-semantics@1"},
+    "target_subsystem": {"const": "jcl.planning"},
+    "source_catalog": {"const": "conformance/subsystems/coverage/catalogs/jcl-jes2.json"},
+    "generated_coverage_credit": {"const": 0},
+    "families": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["jcl-statements", "jes2-jecl-statements", "dd-parameters", "exec-parameters", "job-parameters", "output-parameters"],
+      "properties": {
+        "jcl-statements": {"$ref": "#/$defs/family"},
+        "jes2-jecl-statements": {"$ref": "#/$defs/family"},
+        "dd-parameters": {"$ref": "#/$defs/family"},
+        "exec-parameters": {"$ref": "#/$defs/family"},
+        "job-parameters": {"$ref": "#/$defs/family"},
+        "output-parameters": {"$ref": "#/$defs/family"}
+      }
+    }
+  },
+  "$defs": {
+    "family": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capability_prefix", "default", "rules"],
+      "properties": {
+        "capability_prefix": {"type": "string", "pattern": "^[a-z][a-z0-9.-]+$"},
+        "default": {"$ref": "#/$defs/rule"},
+        "rules": {
+          "type": "object",
+          "maxProperties": 204,
+          "additionalProperties": {"$ref": "#/$defs/rule"}
+        }
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["validation", "support"],
+      "properties": {
+        "validation": {
+          "enum": [
+            "none", "jcl-value", "text", "name", "name-list", "integer",
+            "integer-or-tuple", "integer-or-x", "integer-or-suffix", "boolean",
+            "enum", "size", "size-or-tuple", "time", "class", "condition",
+            "message-level", "dataset", "disposition", "delimiter", "record-format",
+            "path", "program", "procedure", "restart", "sysout", "output-reference",
+            "backward-reference", "secret"
+          ]
+        },
+        "minimum": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+        "maximum": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+        "choices": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 64}
+        },
+        "support": {"enum": ["available", "deferred"]},
+        "sensitive": {"type": "boolean"},
+        "capability": {"type": "string", "pattern": "^[a-z][a-z0-9.-]+$"}
+      }
+    }
+  }
+}

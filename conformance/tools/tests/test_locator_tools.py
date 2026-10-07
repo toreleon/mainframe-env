@@ -247,7 +247,7 @@ class DigestTests(unittest.TestCase):
         self.assertEqual(DOCS.manifest_digest(topics), DOCS.manifest_digest(topics[::-1]))
 
     def test_every_committed_manifest_still_hashes_to_its_recorded_digest(self) -> None:
-        manifests = sorted((REPOSITORY / "conformance/0.2/manifests").glob("*.json"))
+        manifests = sorted((REPOSITORY / "conformance/subsystems/coverage/manifests").glob("*.json"))
         self.assertEqual(len(manifests), 9)
         for path in manifests:
             manifest = json.loads(path.read_text(encoding="utf-8"))
@@ -257,7 +257,7 @@ class DigestTests(unittest.TestCase):
 
     def test_the_schema_states_the_same_definition_the_code_uses(self) -> None:
         schema = json.loads(
-            (REPOSITORY / "conformance/0.2/schemas/topic-manifest.schema.json").read_text(
+            (REPOSITORY / "conformance/subsystems/coverage/schemas/topic-manifest.schema.json").read_text(
                 encoding="utf-8"
             )
         )
@@ -609,7 +609,7 @@ class CheckTests(unittest.TestCase):
         # End to end, on the locators the tree actually carries rather than on
         # ones the test wrote for itself: all 20 read `exact` on `table-row`.
         catalog = json.loads(
-            (REPOSITORY / "conformance/0.2/catalogs/jcl-jes2.json").read_text(encoding="utf-8")
+            (REPOSITORY / "conformance/subsystems/coverage/catalogs/jcl-jes2.json").read_text(encoding="utf-8")
         )
         unit = next(u for u in catalog["units"] if u["id"] == "jcl-statements")
         self.assertEqual(len(unit["rows"]), 20)
@@ -709,7 +709,7 @@ class CatalogLocatorTests(unittest.TestCase):
 
     def locators(self) -> list[tuple[str, str, dict[str, str]]]:
         found = []
-        for path in sorted((REPOSITORY / "conformance/0.2/catalogs").glob("*.json")):
+        for path in sorted((REPOSITORY / "conformance/subsystems/coverage/catalogs").glob("*.json")):
             document = json.loads(path.read_text(encoding="utf-8"))
             for unit in document.get("units", []):
                 for entry in unit["rows"]:
@@ -751,11 +751,11 @@ class CatalogLocatorTests(unittest.TestCase):
 
 class DestinationTests(unittest.TestCase):
     def test_a_report_inside_the_repository_is_refused(self) -> None:
-        # Unbound JSON under conformance/0.2 is what broke this branch once.
+        # Unbound JSON under conformance/subsystems/coverage is what broke this branch once.
         for tool in (LOCATORS, PINS):
             with self.subTest(tool=tool.__name__):
                 with self.assertRaises(ValueError):
-                    tool.outside_repository(REPOSITORY / "conformance/0.2/audit.json")
+                    tool.outside_repository(REPOSITORY / "conformance/subsystems/coverage/audit.json")
 
     def test_a_report_outside_the_repository_is_allowed(self) -> None:
         for tool in (LOCATORS, PINS):

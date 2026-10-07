@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/mq-licensed-differential-fixtures@1",
+  "title": "IBM MQ 9.4 licensed-differential independent fixture index",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_subsystem",
+    "work_package",
+    "baseline_id",
+    "unit",
+    "independent_fixture_authority",
+    "case_count",
+    "cases_per_call",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mainframe-env.mq-licensed-differential-fixtures@1"
+    },
+    "target_subsystem": {"const": "mq.programming"},
+    "work_package": {"const": "MQ-1506.licensed-harness-contract"},
+    "baseline_id": {"const": "ibm-mq-9.4-mqi-2026-08-31"},
+    "unit": {"const": "mqi-calls-unique"},
+    "independent_fixture_authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "product_output_derived",
+        "oracle_output_embedded",
+        "raw_fixture_bytes_retained",
+        "external_bundle_digest_required"
+      ],
+      "properties": {
+        "kind": {"const": "reviewed-external-fixture-bundle"},
+        "product_output_derived": {"const": false},
+        "oracle_output_embedded": {"const": false},
+        "raw_fixture_bytes_retained": {"const": false},
+        "external_bundle_digest_required": {"const": true}
+      }
+    },
+    "case_count": {"const": 26},
+    "cases_per_call": {"const": 1},
+    "cases": {
+      "type": "array",
+      "minItems": 26,
+      "maxItems": 26,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/case"}
+    }
+  },
+  "$defs": {
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "row_id",
+        "call",
+        "source_topic_path",
+        "input_profile",
+        "fixture_bundle_member",
+        "observation_profile"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "pattern": "^mq\\.mqi\\.mq[a-z0-9_]+\\.licensed-differential$",
+          "maxLength": 96
+        },
+        "row_id": {
+          "type": "string",
+          "pattern": "^ibm-mq-9\\.4-mqi-2026-08-31:mqi-calls-unique:[0-9]{4}$"
+        },
+        "call": {
+          "type": "string",
+          "pattern": "^MQ[A-Z0-9_]+$",
+          "maxLength": 32
+        },
+        "source_topic_path": {
+          "type": "string",
+          "pattern": "^SSFKSJ_9\\.4\\.0/refdev/q[0-9]+_\\.html$",
+          "maxLength": 64
+        },
+        "input_profile": {
+          "type": "string",
+          "pattern": "^independent-mqi\\.[a-z0-9-]+\\.v1$",
+          "maxLength": 96
+        },
+        "fixture_bundle_member": {
+          "type": "string",
+          "pattern": "^mqi/mq[a-z0-9_]+\\.json$",
+          "maxLength": 64
+        },
+        "observation_profile": {"const": "mq-normalized-observation@1"}
+      }
+    }
+  }
+}

@@ -15,6 +15,8 @@ SPEC.loader.exec_module(binding)
 class TransactionParticipantBindingTests(unittest.TestCase):
     def fixture(self, root: Path) -> None:
         for relative in [
+            "conformance/subsystems/integration/contracts/transaction-participant.json",
+            "crates/providers/mainframe-env-ims/tests/participant_contract.rs",
             "crates/kernel/mainframe-env-interpreter/src/coordinator.rs",
             "crates/providers/mainframe-env-cics/src/handlers/recovery.rs",
             "crates/providers/mainframe-env-db2/src/service.rs",
@@ -55,6 +57,15 @@ class TransactionParticipantBindingTests(unittest.TestCase):
                     1,
                 )
             )
+            with self.assertRaises(ValueError):
+                binding.check(root)
+
+    def test_ims_preparation_without_restart_test_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.fixture(root)
+            path = root / "crates/providers/mainframe-env-ims/tests/participant_contract.rs"
+            path.write_text(path.read_text().replace("std::process::Command::new", "removed_restart"))
             with self.assertRaises(ValueError):
                 binding.check(root)
 

@@ -1,0 +1,132 @@
+{
+  "schema_version": "mainframe-env.jcl-fixture-seeds@1",
+  "target_subsystem": "jcl.planning",
+  "value_shapes": {
+    "none": {"valid": "POSITIONAL", "invalid": "VALUE=BAD"},
+    "jcl-value": {"valid": "VALUE", "invalid": "("},
+    "text": {"valid": "TEXT", "invalid": ""},
+    "name": {"valid": "NAME1", "invalid": ""},
+    "name-list": {"valid": "(ONE,TWO)", "invalid": ""},
+    "integer": {"valid": "1", "invalid": "NOTNUM"},
+    "integer-or-tuple": {"valid": "1", "invalid": "NOTNUM"},
+    "integer-or-x": {"valid": "1", "invalid": "NOTNUM"},
+    "integer-or-suffix": {"valid": "1K", "invalid": "NOTNUM"},
+    "boolean": {"valid": "YES", "invalid": "MAYBE"},
+    "enum": {"valid": "$FIRST_CHOICE", "invalid": "INVALID"},
+    "size": {"valid": "4M", "invalid": "BIG"},
+    "size-or-tuple": {"valid": "4M", "invalid": "BIG"},
+    "time": {"valid": "1", "invalid": "(1,99)"},
+    "class": {"valid": "A", "invalid": "AB"},
+    "condition": {"valid": "(0,EQ)", "invalid": "(X,EQ)"},
+    "message-level": {"valid": "(1,1)", "invalid": "(3,2)"},
+    "dataset": {"valid": "USER.DATA", "invalid": "BAD DATA"},
+    "disposition": {"valid": "(NEW,CATLG,DELETE)", "invalid": "(BAD,KEEP)"},
+    "delimiter": {"valid": "@@", "invalid": "LONG"},
+    "record-format": {"valid": "FB", "invalid": "BAD"},
+    "path": {"valid": "/tmp/data", "invalid": "relative"},
+    "program": {"valid": "IEFBR14", "invalid": "TOO-LONG9"},
+    "procedure": {"valid": "PROC1", "invalid": "TOO-LONG9"},
+    "restart": {"valid": "STEP1", "invalid": "TOO-LONG9"},
+    "sysout": {"valid": "*", "invalid": "(AB,TOO,MANY,VALUES)"},
+    "output-reference": {"valid": "OUT1", "invalid": ""},
+    "backward-reference": {"valid": "*.BASE", "invalid": "BASE"},
+    "secret": {"valid": "SECRET", "invalid": "TOO-LONG9"}
+  },
+  "statements": {
+    "JCL-COMMAND": {
+      "valid": {"primary": "//J JOB\n//DISPLAY\n//S EXEC PGM=IEFBR14\n", "target_line": 2},
+      "invalid": {"primary": "//J JOB\n//(\n//S EXEC PGM=IEFBR14\n", "target_line": 2, "expected_error": "MEJCL0760"}
+    },
+    "COMMAND": {
+      "valid": {"primary": "//J JOB\n//C COMMAND 'D A,L'\n//S EXEC PGM=IEFBR14\n", "target_line": 2},
+      "invalid": {"primary": "//J JOB\n//C COMMAND (\n//S EXEC PGM=IEFBR14\n", "target_line": 2, "expected_error": "MEJCL0760"}
+    },
+    "COMMENT": {
+      "valid": {"primary": "//J JOB\n//* COMMENT\n//S EXEC PGM=IEFBR14\n", "target_line": 2},
+      "invalid": {"primary": "//J JOB\n//* é\n//S EXEC PGM=IEFBR14\n", "target_line": 2, "expected_error": "MEJCL0702"}
+    },
+    "CNTL": {
+      "valid": {"primary": "//J JOB\n//C CNTL\nCONTROL\n//E ENDCNTL\n//S EXEC PGM=IEFBR14\n", "target_line": 2},
+      "invalid": {"primary": "//J JOB\n//C CNTL EXTRA\nCONTROL\n//E ENDCNTL\n//S EXEC PGM=IEFBR14\n", "target_line": 2, "expected_error": "MEJCL0760"}
+    },
+    "DD": {
+      "valid": {"primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DUMMY\n", "target_line": 3},
+      "invalid": {"primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD UNKNOWN=VALUE\n", "target_line": 3, "expected_error": "MEJCL0721"}
+    },
+    "DELIMITER": {
+      "valid": {"primary": "//J JOB\n//S EXEC PGM=IEFBR14\n/*\n", "target_line": 3},
+      "invalid": {"primary": "//J JOB\n//S EXEC PGM=IEFBR14\n/*é\n", "target_line": 3, "expected_error": "MEJCL0702"}
+    },
+    "ENDCNTL": {
+      "valid": {"primary": "//J JOB\n//C CNTL\nCONTROL\n//E ENDCNTL\n//S EXEC PGM=IEFBR14\n", "target_line": 4},
+      "invalid": {"primary": "//J JOB\n//C CNTL\nCONTROL\n//E ENDCNTL EXTRA\n//S EXEC PGM=IEFBR14\n", "target_line": 4, "expected_error": "MEJCL0760"}
+    },
+    "EXEC": {
+      "valid": {"primary": "//J JOB\n//S EXEC PGM=IEFBR14\n", "target_line": 2},
+      "invalid": {"primary": "//J JOB\n//S EXEC UNKNOWN=VALUE\n", "target_line": 2, "expected_error": "MEJCL0721"}
+    },
+    "EXPORT": {
+      "valid": {"primary": "//J JOB\n// SET X=VALUE\n// EXPORT SYMLIST=(X)\n//S EXEC PGM=IEFBR14\n", "target_line": 3},
+      "invalid": {"primary": "//J JOB\n// SET X=VALUE\n// EXPORT BAD\n//S EXEC PGM=IEFBR14\n", "target_line": 3, "expected_error": "MEJCL0760"}
+    },
+    "IF": {
+      "valid": {"primary": "//J JOB\n// IF (RC = 0) THEN\n//S EXEC PGM=IEFBR14\n// ENDIF\n", "target_line": 2},
+      "invalid": {"primary": "//J JOB\n// IF (RC ?? 0) THEN\n//S EXEC PGM=IEFBR14\n// ENDIF\n", "target_line": 2, "expected_error": "MEJCL0750"}
+    },
+    "INCLUDE": {
+      "valid": {"primary": "//J JOB\n//I INCLUDE MEMBER=PART\n//S EXEC PGM=IEFBR14\n", "target_line": 2, "includes": {"PART": "//* INCLUDED\n"}},
+      "invalid": {"primary": "//J JOB\n//I INCLUDE MEMBER=PART,EXTRA\n//S EXEC PGM=IEFBR14\n", "target_line": 2, "expected_error": "MEJCL0760", "includes": {"PART": "//* INCLUDED\n"}}
+    },
+    "JCLLIB": {
+      "valid": {"primary": "//J JOB\n//L JCLLIB ORDER=LIB1\n//S EXEC PGM=IEFBR14\n", "target_line": 2},
+      "invalid": {"primary": "//J JOB\n//L JCLLIB ORDER=(LIB1),EXTRA\n//S EXEC PGM=IEFBR14\n", "target_line": 2, "expected_error": "MEJCL0760"}
+    },
+    "JOB": {
+      "valid": {"primary": "//J JOB CLASS=A\n//S EXEC PGM=IEFBR14\n", "target_line": 1},
+      "invalid": {"primary": "//J JOB CLASS=AB\n//S EXEC PGM=IEFBR14\n", "target_line": 1, "expected_error": "MEJCL0745"}
+    },
+    "NULL": {
+      "valid": {"primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//\n", "target_line": 3},
+      "invalid": {"primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//é\n", "target_line": 3, "expected_error": "MEJCL0702"}
+    },
+    "OUTPUT": {
+      "valid": {"primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT CLASS=A\n", "target_line": 3},
+      "invalid": {"primary": "//J JOB\n//S EXEC PGM=IEFBR14\n//O OUTPUT CLASS=AB\n", "target_line": 3, "expected_error": "MEJCL0745"}
+    },
+    "PEND": {
+      "valid": {"primary": "//J JOB\n//P PROC\n//X EXEC PGM=IEFBR14\n// PEND\n//S EXEC PROC=P\n", "target_line": 4},
+      "invalid": {"primary": "//J JOB\n//P PROC\n//X EXEC PGM=IEFBR14\n// PEND EXTRA\n//S EXEC PROC=P\n", "target_line": 4, "expected_error": "MEJCL0760"}
+    },
+    "PROC": {
+      "valid": {"primary": "//J JOB\n//P PROC\n//X EXEC PGM=IEFBR14\n// PEND\n//S EXEC PROC=P\n", "target_line": 2},
+      "invalid": {"primary": "//J JOB\n//P PROC BAD\n//X EXEC PGM=IEFBR14\n// PEND\n//S EXEC PROC=P\n", "target_line": 2, "expected_error": "MEJCL0760"}
+    },
+    "SCHEDULE": {
+      "valid": {"primary": "//J JOB\n//S SCHEDULE HOLD\n//X EXEC PGM=IEFBR14\n", "target_line": 2},
+      "invalid": {"primary": "//J JOB\n//S SCHEDULE (\n//X EXEC PGM=IEFBR14\n", "target_line": 2, "expected_error": "MEJCL0760"}
+    },
+    "SET": {
+      "valid": {"primary": "//J JOB\n// SET P=IEFBR14\n//S EXEC PGM=&P.\n", "target_line": 2},
+      "invalid": {"primary": "//J JOB\n// SET BAD\n//S EXEC PGM=IEFBR14\n", "target_line": 2, "expected_error": "MEJCL0760"}
+    },
+    "XMIT": {
+      "valid": {"primary": "//J JOB\n//X XMIT DEST\n//S EXEC PGM=IEFBR14\n", "target_line": 2},
+      "invalid": {"primary": "//J JOB\n//X XMIT (\n//S EXEC PGM=IEFBR14\n", "target_line": 2, "expected_error": "MEJCL0760"}
+    }
+  },
+  "jecl": {
+    "$": {"valid": "/*$D A,L", "invalid": "/*$"},
+    "JOBPARM": {"valid": "/*JOBPARM SYSAFF=SYS1", "invalid": "/*JOBPARM BAD=VALUE"},
+    "MESSAGE": {"valid": "/*MESSAGE HELLO", "invalid": "/*MESSAGE"},
+    "NETACCT": {"valid": "/*NETACCT 1234", "invalid": "/*NETACCT"},
+    "NOTIFY": {"valid": "/*NOTIFY USER1", "invalid": "/*NOTIFY"},
+    "OUTPUT": {"valid": "/*OUTPUT DEST=LOCAL", "invalid": "/*OUTPUT BAD=VALUE"},
+    "PRIORITY": {"valid": "/*PRIORITY 10", "invalid": "/*PRIORITY 16"},
+    "ROUTE": {"valid": "/*ROUTE PRINT LOCAL", "invalid": "/*ROUTE BAD LOCAL"},
+    "SETUP": {"valid": "/*SETUP VOL1", "invalid": "/*SETUP"},
+    "SIGNOFF": {"valid": "/*SIGNOFF", "invalid": "/*SIGNOFF EXTRA"},
+    "SIGNON": {"valid": "/*SIGNON 1", "invalid": "/*SIGNON"},
+    "XEQ": {"valid": "/*XEQ NODE1", "invalid": "/*XEQ"},
+    "XMIT": {"valid": "/*XMIT NODE1", "invalid": "/*XMIT"}
+  }
+}

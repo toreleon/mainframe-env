@@ -3,7 +3,7 @@
 Status: **Proposed for CIC-902.program-task.frames; acceptance pending**
 Owner: **CICS provider and selected execution maintainers**
 Scope: **local LINK and INVOKE APPLICATION on an existing task**
-Applies from: **mainframe-env 0.9.0 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Context
 

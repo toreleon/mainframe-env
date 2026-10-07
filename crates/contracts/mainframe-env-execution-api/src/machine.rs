@@ -12,6 +12,7 @@ impl FrameId {
     }
     /// Return the nonzero numeric identity.
     #[must_use]
+    /// Return the original positive value without changing its scope.
     pub const fn get(self) -> u32 {
         self.0
     }
@@ -37,6 +38,7 @@ impl Frame {
     ///
     /// No frame-stack membership or selector validity is checked.
     #[must_use]
+    /// Check positive depth within the supplied budget; this does not validate frame identity/linkage.
     pub fn within_limit(&self, max_frames: u32) -> bool {
         self.depth > 0 && self.depth <= max_frames
     }

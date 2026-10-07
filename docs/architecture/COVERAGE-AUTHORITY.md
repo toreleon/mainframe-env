@@ -1,13 +1,13 @@
 # Official coverage authority
 
-Status: **Frozen for mainframe-env 0.2.0**
+Status: **Frozen for mainframe-env coverage.foundation**
 Owner: **coverage and conformance maintainers**
 Scope: **official coverage denominators, evidence, and credit policy**
-Applies from: **mainframe-env 0.2.0**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Authority boundary
 
-The reviewed source receipt index under `conformance/0.2/catalogs/` is the
+The reviewed source receipt index under `conformance/subsystems/coverage/catalogs/` is the
 authority for a baseline's publication identity, source digest, normalized
 rows, and immutable denominator. IBM publication bytes are not repository
 assets. A source update creates a new baseline and catalog digest; it never
@@ -50,7 +50,7 @@ evidence has not first been appended to the evidence store fails.
 
 For gate `g`, the denominator is the number of mandatory rows to which `g`
 applies and the numerator is the number whose latest evidence for `g` passes.
-There is no weighting or rounding. The checked-in 0.2 generation contains all
+There is no weighting or rounding. The checked-in coverage.foundation generation contains all
 1,506 normalized rows, no semantic evidence, zero complete rows, and zero
 numerators for every gate.
 

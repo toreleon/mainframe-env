@@ -1,0 +1,1178 @@
+{
+  "schema_version": "mainframe-env.cics-command-form-locators@1",
+  "work_package": "SPI-1001.command-source-maps",
+  "semantic_authority": false,
+  "coverage_credit": 0,
+  "identity_topic": {
+    "topic_path": "SSJL4D_6.x/reference-diagnostics/eib/dfha8mf.html",
+    "sha256": "sha256:78f90b09987b1a56da7cd9f0a2a36fa43a549966fa7dbeff2ad9608106ef7c25"
+  },
+  "locator_definition": "Zero-based UTF-8 byte ranges [start,end) and SHA-256 of that exact retained HTML fragment; source selects the pinned identity or command topic. No publication bodies retained.",
+  "rows": [
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0148",
+      "label": "6.3 and later INQUIRE OTEL",
+      "eibfn": "5E4A",
+      "state": "mapped",
+      "topic_path": "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquireoteltrace.html",
+      "topic_sha256": "sha256:1701306cde27b77b00f696ed4f8870bfc06dd157d1626d8244b7f4d47f697315",
+      "heading_id": "spi.inquire.otel__title__1",
+      "classification": "release-badge-annotation",
+      "locators": [
+        {
+          "source": "identity",
+          "kind": "official-command-cell",
+          "id": null,
+          "byte_range": [
+            220677,
+            220894
+          ],
+          "fragment_sha256": "sha256:cea8afaa00161e56e19c3972c512e26f3568385ebf16ea6ad8adcf40357087a1"
+        },
+        {
+          "source": "identity",
+          "kind": "release-badge",
+          "id": null,
+          "byte_range": [
+            220764,
+            220867
+          ],
+          "fragment_sha256": "sha256:0930a90d3da9828020dd51c22c8f7cc4ca0266c7af7ac09799ff1b629168be72"
+        },
+        {
+          "source": "command",
+          "kind": "heading",
+          "id": "spi.inquire.otel__title__1",
+          "byte_range": [
+            75,
+            148
+          ],
+          "fragment_sha256": "sha256:f6946b4a96ba99d3fe28556f8ce57681c2720d33f55abd9237452f34cfef23f3"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            4350,
+            4398
+          ],
+          "fragment_sha256": "sha256:7baf97ffa842dd3078234911fe4f2d89a45cc76939a3f2a9361dd96a523ecfce"
+        }
+      ]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0158",
+      "label": "6.2 and later INQUIRE SECDISCOVERY",
+      "eibfn": "6432",
+      "state": "mapped",
+      "topic_path": "SSJL4D_6.x/reference-system-programming/commands-spi/inquire-secdiscovery.html",
+      "topic_sha256": "sha256:3b5d957760122cf17150ddbf7f55f0add3f67f4e166fc57e7c65da18296995d6",
+      "heading_id": "inquire-secdiscovery__title__1",
+      "classification": "release-badge-annotation",
+      "locators": [
+        {
+          "source": "identity",
+          "kind": "official-command-cell",
+          "id": null,
+          "byte_range": [
+            223306,
+            223532
+          ],
+          "fragment_sha256": "sha256:6eeecd024512acb9de9ddce630676b689b824ec92df0241b7c204ad53657c5c5"
+        },
+        {
+          "source": "identity",
+          "kind": "release-badge",
+          "id": null,
+          "byte_range": [
+            223393,
+            223496
+          ],
+          "fragment_sha256": "sha256:d9f130341635be71fc4a608f9c705dbef15c6d08f630ac4a60040c30ee177f75"
+        },
+        {
+          "source": "command",
+          "kind": "heading",
+          "id": "inquire-secdiscovery__title__1",
+          "byte_range": [
+            79,
+            164
+          ],
+          "fragment_sha256": "sha256:e9374dd44f4f063d9332b2dc40f54402ac7d0ee86fd6391383af50bd547b3e72"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            4177,
+            4228
+          ],
+          "fragment_sha256": "sha256:bceec1e2c59417eb8ba79c55b3464dabda20ddea0d46418fa6b4f7901ed8b48e"
+        }
+      ]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0181",
+      "label": "INQUIRE TSQNAME",
+      "eibfn": "8012",
+      "state": "mapped",
+      "topic_path": "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquiretsqueue.html",
+      "topic_sha256": "sha256:437141dad1b69708acd148c084690a6d2cf471c38873d8b662d4a6b5243f5d68",
+      "heading_id": "dfha8dz__title__1",
+      "classification": "explicit-alternatives-in-combined-page",
+      "locators": [
+        {
+          "source": "identity",
+          "kind": "official-command-cell",
+          "id": null,
+          "byte_range": [
+            229723,
+            229813
+          ],
+          "fragment_sha256": "sha256:65ba516474e5d6933bc04ef298107af494fc5bbd4e8d2c05053bf9f3f420bae6"
+        },
+        {
+          "source": "command",
+          "kind": "heading",
+          "id": "dfha8dz__title__1",
+          "byte_range": [
+            66,
+            143
+          ],
+          "fragment_sha256": "sha256:7422bad5f09849f1b54e4cbc295d2daa4fda48e6451a4e4584b792dedad70935"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            3999,
+            4043
+          ],
+          "fragment_sha256": "sha256:5ca51caeb697fb1d48446f5424b3e39828165a9c8f0ede375e1592ff589b3240"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            4409,
+            4448
+          ],
+          "fragment_sha256": "sha256:663a88db5ce9dc4b4bde9de3c09e4aaa2b101df091b2edb8361cc0f094b790b7"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            4961,
+            5000
+          ],
+          "fragment_sha256": "sha256:c172335a848d530064d75d4788f930ca38bb0fe0bcd4c3fe730e06356131977a"
+        },
+        {
+          "source": "command",
+          "kind": "form-option",
+          "id": null,
+          "byte_range": [
+            40103,
+            40208
+          ],
+          "fragment_sha256": "sha256:c6bcc5230fbac5a804c1ad6c403aded82470026cd47bb7086e9b8e7ec948de89"
+        },
+        {
+          "source": "command",
+          "kind": "form-option",
+          "id": null,
+          "byte_range": [
+            40326,
+            40431
+          ],
+          "fragment_sha256": "sha256:3151732aff4f910756f75007473a2738e8e65508a3a5d056a671230319497f8e"
+        }
+      ]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0182",
+      "label": "INQUIRE TSQUEUE",
+      "eibfn": "8002",
+      "state": "mapped",
+      "topic_path": "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquiretsqueue.html",
+      "topic_sha256": "sha256:437141dad1b69708acd148c084690a6d2cf471c38873d8b662d4a6b5243f5d68",
+      "heading_id": "dfha8dz__title__1",
+      "classification": "explicit-alternatives-in-combined-page",
+      "locators": [
+        {
+          "source": "identity",
+          "kind": "official-command-cell",
+          "id": null,
+          "byte_range": [
+            229973,
+            230063
+          ],
+          "fragment_sha256": "sha256:340e87d6a9e3b3eba8409ef0e024cdcd64ccbb99274ceddb49fe093be2f8fac4"
+        },
+        {
+          "source": "command",
+          "kind": "heading",
+          "id": "dfha8dz__title__1",
+          "byte_range": [
+            66,
+            143
+          ],
+          "fragment_sha256": "sha256:7422bad5f09849f1b54e4cbc295d2daa4fda48e6451a4e4584b792dedad70935"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            3999,
+            4043
+          ],
+          "fragment_sha256": "sha256:5ca51caeb697fb1d48446f5424b3e39828165a9c8f0ede375e1592ff589b3240"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            4409,
+            4448
+          ],
+          "fragment_sha256": "sha256:663a88db5ce9dc4b4bde9de3c09e4aaa2b101df091b2edb8361cc0f094b790b7"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            4961,
+            5000
+          ],
+          "fragment_sha256": "sha256:c172335a848d530064d75d4788f930ca38bb0fe0bcd4c3fe730e06356131977a"
+        },
+        {
+          "source": "command",
+          "kind": "form-option",
+          "id": null,
+          "byte_range": [
+            40103,
+            40208
+          ],
+          "fragment_sha256": "sha256:c6bcc5230fbac5a804c1ad6c403aded82470026cd47bb7086e9b8e7ec948de89"
+        },
+        {
+          "source": "command",
+          "kind": "form-option",
+          "id": null,
+          "byte_range": [
+            40326,
+            40431
+          ],
+          "fragment_sha256": "sha256:3151732aff4f910756f75007473a2738e8e65508a3a5d056a671230319497f8e"
+        }
+      ]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0189",
+      "label": "INQUIRE VTAM 1",
+      "eibfn": "6802",
+      "state": "mapped",
+      "topic_path": "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquirevtam.html",
+      "topic_sha256": "sha256:e7271d77773ca0c0474038bb3540f8d80187a9a3b9351c51efffdcfc6b7d1f94",
+      "heading_id": "dfha8d5__title__1",
+      "classification": "linked-footnote-annotation",
+      "locators": [
+        {
+          "source": "identity",
+          "kind": "official-command-cell",
+          "id": null,
+          "byte_range": [
+            231719,
+            231851
+          ],
+          "fragment_sha256": "sha256:3383799421909fc212aa97b09e6ff9e3ed15cca53a766ae129570e1250167bc9"
+        },
+        {
+          "source": "identity",
+          "kind": "command-cell-link",
+          "id": null,
+          "byte_range": [
+            231807,
+            231840
+          ],
+          "fragment_sha256": "sha256:fb4d2c22fd193b0a892e388b60a158c09574d7e588ff52eac6631065057d4c62"
+        },
+        {
+          "source": "command",
+          "kind": "heading",
+          "id": "dfha8d5__title__1",
+          "byte_range": [
+            66,
+            130
+          ],
+          "fragment_sha256": "sha256:7fc100cfca0d82110cae35d3d11f7001e67ac42ee97c3893fddcd2b398be195d"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            3824,
+            3872
+          ],
+          "fragment_sha256": "sha256:b6b77feec4ad19eaf4c932ff8dad11c0c47c23b0dc7a0fa4b8c0ca17b4e36e11"
+        }
+      ]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0200",
+      "label": "6.2 and later PERFORM SECDISCOVERY",
+      "eibfn": "6436",
+      "state": "mapped",
+      "topic_path": "SSJL4D_6.x/reference-system-programming/commands-spi/perform-secdiscovery.html",
+      "topic_sha256": "sha256:f521252271342f21aa0efe8c95a3b9261224828acb17013e4abc2adf823e5251",
+      "heading_id": "perform-secdiscovery__title__1",
+      "classification": "release-badge-annotation",
+      "locators": [
+        {
+          "source": "identity",
+          "kind": "official-command-cell",
+          "id": null,
+          "byte_range": [
+            234514,
+            234740
+          ],
+          "fragment_sha256": "sha256:776e2d4fa93d6908bbbb7cd341553549b3509a9dbb90df5b6a0abdaa803c79e5"
+        },
+        {
+          "source": "identity",
+          "kind": "release-badge",
+          "id": null,
+          "byte_range": [
+            234601,
+            234704
+          ],
+          "fragment_sha256": "sha256:d9f130341635be71fc4a608f9c705dbef15c6d08f630ac4a60040c30ee177f75"
+        },
+        {
+          "source": "command",
+          "kind": "heading",
+          "id": "perform-secdiscovery__title__1",
+          "byte_range": [
+            79,
+            164
+          ],
+          "fragment_sha256": "sha256:db1897be9d8d484a82037a7f7cbb052e48af23faf24a7f606234bacc63cc3531"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            4200,
+            4256
+          ],
+          "fragment_sha256": "sha256:081499b7e33206721826b684c57a4916c72f4ce8f625f5ee082e7f1e70572b21"
+        }
+      ]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0201",
+      "label": "PERFORM SECURITY",
+      "eibfn": "6402",
+      "state": "candidate-unresolved",
+      "topic_path": "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_performsecurity.html",
+      "topic_sha256": "sha256:830d0abe3e41d8ded0a29d9692afa52c2466dc4a70f2dccdb5af8b62aabf86f2",
+      "heading_id": "dfha8ee__title__1",
+      "classification": "qualified-heading-candidate-unproved-row-equivalence",
+      "locators": [
+        {
+          "source": "identity",
+          "kind": "official-command-cell",
+          "id": null,
+          "byte_range": [
+            234900,
+            234991
+          ],
+          "fragment_sha256": "sha256:2fc1c6a925423836328da38e12b36ffcc59c4fa0168bfd3d10f7a22ae7537070"
+        },
+        {
+          "source": "command",
+          "kind": "heading",
+          "id": "dfha8ee__title__1",
+          "byte_range": [
+            66,
+            142
+          ],
+          "fragment_sha256": "sha256:e8979655821cd823817cded697855b90717e2a94a607513d379dd35d8d2022b6"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            3807,
+            3872
+          ],
+          "fragment_sha256": "sha256:9344dc25e385f5171ee1f76fa32153e4ecc02f5f760db1e6f3430897eaa97227"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            4249,
+            4287
+          ],
+          "fragment_sha256": "sha256:7458b721f5ef76e6d8a4d65c7147615a74724bb3559ab25ed4a29095ec118f4f"
+        }
+      ]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0203",
+      "label": "PERFORM SSL",
+      "eibfn": "6412",
+      "state": "candidate-unresolved",
+      "topic_path": "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_performssl.html",
+      "topic_sha256": "sha256:5179c5ec352f12fd973f0e702bfd8cafa4c70b2b73ac9f69b4182638805daff9",
+      "heading_id": "dfha8_performssl__title__1",
+      "classification": "qualified-heading-candidate-unproved-row-equivalence",
+      "locators": [
+        {
+          "source": "identity",
+          "kind": "official-command-cell",
+          "id": null,
+          "byte_range": [
+            235402,
+            235488
+          ],
+          "fragment_sha256": "sha256:cf10a018a712a9e8a10cc811ea7142db76bcbb2e3208814c3670641ef79e63e0"
+        },
+        {
+          "source": "command",
+          "kind": "heading",
+          "id": "dfha8_performssl__title__1",
+          "byte_range": [
+            75,
+            155
+          ],
+          "fragment_sha256": "sha256:8c07f8c75f40342ec619d8779774f3776fd6770012961877ab2fa7a35802797e"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            5361,
+            5421
+          ],
+          "fragment_sha256": "sha256:52210d5cd1ac5c6c1567f61a5cb5bcc6fdf4e5509b3634d9e0034a819cb07176"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            5798,
+            5836
+          ],
+          "fragment_sha256": "sha256:402dae9b31a9b33576767ad5e09ad28948d5e35d1018d7f6af8e80c35b200a0f"
+        },
+        {
+          "source": "command",
+          "kind": "command-name-span",
+          "id": null,
+          "byte_range": [
+            1334,
+            1390
+          ],
+          "fragment_sha256": "sha256:034086cfc5846b2af4097896ad6e4a81fd7691228bfaeeee9aa57f7809f3c4f8"
+        },
+        {
+          "source": "command",
+          "kind": "command-name-span",
+          "id": null,
+          "byte_range": [
+            11023,
+            11079
+          ],
+          "fragment_sha256": "sha256:034086cfc5846b2af4097896ad6e4a81fd7691228bfaeeee9aa57f7809f3c4f8"
+        },
+        {
+          "source": "command",
+          "kind": "command-name-span",
+          "id": null,
+          "byte_range": [
+            11474,
+            11530
+          ],
+          "fragment_sha256": "sha256:034086cfc5846b2af4097896ad6e4a81fd7691228bfaeeee9aa57f7809f3c4f8"
+        },
+        {
+          "source": "command",
+          "kind": "command-name-span",
+          "id": null,
+          "byte_range": [
+            15888,
+            15944
+          ],
+          "fragment_sha256": "sha256:08fc6357b5603c7686df7fcbbffb31ac6634b8d703ada4e7ffe6e68703695f68"
+        },
+        {
+          "source": "command",
+          "kind": "command-name-span",
+          "id": null,
+          "byte_range": [
+            16318,
+            16374
+          ],
+          "fragment_sha256": "sha256:034086cfc5846b2af4097896ad6e4a81fd7691228bfaeeee9aa57f7809f3c4f8"
+        }
+      ]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0204",
+      "label": "PERFORM STATISTICS",
+      "eibfn": "7006",
+      "state": "candidate-unresolved",
+      "topic_path": "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_performstatistics.html",
+      "topic_sha256": "sha256:3732a301a401c5720c300be074876fe7f1b1392de3efb0011f6c19259b6b6130",
+      "heading_id": "dfha81l__title__1",
+      "classification": "qualified-heading-candidate-unproved-row-equivalence",
+      "locators": [
+        {
+          "source": "identity",
+          "kind": "official-command-cell",
+          "id": null,
+          "byte_range": [
+            235648,
+            235741
+          ],
+          "fragment_sha256": "sha256:381c07961be574056dcb1accefca2a52071b455218b313e04255ed7e7b18745f"
+        },
+        {
+          "source": "command",
+          "kind": "heading",
+          "id": "dfha81l__title__1",
+          "byte_range": [
+            66,
+            143
+          ],
+          "fragment_sha256": "sha256:e2bdc8966db88c051423e402de34ae7e147cd2c7f69b6b25cbd773fc5aac43cf"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            3853,
+            3919
+          ],
+          "fragment_sha256": "sha256:5a4c2bb8a9866cb458c5c60b615f228c90a215a2dc551142086366f767bd5333"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            4342,
+            4376
+          ],
+          "fragment_sha256": "sha256:390b562c9dea2463a41630dc95a8a8494b87f7fddc79f3d339813157c719eac6"
+        },
+        {
+          "source": "command",
+          "kind": "command-name-span",
+          "id": null,
+          "byte_range": [
+            69177,
+            69239
+          ],
+          "fragment_sha256": "sha256:5db14a0a7c703893e07551d06b79e9342ae80fac9f6f63109672ccbd2e66951d"
+        },
+        {
+          "source": "command",
+          "kind": "command-name-span",
+          "id": null,
+          "byte_range": [
+            70820,
+            70892
+          ],
+          "fragment_sha256": "sha256:118dada13db50be14232dcf4ebb217bffa76ab94a3e40f19b2f508e87a0cad98"
+        }
+      ]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0238",
+      "label": "6.3 and later SET OTEL",
+      "eibfn": "5E4C",
+      "state": "mapped",
+      "topic_path": "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_setoteltrace.html",
+      "topic_sha256": "sha256:0cbdb6d7fd13f973134d19d0d8685592adbc38394297ab2e011ecc79dcc66e19",
+      "heading_id": "reference_f3b_jz2_g2c__title__1",
+      "classification": "release-badge-annotation",
+      "locators": [
+        {
+          "source": "identity",
+          "kind": "official-command-cell",
+          "id": null,
+          "byte_range": [
+            244041,
+            244254
+          ],
+          "fragment_sha256": "sha256:94cacabd5c74e736bd2fd016c610fa28c5306c9968b0b68f0f891387c3afdf3e"
+        },
+        {
+          "source": "identity",
+          "kind": "release-badge",
+          "id": null,
+          "byte_range": [
+            244128,
+            244231
+          ],
+          "fragment_sha256": "sha256:0930a90d3da9828020dd51c22c8f7cc4ca0266c7af7ac09799ff1b629168be72"
+        },
+        {
+          "source": "command",
+          "kind": "heading",
+          "id": "reference_f3b_jz2_g2c__title__1",
+          "byte_range": [
+            80,
+            154
+          ],
+          "fragment_sha256": "sha256:ece93a32ef2feaf90574d931a13e40aa6b0de4dfefc0f40fd47247836a7bab08"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            4398,
+            4437
+          ],
+          "fragment_sha256": "sha256:06c76a9a62d3682c8459cb4eae15b98e1f35fe2362d46a9acca4a5132b94411d"
+        }
+      ]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0242",
+      "label": "6.2 and later SET SECDISCOVERY",
+      "eibfn": "6434",
+      "state": "mapped",
+      "topic_path": "SSJL4D_6.x/reference-system-programming/commands-spi/set-secdiscovery.html",
+      "topic_sha256": "sha256:b204b7399ba8843a5ca7a3328f27e3e7ea30a1d67aed9ac78aa6e8fbb2be1fec",
+      "heading_id": "set-secdiscovery__title__1",
+      "classification": "release-badge-annotation",
+      "locators": [
+        {
+          "source": "identity",
+          "kind": "official-command-cell",
+          "id": null,
+          "byte_range": [
+            245157,
+            245379
+          ],
+          "fragment_sha256": "sha256:cef3de2143f31ad95344fc3b129c8ed811c6f98e648525b5b9f44ec44597ecd5"
+        },
+        {
+          "source": "identity",
+          "kind": "release-badge",
+          "id": null,
+          "byte_range": [
+            245244,
+            245347
+          ],
+          "fragment_sha256": "sha256:d9f130341635be71fc4a608f9c705dbef15c6d08f630ac4a60040c30ee177f75"
+        },
+        {
+          "source": "command",
+          "kind": "heading",
+          "id": "set-secdiscovery__title__1",
+          "byte_range": [
+            75,
+            152
+          ],
+          "fragment_sha256": "sha256:eb41d43cb9f8f4f043e4bd7dca4aafe31219d908c725cc664dd1cc5dd79baf9a"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            4108,
+            4155
+          ],
+          "fragment_sha256": "sha256:fc4a9278e4abddec99a6c14cceefb896262ba7ad47ca6759bb05ea88347bbd42"
+        }
+      ]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0259",
+      "label": "SET TSQNAME",
+      "eibfn": "8014",
+      "state": "mapped",
+      "topic_path": "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_settsqueue.html",
+      "topic_sha256": "sha256:9952f0c76e754978ae4475e745e65ca5bb806dd0b1aa0edb83da1fb4721fa7b6",
+      "heading_id": "dfha8gg__title__1",
+      "classification": "explicit-alternatives-in-combined-page",
+      "locators": [
+        {
+          "source": "identity",
+          "kind": "official-command-cell",
+          "id": null,
+          "byte_range": [
+            249749,
+            249835
+          ],
+          "fragment_sha256": "sha256:96127d79eaf4ebdd8859e42e95f347021583c451fcf41786c4659a62b0144966"
+        },
+        {
+          "source": "command",
+          "kind": "heading",
+          "id": "dfha8gg__title__1",
+          "byte_range": [
+            66,
+            139
+          ],
+          "fragment_sha256": "sha256:4b7ab76d9c1ae4d8e259df7f371ba8eb8e50b69049948ab5503a0fdc82444468"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            4030,
+            4070
+          ],
+          "fragment_sha256": "sha256:4c62b5c0e67dd93907187eb19c7663608d739ea37b44fd8bd7327fbb7814408e"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            4441,
+            4479
+          ],
+          "fragment_sha256": "sha256:c215d151bd0ed4a11a9b6d4751da777df5645f633cb074ac09b17b4541353957"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            6370,
+            6408
+          ],
+          "fragment_sha256": "sha256:fa5b6ffad4a748aea2a01ba2eda1ffd4645116e98343a5047c777193d2841c1e"
+        },
+        {
+          "source": "command",
+          "kind": "form-option",
+          "id": null,
+          "byte_range": [
+            26604,
+            26708
+          ],
+          "fragment_sha256": "sha256:16ca55be8c5405dac38a77fa64435d166d723429b456a98078eacce343a7e822"
+        },
+        {
+          "source": "command",
+          "kind": "form-option",
+          "id": null,
+          "byte_range": [
+            26792,
+            26896
+          ],
+          "fragment_sha256": "sha256:a5c37d5224b30c953b9684e16dbfff029c9094b4128a5e15d079412e08d408f6"
+        }
+      ]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0260",
+      "label": "SET TSQUEUE",
+      "eibfn": "8004",
+      "state": "mapped",
+      "topic_path": "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_settsqueue.html",
+      "topic_sha256": "sha256:9952f0c76e754978ae4475e745e65ca5bb806dd0b1aa0edb83da1fb4721fa7b6",
+      "heading_id": "dfha8gg__title__1",
+      "classification": "explicit-alternatives-in-combined-page",
+      "locators": [
+        {
+          "source": "identity",
+          "kind": "official-command-cell",
+          "id": null,
+          "byte_range": [
+            249995,
+            250081
+          ],
+          "fragment_sha256": "sha256:99ad2a627f6f698888343473ab090a63a7be8ecba02d63d4059ac0dd80b81d42"
+        },
+        {
+          "source": "command",
+          "kind": "heading",
+          "id": "dfha8gg__title__1",
+          "byte_range": [
+            66,
+            139
+          ],
+          "fragment_sha256": "sha256:4b7ab76d9c1ae4d8e259df7f371ba8eb8e50b69049948ab5503a0fdc82444468"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            4030,
+            4070
+          ],
+          "fragment_sha256": "sha256:4c62b5c0e67dd93907187eb19c7663608d739ea37b44fd8bd7327fbb7814408e"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            4441,
+            4479
+          ],
+          "fragment_sha256": "sha256:c215d151bd0ed4a11a9b6d4751da777df5645f633cb074ac09b17b4541353957"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            6370,
+            6408
+          ],
+          "fragment_sha256": "sha256:fa5b6ffad4a748aea2a01ba2eda1ffd4645116e98343a5047c777193d2841c1e"
+        },
+        {
+          "source": "command",
+          "kind": "form-option",
+          "id": null,
+          "byte_range": [
+            26604,
+            26708
+          ],
+          "fragment_sha256": "sha256:16ca55be8c5405dac38a77fa64435d166d723429b456a98078eacce343a7e822"
+        },
+        {
+          "source": "command",
+          "kind": "form-option",
+          "id": null,
+          "byte_range": [
+            26792,
+            26896
+          ],
+          "fragment_sha256": "sha256:a5c37d5224b30c953b9684e16dbfff029c9094b4128a5e15d079412e08d408f6"
+        }
+      ]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0265",
+      "label": "SET VTAM 1",
+      "eibfn": "6804",
+      "state": "mapped",
+      "topic_path": "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_setvtam.html",
+      "topic_sha256": "sha256:e74032ca2487b4cecf788eddd21aaedf4090a517c782df31185b1d23c46afa69",
+      "heading_id": "dfha8gk__title__1",
+      "classification": "linked-footnote-annotation",
+      "locators": [
+        {
+          "source": "identity",
+          "kind": "official-command-cell",
+          "id": null,
+          "byte_range": [
+            251219,
+            251347
+          ],
+          "fragment_sha256": "sha256:37c36745ec378413cd6d6a52cf362046fe13d1a454a3c9f88e22981f725c7925"
+        },
+        {
+          "source": "identity",
+          "kind": "command-cell-link",
+          "id": null,
+          "byte_range": [
+            251303,
+            251336
+          ],
+          "fragment_sha256": "sha256:fb4d2c22fd193b0a892e388b60a158c09574d7e588ff52eac6631065057d4c62"
+        },
+        {
+          "source": "command",
+          "kind": "heading",
+          "id": "dfha8gk__title__1",
+          "byte_range": [
+            66,
+            126
+          ],
+          "fragment_sha256": "sha256:d9c79b3a6f08bbf1df3cc5837e74390d1a8415386a12674e26f1df7f736c7cc9"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            3856,
+            3900
+          ],
+          "fragment_sha256": "sha256:ad53e516667337b3c924e064b01f39f89c3b9d8b0abd8562ff9f53ef87e64142"
+        }
+      ]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0033",
+      "label": "FEPI SET NODELIST",
+      "eibfn": "8444",
+      "state": "mapped",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp73e.html",
+      "topic_sha256": "sha256:1e6a86a182029c11fc44f744416dce87388db2a452c9a753bdbaff21fe2f344a",
+      "heading_id": "dfhp73e__title__1",
+      "classification": "explicit-list-form-in-shared-page",
+      "locators": [
+        {
+          "source": "identity",
+          "kind": "official-command-cell",
+          "id": null,
+          "byte_range": [
+            262233,
+            262325
+          ],
+          "fragment_sha256": "sha256:216c408901d86696398e20d0dfdd3170455f3bfccfd876d93323b51cab9d92d5"
+        },
+        {
+          "source": "command",
+          "kind": "heading",
+          "id": "dfhp73e__title__1",
+          "byte_range": [
+            66,
+            131
+          ],
+          "fragment_sha256": "sha256:b8a1ce693126ff697c5c470513d0d2d72bb66cac2e7957a6dc9195d05222f49b"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            1976,
+            2020
+          ],
+          "fragment_sha256": "sha256:5ec6cb835ca1cdcebed5f23ef5d3c2143c4e1130aed9eeb0d390a6c4bf747c4e"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            2390,
+            2425
+          ],
+          "fragment_sha256": "sha256:00293e184978577a2d04ef5e54c6c7a9ecbd6ed659c09bcf7668c01c1fa0aeca"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            4361,
+            4400
+          ],
+          "fragment_sha256": "sha256:557d03ee5960485e259dfb7c7ef37ccf5d74586e7848cd5168f73d2243381eb6"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            6292,
+            6330
+          ],
+          "fragment_sha256": "sha256:4deab81ae7074cbbf109e36a52b6cf34140d4b33f1cfc1647005cbcb8ab7880e"
+        },
+        {
+          "source": "command",
+          "kind": "form-option",
+          "id": null,
+          "byte_range": [
+            27618,
+            27664
+          ],
+          "fragment_sha256": "sha256:2cdf30954eb2caad1218aa8a5c38963dea4abe88a19319c32885e7faf9f5d969"
+        }
+      ]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0035",
+      "label": "FEPI SET POOLLIST",
+      "eibfn": "8464",
+      "state": "mapped",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp73f.html",
+      "topic_sha256": "sha256:071cd96104473c10555b5475d359bf53477f5842f573bb20cb635e762fe933eb",
+      "heading_id": "dfhp73f__title__1",
+      "classification": "explicit-list-form-in-shared-page",
+      "locators": [
+        {
+          "source": "identity",
+          "kind": "official-command-cell",
+          "id": null,
+          "byte_range": [
+            262765,
+            262857
+          ],
+          "fragment_sha256": "sha256:787754fcccc8b156ef0d3f9b70a00b7afdbf6cb7c3329cb8c502cdd7d08a0d6a"
+        },
+        {
+          "source": "command",
+          "kind": "heading",
+          "id": "dfhp73f__title__1",
+          "byte_range": [
+            66,
+            131
+          ],
+          "fragment_sha256": "sha256:c1809d8a4a0f69aa579e3c4079ff89bd1277f045b7d7f6a2cc98a545ac77d753"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            1970,
+            2014
+          ],
+          "fragment_sha256": "sha256:5ec6cb835ca1cdcebed5f23ef5d3c2143c4e1130aed9eeb0d390a6c4bf747c4e"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            2383,
+            2418
+          ],
+          "fragment_sha256": "sha256:aaf3130cd3bd2f563f5854c9829e0ef210eea455f77016c083f3e95f2894d88a"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            4346,
+            4385
+          ],
+          "fragment_sha256": "sha256:4fa1f75c2297713f178c92b8aa243ab9e5194882a3ff3f057fac3cf5ee311843"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            6275,
+            6313
+          ],
+          "fragment_sha256": "sha256:eea2396eb04c653f0d50522ddfa526a8430ce13b79ed37b43874c464f227ff41"
+        },
+        {
+          "source": "command",
+          "kind": "form-option",
+          "id": null,
+          "byte_range": [
+            20900,
+            20946
+          ],
+          "fragment_sha256": "sha256:34a8d5db59e0d4afefa10f8a2cb25a4487715e327035de82502bbe122c86c43d"
+        }
+      ]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:fepi-commands:0037",
+      "label": "FEPI SET TARGETLIST",
+      "eibfn": "8484",
+      "state": "mapped",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp73g.html",
+      "topic_sha256": "sha256:439162b6c38854e1cdfc16f8f6610a512ec7035c48894d96e056e8dbf1e5e3f6",
+      "heading_id": "dfhp73g__title__1",
+      "classification": "explicit-list-form-in-shared-page",
+      "locators": [
+        {
+          "source": "identity",
+          "kind": "official-command-cell",
+          "id": null,
+          "byte_range": [
+            263299,
+            263393
+          ],
+          "fragment_sha256": "sha256:d4c47955f9f9a0e2ce45b72078a955049a01ece58c88f40ef22b410eb90bce88"
+        },
+        {
+          "source": "command",
+          "kind": "heading",
+          "id": "dfhp73g__title__1",
+          "byte_range": [
+            66,
+            133
+          ],
+          "fragment_sha256": "sha256:0b8399971395ba7106478c100722d619c45ef26cbcbe5f9e2a687dc2850f39a5"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            1977,
+            2021
+          ],
+          "fragment_sha256": "sha256:5ec6cb835ca1cdcebed5f23ef5d3c2143c4e1130aed9eeb0d390a6c4bf747c4e"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            2391,
+            2428
+          ],
+          "fragment_sha256": "sha256:06cb52113f07e822f55963af77f0e66f3bcca257f5aa138fa2c85539ec65adcd"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            4363,
+            4404
+          ],
+          "fragment_sha256": "sha256:7f92f66492ef7fa6634da824d58f1a1c0941576fe238618ecab8a4319ded243f"
+        },
+        {
+          "source": "command",
+          "kind": "diagram-symbol",
+          "id": null,
+          "byte_range": [
+            6290,
+            6330
+          ],
+          "fragment_sha256": "sha256:bfe5ed1ee0eb2a89700829bafc48bdbdabc388e7578c1dafc73b187bd99bbc00"
+        },
+        {
+          "source": "command",
+          "kind": "form-option",
+          "id": null,
+          "byte_range": [
+            21582,
+            21630
+          ],
+          "fragment_sha256": "sha256:2c43938d6cba162e3d0f9c415289b9a020f7b7f0714430b06dccac74ab9293b2"
+        }
+      ]
+    }
+  ],
+  "target_subsystem": "cics.system-api"
+}

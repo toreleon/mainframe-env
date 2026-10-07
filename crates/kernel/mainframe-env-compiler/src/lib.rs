@@ -58,3 +58,7 @@ pub const COBOL_TYPED_HIR_DIALECT: &str = "cobol.hir@2";
 /// Every COBOL HIR dialect version the compiler may currently emit.
 pub const COBOL_HIR_DIALECTS: &[&str] = &[COBOL_HIR_DIALECT, COBOL_TYPED_HIR_DIALECT];
 pub const CORE_MIR_DIALECT: &str = "mainframe.core.cobol@1";
+
+/// Executable artifact compatibility identity, independent of Cargo package versions.
+/// Retained across the public source reset so accepted artifacts keep their identities.
+pub const COBOL_COMPILER_GENERATION: &str = "mainframe-env-cobol-0.8.3";

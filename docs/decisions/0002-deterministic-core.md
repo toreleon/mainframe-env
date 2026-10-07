@@ -3,7 +3,7 @@
 Status: **Accepted by repository owner**
 Owner: **repository owner**
 Scope: **deterministic core and asynchronous infrastructure shell**
-Applies from: **mainframe-env 0.1.0**
+Applies from: **mainframe-env current subsystem contracts**
 Decision scope: **Compiler, interpreter, execution, and host effects**
 
 ## Context

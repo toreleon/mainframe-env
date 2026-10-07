@@ -3,7 +3,6 @@
 Subsystem: **mq**
 Phase: **programming**
 
-Target version: **0.15.0**
 Completion dependencies: cobol.execution, racf.security
 
 Use this prompt from the repository root. The
@@ -15,7 +14,7 @@ requirements alongside the version-specific boundaries below.
 
 ---
 
-You are implementing **mainframe-env 0.15.0: complete IBM MQ 9.4 programming
+You are implementing **mainframe-env mq.programming: complete IBM MQ 9.4 programming
 surface** for all 26 unique pinned MQI calls.
 
 ## Read and verify first
@@ -23,7 +22,7 @@ surface** for all 26 unique pinned MQI calls.
 Read `docs/prompts/subsystems/README.md`,
 `docs/delivery/subsystems/mq/programming-plan.md`, the canonical MQ documentation-row
 deduplication and generated MQI catalog, MQ/provider/host/UOW/security contracts,
-and accepted 0.4.0 and 0.5.0 evidence.
+and accepted cobol.execution and racf.security evidence.
 
 ## Implement in this order
 

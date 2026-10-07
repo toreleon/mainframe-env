@@ -3,7 +3,6 @@
 Subsystem: **cobol**
 Phase: **execution**
 
-Target version: **0.4.0**
 Completion dependencies: cobol.structure
 
 Use this prompt from the repository root. The
@@ -11,20 +10,20 @@ Use this prompt from the repository root. The
 
 ---
 
-You are implementing **mainframe-env 0.4.0: complete COBOL execution and
-differential semantics** over the accepted 0.3 typed language model.
+You are implementing **mainframe-env cobol.execution: complete COBOL execution and
+differential semantics** over the accepted cobol.structure typed language model.
 
 ## Read and verify first
 
 Read `docs/prompts/subsystems/README.md`,
-`docs/delivery/subsystems/cobol/execution-plan.md`, the 0.3 coverage/evidence package,
-the accepted 0.3 Conformance IR/verdict/ledger contracts,
+`docs/delivery/subsystems/cobol/execution-plan.md`, the cobol.structure coverage/evidence package,
+the accepted cobol.structure Conformance IR/verdict/ledger contracts,
 compiler/interpreter/execution/host contracts, and the pinned Enterprise COBOL
-6.5 receipt. Verify 0.3.0 has accepted all structural rows and artifact formats.
+6.5 receipt. Verify cobol.structure has accepted all structural rows and artifact formats.
 
-Do not reinterpret or bypass 0.3 nodes in a second parser. Any structural defect
+Do not reinterpret or bypass cobol.structure nodes in a second parser. Any structural defect
 found during execution work must be fixed at its single compiler authority and
-must rerun the affected 0.3 gate.
+must rerun the affected cobol.structure gate.
 
 ## Implement in this order
 
@@ -40,7 +39,7 @@ must rerun the affected 0.3 gate.
 
 ## Approved 2026-09-02 completion policy
 
-The user-approved 0.4 disposition is
+The user-approved cobol.execution disposition is
 `pass-with-licensed-differential-pending`. A licensed Enterprise COBOL 6.5
 environment remains unavailable, so:
 
@@ -56,7 +55,7 @@ environment remains unavailable, so:
 - require exact independently projected mainframe-env-versus-reference
   comparisons, a portability rationale and pinned IBM source locator for every
   case, and representative harness mutants; and
-- defer the real licensed 153-row campaign to the 0.17 release-certification
+- defer the real licensed 153-row campaign to the certification.licensed release-certification
   hard gate, where it remains mandatory before 1.0.
 
 ## Reuse and architecture guardrails
@@ -69,8 +68,8 @@ environment remains unavailable, so:
 - COBOL packed/zoned/binary representation, PICTURE behavior, intermediate
   precision, compiler options, size-error conditions, aliasing, and IBM-visible
   results remain owned semantic adapters and must pass licensed differentials.
-- Reuse the 0.2 host registry, effect protocol, checkpoint envelope, migration
-  runner, and the 0.3 Conformance IR/runner. LE and host extensions add typed
+- Reuse the coverage.foundation host registry, effect protocol, checkpoint envelope, migration
+  runner, and the cobol.structure Conformance IR/runner. LE and host extensions add typed
   catalog rows and handlers rather than introducing a second invocation or
   conformance mechanism.
 - Locale, code-page, date/time, sort/merge, and file adapters may use reviewed
@@ -87,7 +86,7 @@ environment remains unavailable, so:
 - Host services are selected by typed ABI contracts, never copybook/program names.
 - Resource exhaustion, cancellation, provider failure, invalid data, and runtime
   limits produce exact typed conditions without forbidden mutation.
-- Extend the accepted 0.3 row specifications with execution, condition,
+- Extend the accepted cobol.structure row specifications with execution, condition,
   recovery, and oracle obligations. Generate obligation-level verdicts and the
   ledger; never infer execution coverage from a broad interpreter/CardDemo
   pass.
@@ -96,11 +95,11 @@ environment remains unavailable, so:
 
 Do not finish until every pinned COBOL row executes all applicable behavior,
 every applicable mutation/restart/recovery row passes, the approved bounded
-GnuCOBOL campaign and harness mutants pass, and the complete 0.3
-recognition/validation and 0.1.1 compatibility suites remain green. The
+GnuCOBOL campaign and harness mutants pass, and the complete cobol.structure
+recognition/validation and profile.carddemo compatibility suites remain green. The
 licensed Enterprise COBOL 6.5 positive, negative, boundary, condition, and
 interaction differential stays explicitly pending at 0/153 under the approved
-policy and is a hard 0.17 release-certification dependency.
+policy and is a hard certification.licensed release-certification dependency.
 
 At handoff, report coverage by all six gates, the GnuCOBOL reference receipt and
 normalization rules, interpreter resource bounds, recovery results, exact

@@ -1,0 +1,20 @@
+{
+  "purpose": "Fixed independently verified source identities only; no publication bodies or numeric semantic authority",
+  "scope_id": "mq-message-handle-sources",
+  "baseline_id": "ibm-mq-9.4-message-handle-sources-2026-09-12",
+  "product": "SSFKSJ_9.4.0",
+  "manifest_sha256": "sha256:5f35e67eb0366dbf87f90b45fe06b8bfaa58b3fb020ba0c2c0bbdb88e97fabe7",
+  "topic_manifest_digest": "22bf0aaec21fc919bd5e53713d3cbeffc3e3c4673bad42b444e9d22f27e6091b",
+  "toc_sha256": "5b23147424db490f5292bd56afe1a0dd2a6ccdde3a08388a79d599998e002bd4",
+  "old_registry_rows_sha256": "65f58d8ffbea949d32a0a3abeb2b76406c4236b6700c3765fd0c9f7d0adad83c",
+  "semantic_authority": false,
+  "coverage_credit": 0,
+  "topics": [
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q091560_.html",
+      "sha256": "72f96585920e26aeab0f567a42a3959cdb58e4016d907600ef820d077db80baa",
+      "bytes": 2409,
+      "last_modified": "2026-05-18"
+    }
+  ]
+}

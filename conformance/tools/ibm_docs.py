@@ -26,11 +26,12 @@ import urllib.parse
 import docs_api
 
 
-INDEX = docs_api.REPOSITORY / "conformance/0.2/catalogs/index.json"
-REGISTRY = docs_api.REPOSITORY / "conformance/0.9/manifests/index.json"
+INDEX = docs_api.REPOSITORY / "conformance/subsystems/coverage/catalogs/index.json"
+REGISTRY = docs_api.REPOSITORY / "conformance/subsystems/cics/application/manifests/index.json"
 ADDITIONAL_REGISTRIES = (
-    docs_api.REPOSITORY / "conformance/0.10/manifests/index.json",
-    docs_api.REPOSITORY / "conformance/0.14/manifests/index.json",
+    docs_api.REPOSITORY / "conformance/subsystems/cics/system/manifests/index.json",
+    docs_api.REPOSITORY / "conformance/subsystems/ims/manifests/index.json",
+    docs_api.REPOSITORY / "conformance/subsystems/mq/manifests/index.json",
 )
 CONTENT_TEMPLATE = docs_api.CONTENT_URL
 MAX_FILE = 64 * 1024 * 1024
@@ -47,7 +48,7 @@ class Scope:
     scope_id: str
     subsystem: str
     baseline: str
-    target_version: str
+    target_subsystem: str
     manifest: str
 
 
@@ -115,7 +116,7 @@ def safe_relative_manifest(value: object, prefix: str, owner: str) -> str:
         or path.as_posix() != value
         or any(part in {"", ".", ".."} for part in path.parts)
         or not value.startswith(prefix)
-        or len(path.parts) != 4
+        or len(path.parts) != len(PurePosixPath(prefix).parts) + 1
         or path.suffix != ".json"
     ):
         raise ValueError(f"unsafe manifest path in {owner}")
@@ -171,7 +172,7 @@ def validate_manifest(
     manifest: dict,
     path: Path,
     *,
-    target_version: str,
+    target_subsystem: str,
     baseline: str,
     subsystem: str,
 ) -> tuple[list[dict], str, str]:
@@ -183,7 +184,7 @@ def validate_manifest(
     toc_sha256 = manifest.get("toc_sha256")
     if (
         manifest.get("schema_version") != "mainframe-env.topic-manifest@1"
-        or manifest.get("target_version") != target_version
+        or manifest.get("target_subsystem") != target_subsystem
         or manifest.get("baseline_id") != baseline
         or manifest.get("subsystem") != subsystem
         or not isinstance(product, str)
@@ -244,14 +245,14 @@ def baseline_sources(index: Path) -> list[tuple[Scope, dict, list[dict], str, st
         baseline_id = baseline.get("id")
         subsystem = baseline.get("subsystem")
         relative = safe_relative_manifest(
-            source.get("manifest"), "conformance/0.2/manifests/", str(index)
+            source.get("manifest"), "conformance/subsystems/coverage/manifests/", str(index)
         )
         path = docs_api.REPOSITORY / relative
         manifest = read_json(path)
         topics, toc_url, toc_sha256 = validate_manifest(
             manifest,
             path,
-            target_version="0.2.0",
+            target_subsystem="coverage.foundation",
             baseline=baseline_id,
             subsystem=subsystem,
         )
@@ -268,7 +269,7 @@ def baseline_sources(index: Path) -> list[tuple[Scope, dict, list[dict], str, st
             or source.get("sha256") != "sha256:" + digest
         ):
             raise ValueError(f"manifest disagrees with baseline: {baseline_id}")
-        scope = Scope(baseline_id, subsystem, baseline_id, "0.2.0", relative)
+        scope = Scope(baseline_id, subsystem, baseline_id, "coverage.foundation", relative)
         result.append((scope, manifest, topics, toc_url, toc_sha256))
     return result
 
@@ -280,11 +281,11 @@ def registered_sources(
     repository = docs_api.REPOSITORY if repository is None else repository
     document = read_json(registry)
     entries = document.get("manifests")
-    target_version = document.get("target_version")
+    target_subsystem = document.get("target_subsystem")
     if (
         document.get("schema_version") != "mainframe-env.topic-manifest-registry@1"
-        or not isinstance(target_version, str)
-        or re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", target_version) is None
+        or not isinstance(target_subsystem, str)
+        or re.fullmatch(r"[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)?", target_subsystem) is None
         or document.get("semantic_authority") is not False
         or document.get("coverage_credit") != 0
         or not isinstance(entries, list)
@@ -322,7 +323,7 @@ def registered_sources(
         topics, toc_url, toc_sha256 = validate_manifest(
             manifest,
             path,
-            target_version=target_version,
+            target_subsystem=target_subsystem,
             baseline=baseline,
             subsystem=subsystem,
         )
@@ -336,7 +337,7 @@ def registered_sources(
             or entry.get("semantic_authority") is not False
         ):
             raise ValueError(f"registry entry disagrees with manifest: {scope_id}")
-        scope = Scope(scope_id, subsystem, baseline, target_version, relative)
+        scope = Scope(scope_id, subsystem, baseline, target_subsystem, relative)
         result.append((scope, manifest, topics, toc_url, toc_sha256))
     present = {
         str(path.relative_to(repository))
@@ -344,7 +345,7 @@ def registered_sources(
         if path.name != "index.json"
     }
     if present != paths:
-        raise ValueError(f"{target_version} topic manifests are unregistered or missing")
+        raise ValueError(f"{target_subsystem} topic manifests are unregistered or missing")
     return result
 
 
@@ -366,7 +367,7 @@ def load_pins(
         scope_ids.add(scope.scope_id)
         signature = (
             scope.subsystem,
-            scope.target_version,
+            scope.target_subsystem,
             manifest["product"],
             manifest["book_href"],
             toc_url,

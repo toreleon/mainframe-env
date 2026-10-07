@@ -3,7 +3,7 @@
 Status: **Proposed; private source-contract validation**
 Owner: **CICS contract and verification maintainers**
 Scope: **private source-validator dependency and condition identity**
-Applies from: **mainframe-env 0.10.0 development**
+Applies from: **mainframe-env development**
 
 ## Decision
 

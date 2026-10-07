@@ -1,9 +1,57 @@
 # Durable storage profile
 
 - Status: **Implemented**
-- Applies from: mainframe-env 0.8.3 hardening
+- Applies from: mainframe-env current subsystem contracts
 - Owner: store adapters and core-server composition
 - Scope: PostgreSQL quotas, shared immutable artifacts, and local publication durability
+
+## Audited provider publication
+
+The deliberately configured synchronous root-publication framework additionally
+uses JournalStore's bounded core-owned admission/enrollment/Closing and one
+atomic terminal publication. Memory and SQLite compose original legal core
+steps, exact lifecycle outbox, provider settlement and two typed terminal audit
+subjects under their existing single lock/transaction, with whole graph/epoch/
+Exact-or-Absent dependency checks. Other backends refuse without fallback.
+This prerequisite does not confer pending-PUT/removed-GET native root,
+recovery or participant acceptance.
+Versioned ownership/audit subjects, drain/backup/downgrade requirements and
+remaining proof boundaries are specified in
+[ADR 0034](../decisions/0034-mq-root-terminal-publication.md).
+
+Memory and SQLite implement the additive
+`ProviderStateStore::publish_provider_states_audited` boundary described in
+[ADR 0029](../decisions/0029-audited-provider-publication.md). Its request carries
+the exact observed canonical coordinator intent, typed audit, finite observed
+tick and at most 4,096 provider puts/deletes/moves. Empty mutations permit an
+audit-only decision; a denial cannot mutate rows. PostgreSQL currently returns
+the default `InvalidTransition` without mutation. Sequential fallback is forbidden.
+
+The physical lock/transaction asserts entire retained-intent equality and the
+current running execution/run/attempt/principal attribution. The audit must
+match the intent's capability, resource digest/format, invocation key and effect
+sequence. Missing, legacy, terminal, recovered, stale, expired or mismatched
+ownership fails closed. Observation must equal the audit tick, be at or after
+positive creation and before the finite recovery boundary, fit the signed SQL
+clock domain, and not regress the retained logical clock or execution lease.
+Trusted authorization and cancellation remain outside the store.
+
+Memory uses its existing touched-entry undo log and typed audit authority.
+SQLite reads the existing core effect/execution rows under its writer lock and
+uses the existing row loop and audit row codec in that same transaction. Audit
+payloads and ordinals retain `AuditSink` compatibility. SQLite audits consume
+its shared provider-table row/payload quotas; Memory retains its separate audit
+count/encoded-payload limits and provider byte quotas. Any row CAS, quota,
+encoding, epoch or clock failure restores provider/audit rows and all affected
+counters. Core result, lifecycle and outbox completion remains coordinator-owned;
+the mutation batch cannot target core `durable-` or legacy clock identities.
+
+No schema migration or canonical/durable byte change is required. The older
+row and audit APIs remain available, so service rollout must stop legacy
+sequential writers before claiming atomic publication. Callers supply their own
+CAS-protected UOW/replay result dependency; this method is not another dispatcher
+or an intent-wide deduplication protocol. MQ service composition and PostgreSQL
+execution remain pending, and this primitive grants no participant acceptance.
 
 ## PostgreSQL quotas
 

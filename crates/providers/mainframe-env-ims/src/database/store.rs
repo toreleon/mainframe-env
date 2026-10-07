@@ -1,9 +1,9 @@
-use super::navigation::{field_value, optional_field_value};
+use super::navigation::field_value;
 use super::*;
 
 impl DatabaseEngine {
     pub fn insert(&mut self, request: InsertRequest) -> Result<RecordView, EngineProblem> {
-        self.insert_internal(request, false)
+        self.insert_internal(request, false, false)
     }
 
     /// Utility load can materialize index pointer rows; DL/I ISRT cannot.
@@ -11,13 +11,59 @@ impl DatabaseEngine {
         &mut self,
         request: InsertRequest,
     ) -> Result<RecordView, EngineProblem> {
-        self.insert_internal(request, true)
+        self.insert_internal(request, true, false)
+    }
+
+    /// The generic adapter alone supplies validated SEQ M/default LAST admission.
+    /// Historical engine insertion entry points continue to require unique keys.
+    pub(crate) fn insert_nonunique_dependent_last(
+        &mut self,
+        request: InsertRequest,
+        utility_load: bool,
+    ) -> Result<RecordView, EngineProblem> {
+        let segments = &self.definition.segments;
+        if self.definition.organization != DatabaseOrganization::Hisam
+            || segments.len() != 2
+            || !self.definition.secondary_indexes.is_empty()
+            || !self.logical_links.is_empty()
+            || segments[0].parent.is_some()
+            || segments[1].parent.as_deref() != Some(segments[0].name.as_str())
+            || segments
+                .iter()
+                .any(|s| s.min_length != s.max_length || s.key_field.is_none())
+            || request.segment != segments[1].name
+            || request.parent.is_none_or(|id| {
+                self.records
+                    .get(&id)
+                    .is_none_or(|r| r.segment != segments[0].name)
+            })
+        {
+            return Err(EngineProblem::Unsupported);
+        }
+        self.insert_internal(request, utility_load, true)
+    }
+
+    /// ISRT preserves established ancestor parentage; it does not establish a
+    /// new parent at the inserted occurrence. No retained position field changes.
+    pub(crate) fn position_after_nonunique_dependent_insert(
+        &self,
+        position: &mut PcbPosition,
+        id: RecordId,
+    ) -> Result<(), EngineProblem> {
+        let record = self.records.get(&id).ok_or(EngineProblem::InvalidRequest)?;
+        let parentage = position
+            .parentage
+            .filter(|parent| record.parent == Some(*parent));
+        position.set_current(id);
+        position.parentage = parentage;
+        Ok(())
     }
 
     fn insert_internal(
         &mut self,
         request: InsertRequest,
         utility_load: bool,
+        nonunique_sequence: bool,
     ) -> Result<RecordView, EngineProblem> {
         if is_index_database(self.definition.organization) && !utility_load {
             return Err(EngineProblem::Unsupported);
@@ -48,7 +94,8 @@ impl DatabaseEngine {
             return Err(EngineProblem::Unsupported);
         }
         let key = self.primary_key(&definition, &request.data)?;
-        if let Some(key) = &key
+        if !nonunique_sequence
+            && let Some(key) = &key
             && self.siblings(request.parent).iter().any(|id| {
                 self.records
                     .get(id)
@@ -78,6 +125,8 @@ impl DatabaseEngine {
             data: request.data,
             children: Vec::new(),
             version: 1,
+            gsam_address: None,
+            secondary_checkpoint_identity: None,
         };
         self.records.insert(id, record);
         if let Some(parent) = request.parent {
@@ -150,18 +199,45 @@ impl DatabaseEngine {
             .ok_or(EngineProblem::StaleHold)?;
         updated.data = data.to_vec();
         updated.version = version;
+        if old_values != new_values {
+            updated.secondary_checkpoint_identity = None;
+        }
         self.indexes = indexes;
         self.revision = revision;
         position.held = Some(HeldRecord {
             id: record.id,
             version,
         });
+        self.primary_replaced(position, record.id);
+        if position.secondary.as_ref().is_some_and(|selected| {
+            old_values
+                .iter()
+                .zip(&new_values)
+                .any(|(old, new)| old.0 == selected.index && old != new)
+        }) {
+            position.parentage = None;
+        }
+        if position.secondary.as_ref().is_some_and(|selected| {
+            selected.source == record.id
+                && new_values
+                    .iter()
+                    .any(|(name, value)| name == &selected.index && value.is_none())
+        }) {
+            *position = PcbPosition::default();
+        }
         Ok(self.view(record.id))
     }
 
     /// Physically delete the current held occurrence and all physical
     /// dependents, updating every secondary index atomically.
     pub fn delete(&mut self, position: &mut PcbPosition) -> Result<usize, EngineProblem> {
+        self.delete_with_primary(position).map(|(count, _)| count)
+    }
+
+    pub(crate) fn delete_with_primary(
+        &mut self,
+        position: &mut PcbPosition,
+    ) -> Result<(usize, Option<primary_position::PrimaryDeletion>), EngineProblem> {
         if self.definition.organization == DatabaseOrganization::Gsam {
             return Err(EngineProblem::Unsupported);
         }
@@ -186,6 +262,7 @@ impl DatabaseEngine {
             .revision
             .checked_add(1)
             .ok_or(EngineProblem::LimitExceeded)?;
+        let deletion = self.primary_deletion(record.id, removed.clone(), revision)?;
         let mut records = self.records.clone();
         let mut roots = self.roots.clone();
         let mut indexes = self.indexes.clone();
@@ -215,7 +292,17 @@ impl DatabaseEngine {
         if position.parentage.is_some_and(|id| removed.contains(&id)) {
             position.parentage = None;
         }
-        Ok(removed.len())
+        if position
+            .secondary
+            .as_ref()
+            .is_some_and(|selected| removed.contains(&selected.source))
+        {
+            *position = PcbPosition::default();
+        }
+        if let Some(deletion) = &deletion {
+            position.consume_primary_deletion(deletion, true);
+        }
+        Ok((removed.len(), deletion))
     }
 
     /// Resolve an exact secondary-index value in current hierarchical order.
@@ -248,7 +335,14 @@ impl DatabaseEngine {
         {
             Err(EngineProblem::InvalidData)
         } else {
-            Ok(())
+            self.definition
+                .gsam_format
+                .as_ref()
+                .map_or(Ok(()), |format| {
+                    format
+                        .validate_area(data, definition.min_length, definition.max_length)
+                        .map_err(|_| EngineProblem::InvalidData)
+                })
         }
     }
 
@@ -287,7 +381,7 @@ impl DatabaseEngine {
             .map(|index| {
                 Ok((
                     index.name.clone(),
-                    optional_field_value(definition, &index.field, data)?,
+                    self.index_value(index, definition, data)?,
                 ))
             })
             .collect()

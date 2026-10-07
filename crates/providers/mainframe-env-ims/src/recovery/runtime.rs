@@ -15,6 +15,10 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
+mod application;
+mod application_backout;
+pub(crate) const APPLICATION_RESULT_DOMAIN: &[u8] = b"mainframe-env.ims-application-result@1\0";
+
 const ROW_NAMESPACE: &str = "ims-recovery-v1-session";
 const ROW_SCHEMA: &str = "mainframe-env.ims-recovery-session@1";
 const LOG_DOMAIN: &str = "mainframe-env.ims-recovery-log@1";
@@ -102,10 +106,21 @@ struct CapturedResource {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 struct BackoutPoint {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    application_epoch: Option<ApplicationEpoch>,
     token: Option<[u8; 4]>,
     kind: BackoutPointKind,
     user_data: Vec<u8>,
     resources: Vec<CapturedResource>,
+}
+
+/// Both the real Session's scheduling incarnation and its commit interval must
+/// match. A reused run identifier cannot resurrect a prior Session's points.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ApplicationEpoch {
+    pub(crate) incarnation: String,
+    pub(crate) sequence: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -202,10 +217,10 @@ impl StoredState {
             || (self.baseline.is_none() && !self.points.is_empty())
             || (self.xrst_generation == 0) != self.xrst_result.is_none()
             || self.replays.len() > limits.max_log_records
-            || self
-                .replays
-                .values()
-                .any(|replay| replay.returned_data.len() > limits.max_user_area_bytes)
+            || self.replays.values().any(|replay| {
+                replay.returned_data.len()
+                    > application::replay_data_bound(&replay.returned_data, limits)
+            })
             || self
                 .xrst_result
                 .as_ref()
@@ -563,6 +578,48 @@ impl RecoverySession {
         generation: u64,
         selection: RestartSelection,
         context: RecoveryContext,
+        resolve: F,
+    ) -> Result<XrstPlan, RecoveryProblem>
+    where
+        F: FnMut(&SavedPcbPosition) -> Result<PositionAttempt, RecoveryProblem>,
+    {
+        self.xrst_proposal(effect_id, generation, selection, context, true, resolve)
+    }
+
+    /// Only the owned application adapter may stage all real Session PCBs as a
+    /// single row. Public callbacks must still supply a distinct row mutation.
+    pub(crate) fn xrst_staged<F>(
+        &self,
+        effect_id: &str,
+        selection: RestartSelection,
+        resolve: F,
+    ) -> Result<XrstPlan, RecoveryProblem>
+    where
+        F: FnMut(&SavedPcbPosition) -> Result<PositionAttempt, RecoveryProblem>,
+    {
+        let generation = self
+            .state
+            .xrst_generation
+            .checked_add(1)
+            .ok_or(RecoveryProblem::LimitExceeded)?;
+        self.xrst_proposal(
+            effect_id,
+            generation,
+            selection,
+            RecoveryContext::Batch,
+            false,
+            resolve,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn xrst_proposal<F>(
+        &self,
+        effect_id: &str,
+        generation: u64,
+        selection: RestartSelection,
+        context: RecoveryContext,
+        require_mutation: bool,
         mut resolve: F,
     ) -> Result<XrstPlan, RecoveryProblem>
     where
@@ -596,7 +653,10 @@ impl RecoverySession {
                 .ok_or(RecoveryProblem::CorruptImage)?;
             for (saved, status) in image.request.positions.iter().zip(&mut result.positions) {
                 let attempt = resolve(saved)?;
-                if attempt.status != RepositionStatus::NotAttempted && attempt.mutation.is_none() {
+                if require_mutation
+                    && attempt.status != RepositionStatus::NotAttempted
+                    && attempt.mutation.is_none()
+                {
                     return Err(RecoveryProblem::InvalidRequest);
                 }
                 if let Some(mutation) = attempt.mutation {
@@ -650,6 +710,7 @@ impl RecoverySession {
         let captured = capture(store, &resources, self.limits)?;
         let mut next = self.state.clone();
         next.baseline = Some(BackoutPoint {
+            application_epoch: None,
             token: None,
             kind: BackoutPointKind::Sets,
             user_data: Vec::new(),
@@ -710,6 +771,7 @@ impl RecoverySession {
                     .map(|captured| captured.resource.clone())
                     .collect::<Vec<_>>();
                 let point = BackoutPoint {
+                    application_epoch: None,
                     token: Some(token),
                     kind,
                     user_data,

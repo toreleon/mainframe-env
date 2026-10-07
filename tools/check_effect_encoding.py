@@ -45,11 +45,47 @@ def require(source: str, fragments: tuple[str, ...], label: str) -> None:
         raise ValueError(f"{label} is missing canonical encoding controls: {missing}")
 
 
+def coordinator_control_source(source: str) -> tuple[str, str]:
+    """Keep literals for the topic check, but never accept comment/string decoys."""
+    tokens = re.compile(r'"(?:\\.|[^"\\])*"|//[^\n]*|/\*', re.DOTALL)
+    parts = []
+    cursor = 0
+    while match := tokens.search(source, cursor):
+        parts.append(source[cursor : match.start()])
+        token = match.group()
+        if token.startswith('"'):
+            parts.append(token)
+            cursor = match.end()
+        elif token.startswith("//"):
+            parts.append("\n")
+            cursor = match.end()
+        else:
+            depth = 1
+            cursor = match.end()
+            while depth:
+                delimiter = re.search(r"/\*|\*/", source[cursor:])
+                if delimiter is None:
+                    raise ValueError("unterminated coordinator control comment")
+                cursor += delimiter.end()
+                depth += 1 if delimiter.group() == "/*" else -1
+            parts.append("\n")
+    parts.append(source[cursor:])
+    literals = "".join(parts)
+    code = re.sub(r'"(?:\\.|[^"\\])*"', '""', literals, flags=re.DOTALL)
+    return literals, code
+
+
 def check(root: Path) -> None:
     reject_persisted_diagnostic_formatting(root)
 
     coordinator = production_source(
         root / "crates/kernel/mainframe-env-interpreter/src/coordinator.rs"
+    )
+    coordinator_literals, coordinator_code = coordinator_control_source(coordinator)
+    _, original_dispatch = coordinator_control_source(
+        production_source(
+            root / "crates/kernel/mainframe-env-interpreter/src/coordinator/original_dispatch.rs"
+        )
     )
     service = production_source(
         root / "crates/contracts/mainframe-env-host-api/src/service.rs"
@@ -58,15 +94,42 @@ def check(root: Path) -> None:
         root / "crates/contracts/mainframe-env-host-api/src/canonical.rs"
     )
     require(
-        coordinator,
+        coordinator_code,
         (
-            "canonical_request_digest(&effect.request)",
-            "canonical_result_digest(&result.outcome)",
-            'LIFECYCLE_OUTBOX_TOPIC: &str = "execution.lifecycle.v1"',
-            'b"mainframe-env.execution-lifecycle@1\\0"',
+            "mod original_dispatch;",
+            "let dispatch = original_dispatch::OriginalDispatch {",
+            "match dispatch.dispatch(effect) {",
+            "mainframe_env_execution_api::lifecycle_notification_payload(kind)",
             "payload: lifecycle_payload(&event.kind)",
         ),
         "coordinator",
+    )
+    if not re.search(
+        r'(?m)^const LIFECYCLE_OUTBOX_TOPIC: &str = "execution\.lifecycle\.v1";$',
+        coordinator_literals,
+    ):
+        raise ValueError("coordinator is missing canonical lifecycle topic")
+    require(
+        original_dispatch,
+        (
+            "let request_digest = match canonical_request_digest(&effect.request)",
+            "let replay_digest = match canonical_result_digest(&result.outcome)",
+            "let result_digest = match canonical_result_digest(&result.outcome)",
+        ),
+        "coordinator original dispatch",
+    )
+    require(
+        production_source(
+            root / "crates/contracts/mainframe-env-execution-api/src/lifecycle_notification.rs"
+        ),
+        (
+            'b"mainframe-env.execution-lifecycle@1\\0"',
+            "pub fn lifecycle_notification_payload(kind: &LifecycleEventKind)",
+            "payload.extend_from_slice(DOMAIN)",
+            "payload.extend_from_slice(&sequence.to_be_bytes())",
+            "payload.extend_from_slice(&return_code.to_be_bytes())",
+        ),
+        "shared frozen lifecycle outbox encoder",
     )
     require(
         service,
@@ -101,8 +164,11 @@ def check(root: Path) -> None:
         ),
     }
     for name, (path, encoder) in providers.items():
+        source = production_source(path)
+        if name == "IMS":
+            source += "\n" + production_source(path.parent / "service/execution.rs")
         require(
-            production_source(path),
+            source,
             (
                 encoder,
                 "request_digest_format",

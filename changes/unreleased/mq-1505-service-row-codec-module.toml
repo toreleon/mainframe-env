@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Extracted the existing MQ row persistence and migration helpers behind the same service authority, restoring its registered size ceiling while preserving atomic CAS and strict row guards."

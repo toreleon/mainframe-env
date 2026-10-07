@@ -1,0 +1,27 @@
+{
+  "schema_version": "mainframe-env.cics-browser-source-verification@1",
+  "target_subsystem": "cics.application-api",
+  "work_package": "CIC-901.sources-a-corpus",
+  "verified_on": "2026-09-10",
+  "source_origin": "https://www.ibm.com/docs/",
+  "retrieval_method": "user-chrome-direct-content-navigation",
+  "response_materialization": "document.body.innerHTML read in 65536-character chunks and UTF-8 encoded",
+  "source_bytes_retained_in_repository": false,
+  "semantic_authority": false,
+  "coverage_credit": 0,
+  "topic_manifest": {
+    "path": "conformance/subsystems/cics/application/manifests/cics-application-api-sources-a-topics.json",
+    "file_sha256": "sha256:9a74888a81c32d755e6f3abd73131dd85a12b04f2cbc16b0ea26eb9283a5e152",
+    "topic_manifest_sha256": "sha256:344e912ef28b1d9ba4a1a00b4613865d759c3e337ac809ccb23fd4f4358652d5",
+    "topic_count": 173,
+    "total_bytes": 5207440
+  },
+  "observation": {
+    "topics_requested": 173,
+    "topics_loaded": 173,
+    "topic_identity_matches": 173,
+    "mismatches": [],
+    "identity_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-browser-source-verification@1, one NUL byte (0x00), then one UTF-8 '<topic_path> <bytes> <sha256>\\n' line per observed topic sorted by topic_path",
+    "identity_sha256": "sha256:6d33171e07e5e247c28e52cb07d6cf7c0a4d132ad110fc1e04a83dfddf119a6d"
+  }
+}

@@ -13,15 +13,16 @@ use mainframe_env_source::{
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-const FIXTURE_BYTES: &[u8] =
-    include_bytes!("../../../../conformance/0.3/cobol/frontend-fixtures.json");
+const FIXTURE_BYTES: &[u8] = include_bytes!(
+    "../../../../conformance/subsystems/cobol/structure/cobol/frontend-fixtures.json"
+);
 const FIXTURE_PREFIX: &str = "cobol.frontend.";
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct FixtureCatalog {
     schema_version: String,
-    target_version: String,
+    target_subsystem: String,
     fixtures: Vec<FrontendFixture>,
 }
 
@@ -105,7 +106,7 @@ pub struct CobolConformanceHandlers {
 pub fn verify_cobol_frontend_fixtures() -> Result<(), String> {
     let catalog = fixture_catalog()?;
     if catalog.schema_version != "mainframe-env.cobol-frontend-fixtures@1"
-        || catalog.target_version != "0.3.0"
+        || catalog.target_subsystem != "cobol.structure"
         || catalog.fixtures.len() != 20
     {
         return Err("COBOL frontend fixture catalog identity or denominator drifted".into());

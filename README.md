@@ -1,158 +1,136 @@
-# mainframe-env
+# Mainframe Sandbox
 
-`mainframe-env` is a greenfield Rust implementation of a bounded mainframe
-application environment. It combines a deterministic COBOL compiler and
-execution kernel with owned CICS, JCL/JES, dataset, RACF/SAF, z/OSMF, Db2, IMS,
-MQ, spool, and persistence contracts.
+An executable workspace for compiling, running and modifying supported mainframe
+applications, with CLI, browser and coding-agent access. The `mainframe-env` Rust
+framework powers the sandbox and combines a deterministic COBOL compiler and interpreter with
+owned contracts for CICS, JCL/JES, datasets, RACF/SAF, Db2, IMS, MQ, spool,
+z/OSMF, and durable storage.
 
-The project uses IBM documentation and licensed systems as conformance
-authorities. It is not an IBM product, and local or modeled results are never
-presented as licensed IBM equivalence.
+Start with the [sandbox setup and agent guide](docs/guides/MAINFRAME-SANDBOX.md)
+for standalone COBOL or a persistent CardDemo application. Native execution owns
+independent application state; a container or Cube MicroVM supplies OS isolation.
+
+Use it to explore application behavior, build integration tools, and contribute
+to mainframe compatibility work. Execution, resource limits, host effects, and
+recovery have explicit owners, so an embedding application can compose providers
+without moving language semantics into transport or storage adapters.
 
 ## Project status
 
 | Item | Status |
 |---|---|
-| Latest published release | [0.8.2](https://github.com/toreleon/mainframe-env/releases/tag/mainframe-env-v0.8.2), source bundle only |
-| Current workspace version | `0.8.3` (development) |
-| Development baseline | `0.8.3` contains unreleased pre-0.9 hardening after the published 0.8.2 tag |
+| Distribution | Public source, relocatable executable bundle and pinned container recipe |
+| Work management | Named subsystems and phases |
 | Implementation progress | [Subsystem progress](docs/delivery/IMPLEMENTATION-STATUS.md) |
 | Production readiness | Not claimed |
-| Licensed differential status | Required campaigns remain pending where the release notes say so |
+| Licensed differential status | Pending where the owning subsystem record says so |
 
-The [pre-0.9 deep review](docs/reviews/PRE-0.9.0-DEEP-REVIEW.md) recorded the
-original no-go for broad implementation. Its R-01–R-15 P1 items (#101–#115)
-were closed through PR #131 on 2026-09-09, and the integrated entry gate accepted
-the post-review candidate that day. The tracked
-[CICS application API progress](docs/delivery/subsystems/cics/application-api-status.md) documents
-that decision and its fix mapping. The accepted gate authorizes implementation;
-it does not establish 0.9 release readiness or licensed certification.
+mainframe-env is an independent Apache-2.0 project. IBM documentation and
+licensed systems serve as conformance authorities; local tests and modeled
+results do not establish licensed IBM equivalence. Read the
+[capabilities and limitations](docs/guides/CAPABILITIES.md) before selecting a
+workload. The presence of a subsystem crate does not promise its entire API.
 
-The [Db2 core progress](docs/delivery/subsystems/db2/core-status.md)
-tracks recovered Db2 parser slices. They do not grant whole-row catalog,
-execution, conformance, differential, or licensed credit.
+## Run your first program
 
-## Quick start
+Install Rust using the toolchain in [rust-toolchain.toml](rust-toolchain.toml)
+(currently Rust 1.98.0), Git, and the platform's native linker/build tools. From
+a source checkout:
 
-The repository pins Rust 1.98.0. Install the toolchain declared in
-[`rust-toolchain.toml`](rust-toolchain.toml), then run:
+```bash
+git clone https://github.com/toreleon/mainframe-env.git
+cd mainframe-env
+cargo run --locked -p mainframe-env-cli --bin mainframe-env -- \
+  run conformance/subsystems/platform/fixtures/cobol/HELLO.cbl --format fixed
+```
+
+The fixture prints a banner, `Hello, World!`, and `Goodbye!`. It runs locally
+without a server, database, or licensed oracle. The
+[getting-started guide](docs/guides/GETTING-STARTED.md) explains compilation,
+inspection, COPY libraries, and troubleshooting.
+
+## How it fits together
+
+```mermaid
+flowchart TB
+    cli["CLI"] --> compiler["Deterministic compiler"]
+    compiler --> artifact["Verified, immutable artifact"]
+    artifact --> machine["Reference machine"]
+    http["HTTP / z/OSMF"] --> app["Application composition and admission"]
+    app --> compiler
+    app --> coordinator["Execution coordinator / batch authority"]
+    coordinator --> machine
+    machine --> effects["Typed host effects"]
+    coordinator --> contracts["Owned host and store contracts"]
+    effects --> contracts
+    contracts --> providers["CICS / datasets / RACF / Db2 / IMS / MQ / spool"]
+    contracts --> stores["Memory / SQLite / PostgreSQL / artifacts"]
+```
+
+Semantic work stays deterministic; I/O, scheduling, persistence, and transport
+sit behind owned contracts. The [architecture overview](docs/architecture/OVERVIEW.md)
+and [current package map](docs/architecture/PACKAGE-MAP.md) explain the boundaries.
+
+## Choose a path
+
+| Goal | Start here |
+|---|---|
+| Evaluate the framework | [Getting started](docs/guides/GETTING-STARTED.md) and [capabilities](docs/guides/CAPABILITIES.md) |
+| Set up a coding-agent sandbox | [Mainframe Sandbox](docs/guides/MAINFRAME-SANDBOX.md) |
+| Embed it in a Rust application | [Embedding guide](docs/guides/EMBEDDING.md) |
+| Start the development server | [Operations runbook](docs/runbooks/OPERATIONS.md) |
+| Use CardDemo in your browser | [CardDemo application launcher](docs/runbooks/CARDDEMO-OPERATOR.md#run-and-use-the-application) |
+| Understand mainframe terminology | [Glossary](docs/guides/GLOSSARY.md) |
+| Contribute code or documentation | [Contributing](CONTRIBUTING.md) |
+| Review public distribution | [Source distribution guide](docs/guides/DISTRIBUTION.md) |
+| Find detailed contracts and subsystem plans | [Documentation portal](docs/README.md) |
+| Report a vulnerability privately | [Security policy](SECURITY.md) |
+
+## Build and verify
+
+For a local CLI change, start with its focused suite:
+
+```bash
+cargo test --locked -p mainframe-env-cli
+```
+
+For workspace integration:
 
 ```bash
 cargo build --workspace --all-features --locked
 cargo test --workspace --all-features --locked --no-fail-fast
 ```
 
-Compile and run the included fixed-format COBOL fixture:
-
-```bash
-cargo run --quiet -p mainframe-env-cli --bin mainframe-env -- \
-  compile conformance/0.1/fixtures/cobol/HELLO.cbl --format fixed
-
-cargo run --quiet -p mainframe-env-cli --bin mainframe-env -- \
-  run conformance/0.1/fixtures/cobol/HELLO.cbl --format fixed
-```
-
-The standalone server remains a development composition rather than a turnkey
-deployment. It now has named configuration overrides, reference-only runtime
-secrets, a first-administrator bootstrap, and explicit liveness/readiness
-signals. See the [operations runbook](docs/runbooks/OPERATIONS.md) before
-starting it.
-
-## Architecture at a glance
-
-```text
-HTTP / CLI / z/OSMF
-         |
-         v
-application composition and admission
-         |
-         v
-compiler / interpreter / batch kernels
-         |
-         v
-owned execution, host, and store contracts
-         |
-         v
-CICS / dataset / RACF / Db2 / IMS / MQ / spool / durable stores
-```
-
-The core rule is that semantic work remains deterministic while I/O,
-scheduling, persistence, and transport stay behind owned contracts. Start with
-the [architecture overview](docs/architecture/OVERVIEW.md) and the
-[package map](docs/architecture/PACKAGE-MAP.md).
-
-## Verification
-
-Common local checks are:
-
-```bash
-cargo fmt --all -- --check
-"$(tools/jenkins/select-python.sh)" -B tools/supply_chain.py check
-cargo deny check
-cargo xtask license-notices --check
-cargo xtask docs --check
-cargo +1.95.0 check --workspace --all-targets --all-features --locked
-cargo xtask spec --check
-cargo xtask architecture-fast --check
-cargo test --workspace --all-features --locked --no-fail-fast
-cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
-RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features --no-deps --locked
-```
-
-The full conformance and certification commands are documented in the
-[verification strategy](docs/delivery/VERIFICATION-STRATEGY.md). Some gates
-need a disposable PostgreSQL 18 instance, a pinned CardDemo checkout, a live
-Zowe client, or a licensed IBM environment; skipped environment-dependent tests
-receive no evidence credit.
+The [contribution guide](CONTRIBUTING.md) lists required policy checks and
+validation by change type. Some integration gates require PostgreSQL, a pinned
+CardDemo checkout, Zowe, or licensed IBM environments. Skipped gates receive no
+evidence credit. The [verification strategy](docs/delivery/VERIFICATION-STRATEGY.md)
+defines the complete assurance boundary.
 
 ## Repository map
 
 | Path | Purpose |
 |---|---|
 | `crates/foundation/` | Source, diagnostics, encoding, and IR primitives |
-| `crates/contracts/` | Compiler, execution, host, store, and conformance contracts |
+| `crates/contracts/` | Compiler, execution, host, store, and coverage contracts |
 | `crates/kernel/` | Compiler, interpreter, and application-package authorities |
 | `crates/providers/` | Dataset, CICS, RACF, Db2, IMS, MQ, and spool implementations |
 | `crates/apps/` | CLI, batch, and server composition |
 | `crates/gateways/` | z/OSMF protocol translation |
-| `crates/stores/` | Memory, SQLite, PostgreSQL, and local artifact adapters |
-| `crates/tooling/`, `xtask/` | Conformance, generation, validation, and release tooling |
-| `conformance/` | Versioned catalogs, schemas, fixtures, and evidence |
-| `docs/` | Architecture, decisions, delivery plans, runbooks, research, and releases |
+| `crates/stores/` | Memory, SQLite, PostgreSQL, and artifact adapters |
+| `crates/tooling/`, `xtask/` | Conformance, generation, and validation tooling |
+| `bin/mainframe-sandbox`, `tools/sandbox/` | Executable sandbox, lifecycle, agent interfaces and packaging |
+| `conformance/` | Subsystem specifications, schemas, catalogs, fixtures, and tests |
+| `docs/` | Guides, architecture, contracts, runbooks, and subsystem plans |
 
-## Documentation
-
-- [Documentation portal](docs/README.md)
-- [Project charter](docs/CHARTER.md)
-- [Architecture overview](docs/architecture/OVERVIEW.md)
-- [Verification strategy](docs/delivery/VERIFICATION-STRATEGY.md)
-- [Versioning and release policy](docs/delivery/VERSIONING-AND-RELEASES.md)
-- [0.8 release notes](docs/releases/0.8.md)
-- [0.9.0 readiness status](docs/delivery/subsystems/cics/application-api-status.md)
-- [Pre-0.9 deep review](docs/reviews/PRE-0.9.0-DEEP-REVIEW.md)
-- [Contribution guide](CONTRIBUTING.md)
-- [Security policy](SECURITY.md)
-
-## Compatibility boundary
-
-The superseded OpenMainframe workspace is an executable compatibility oracle,
-not a source dependency:
-
-```text
-OpenMainframe reference workspace
-        | differential observations
-        v
-mainframe-env owned contracts and implementation
-```
-
-No production deployment, remote publication, or licensed-equivalence claim is
-implied by repository publication or by passing local tests.
+The superseded OpenMainframe workspace is an out-of-process compatibility
+oracle, never a production source dependency. See
+[compatibility and cutover](docs/delivery/COMPATIBILITY-AND-CUTOVER.md).
 
 ## License
 
-mainframe-env is licensed under the [Apache License 2.0](LICENSE). Required
-project and third-party attributions are in [NOTICE](NOTICE); the exact ICU text
-approved for the locked decNumber dependency is retained in
-[LICENSES/ICU.txt](LICENSES/ICU.txt). Release tooling generates full,
-target-specific `LICENSES.md` notices for every production dependency before it
-writes release receipts.
+mainframe-env uses the [Apache License 2.0](LICENSE). Project and third-party
+attributions are in [NOTICE](NOTICE), with the approved decNumber ICU text in
+[LICENSES/ICU.txt](LICENSES/ICU.txt). Dependency tooling generates target-specific
+notices for the current build. Source publication does
+not confer rights to IBM publications, customer data, or licensed oracle inputs.

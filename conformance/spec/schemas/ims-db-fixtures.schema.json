@@ -1,0 +1,301 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Bounded IMS DB independent candidate fixtures",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "metadata",
+    "seed",
+    "fixtures"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mainframe-env.ims-db-fixtures@1"
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "backend",
+          "trial",
+          "expected",
+          "seed_scope"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "pattern": "^[A-Za-z0-9_.:/@+\\-]+$"
+          },
+          "backend": {
+            "enum": [
+              "memory",
+              "sqlite"
+            ]
+          },
+          "trial": {
+            "enum": [
+              "unique_repeated",
+              "sequential_boundary",
+              "parent_sequence",
+              "parent_required",
+              "parent_mismatch",
+              "hold_unique_replace",
+              "hold_next_replace",
+              "hold_parent_replace",
+              "replace_without_hold",
+              "delete_without_hold",
+              "replace_key_forbidden",
+              "delete_subtree",
+              "malformed_ssa",
+              "ssa_limit",
+              "denied",
+              "replayed_next",
+              "replace_rollback",
+              "replace_restart_replay",
+              "delete_restart_replay",
+              "intervening_get"
+            ]
+          },
+          "expected": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "calls",
+              "state"
+            ],
+            "properties": {
+              "calls": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 16,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "status",
+                    "problem",
+                    "segments",
+                    "affected"
+                  ],
+                  "properties": {
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 2,
+                          "maxLength": 2
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "problem": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "Malformed",
+                            "ResourceExhausted",
+                            "Unauthorized"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "segments": {
+                      "type": "array",
+                      "maxItems": 16,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "name",
+                          "data",
+                          "parent_key"
+                        ],
+                        "properties": {
+                          "name": {
+                            "enum": [
+                              "ROOT",
+                              "CHILD"
+                            ]
+                          },
+                          "data": {
+                            "type": "array",
+                            "maxItems": 64,
+                            "items": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 255
+                            }
+                          },
+                          "parent_key": {
+                            "anyOf": [
+                              {
+                                "type": "array",
+                                "maxItems": 64,
+                                "items": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 255
+                                }
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "affected": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 16
+                    }
+                  }
+                }
+              },
+              "state": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "current",
+                  "parentage",
+                  "held",
+                  "database"
+                ],
+                "properties": {
+                  "current": {
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "maxItems": 64,
+                        "items": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 255
+                        }
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "parentage": {
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "maxItems": 64,
+                        "items": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 255
+                        }
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "held": {
+                    "type": "boolean"
+                  },
+                  "database": {
+                    "type": "array",
+                    "maxItems": 16,
+                    "items": {
+                      "type": "array",
+                      "maxItems": 64,
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "seed_scope": {
+            "enum": [
+              "hierarchy",
+              "roots_only"
+            ]
+          }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "seed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "database",
+        "records"
+      ],
+      "properties": {
+        "database": {
+          "const": "IRDB"
+        },
+        "records": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "segment",
+              "parent",
+              "data"
+            ],
+            "properties": {
+              "segment": {
+                "enum": [
+                  "ROOT",
+                  "CHILD"
+                ]
+              },
+              "parent": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 15
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "data": {
+                "type": "array",
+                "maxItems": 64,
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

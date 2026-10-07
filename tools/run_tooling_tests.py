@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 from dataclasses import dataclass
 import json
 import os
@@ -67,6 +68,17 @@ def discover(root: Path) -> TestInventory:
     output = subprocess.check_output(["git", "ls-files", "-z"], cwd=root)
     paths = [part.decode("utf-8") for part in output.split(b"\0") if part]
     inventory = inventory_from_paths(paths)
+    # Helper scripts may have no unittest file of their own. Validate syntax
+    # without importing them or triggering their external work.
+    for raw in paths:
+        if raw.endswith(".py"):
+            candidate = root / raw
+            if candidate.is_symlink() or not candidate.is_file():
+                raise ValueError(f"tracked Python path is missing or is a symlink: {raw}")
+            try:
+                ast.parse(candidate.read_bytes(), filename=raw)
+            except SyntaxError as error:
+                raise ValueError(f"invalid Python syntax: {raw}:{error.lineno}: {error.msg}") from error
     for raw in (*inventory.python_tests, *inventory.shell_tests, *inventory.shell_tools):
         candidate = root / raw
         if candidate.is_symlink() or not candidate.is_file():

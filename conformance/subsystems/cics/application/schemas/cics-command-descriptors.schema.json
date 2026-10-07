@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/cics-command-descriptors-v2.json",
+  "title": "mainframe-env CICS application identity and runtime-operation catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_subsystem",
+    "official_catalog",
+    "official_catalog_sha256",
+    "application_catalog",
+    "runtime"
+  ],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.cics-command-descriptors@2"},
+    "target_subsystem": {"const": "cics.application-api"},
+    "official_catalog": {"const": "conformance/subsystems/coverage/catalogs/cics.json"},
+    "official_catalog_sha256": {
+      "const": "sha256:fccd2a8e5cc24dd08aeb32754daf14ed80e9f1b20b5d9e762a1b0cfe429ceeba"
+    },
+    "application_catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unit",
+        "command_count",
+        "automatic_registration",
+        "generated_coverage_credit",
+        "commands"
+      ],
+      "properties": {
+        "unit": {"const": "api-commands"},
+        "command_count": {"const": 263},
+        "automatic_registration": {"const": false},
+        "generated_coverage_credit": {"const": 0},
+        "commands": {
+          "type": "array",
+          "minItems": 263,
+          "maxItems": 263,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["official_row", "label", "eibfn"],
+            "properties": {
+              "official_row": {
+                "type": "string",
+                "pattern": "^ibm-cics-ts-6x-2026-08-31:api-commands:[0-9]{4}$"
+              },
+              "label": {"type": "string", "minLength": 2},
+              "eibfn": {"type": "string", "pattern": "^[0-9A-F]{4}$"}
+            }
+          }
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation_count",
+        "api_operation_count",
+        "spi_compatibility_operation_count",
+        "families",
+        "operations"
+      ],
+      "properties": {
+        "operation_count": {"const": 25},
+        "api_operation_count": {"const": 23},
+        "spi_compatibility_operation_count": {"const": 2},
+        "families": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 11,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "rust_variant", "responsibility"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+              },
+              "rust_variant": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Za-z0-9]*$"
+              },
+              "responsibility": {"type": "string", "minLength": 16}
+            }
+          }
+        },
+        "operations": {
+          "type": "array",
+          "minItems": 25,
+          "maxItems": 25,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "interface",
+              "family",
+              "mutating",
+              "official_row"
+            ],
+            "properties": {
+              "operation": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Za-z0-9]*$"
+              },
+              "interface": {"enum": ["api", "spi-compatibility"]},
+              "family": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+              },
+              "mutating": {"type": "boolean"},
+              "official_row": {
+                "type": "string",
+                "pattern": "^ibm-cics-ts-6x-2026-08-31:(?:api-commands|spi-commands-unique):[0-9]{4}$"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

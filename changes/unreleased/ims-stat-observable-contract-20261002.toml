@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Add a bounded typed basic IMS STAT projection with explicit capacities, published counters, OSAM aggregation, selected-PCB VSAM LSR iteration and totals; preserve historical wire/readers and reject enhanced or unproven forms without inventing counters or raw IBM layout parity."

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Connected bounded standalone-batch GSAM GU/GN/ISRT to the public host and selected-package routes with persistent opaque logical addresses, independent PCB positioning, stale-address rejection and atomic replay; IBM physical RSA formats and symbolic recovery integration remain explicit followups, with zero official coverage credit."

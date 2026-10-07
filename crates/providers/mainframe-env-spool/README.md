@@ -46,3 +46,7 @@ cargo xtask architecture-fast --check
 
 Batch integration, authorization, recovery, and artifact-retention behavior is
 covered by `mainframe-env-batch`, `mainframe-env-server`, and conformance gates.
+
+## Documentation
+
+[Documentation portal](../../../docs/README.md) · [Current package map](../../../docs/architecture/PACKAGE-MAP.md) · [Embedding guide](../../../docs/guides/EMBEDDING.md) · [Contribution and verification](../../../CONTRIBUTING.md)

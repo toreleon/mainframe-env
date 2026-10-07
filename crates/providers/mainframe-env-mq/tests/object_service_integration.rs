@@ -16,6 +16,7 @@ use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn name(value: &str) -> MqObjectName {
@@ -237,9 +238,26 @@ impl SqliteFile {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let directory = std::env::temp_dir().join(format!("mq-1502-{}-{now}", std::process::id()));
-        std::fs::create_dir(&directory).unwrap();
-        Self(directory.join("state.sqlite"))
+        Self::new_at(now)
+    }
+
+    fn new_at(now: u128) -> Self {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        // A clock tick is not a uniqueness guarantee, even with a process ID.
+        // Atomic creation also avoids taking ownership of an existing path.
+        for _ in 0..32 {
+            let serial = NEXT
+                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+                .expect("SQLite fixture identity exhausted");
+            let directory =
+                std::env::temp_dir().join(format!("mq-1502-{}-{now}-{serial}", std::process::id()));
+            match std::fs::create_dir(&directory) {
+                Ok(()) => return Self(directory.join("state.sqlite")),
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => panic!("SQLite fixture allocation failed: {error}"),
+            }
+        }
+        panic!("SQLite fixture allocation retries exhausted");
     }
 
     fn open(&self) -> Arc<dyn ProviderStateStore> {
@@ -252,6 +270,19 @@ impl SqliteFile {
             .unwrap(),
         )
     }
+}
+
+#[test]
+fn sqlite_fixture_allocation_is_unique_for_parallel_calls_at_one_clock_tick() {
+    let workers: Vec<_> = (0..32)
+        .map(|_| std::thread::spawn(|| SqliteFile::new_at(7)))
+        .collect();
+    let files: Vec<_> = workers
+        .into_iter()
+        .map(|worker| worker.join().unwrap())
+        .collect();
+    let paths: BTreeSet<_> = files.iter().map(|file| &file.0).collect();
+    assert_eq!(paths.len(), files.len());
 }
 
 impl Drop for SqliteFile {

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Return source physical-path PCB key feedback for successful keyed real logical child retrieval through one validated forward link, including non-root logical parents, using the existing IMS proposal and replay owners."

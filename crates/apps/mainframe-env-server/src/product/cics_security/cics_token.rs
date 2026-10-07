@@ -174,7 +174,7 @@ fn mapped_token(
         }
         _ => None,
     };
-    let failure = user.is_none().then(|| match outcome.status.reason {
+    let failure = user.is_none().then_some(match outcome.status.reason {
         DecisionReason::PrincipalInactive => CicsTokenFailure::Revoked,
         DecisionReason::PrincipalNotFound => CicsTokenFailure::UnknownUser,
         DecisionReason::PolicyUnavailable | DecisionReason::StoreUnavailable => {

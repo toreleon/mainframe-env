@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 mod abend;
 mod scoped;
+mod terminal;
 mod transfer;
 
 use super::retention::{
@@ -789,36 +790,19 @@ impl CobolProgram {
                 })
                 .collect::<Result<Vec<_>, _>>()?
         };
-        let mut mutations = Vec::new();
-        for record in records {
-            let value = load_instance(&record)?;
-            if value.busy || value.open_files {
-                return Err(HostProblem::Unsupported);
-            }
-            abend::verify_for_cleanup(store.as_ref(), invocation, &record, &value)?;
-            mutations.push(ProviderStateMutation::Delete {
-                namespace: namespace.clone(),
-                key: record.key,
-                expected_version: record.version,
-            });
-        }
         let ended_tick = match state.ended_tick {
             Some(tick) => tick,
             None => super::replay::retention_observation_tick(self, invocation)?,
         };
-        if !already_attributed_terminal {
-            state.ended = true;
-            state.ended_tick = Some(ended_tick);
-            state.instances = 0;
-            state.programs.clear();
-            refresh_run_metadata(&mut state, &key);
-            mutations.push(ProviderStateMutation::Put(write(
-                RUN_STATE_NAMESPACE,
-                &key,
-                &state,
-                version,
-            )?));
-        }
+        let mut mutations = terminal::plan_end(
+            invocation,
+            state,
+            version,
+            records,
+            ended_tick,
+            already_attributed_terminal,
+            |record, value| abend::verify_for_cleanup(store.as_ref(), invocation, record, value),
+        )?;
         if let Some(protocol) =
             super::replay::protocol_terminal_mutation(store.as_ref(), invocation, ended_tick)?
         {

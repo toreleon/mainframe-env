@@ -27,7 +27,9 @@ mod file_unlock;
 mod handle_state;
 mod host_boundary;
 pub use host_boundary::{CicsLocalLinkCallAttestation, CicsLocalLinkEntryAttestation};
-pub(in crate::service) use host_boundary::{SessionCleanupLease, TaskDispatch};
+pub(in crate::service) use host_boundary::{
+    SessionCleanupLease, TaskDispatch, invocation_with_nested_origin,
+};
 mod interval;
 mod interval_control;
 mod issue_device;

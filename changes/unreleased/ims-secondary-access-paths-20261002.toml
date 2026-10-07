@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Maintain composite IMS secondary search bytes and source-to-ancestor target pointers, connect optional selected-PCB root secondary navigation with independent retained cursors, and reject unavailable access shapes before mutation."

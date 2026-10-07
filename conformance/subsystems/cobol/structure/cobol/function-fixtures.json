@@ -1,0 +1,970 @@
+{
+  "schema_version": "mainframe-env.cobol-function-fixtures@1",
+  "target_subsystem": "cobol.structure",
+  "fixtures": [
+    {
+      "id": "abs",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0001",
+      "name": "ABS",
+      "valid_expression": "FUNCTION ABS(NUM)",
+      "invalid_expression": "FUNCTION ABS",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "acos",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0002",
+      "name": "ACOS",
+      "valid_expression": "FUNCTION ACOS(NUM)",
+      "invalid_expression": "FUNCTION ACOS",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "annuity",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0003",
+      "name": "ANNUITY",
+      "valid_expression": "FUNCTION ANNUITY(NUM, INT)",
+      "invalid_expression": "FUNCTION ANNUITY(TEXT)",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "asin",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0004",
+      "name": "ASIN",
+      "valid_expression": "FUNCTION ASIN(NUM)",
+      "invalid_expression": "FUNCTION ASIN",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "atan",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0005",
+      "name": "ATAN",
+      "valid_expression": "FUNCTION ATAN(NUM)",
+      "invalid_expression": "FUNCTION ATAN",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "bit-of",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0006",
+      "name": "BIT-OF",
+      "valid_expression": "FUNCTION BIT-OF(PTR)",
+      "invalid_expression": "FUNCTION BIT-OF",
+      "result_type": "alphanumeric",
+      "fixed_length": null
+    },
+    {
+      "id": "bit-to-char",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0007",
+      "name": "BIT-TO-CHAR",
+      "valid_expression": "FUNCTION BIT-TO-CHAR(TEXT)",
+      "invalid_expression": "FUNCTION BIT-TO-CHAR",
+      "result_type": "alphanumeric",
+      "fixed_length": null
+    },
+    {
+      "id": "byte-length",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0008",
+      "name": "BYTE-LENGTH",
+      "valid_expression": "FUNCTION BYTE-LENGTH(PTR)",
+      "invalid_expression": "FUNCTION BYTE-LENGTH",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "char",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0009",
+      "name": "CHAR",
+      "valid_expression": "FUNCTION CHAR(INT)",
+      "invalid_expression": "FUNCTION CHAR",
+      "result_type": "alphanumeric",
+      "fixed_length": 1
+    },
+    {
+      "id": "combined-datetime",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0010",
+      "name": "COMBINED-DATETIME",
+      "valid_expression": "FUNCTION COMBINED-DATETIME(INT, NUM)",
+      "invalid_expression": "FUNCTION COMBINED-DATETIME(TEXT)",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "content-of",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0011",
+      "name": "CONTENT-OF",
+      "valid_expression": "FUNCTION CONTENT-OF(NAT)",
+      "invalid_expression": "FUNCTION CONTENT-OF",
+      "result_type": "national",
+      "fixed_length": null
+    },
+    {
+      "id": "cos",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0012",
+      "name": "COS",
+      "valid_expression": "FUNCTION COS(NUM)",
+      "invalid_expression": "FUNCTION COS",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "current-date",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0013",
+      "name": "CURRENT-DATE",
+      "valid_expression": "FUNCTION CURRENT-DATE",
+      "invalid_expression": "FUNCTION CURRENT-DATE(TEXT)",
+      "result_type": "alphanumeric",
+      "fixed_length": 21
+    },
+    {
+      "id": "date-of-integer",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0014",
+      "name": "DATE-OF-INTEGER",
+      "valid_expression": "FUNCTION DATE-OF-INTEGER(INT)",
+      "invalid_expression": "FUNCTION DATE-OF-INTEGER",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "date-to-yyyymmdd",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0015",
+      "name": "DATE-TO-YYYYMMDD",
+      "valid_expression": "FUNCTION DATE-TO-YYYYMMDD(INT, INT2)",
+      "invalid_expression": "FUNCTION DATE-TO-YYYYMMDD",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "day-of-integer",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0016",
+      "name": "DAY-OF-INTEGER",
+      "valid_expression": "FUNCTION DAY-OF-INTEGER(INT)",
+      "invalid_expression": "FUNCTION DAY-OF-INTEGER",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "day-to-yyyyddd",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0017",
+      "name": "DAY-TO-YYYYDDD",
+      "valid_expression": "FUNCTION DAY-TO-YYYYDDD(INT, INT2)",
+      "invalid_expression": "FUNCTION DAY-TO-YYYYDDD",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "display-of",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0018",
+      "name": "DISPLAY-OF",
+      "valid_expression": "FUNCTION DISPLAY-OF(NAT, INT)",
+      "invalid_expression": "FUNCTION DISPLAY-OF",
+      "result_type": "alphanumeric",
+      "fixed_length": null
+    },
+    {
+      "id": "e",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0019",
+      "name": "E",
+      "valid_expression": "FUNCTION E",
+      "invalid_expression": "FUNCTION E(TEXT)",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "exp",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0020",
+      "name": "EXP",
+      "valid_expression": "FUNCTION EXP(NUM)",
+      "invalid_expression": "FUNCTION EXP",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "exp10",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0021",
+      "name": "EXP10",
+      "valid_expression": "FUNCTION EXP10(NUM)",
+      "invalid_expression": "FUNCTION EXP10",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "factorial",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0022",
+      "name": "FACTORIAL",
+      "valid_expression": "FUNCTION FACTORIAL(INT)",
+      "invalid_expression": "FUNCTION FACTORIAL",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "formatted-current-date",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0023",
+      "name": "FORMATTED-CURRENT-DATE",
+      "valid_expression": "FUNCTION FORMATTED-CURRENT-DATE('YYYYMMDDThhmmss')",
+      "invalid_expression": "FUNCTION FORMATTED-CURRENT-DATE(TEXT)",
+      "result_type": "alphanumeric",
+      "fixed_length": null
+    },
+    {
+      "id": "formatted-date",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0024",
+      "name": "FORMATTED-DATE",
+      "valid_expression": "FUNCTION FORMATTED-DATE('YYYYMMDD', INT)",
+      "invalid_expression": "FUNCTION FORMATTED-DATE(TEXT, INT)",
+      "result_type": "alphanumeric",
+      "fixed_length": null
+    },
+    {
+      "id": "formatted-datetime",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0025",
+      "name": "FORMATTED-DATETIME",
+      "valid_expression": "FUNCTION FORMATTED-DATETIME('YYYYMMDDThhmmss', INT, NUM, INT2)",
+      "invalid_expression": "FUNCTION FORMATTED-DATETIME(TEXT, INT, NUM)",
+      "result_type": "alphanumeric",
+      "fixed_length": null
+    },
+    {
+      "id": "formatted-time",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0026",
+      "name": "FORMATTED-TIME",
+      "valid_expression": "FUNCTION FORMATTED-TIME('hhmmss', NUM, INT2)",
+      "invalid_expression": "FUNCTION FORMATTED-TIME(TEXT, NUM)",
+      "result_type": "alphanumeric",
+      "fixed_length": null
+    },
+    {
+      "id": "hex-of",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0027",
+      "name": "HEX-OF",
+      "valid_expression": "FUNCTION HEX-OF(PTR)",
+      "invalid_expression": "FUNCTION HEX-OF",
+      "result_type": "alphanumeric",
+      "fixed_length": null
+    },
+    {
+      "id": "hex-to-char",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0028",
+      "name": "HEX-TO-CHAR",
+      "valid_expression": "FUNCTION HEX-TO-CHAR(TEXT)",
+      "invalid_expression": "FUNCTION HEX-TO-CHAR",
+      "result_type": "alphanumeric",
+      "fixed_length": null
+    },
+    {
+      "id": "integer",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0029",
+      "name": "INTEGER",
+      "valid_expression": "FUNCTION INTEGER(NUM)",
+      "invalid_expression": "FUNCTION INTEGER",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "integer-of-date",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0030",
+      "name": "INTEGER-OF-DATE",
+      "valid_expression": "FUNCTION INTEGER-OF-DATE(INT)",
+      "invalid_expression": "FUNCTION INTEGER-OF-DATE",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "integer-of-day",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0031",
+      "name": "INTEGER-OF-DAY",
+      "valid_expression": "FUNCTION INTEGER-OF-DAY(INT)",
+      "invalid_expression": "FUNCTION INTEGER-OF-DAY",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "integer-of-formatted-date",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0032",
+      "name": "INTEGER-OF-FORMATTED-DATE",
+      "valid_expression": "FUNCTION INTEGER-OF-FORMATTED-DATE('YYYYMMDD', TEXT)",
+      "invalid_expression": "FUNCTION INTEGER-OF-FORMATTED-DATE(TEXT, TEXT2)",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "integer-part",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0033",
+      "name": "INTEGER-PART",
+      "valid_expression": "FUNCTION INTEGER-PART(NUM)",
+      "invalid_expression": "FUNCTION INTEGER-PART",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "length",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0034",
+      "name": "LENGTH",
+      "valid_expression": "FUNCTION LENGTH(NAT)",
+      "invalid_expression": "FUNCTION LENGTH",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "log",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0035",
+      "name": "LOG",
+      "valid_expression": "FUNCTION LOG(NUM)",
+      "invalid_expression": "FUNCTION LOG",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "log10",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0036",
+      "name": "LOG10",
+      "valid_expression": "FUNCTION LOG10(NUM)",
+      "invalid_expression": "FUNCTION LOG10",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "lower-case",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0037",
+      "name": "LOWER-CASE",
+      "valid_expression": "FUNCTION LOWER-CASE(TEXT)",
+      "invalid_expression": "FUNCTION LOWER-CASE",
+      "result_type": "alphanumeric",
+      "fixed_length": null
+    },
+    {
+      "id": "max",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0038",
+      "name": "MAX",
+      "valid_expression": "FUNCTION MAX(INT, INT2)",
+      "invalid_expression": "FUNCTION MAX",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "mean",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0039",
+      "name": "MEAN",
+      "valid_expression": "FUNCTION MEAN(NUM, NUM2)",
+      "invalid_expression": "FUNCTION MEAN",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "median",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0040",
+      "name": "MEDIAN",
+      "valid_expression": "FUNCTION MEDIAN(NUM, NUM2)",
+      "invalid_expression": "FUNCTION MEDIAN",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "midrange",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0041",
+      "name": "MIDRANGE",
+      "valid_expression": "FUNCTION MIDRANGE(NUM, NUM2)",
+      "invalid_expression": "FUNCTION MIDRANGE",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "min",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0042",
+      "name": "MIN",
+      "valid_expression": "FUNCTION MIN(NAT, NAT2)",
+      "invalid_expression": "FUNCTION MIN",
+      "result_type": "national",
+      "fixed_length": null
+    },
+    {
+      "id": "mod",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0043",
+      "name": "MOD",
+      "valid_expression": "FUNCTION MOD(INT, INT2)",
+      "invalid_expression": "FUNCTION MOD(TEXT)",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "national-of",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0044",
+      "name": "NATIONAL-OF",
+      "valid_expression": "FUNCTION NATIONAL-OF(TEXT, INT)",
+      "invalid_expression": "FUNCTION NATIONAL-OF",
+      "result_type": "national",
+      "fixed_length": null
+    },
+    {
+      "id": "numval",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0045",
+      "name": "NUMVAL",
+      "valid_expression": "FUNCTION NUMVAL(TEXT)",
+      "invalid_expression": "FUNCTION NUMVAL",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "numval-c",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0046",
+      "name": "NUMVAL-C",
+      "valid_expression": "FUNCTION NUMVAL-C(TEXT, TEXT2)",
+      "invalid_expression": "FUNCTION NUMVAL-C",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "numval-f",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0047",
+      "name": "NUMVAL-F",
+      "valid_expression": "FUNCTION NUMVAL-F(TEXT)",
+      "invalid_expression": "FUNCTION NUMVAL-F",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "ord",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0048",
+      "name": "ORD",
+      "valid_expression": "FUNCTION ORD(ALPHA)",
+      "invalid_expression": "FUNCTION ORD",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "ord-max",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0049",
+      "name": "ORD-MAX",
+      "valid_expression": "FUNCTION ORD-MAX(TEXT, TEXT2)",
+      "invalid_expression": "FUNCTION ORD-MAX",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "ord-min",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0050",
+      "name": "ORD-MIN",
+      "valid_expression": "FUNCTION ORD-MIN(TEXT, TEXT2)",
+      "invalid_expression": "FUNCTION ORD-MIN",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "pi",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0051",
+      "name": "PI",
+      "valid_expression": "FUNCTION PI",
+      "invalid_expression": "FUNCTION PI(TEXT)",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "present-value",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0052",
+      "name": "PRESENT-VALUE",
+      "valid_expression": "FUNCTION PRESENT-VALUE(NUM, NUM2)",
+      "invalid_expression": "FUNCTION PRESENT-VALUE(TEXT)",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "random",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0053",
+      "name": "RANDOM",
+      "valid_expression": "FUNCTION RANDOM(INT)",
+      "invalid_expression": "FUNCTION RANDOM(TEXT)",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "range",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0054",
+      "name": "RANGE",
+      "valid_expression": "FUNCTION RANGE(INT, INT2)",
+      "invalid_expression": "FUNCTION RANGE",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "rem",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0055",
+      "name": "REM",
+      "valid_expression": "FUNCTION REM(NUM, NUM2)",
+      "invalid_expression": "FUNCTION REM(TEXT)",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "reverse",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0056",
+      "name": "REVERSE",
+      "valid_expression": "FUNCTION REVERSE(NAT)",
+      "invalid_expression": "FUNCTION REVERSE",
+      "result_type": "national",
+      "fixed_length": null
+    },
+    {
+      "id": "seconds-from-formatted-time",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0057",
+      "name": "SECONDS-FROM-FORMATTED-TIME",
+      "valid_expression": "FUNCTION SECONDS-FROM-FORMATTED-TIME('hhmmss', TEXT)",
+      "invalid_expression": "FUNCTION SECONDS-FROM-FORMATTED-TIME(TEXT, TEXT2)",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "seconds-past-midnight",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0058",
+      "name": "SECONDS-PAST-MIDNIGHT",
+      "valid_expression": "FUNCTION SECONDS-PAST-MIDNIGHT",
+      "invalid_expression": "FUNCTION SECONDS-PAST-MIDNIGHT(TEXT)",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "sign",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0059",
+      "name": "SIGN",
+      "valid_expression": "FUNCTION SIGN(NUM)",
+      "invalid_expression": "FUNCTION SIGN",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "sin",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0060",
+      "name": "SIN",
+      "valid_expression": "FUNCTION SIN(NUM)",
+      "invalid_expression": "FUNCTION SIN",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "sqrt",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0061",
+      "name": "SQRT",
+      "valid_expression": "FUNCTION SQRT(NUM)",
+      "invalid_expression": "FUNCTION SQRT",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "standard-deviation",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0062",
+      "name": "STANDARD-DEVIATION",
+      "valid_expression": "FUNCTION STANDARD-DEVIATION(NUM, NUM2)",
+      "invalid_expression": "FUNCTION STANDARD-DEVIATION",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "sum",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0063",
+      "name": "SUM",
+      "valid_expression": "FUNCTION SUM(INT, INT2)",
+      "invalid_expression": "FUNCTION SUM",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "tan",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0064",
+      "name": "TAN",
+      "valid_expression": "FUNCTION TAN(NUM)",
+      "invalid_expression": "FUNCTION TAN",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "test-date-yyyymmdd",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0065",
+      "name": "TEST-DATE-YYYYMMDD",
+      "valid_expression": "FUNCTION TEST-DATE-YYYYMMDD(INT)",
+      "invalid_expression": "FUNCTION TEST-DATE-YYYYMMDD",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "test-day-yyyyddd",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0066",
+      "name": "TEST-DAY-YYYYDDD",
+      "valid_expression": "FUNCTION TEST-DAY-YYYYDDD(INT)",
+      "invalid_expression": "FUNCTION TEST-DAY-YYYYDDD",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "test-formatted-datetime",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0067",
+      "name": "TEST-FORMATTED-DATETIME",
+      "valid_expression": "FUNCTION TEST-FORMATTED-DATETIME('hhmmss', TEXT)",
+      "invalid_expression": "FUNCTION TEST-FORMATTED-DATETIME(TEXT, TEXT2)",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "test-numval",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0068",
+      "name": "TEST-NUMVAL",
+      "valid_expression": "FUNCTION TEST-NUMVAL(TEXT)",
+      "invalid_expression": "FUNCTION TEST-NUMVAL",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "test-numval-c",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0069",
+      "name": "TEST-NUMVAL-C",
+      "valid_expression": "FUNCTION TEST-NUMVAL-C(TEXT, TEXT2)",
+      "invalid_expression": "FUNCTION TEST-NUMVAL-C",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "test-numval-f",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0070",
+      "name": "TEST-NUMVAL-F",
+      "valid_expression": "FUNCTION TEST-NUMVAL-F(TEXT)",
+      "invalid_expression": "FUNCTION TEST-NUMVAL-F",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "trim",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0071",
+      "name": "TRIM",
+      "valid_expression": "FUNCTION TRIM(UTF, LEADING)",
+      "invalid_expression": "FUNCTION TRIM",
+      "result_type": "utf8",
+      "fixed_length": null
+    },
+    {
+      "id": "ulength",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0072",
+      "name": "ULENGTH",
+      "valid_expression": "FUNCTION ULENGTH(UTF, INT, INT2)",
+      "invalid_expression": "FUNCTION ULENGTH",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "upos",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0073",
+      "name": "UPOS",
+      "valid_expression": "FUNCTION UPOS(UTF, INT)",
+      "invalid_expression": "FUNCTION UPOS(TEXT)",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "upper-case",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0074",
+      "name": "UPPER-CASE",
+      "valid_expression": "FUNCTION UPPER-CASE(TEXT)",
+      "invalid_expression": "FUNCTION UPPER-CASE",
+      "result_type": "alphanumeric",
+      "fixed_length": null
+    },
+    {
+      "id": "usubstr",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0075",
+      "name": "USUBSTR",
+      "valid_expression": "FUNCTION USUBSTR(UTF, INT, INT2)",
+      "invalid_expression": "FUNCTION USUBSTR(TEXT)",
+      "result_type": "utf8",
+      "fixed_length": null
+    },
+    {
+      "id": "usupplementary",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0076",
+      "name": "USUPPLEMENTARY",
+      "valid_expression": "FUNCTION USUPPLEMENTARY(UTF)",
+      "invalid_expression": "FUNCTION USUPPLEMENTARY",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "uuid4",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0077",
+      "name": "UUID4",
+      "valid_expression": "FUNCTION UUID4",
+      "invalid_expression": "FUNCTION UUID4(TEXT)",
+      "result_type": "alphanumeric",
+      "fixed_length": 36
+    },
+    {
+      "id": "uvalid",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0078",
+      "name": "UVALID",
+      "valid_expression": "FUNCTION UVALID(UTF)",
+      "invalid_expression": "FUNCTION UVALID",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "uwidth",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0079",
+      "name": "UWIDTH",
+      "valid_expression": "FUNCTION UWIDTH(UTF, INT)",
+      "invalid_expression": "FUNCTION UWIDTH(TEXT)",
+      "result_type": "integer",
+      "fixed_length": null
+    },
+    {
+      "id": "variance",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0080",
+      "name": "VARIANCE",
+      "valid_expression": "FUNCTION VARIANCE(NUM, NUM2)",
+      "invalid_expression": "FUNCTION VARIANCE",
+      "result_type": "numeric",
+      "fixed_length": null
+    },
+    {
+      "id": "when-compiled",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0081",
+      "name": "WHEN-COMPILED",
+      "valid_expression": "FUNCTION WHEN-COMPILED",
+      "invalid_expression": "FUNCTION WHEN-COMPILED(TEXT)",
+      "result_type": "alphanumeric",
+      "fixed_length": 21
+    },
+    {
+      "id": "year-to-yyyy",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0082",
+      "name": "YEAR-TO-YYYY",
+      "valid_expression": "FUNCTION YEAR-TO-YYYY(INT, INT2)",
+      "invalid_expression": "FUNCTION YEAR-TO-YYYY",
+      "result_type": "integer",
+      "fixed_length": null
+    }
+  ],
+  "special_registers": [
+    {
+      "id": "address-of",
+      "name": "ADDRESS OF",
+      "value_type": "other",
+      "length_kind": "lp",
+      "fixed_length": null,
+      "writable": true
+    },
+    {
+      "id": "debug-item",
+      "name": "DEBUG-ITEM",
+      "value_type": "group",
+      "length_kind": "dependent",
+      "fixed_length": null,
+      "writable": false
+    },
+    {
+      "id": "igy-javaiop-call-exception",
+      "name": "IGY-JAVAIOP-CALL-EXCEPTION",
+      "value_type": "integer",
+      "length_kind": "lp",
+      "fixed_length": null,
+      "writable": false
+    },
+    {
+      "id": "jnienvptr",
+      "name": "JNIENVPTR",
+      "value_type": "other",
+      "length_kind": "lp",
+      "fixed_length": null,
+      "writable": false
+    },
+    {
+      "id": "json-code",
+      "name": "JSON-CODE",
+      "value_type": "integer",
+      "length_kind": "fixed",
+      "fixed_length": 4,
+      "writable": true
+    },
+    {
+      "id": "json-status",
+      "name": "JSON-STATUS",
+      "value_type": "integer",
+      "length_kind": "fixed",
+      "fixed_length": 4,
+      "writable": false
+    },
+    {
+      "id": "length-of",
+      "name": "LENGTH OF",
+      "value_type": "integer",
+      "length_kind": "lp",
+      "fixed_length": null,
+      "writable": false
+    },
+    {
+      "id": "linage-counter",
+      "name": "LINAGE-COUNTER",
+      "value_type": "integer",
+      "length_kind": "dependent",
+      "fixed_length": null,
+      "writable": false
+    },
+    {
+      "id": "return-code",
+      "name": "RETURN-CODE",
+      "value_type": "integer",
+      "length_kind": "fixed",
+      "fixed_length": 2,
+      "writable": true
+    },
+    {
+      "id": "shift-out",
+      "name": "SHIFT-OUT",
+      "value_type": "alphanumeric",
+      "length_kind": "fixed",
+      "fixed_length": 1,
+      "writable": false
+    },
+    {
+      "id": "shift-in",
+      "name": "SHIFT-IN",
+      "value_type": "alphanumeric",
+      "length_kind": "fixed",
+      "fixed_length": 1,
+      "writable": false
+    },
+    {
+      "id": "sort-control",
+      "name": "SORT-CONTROL",
+      "value_type": "alphanumeric",
+      "length_kind": "fixed",
+      "fixed_length": 8,
+      "writable": true
+    },
+    {
+      "id": "sort-core-size",
+      "name": "SORT-CORE-SIZE",
+      "value_type": "integer",
+      "length_kind": "fixed",
+      "fixed_length": 4,
+      "writable": true
+    },
+    {
+      "id": "sort-file-size",
+      "name": "SORT-FILE-SIZE",
+      "value_type": "integer",
+      "length_kind": "fixed",
+      "fixed_length": 4,
+      "writable": true
+    },
+    {
+      "id": "sort-message",
+      "name": "SORT-MESSAGE",
+      "value_type": "alphanumeric",
+      "length_kind": "fixed",
+      "fixed_length": 8,
+      "writable": true
+    },
+    {
+      "id": "sort-mode-size",
+      "name": "SORT-MODE-SIZE",
+      "value_type": "integer",
+      "length_kind": "fixed",
+      "fixed_length": 4,
+      "writable": true
+    },
+    {
+      "id": "sort-return",
+      "name": "SORT-RETURN",
+      "value_type": "integer",
+      "length_kind": "fixed",
+      "fixed_length": 2,
+      "writable": true
+    },
+    {
+      "id": "tally",
+      "name": "TALLY",
+      "value_type": "integer",
+      "length_kind": "fixed",
+      "fixed_length": 4,
+      "writable": true
+    },
+    {
+      "id": "when-compiled",
+      "name": "WHEN-COMPILED",
+      "value_type": "alphanumeric",
+      "length_kind": "fixed",
+      "fixed_length": 16,
+      "writable": false
+    },
+    {
+      "id": "xml-code",
+      "name": "XML-CODE",
+      "value_type": "integer",
+      "length_kind": "fixed",
+      "fixed_length": 4,
+      "writable": true
+    },
+    {
+      "id": "xml-event",
+      "name": "XML-EVENT",
+      "value_type": "alphanumeric",
+      "length_kind": "fixed",
+      "fixed_length": 30,
+      "writable": false
+    },
+    {
+      "id": "xml-information",
+      "name": "XML-INFORMATION",
+      "value_type": "integer",
+      "length_kind": "fixed",
+      "fixed_length": 4,
+      "writable": false
+    },
+    {
+      "id": "xml-namespace",
+      "name": "XML-NAMESPACE",
+      "value_type": "alphanumeric",
+      "length_kind": "dynamic",
+      "fixed_length": null,
+      "writable": false
+    },
+    {
+      "id": "xml-nnamespace",
+      "name": "XML-NNAMESPACE",
+      "value_type": "national",
+      "length_kind": "dynamic",
+      "fixed_length": null,
+      "writable": false
+    },
+    {
+      "id": "xml-namespace-prefix",
+      "name": "XML-NAMESPACE-PREFIX",
+      "value_type": "alphanumeric",
+      "length_kind": "dynamic",
+      "fixed_length": null,
+      "writable": false
+    },
+    {
+      "id": "xml-nnamespace-prefix",
+      "name": "XML-NNAMESPACE-PREFIX",
+      "value_type": "national",
+      "length_kind": "dynamic",
+      "fixed_length": null,
+      "writable": false
+    },
+    {
+      "id": "xml-ntext",
+      "name": "XML-NTEXT",
+      "value_type": "national",
+      "length_kind": "dynamic",
+      "fixed_length": null,
+      "writable": false
+    },
+    {
+      "id": "xml-text",
+      "name": "XML-TEXT",
+      "value_type": "alphanumeric",
+      "length_kind": "dynamic",
+      "fixed_length": null,
+      "writable": false
+    }
+  ]
+}

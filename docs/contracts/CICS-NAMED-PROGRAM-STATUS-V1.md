@@ -3,7 +3,7 @@
 Status: **Proposed private prerequisite**
 Owner: **CICS command, ProgramControl, security and storage maintainers**
 Scope: **named PROGRAM STATUS for a trusted public, local, non-Java cohort**
-Applies from: **mainframe-env 0.10.0 development preparation**
+Applies from: **mainframe-env development**
 
 Runtime admission and integration: **Pending**
 

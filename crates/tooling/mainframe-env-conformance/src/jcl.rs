@@ -7,13 +7,13 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
 const FIXTURES: &str =
-    include_str!("../../../../conformance/0.7/fixtures/jcl-conformance-fixtures.json");
+    include_str!("../../../../conformance/subsystems/jcl/fixtures/jcl-conformance-fixtures.json");
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct FixtureCatalog {
     schema_version: String,
-    target_version: String,
+    target_subsystem: String,
     source_catalog_sha256: String,
     fixtures: Vec<JclFixture>,
 }
@@ -271,7 +271,7 @@ fn fixture_catalog() -> FixtureCatalog {
         catalog.schema_version, "mainframe-env.jcl-conformance-fixtures@1",
         "generated JCL fixture catalog contract"
     );
-    assert_eq!(catalog.target_version, "0.7.0");
+    assert_eq!(catalog.target_subsystem, "jcl.planning");
     assert_eq!(
         catalog.source_catalog_sha256,
         mainframe_env_batch::JCL_OFFICIAL_CATALOG_SHA256
@@ -293,7 +293,6 @@ pub struct JclExitReceipt {
     pub compatibility_plans: usize,
     pub carddemo_representative_plans: usize,
     pub plan_set_sha256: String,
-    pub historical_differential_receipt_sha256: String,
     pub licensed_differential: &'static str,
 }
 
@@ -341,8 +340,6 @@ pub fn verify_jcl_exit() -> Result<JclExitReceipt, String> {
     let malformed_recovery_cases = verify_malformed_recovery()?;
     let scale_boundary_cases = verify_scale_boundaries()?;
     let (compatibility_plans, carddemo_representative_plans) = verify_compatibility_plans()?;
-    let historical =
-        include_bytes!("../../../../conformance/0.1/evidence/differential/jcl-jes.json");
     Ok(JclExitReceipt {
         schema_version: "mainframe-env.jcl-exit@1",
         status: "pass-with-licensed-differential-pending",
@@ -356,7 +353,6 @@ pub fn verify_jcl_exit() -> Result<JclExitReceipt, String> {
         compatibility_plans,
         carddemo_representative_plans,
         plan_set_sha256: format!("sha256:{:x}", plan_set.finalize()),
-        historical_differential_receipt_sha256: format!("sha256:{:x}", Sha256::digest(historical)),
         licensed_differential: "pending-no-pinned-licensed-oracle-receipt",
     })
 }

@@ -1,9 +1,9 @@
-# CICS terminal control in the v0.9 typed route
+# CICS terminal control in the cics.application-api typed route
 
 Status: **Implemented incrementally**
 Owner: **CICS provider maintainers**
 Scope: **typed terminal-control routes and durable terminal state**
-Applies from: **mainframe-env 0.9.0 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 The typed `SEND PARTNSET` route selects a registered 8775 partition set for
 the current task, or resets the task to the base partition when its operand is

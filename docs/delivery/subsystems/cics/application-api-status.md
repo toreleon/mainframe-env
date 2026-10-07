@@ -2,7 +2,6 @@
 
 Subsystem: **cics**
 Phase: **application-api**
-Target release: **0.9.0**
 Status: **Implementation in progress; application API acceptance and licensed differential remain incomplete**
 
 ## Authorized prerequisite completion, 2026-10-02
@@ -128,7 +127,7 @@ isolated PostgreSQL 18.6 instance. The ordinary maintenance run leaves that
 PostgreSQL test ignored; its separate passing execution supplies backend evidence.
 Nine corrupt/schema/version/foreign-owner cases preserve private and outer rows,
 capacity, archive contents and the provider epoch on all three backends. This is
-retention-slice evidence, not CardDemo-full or v0.9 final-candidate certification.
+retention-slice evidence, not CardDemo-full or cics.application-api final-candidate certification.
 
 The export audit fixes #326 and #327 leave the registry at **260 typed / 0
 legacy / 3 unready**. The interpreter releases a channel GET CONTAINER SET area
@@ -151,7 +150,7 @@ channel and BTS rows, before exposing their contents.
 Parent CIC-904 remains in progress. This slice owns row 0086 GET CONTAINER
 length/data-copy obligations for the BTS INTO, SET and NODATA forms, and the
 typed INTO prefix writer shared with the channel form. Dependencies are the
-accepted 0.4 host ABI, 0.5 SAF, BTS lifecycle/UOW authority and durable
+accepted cobol.execution host ABI, racf.security SAF, BTS lifecycle/UOW authority and durable
 coordinator. Owners are `handlers/bts_container/bts.rs`, typed interpreter
 output conversion and the selected compiled server restart route. No registry,
 stored-row, checkpoint format or command identity changes are planned.
@@ -422,7 +421,7 @@ these focused results are not full-row/minor or licensed differential credit.
 
 ## Declared CIC-902.program-task.frames
 
-Parent CIC-902 and v0.9 remain in progress. This slice owns local LINK row
+Parent CIC-902 and cics.application-api remain in progress. This slice owns local LINK row
 0138 and selected INVOKE APPLICATION row 0106 task/frame ownership, with
 HANDLE CONDITION 0099, IGNORE CONDITION 0100, POP HANDLE 0146 and PUSH HANDLE
 0149 as logical-level consumers, plus ASSIGN row 0011 lineage/link level and
@@ -614,7 +613,7 @@ policy/derived checks. Do not seal this slice from normal-path proof alone.
 The current changes are a focused repair commit, allowed by the common execution
 contract, not a `Complete CIC-902.program-task.frames` commit or passing slice
 seal. The review PR must keep these remaining obligations explicit; no frame
-slice, command-readiness, official coverage or full-minor completion is claimed.
+slice, command-readiness, official coverage or full-phase completion is claimed.
 
 Continuation at `b8896942` starts the remaining ancestor explicit-ABEND obligation
 inside this same slice, adding consumers HANDLE ABEND row 0097 and ABEND row
@@ -683,7 +682,7 @@ The protected START commit/rollback/ABEND regression also passes. None of these
 closes general/default-condition ABEND, ancestor PROGRAM execution, explicit
 INVOKE ABEND selected-route proof, legacy unknown-call identity compatibility,
 cross-provider recovery, virtual-storage lifetime or final/licensed acceptance.
-This remains a focused repair, not a completed/sealed frame slice or v0.9.
+This remains a focused repair, not a completed/sealed frame slice or cics.application-api.
 
 Focused repair gates pass for formatting, dependency policy, changelog,
 module boundaries, typed semantic boundaries and the common production-route
@@ -768,7 +767,7 @@ topics are `reference-applications/commands-api/dfhp4_link.html` SHA-256
 all beneath `SSJL4D_6.x/` and their 2026-09-10 sources B/C baselines. Source
 review is offline reference only, with zero licensed execution credit.
 No workers, network refresh, whole-cache audit or publication-body import ran.
-Full v0.9 acceptance and existing documented infrastructure/source blockers
+Full cics.application-api acceptance and existing documented infrastructure/source blockers
 remain open; this focused repair does not close the frame slice or the goal.
 
 ## CIC-902.program-task.frames PROGRAM-exit continuation
@@ -797,7 +796,7 @@ pinned Python 3.12.13; no source pin, publication body, framework or worker is
 introduced. Exit deactivation/reset, normal completion, nearest non-root PROGRAM
 replacement, equivalent INVOKE APPLICATION behavior and general/default-condition
 recovery remain required, not inferred from this root-owner diagnostic. Full
-v0.9 acceptance remains open.
+cics.application-api acceptance remains open.
 
 Focused verification: the compiled cold-reopen diagnostic passes once against
 SQLite and once against a fresh PostgreSQL 18.6 database (the normally ignored
@@ -836,7 +835,7 @@ backup, never relabel a pending call or remove its proof.
 The compiled PROGRAM-exit cold-reopen diagnostic now observes active count zero
 and the known-abandoned instance, but still fences task completion because the
 replacement execution lacks the original run owner. Stable owner handoff,
-nearest non-root PROGRAM replacement, general/default recovery and full v0.9
+nearest non-root PROGRAM replacement, general/default recovery and full cics.application-api
 acceptance remain required. This repair does not close the frame slice.
 
 Focused checks: seven new memory/SQLite lifecycle/codec probes pass, including
@@ -896,7 +895,7 @@ baseline `ibm-cics-ts-6x-application-api-sources-b-2026-09-10`, HANDLE ABEND row
 abnormal-recovery context `SSJL4D_6.x/applications/designing/dfhp378.html`
 (`1ca20494e0ff11efc12073511fb76ddd50bb384f0eaafd2a613e88349c579e31`).
 These pinned references do not constitute licensed execution evidence. No
-network refresh, publication-body import or v0.9 final certification occurred.
+network refresh, publication-body import or cics.application-api final certification occurred.
 
 ## Declared CIC-902.program-task.frames restored CICS task ownership
 
@@ -913,7 +912,7 @@ Warm restoration must retain shared task resources and fail without mutation
 on conflicting owner, widened authority, live loans, stale session or capacity.
 Legacy ordinary restoration remains supported; ownership cannot be guessed
 from durable resource rows. Nearest non-root PROGRAM exits, general/default
-ancestor recovery and final v0.9 certification remain separate obligations.
+ancestor recovery and final cics.application-api certification remain separate obligations.
 
 Implemented through the existing exchange V2/core handoff proof and provider
 Run/current-frame split. The provider's explicit task/actor restoration API
@@ -1029,7 +1028,7 @@ wrong result digest/owner/payload. CALL bytes and source checkpoint remain
 unchanged on cold replay; source stays Suspended, instance busy, run active and
 caller unknown. The unchanged child-SUSPEND SQLite regression also passes.
 This is target-staging evidence only, not target execution, source retirement,
-instance release, complete program-family closure or final v0.9 certification.
+instance release, complete program-family closure or final cics.application-api certification.
 
 Invocation context roundtrip/strict-negative units 2/2, target phase/vector
 units 2/2, existing source-intent units 6/6 and COBOL retention units 4/4 pass.
@@ -1103,7 +1102,7 @@ sources-B row 0097 HANDLE ABEND and sources-C row 0263 XCTL, catalog prefix
 `ibm-cics-ts-6x-2026-08-31:api-commands:`. Both selected full reads match their
 recorded SHA-256 identities. Unrelated cache holes remain unrefreshed. No IBM
 execution oracle, full-source audit, CardDemo-full or final-candidate gate is
-claimed. Full replacement admission/execution, suspension resume and v0.9
+claimed. Full replacement admission/execution, suspension resume and cics.application-api
 remain incomplete; readiness is unchanged at 260 typed / 0 legacy / 3 unready.
 
 Dependency policy (all four checks), changelog and regenerated docs pass.
@@ -1558,7 +1557,7 @@ operation tags are unchanged.
 | `CIC-905.conversation-issue.device` / 0114, 0115, 0117–0119, 0121, 0124, 0126, 0129, 0133 | ISSUE COPY `TERMID CTLCHAR WAIT`; DISCONNECT `SESSION`; ENDFILE `ENDOUTPUT`, ENDOUTPUT `ENDFILE`, EODS (no specific options); ERASEAUP `WAIT`; LOAD `PROGRAM CONVERSE`; PASS `LUNAME FROM LENGTH LOGMODE LOGONLOGMODE NOQUIESCE`; PRINT and RESET (no specific options) | Existing terminal/session authority and device capability contracts, with conversation ledger only where a session is actually owned |
 | `CIC-905.conversation-issue.integration` / all twenty | Exact registration, tag round-trip, generated contracts and aggregate 171/92 | Descriptor/generator/status/ratchet owners and selected server route |
 
-Dependencies are the accepted CIC-901 registry, 0.4 host ABI, 0.5 SAF, 0.6
+Dependencies are the accepted CIC-901 registry, cobol.execution host ABI, racf.security SAF, dataset.data
 data authority, durable coordinator/provider-state CAS, and the committed
 `CIC-905.conversation-open` kernel `3944e66c` plus ledger `5cde1910`.
 These are interface references for one transport-neutral APPC/MRO authority;
@@ -1592,7 +1591,7 @@ uncached topics in the wider sources-b scope.
 The additive BTS private replay archive/capacity-CAS store primitive is now
 present for Memory, SQLite, and PostgreSQL, but no current CICS handler invokes
 it. The provider planner, lifecycle authority adapter, and container command
-routes remain unready; this store primitive grants no additional 0.9 command
+routes remain unready; this store primitive grants no additional cics.application-api command
 or licensed-execution credit.
 
 | Row | Topic basename(s) and SHA-256 |
@@ -1918,7 +1917,7 @@ owner can erase and copy normally; `issue_bms_controls_reject_foreign_run_on_own
 and all 36 runnable ISSUE tests pass. This adds no raw-buffer or CCC claim.
 The verified row 0114 `ISSUE COPY` topic specifies a one-byte `CTLCHAR` CCC
 but does not enumerate its byte values; its links lead only to the API format
-and command summary. No committed 0.9 topic manifest names a CCC value table.
+and command summary. No committed cics.application-api topic manifest names a CCC value table.
 The default copy path can proceed independently, while non-default CCC
 interpretation remains a source gap; no browser or network refresh was used.
 The default path with or without `WAIT` now copies the exact source buffer, including nulls,
@@ -1993,8 +1992,8 @@ contracts consumed by later CIC-905 siblings, without claiming their rows.
 Owners: `cics_plan`/descriptor/codec in IR, typed CICS resolution in the
 compiler, interpreter output and EIB binding, `handlers/conversation_control`
 and durable provider rows, selected CICS route in the server, and the existing
-0.9 registries/generators. Dependencies are the accepted CIC-901 registry,
-0.4 host ABI, 0.5 SAF, 0.6 data authority, shared coordinator and provider-row
+cics.application-api registries/generators. Dependencies are the accepted CIC-901 registry,
+cobol.execution host ABI, racf.security SAF, dataset.data data authority, shared coordinator and provider-row
 CAS. Acceptance requires canonical MCEP v1 decode/v2 encode, exact nine-row
 registration and option legality, negative conditions and GDS return codes,
 SAF/audit before mutation, cancellation/deadline and bounded replay, fenced
@@ -2103,7 +2102,7 @@ inferred from the offline source review.
 
 `CIC-906.oracle-bif-builtins` owns a capture/comparison boundary for catalog
 rows `0013 BIF DEEDIT` and `0014 BIF DIGEST`, with six sealed observation IDs
-in `conformance/0.9/oracles/cics-licensed-family-bif-builtins-v1.json`.
+in `conformance/subsystems/cics/application/oracles/cics-licensed-family-bif-builtins-v1.json`.
 The existing twelve-observation file/UOW pilot and v1 signature payload remain
 unchanged. The v2 family payload binds the family and manifest digests in
 addition to candidate, compiled spec, fixture, source review, environment,
@@ -2423,7 +2422,7 @@ merged service refactor ratchets the CICS root to 3641; server and interpreter
 remain 6302/12943. Ordinary modules remain at most 1200 production lines.
 No other slice's tag allocation is owned here.
 
-Dependencies: accepted 0.4 COBOL host ABI, 0.5 SAF, 0.6 durable authority,
+Dependencies: accepted cobol.execution COBOL host ABI, racf.security SAF, dataset.data durable authority,
 CIC-901 command grammar, and the existing BTS event authority. Allowed context
 is the pinned local BTS scope and explicit DPL applicability per row; RUN
 TRANSID is a local asynchronous child-task route. Public routes are the typed
@@ -2814,7 +2813,7 @@ schemas now pin 231 typed, 0 legacy, 32 unready and 208 exact registrations,
 including all 23 lifecycle rows, six child/LINK rows, and 17 ISSUE rows.
 Their Draft 2020-12 schemas and application contract pass the focused xtask validator.
 The broader `cargo xtask schemas --check` remains stopped by the unchanged
-0.8 CardDemo evidence sentence exceeding its historical 256-character bound;
+jes.execution CardDemo evidence sentence exceeding its historical 256-character bound;
 that unrelated receipt was not edited. The descriptor generator check passes.
 
 The next authority feature adds source-shaped initial/dormant run, activation
@@ -3037,7 +3036,7 @@ common `NOHANDLE`, `RESP`, and `RESP2` controls.
 Owning modules are the typed CICS compiler resolution, CICS plan/codec,
 interpreter host bridge, CICS provider BTS child/link handler, selected-program
 server route, and versioned provider-state authority. Dependencies are the
-accepted 0.4 host ABI, 0.5 SAF, 0.6 durable coordinator, installed CICS program
+accepted cobol.execution host ABI, racf.security SAF, dataset.data durable coordinator, installed CICS program
 catalog, and the common BTS activity/process lifecycle and event authority at
 integration. Acceptance requires source-checked compiler and v1/v2 codec
 regressions; exact EIB/condition/output and negative bounds; SAF allow/deny and
@@ -3108,7 +3107,7 @@ and `spec --check`. The source-map compatibility guard now selects the frozen
 25 runtime operations explicitly. The two later typed family declarations
 (`transform-control` and `spool-control`) moved from the frozen source
 descriptor to typed admission, restoring its accepted SHA-256
-`af06985dba30c6fd7f8dab88886340b3b4fa88ad5b770ef287201b7e172ea948`.
+`8d5f348fb9c2bd03049bab063f37c46c462201b7d277afb52bf8bc43a0b377dc`.
 All three committed source maps, corpora, and projections pass unchanged.
 
 `architecture-fast` passes its effect, provider-row, storage, authorization,
@@ -3200,7 +3199,7 @@ entry is present but was not run: `MAINFRAME_ENV_POSTGRES_TEST_URL` is not
 configured in this checkout. No licensed named-counter server or coupling
 facility differential evidence is claimed.
 
-Status: **0.9.0 Proposed; CIC-901 complete at its non-release implementation
+Status: **cics.application-api Proposed; CIC-901 complete at its non-release implementation
 boundary**
 
 - Historical reviewed candidate: `1bd294c170cae35c470f0d183635f758f80e2c98`
@@ -3385,7 +3384,7 @@ unknown-outcome, recovery, or conformance boundaries.
   263-command program.
 - The licensed CICS adapter is fail-closed and the protected licensed campaign
   has not run. Differential credit remains zero.
-- The [pre-0.9 deep review](../../../reviews/PRE-0.9.0-DEEP-REVIEW.md) found
+- The [subsystem engineering review](../../../reviews/SUBSYSTEM-REVIEW.md) found
   P1 durability, audit, CICS, queueing, timeout, authentication, configuration,
   retention, release, licensing, reproducibility, and release-truth blockers.
 
@@ -3427,12 +3426,12 @@ credit only, with zero licensed differential or release credit.
 
 ## Mandatory baseline reading
 
-1. [0.9.0 release dossier](application-api-plan.md)
-2. [Pre-0.9.0 deep review](../../../reviews/PRE-0.9.0-DEEP-REVIEW.md)
+1. [cics.application-api subsystem plan](application-api-plan.md)
+2. [Subsystem engineering review](../../../reviews/SUBSYSTEM-REVIEW.md)
 3. [CICS behavioral conformance pilot](../../../research/cics-behavioral-conformance-pilot.md)
-4. `conformance/0.9/cics/pilot-rule-review.json`
-5. `conformance/0.9/cics/pilot-fixtures.json`
-6. `conformance/0.9/cics/pilot-environment.json`
+4. `conformance/subsystems/cics/application/cics/pilot-rule-review.json`
+5. `conformance/subsystems/cics/application/cics/pilot-fixtures.json`
+6. `conformance/subsystems/cics/application/cics/pilot-environment.json`
 7. [Licensed CICS pilot runbook](../../../runbooks/cics-licensed-pilot.md)
 8. [Canonical effect encoding](../../../contracts/EFFECT-CANONICAL-V1.md)
 9. [Execution and durability](../../../architecture/EXECUTION-AND-DURABILITY.md)
@@ -3444,117 +3443,14 @@ credit only, with zero licensed differential or release credit.
 15. [Capacity and recovery](../../../runbooks/CAPACITY-AND-RECOVERY.md)
 16. [Verification strategy](../../VERIFICATION-STRATEGY.md)
 
-## Integrated entry acceptance
+## Integration requirements
 
-The authoritative finding detail and close criteria remain in the historical
-deep review. The current implementation plan requires closure of all
-[R-01](https://github.com/toreleon/mainframe-env/issues/101) through
-[R-28](https://github.com/toreleon/mainframe-env/issues/128), including the P2/P3
-storage, assurance, module and documentation baseline.
-
-The accepted candidate was checked by local Jenkins
-[mainframe-env #8](http://127.0.0.1:8080/job/mainframe-env/8/) on the capped
-10 GiB controller. Its archived full-tier and PostgreSQL summaries both name
-the exact candidate/tree above, report selected_commands_passed=true, and give
-zero licensed credit and no release-acceptance credit. The full summary contains
-24/24 passing primary gates; the backend summary contains 11/11 passing
-PostgreSQL gates.
-
-These are immutable historical receipts, not current-candidate receipts. The
-current CIC-901 boundary was independently revalidated with the current source
-and generated identities; its passing result does not relabel Jenkins #8.
-
-| Review gate | Accepted result |
-|---|---|
-| Gate A — release and repository truth | Development/release identity, exact native runtime smoke, cargo-deny, license notices, supply-chain, release-entry guards and runtime-verified archive reproduction passed. Reproduced source archive SHA-256: 1d40c711a28a2765f83938aaf074d11a52e82429f88b53e05d3bf19c86ba4a50. |
-| Gate B — mutation safety and security | Workspace tests, conformance, evidence seal and all 10 source mutants passed; memory/SQLite focused contracts passed and PostgreSQL effect, stale recovery, online resume, atomic invariant, retention and durable contracts passed. |
-| Gate C — service lifecycle | Exact runtime architecture, readiness, work-lease fencing, CardDemo restart, worker and retention paths passed. |
-| Gate D — assurance and modularity | Tool discovery ran 358 tests with one documented optional JCL skip; API/docs/module ratchets, Rust 1.95 MSRV, fuzz smoke/periodic, 3 model tests and 222 coverage tests passed. Coverage was 74.88% functions and 73.74% lines in the declared critical package set. |
-
-Focused exact-candidate entry receipts also passed: CICS local 30/30 verdicts
-over memory and SQLite; RACF/SAF 48/48 at each local gate; Dataset/VSAM/AMS
-180 events across five organizations, 31 commands, 13 properties and eight
-rejected perturbations; Dataset contract; and GnuCOBOL 3.2.0 reference 16/16
-cases with four mutants. The Jenkins PostgreSQL stage passed move, canonical
-effect, stale-effect recovery, online resume, atomic invariants, work leases,
-storage profile, writable readiness, retention, durable migration and CardDemo
-restart.
-
-### Retained dependency receipts
-
-All three release tag commits are ancestors of the accepted candidate. Their
-two-target documents remain under release/VERSION/targets for
-aarch64-apple-darwin and x86_64-unknown-linux-gnu.
-
-| Dependency | Release identity | Retained source digest | Disposition |
-|---|---|---|---|
-| [0.4.0](https://github.com/toreleon/mainframe-env/releases/tag/mainframe-env-v0.4.0) | commit 4a50a4e66f08b9cb5d293fb276cfbd52424b07fc; tree 92ba4ce0855c02b6157d08fedac2cae51977a972 | sha256:143050b6cc13f22dd23e1edba1a4f5a872dde835be9bb7c7ce02a2479ad903ca | pass-with-licensed-differential-pending; IBM COBOL 0/153 |
-| [0.5.0](https://github.com/toreleon/mainframe-env/releases/tag/mainframe-env-v0.5.0) | commit bd5e8ecd211b7da4f3e18dfcfc807352d0ebd2e8; tree 7e89e90c372a8bb1ca63a7b06c3c744e1a85e8d9 | sha256:67faf4b40e2e8c1c619a9564188d4ffe26efff5354e2c60b7032035e37d8b4f6 | pass-with-licensed-differential-pending; RACF/SAF 0/48 |
-| [0.6.0](https://github.com/toreleon/mainframe-env/releases/tag/mainframe-env-v0.6.0) | commit ca3c061adaa63af71eefe8ee494b7c523c3e5540; tree a0dbae4c52a0e3aea28a3ea4bf2e1e8297d2d360 | sha256:905ab74be195244083bf49f8aa0dab53ad2265cd2b9d3b9afbe12ec064ba2b57 | pass-with-licensed-differential-pending; Dataset 0/36 |
-
-### R-01–R-28 integrated mapping
-
-Each commit is present in the accepted candidate. The evidence column names
-the focused regression family or blocking aggregate gate used at entry.
-
-| Finding | Fix commit | Integrated evidence |
-|---|---|---|
-| [R-01](https://github.com/toreleon/mainframe-env/issues/101) | [24bf035](https://github.com/toreleon/mainframe-env/commit/24bf0352e384ddc4daa0e54325f503293ced9062) | stale-effect recovery on memory, SQLite and PostgreSQL; no redispatch after known success |
-| [R-02](https://github.com/toreleon/mainframe-env/issues/102) | [50a5351](https://github.com/toreleon/mainframe-env/commit/50a5351e0031a3f1d2778b9dab12e582b82e4bfa) | versioned audit resource digest, mandatory persisted audit and rollback/saturation tests |
-| [R-03](https://github.com/toreleon/mainframe-env/issues/103) | [7d2988b](https://github.com/toreleon/mainframe-env/commit/7d2988bf22ea20ab61bafb25c629dc992ff80876) | durable resume blocks unknown outcomes; PostgreSQL and process-crash replay |
-| [R-04](https://github.com/toreleon/mainframe-env/issues/104) | [e350c2f](https://github.com/toreleon/mainframe-env/commit/e350c2f0767049c3da7d7acb34f2935f490e6de5) | JES FIFO/identity, SQLite lease reclaim and background-worker lifecycle |
-| [R-05](https://github.com/toreleon/mainframe-env/issues/105) | [ce44365](https://github.com/toreleon/mainframe-env/commit/ce4436500d0468348a2d47c258ac01c67bbdd73c) | global concurrency limit and timeout preemption of blocking backends |
-| [R-06](https://github.com/toreleon/mainframe-env/issues/106) | [eaad1af](https://github.com/toreleon/mainframe-env/commit/eaad1af3fa5aeab9e0b48cbf6b76c39886eab2c1) | atomic invariant contracts on memory, SQLite and PostgreSQL |
-| [R-07](https://github.com/toreleon/mainframe-env/issues/107) | [e3e4212](https://github.com/toreleon/mainframe-env/commit/e3e421267b09056626f970056ccc69b322fbd8d4) | canonical provider replay, lifecycle outbox and message identity goldens |
-| [R-08](https://github.com/toreleon/mainframe-env/issues/108) | [0885079](https://github.com/toreleon/mainframe-env/commit/088507935a33f24f4693116f49223c3c14d47511) | secret-free auth scopes; hashed expiring epoch-bound sessions |
-| [R-09](https://github.com/toreleon/mainframe-env/issues/109) | [8fc946f](https://github.com/toreleon/mainframe-env/commit/8fc946f555f437d2257e5cc3ab3534d8a3bf8e4f) | bootstrap principal/secret, worker capacity/freshness and PostgreSQL writable readiness |
-| [R-10](https://github.com/toreleon/mainframe-env/issues/110) | [a51f274](https://github.com/toreleon/mainframe-env/commit/a51f2745dbf962d65906e0b2dc9751830340c713) | grants from verified plans; Db2/IMS/MQ enterprise denial precedes mutation |
-| [R-11](https://github.com/toreleon/mainframe-env/issues/111) | [a5fbc43](https://github.com/toreleon/mainframe-env/commit/a5fbc434a56e9d2b20774a6c87381fa4b5bb9c5c) | safe oldest-owner selection and memory/SQLite/PostgreSQL retention contracts |
-| [R-12](https://github.com/toreleon/mainframe-env/issues/112) | [ad0cf0a](https://github.com/toreleon/mainframe-env/commit/ad0cf0ab60f31396cbd01779c09efbe817f8372f) | deterministic macOS LC_UUID, foreign-target refusal and bounded defaults |
-| [R-13](https://github.com/toreleon/mainframe-env/issues/113) | [447a1a5](https://github.com/toreleon/mainframe-env/commit/447a1a559f95f0719cf02a61a31b2cf1a1aece76) | dependency policy, cargo-deny and deterministic license notices |
-| [R-14](https://github.com/toreleon/mainframe-env/issues/114) | [b429d62](https://github.com/toreleon/mainframe-env/commit/b429d62c687856e36fddae8bc288902ceafd75df) | two-stage mtime/symlink/mismatch tests and Jenkins archive reproduction |
-| [R-15](https://github.com/toreleon/mainframe-env/issues/115) | [83ec4b8](https://github.com/toreleon/mainframe-env/commit/83ec4b87dd143ffe3de10953394493afb1bdc24a) | distinct development identity and guarded release entry paths |
-| [R-16](https://github.com/toreleon/mainframe-env/issues/116) | [c029219](https://github.com/toreleon/mainframe-env/commit/c029219f0dd647d9255b4334d93167f5524d062d) | semantic/content artifact identity and payload binding |
-| [R-17](https://github.com/toreleon/mainframe-env/issues/117) | [f87eaaa](https://github.com/toreleon/mainframe-env/commit/f87eaaabe873b5d296c502334f2a7a7797eed3d6) | independent table, database, queue, index, cursor and replay rows |
-| [R-18](https://github.com/toreleon/mainframe-env/issues/118) | [6891baf](https://github.com/toreleon/mainframe-env/commit/6891baf5da765e41f9ce5c48076e04a4192a1817) | deadline and fencing contracts on memory, SQLite and PostgreSQL |
-| [R-19](https://github.com/toreleon/mainframe-env/issues/119) | [68dc3c5](https://github.com/toreleon/mainframe-env/commit/68dc3c5f9bb4f31084c5d3f0bfbcf8827fbd6fc4) | concurrent/no-replace publication, transactional quotas and shared PostgreSQL artifacts |
-| [R-20](https://github.com/toreleon/mainframe-env/issues/120) | [9d0025a](https://github.com/toreleon/mainframe-env/commit/9d0025a6f458d23b2b5f289ef7d2a60e727dc545) | per-name SAF filtering for dataset catalog listing |
-| [R-21](https://github.com/toreleon/mainframe-env/issues/121) | [40ff5eb](https://github.com/toreleon/mainframe-env/commit/40ff5eb043d24dd9b21d083c5acae66cd6e50395) | discovered tooling and complete 11-gate PostgreSQL Jenkins stage |
-| [R-22](https://github.com/toreleon/mainframe-env/issues/122) | [540484c](https://github.com/toreleon/mainframe-env/commit/540484ca9e915f0b758cf8921107040df4fa1657) | capture schema/parser parity and numeric conformance-version discovery |
-| [R-23](https://github.com/toreleon/mainframe-env/issues/123) | [49da315](https://github.com/toreleon/mainframe-env/commit/49da315b78cf0ac62e75d6e79c5265e4446e5793) | release tamper, DSSE authentication and retained CycloneDX schemas |
-| [R-24](https://github.com/toreleon/mainframe-env/issues/124) | [88bc06b](https://github.com/toreleon/mainframe-env/commit/88bc06b152b042a3863f2a00660bb69abf1d1f32) | fenced Loom model and killed lost-update/missing-corpus mutants |
-| [R-25](https://github.com/toreleon/mainframe-env/issues/125) | [1a3f39f](https://github.com/toreleon/mainframe-env/commit/1a3f39f248c31c42b4223a6fe562bd1ce865239a) | full Rust 1.95 MSRV, no ambient install and pinned Jenkins inputs |
-| [R-26](https://github.com/toreleon/mainframe-env/issues/126) | [e677c3e](https://github.com/toreleon/mainframe-env/commit/e677c3e5e38497bef6cb42ebf54ae60ad417c739) | generated descriptors plus CICS module size/growth and handler boundaries |
-| [R-27](https://github.com/toreleon/mainframe-env/issues/127) | [48ce19c](https://github.com/toreleon/mainframe-env/commit/48ce19c1be16e8bfe22bdae80687ee1764e188e1) | public API documentation diagnostics and debt ratchet |
-| [R-28](https://github.com/toreleon/mainframe-env/issues/128) | [f1a89ad](https://github.com/toreleon/mainframe-env/commit/f1a89add6ec9544b876350aec498de9fd0ce9be5) | documented-command, relative-link and Markdown-only plan gates |
-
-The following historical blocker themes are retained from the immutable review;
-every row is closed for CIC-901 entry by the mapping and receipts above:
-
-| Gate | Required outcome |
-|---|---|
-| Mutation safety | Post-dispatch journal failure becomes reconcilable uncertainty; online CICS uses the durable path |
-| Audit and authorization | Host audits persist; enterprise resources receive typed SAF decisions before mutation |
-| Work lifecycle | JES has a real worker/clock/fencing model; HTTP deadlines cancel or isolate blocking work |
-| Authentication/config | Secret cleanup, hashed expiring sessions, real reference resolution, secure bootstrap, and truthful readiness |
-| Capacity | Event, outbox, session, work, and replay state have safe retention/reclamation |
-| Release | Exact macOS binaries execute; archives reproduce; non-identical assets cannot be clobbered |
-| Compliance | Root/project and third-party license material ships; `cargo deny check` passes in CI |
-| Release truth | Development and released identities are distinct and public status is generated/checked |
-| Storage and contracts | Sealed artifact identity, schema/parser parity, per-object persistence, fenced leases, transactional quotas and shared PostgreSQL artifacts |
-| Assurance and maintainability | Discovered tooling/PostgreSQL suites, fuzz/model/coverage baseline, full MSRV/supply-chain gates, family modules and docs/API ratchets |
-
-This acceptance changes only the historical 0.9 implementation entry state. It
-does not promote a release, claim IBM equivalence, or close licensed campaigns.
-
-### Current non-release boundary
-
-The CIC-901 artifacts seal only the 263-row source/contract/compiler/registry
-shape. Development checks run directly without nested orchestration or
-deployment. Release generation, exact-target launch, archive
-reproduction, deployment, and licensed campaigns are explicitly deferred and
-remain pending. The full 0.9 status therefore remains **Proposed** even though
-the CIC-901 aggregate gates pass.
+Changes must preserve the subsystem boundaries in the
+[subsystem engineering review](../../../reviews/SUBSYSTEM-REVIEW.md). Validate
+mutation safety, audit and authorization, worker fencing, effective deadlines,
+configuration, retention, and backend parity against the current candidate.
+Historical build numbers, candidate acceptance tables, and execution receipts
+are removed from this status record.
 
 ## Licensed campaign readiness
 
@@ -3575,7 +3471,6 @@ the CIC-901 aggregate gates pass.
 
 | Work package | State | Next reviewable outcome |
 |---|---|---|
-| Pre-0.9 hardening | **Historically accepted** | Preserve candidate/tree and Jenkins #8 only as historical receipts |
 | CIC-901 | **Complete at the non-release implementation boundary.** Sources A/B/C accepted 88/88/87; 263-row contract and registry generated; readiness is 3 typed, 20 legacy compatibility, 240 unready; aggregate gates pass | Begin CIC-902 family vertical slices |
 | CIC-902 | **In progress.** Twelve bounded parent slices, twenty-eight implemented interval children, and the START/RETRIEVE metadata, FMH, SET, WAIT-data, and task-local GETMAIN/FREEMAIN children are described below. The local-data cycle connects strict START records to the shared fenced work queue and typed RETRIEVE consumption, now including automatic facility-less target-task launch under the retained principal with one durable execution identity across worker retries and SQLite reopen before launch or after target completion; local TERMID validation, durable terminal association, facility-matched RETRIEVE, busy-terminal deferral and automatic launch on availability; packed plus literal/dynamic `AFTER`/`AT` unit scheduling; no-data START with replay-safe RETRIEVE ENDDATA; bounded RTRANSID/RTERMID/QUEUE propagation; pre-consumption ENVDEFERR; FMH-to-EIBFMH state; either INTO or checkpointed virtual-pointer SET delivery; durable WAIT suspension/reissue until a promoted record appears; generated REQID/EIBREQID identity with local NOCHECK suppression; RACF-backed USERID validity, surrogate admission and durable target-principal binding; PROTECT admission after explicit or implicit committing syncpoint with rollback cleanup on known execution failure, disconnect, or idle timeout, disposition-bound crash-gap recovery after durable execution terminalization, explicit ABEND cancellation of still-protected rows, and source-defined CANCEL refusal before PROTECT commit followed by ordinary cancellation after commit; bounded local CANCEL tombstones unhonored committed START records and cancels their work; bare/default and literal-zero DELAY complete immediately; positive literal or storage-backed packed INTERVAL, packed TIME, and literal/dynamic FOR/UNTIL unit DELAY including MILLISECS persist one task/statement cycle, suspend, promote under the shared worker fence, automatically resume the matching durable exchange in-process or after SQLite reopen, and complete on reissue; elapsed absolute and sub-50 ms targets return source-defined EXPIRED; and local application-named delays support other-task early-expiration cancellation plus bounded terminal cleanup. The local/default and unambiguous installed-ENQMODEL portions of `task-enqueue`, both ASKTIME forms, the source-checked FORMATTIME and local LINK subsets, typed ABEND/HANDLE ABEND, the 92-output ASSIGN subset, ADDRESS SET virtual-pointer transfer, bounded GETMAIN SET/FLENGTH/LENGTH allocation and FREEMAIN DATAPOINTER/DATA release, CHANGE TASK priority, SET ASSOCIATION USERCORRDATA, one-shot SUSPEND, nested PUSH/POP HANDLE stack, and IGNORE CONDITION are executable, but no whole row is credited yet | Continue source-available storage, interval, and START/RETRIEVE obligations; POST remains blocked on its missing pinned body |
 | CIC-903 | **In progress.** The default-cursor STARTBR/READNEXT/READPREV/ENDBR browse subset, including STARTBR EQUAL/GTEQ and GENERIC/KEYLENGTH positioning plus READNEXT/READPREV LENGTH in/out behavior, keyed READ including GTEQ/GENERIC plus WRITE/DELETE with LENGTH/KEYLENGTH where applicable, held-record REWRITE LENGTH, current-record DELETE after READ UPDATE, local WRITEQ/READQ/DELETEQ TD with durable local TDQUEUE definitions and DELETEQ TS QUEUE/QNAME plus READQ/WRITEQ TS, bounded local RECEIVE MAP/SEND MAP/SEND TEXT including RECEIVE FROM/LENGTH/TERMINAL, send lengths and SEND MAP MAPONLY/DATAONLY, empty-state PURGE MESSAGE, and durable SPOOLCLOSE and SPOOLOPEN INPUT/OUTPUT, SPOOLREAD, and SPOOLWRITE are typed; named/remote cursors, alternate key forms, RLS token locking, TSQ definition state, broader BMS controls, and JES-backed spool integration remain pending | Continue file update/browse, terminal/BMS, TSQ/TDQ, journal, and spool slices |
@@ -3600,7 +3495,7 @@ The ordering and composition of remaining roadmap slices are subject to change
 as source and dependency audits resolve. Sealed behavior and acceptance gates
 remain fixed unless they are explicitly revised.
 
-The full-minor implementation resumes from the integrated PR #163/#199 tree
+The full-phase implementation resumes from the integrated PR #163/#199 tree
 at `24fdcabff31c142725d870ba9b852f4559fee443`. This is the implementation base,
 not a new acceptance receipt. CIC-902 through CIC-906 and the full 263-command
 exit gate remain in scope. The first local interval producer/consumer cycle is
@@ -5795,7 +5690,7 @@ The typed-registration catalog SHA-256 is
 `e1cc3b79407f258f998daf6275509aa86da747ccf0e64c3b4907b49d414f1384`.
 Generation, source-map, schema, profile, inventory, module, API-doc, rustfmt,
 Clippy, documentation, and dependency-policy checks pass. The broader
-`architecture-fast` command, run against the explicit pinned 0.9 cache, reached
+`architecture-fast` command, run against the explicit pinned cics.application-api cache, reached
 the CICS source-review freshness step and stopped because that cache lacks linked
 topic `SSNAQ8_11.1.0/reference-api/r_dump.html`; no whole-cache refresh was
 performed for this bounded topic review, so that aggregate gate remains pending.
@@ -6754,7 +6649,7 @@ values are:
 | `reference-system-management/resources/transaction/dfha4_summary.html` | `03d0dc445c72a2de89b7fe0ba4b5e19fd650f13539bacc4ee638040c2f1eb2ac` |
 | `troubleshooting/java/troubleshooting_web_ref.html` | `b07229031a6b7b9d622586842457c3c71f06fc9fe087a5dfd3a334f621e2e5a5` |
 
-A bounded source-a review check against the existing `ibm-docs-pinned-0.9`
+A bounded source-a review check against the existing `ibm-docs-pinned-cics.application-api`
 cache stops at the separate CICS TX 11.1 DUMP supplement
 `SSNAQ8_11.1.0/reference-api/r_dump.html`, whose committed SHA-256 is
 `0234352759c3d24a0e56db00eaa8a0ad509e4e936889dc2af7ebf1cc6bdd14ee`.
@@ -7639,7 +7534,7 @@ and licensed differential remain pending.
 ### `CIC-903.document` raw-archive source verification
 
 The committed `ibm-cics-ts-6x-application-api-sources-a-2026-09-10`
-manifest (`sha256:ab7120009fb0f2a9d121ffdf518d05960ee006e74f1d28026858cafd6c5467de`)
+manifest (`sha256:9a74888a81c32d755e6f3abd73131dd85a12b04f2cbc16b0ea26eb9283a5e152`)
 binds the catalog rows below. Each exact body was verified on the host at
 `/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/html/sha256/<first-two>/<sha>.html`:
 its byte count and SHA-256 match the committed topic manifest, and
@@ -7665,7 +7560,7 @@ verified from the raw archive at
 
 Before changing document semantics, the registered
 `ibm-cics-ts-6x-application-api-sources-a-2026-09-10` manifest was verified at
-`sha256:ab7120009fb0f2a9d121ffdf518d05960ee006e74f1d28026858cafd6c5467de`
+`sha256:9a74888a81c32d755e6f3abd73131dd85a12b04f2cbc16b0ea26eb9283a5e152`
 with topic-set digest
 `sha256:344e912ef28b1d9ba4a1a00b4613865d759c3e337ac809ccb23fd4f4358652d5`.
 The original repository parser review searched and read row `0051` topic
@@ -8723,7 +8618,7 @@ handler ownership. Generated identity never grants a coverage gate.
 
 | Slice | Scope | Dependencies | Acceptance boundary |
 |---|---|---|---|
-| `CIC-901.catalog` | Rows `0001`–`0263`: official row ID, official label, EIBFN, API classification/separation and deterministic identity-projection digest only. Set `generated_coverage_credit=0` and `automatic_registration=false`. It contains no family ownership, handler, grammar, options, conditions, effects, resource key, capability, execution context or semantic obligation. | Frozen 0.2 CICS catalog and retained 0.4/0.5/0.6 identities | Schema and generator freshness; exactly 263 unique API identities; exact row/label/EIBFN projection; API/SPI/FEPI separation; missing, duplicate and foreign-row rejection; unchanged public registry and zero ledger credit |
+| `CIC-901.catalog` | Rows `0001`–`0263`: official row ID, official label, EIBFN, API classification/separation and deterministic identity-projection digest only. Set `generated_coverage_credit=0` and `automatic_registration=false`. It contains no family ownership, handler, grammar, options, conditions, effects, resource key, capability, execution context or semantic obligation. | Frozen coverage.foundation CICS catalog and retained cobol.execution/racf.security/dataset.data identities | Schema and generator freshness; exactly 263 unique API identities; exact row/label/EIBFN projection; API/SPI/FEPI separation; missing, duplicate and foreign-row rejection; unchanged public registry and zero ledger credit |
 | `CIC-901.sources-a` | Parent source-verification slice for rows `0001`–`0088`: syntax variants, options, operand directions, conditions and execution-context fragments. Automatic source acceptance: **88/88**; semantic and coverage credit remain zero. | Accepted `CIC-901.catalog`; completed `sources-a-map`, `sources-a-corpus`, `sources-a-project` and `sources-a-review` | Exact 88-row source closure with offline reproduction and conflict/missing-fragment rejection; no semantic or differential credit |
 | `CIC-901.sources-a-map` | Rows `0001`–`0088`: deterministic candidate mapping from each official catalog row to zero or more CICS command-summary topic paths. Preserve shared command pages, protocol/variant pages and source gaps explicitly; do not infer semantics. | Accepted `CIC-901.catalog`; pinned CICS TS 6.x TOC digest `sha256:f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a` | Exactly 88 ordered rows; every mapped path exists beneath the pinned command-summary tree; duplicate/shared and one-to-many mappings are explicit; every zero-page row has an explicit source-gap disposition; foreign, stale-label and ambiguous automatic matches fail; deterministic mapping digest; zero coverage credit |
 | `CIC-901.sources-a-corpus` | Freeze the mapped command pages and the bounded, reviewed linked common/context topic closure. Raw IBM HTML remains in the external cache; Git retains only source locators, byte counts, last-modified values, SHA-256 identities and a corpus digest. | Completed `CIC-901.sources-a-map`; official IBM content endpoint; external cache | All selected bytes reverify offline; manifest count/size/digest are derived; unmapped, unhashed, duplicate, changed or repository-retained publication bodies fail; link expansion is bounded and explicit; zero coverage credit |
@@ -8732,12 +8627,12 @@ handler ownership. Generated identity never grants a coverage gate.
 | `CIC-901.sources-b` | Rows `0089`–`0176`, with the same source projection boundary. Automatic source acceptance: **88/88**; semantic and coverage credit remain zero. | Accepted `CIC-901.catalog`; pinned topic bytes | Same source and review gates as `sources-a`; no semantic or differential credit |
 | `CIC-901.sources-c` | Rows `0177`–`0263`, with the same source projection boundary. Automatic source acceptance: **87/87**; semantic and coverage credit remain zero. | Accepted `CIC-901.catalog`; pinned topic bytes | Same source and review gates as `sources-a`; no semantic or differential credit |
 | `CIC-901.command-contract` | All 263 source-reviewed rows are closed in a generated `frozen-with-bounded-ambiguities` contract covering grammar, option legality/direction/bounds, resource/capability intent, EIB/RESP/RESP2/conditions, context applicability, effect class, cancellation, audit and recovery. | Accepted `sources-a`–`sources-c`; early `INT-1601.cics-participant` for mutating commands | Contract compatibility, malformed/forbidden-context matrices, option influence/rejection, canonical encoding and API/docs/module ratchets |
-| `INT-1601.cics-participant` | Minimum durable participant contract for mutating application commands: owner, prepare applicability, completion/compensation limits, unknown outcome, idempotency, effect order, fencing, cancellation, recovery/schema and retention. | Accepted hardening; `CIC-901.catalog`; 0.5 SAF and 0.6 data authorities | Memory/SQLite/PostgreSQL mutation, failure, replay, stale-owner, restart, migration and rollback review |
+| `INT-1601.cics-participant` | Minimum durable participant contract for mutating application commands: owner, prepare applicability, completion/compensation limits, unknown outcome, idempotency, effect order, fencing, cancellation, recovery/schema and retention. | Accepted hardening; `CIC-901.catalog`; racf.security SAF and dataset.data data authorities | Memory/SQLite/PostgreSQL mutation, failure, replay, stale-owner, restart, migration and rollback review |
 | `CIC-901.compiler-route` | Candidate-aware source-reviewed descriptors validate before readiness. Only three typed runtime rows lower through typed COBOL HIR/MIR; 20 legacy compatibility rows remain explicit and unready rows fail closed. | `CIC-901.command-contract` | Parser/semantic negative matrix, canonical request identity and compiled-COBOL selected-route probes pass |
 | `CIC-901.registry` | Reviewed family and handler identities are generated for 263 rows with 3 typed, 20 legacy compatibility, and 240 unready handlers. Automatic registration is false, no default fallback exists, and SPI/FEPI remain outside the numerator. | All three source-review slices; `CIC-901.command-contract`; family ownership review | 263-row registration-shape closure, explicit unsupported/unready errors, API/SPI/FEPI isolation and module budget |
 | `CIC-901.integration` | Aggregate the prior slices at the non-release boundary without claiming CIC-902–CIC-905 family execution or new credit for unready rows. | All earlier CIC-901 slices | **Pass:** focused and workspace Rust suites, source/tooling/schema/architecture/docs/MSRV/dependency gates, unchanged pilot, and 11/11 PostgreSQL selectors |
 
-### CIC-901 source and generated-contract receipts
+### CIC-901 source and generated-contract inputs
 
 Source selection, immutable HTML identity, projection, and independent review
 remain separate stages. The extractor cannot approve its own output, and the
@@ -8836,7 +8731,7 @@ Begin CIC-902 with bounded program/task/interval/storage/recovery vertical
 slices on the shared runtime. Release, deployment, nested orchestration, and
 licensed campaigns are not part of this step.
 
-Do not claim 0.9 coverage, IBM equivalence or release readiness from this entry
+Do not claim cics.application-api coverage, IBM equivalence or release readiness from this entry
 acceptance. Licensed differentials remain a later final-gate dependency.
 
 ## Terminal-control implementation slice
@@ -9314,9 +9209,9 @@ reverified against the pinned raw HTML under
 and parsed with the repository `ibm_docs.py` PlainText parser. No browser or
 network refresh was performed.
 
-The changed v0.9 CICS contract, descriptor catalog, and exact 128-entry typed
+The changed cics.application-api CICS contract, descriptor catalog, and exact 128-entry typed
 registration list pass their Draft 2020-12 schemas. The broader repository
-`cargo xtask schemas --check` remains stopped by an unchanged 0.8 CardDemo
+`cargo xtask schemas --check` remains stopped by an unchanged jes.execution CardDemo
 evidence sentence that exceeds its 256-character historical schema bound.
 That receipt was left untouched by this reconciliation.
 
@@ -9392,8 +9287,8 @@ explicit condition obligations.
 Owners: typed compiler resolution and CICS IR/MCEP codec; host request and
 interpreter output binding; `mainframe-env-cics` conversation extraction
 handler and durable conversation state authority; generated descriptors,
-registrations, schemas and ratchets. The slice depends on the accepted 0.4
-host ABI, 0.5 SAF, 0.6 durable coordinator and CIC-901 catalog, and will
+registrations, schemas and ratchets. The slice depends on the accepted cobol.execution
+host ABI, racf.security SAF, dataset.data durable coordinator and CIC-901 catalog, and will
 connect to the conversation-open state machine at integration without a
 second state authority. Applicable gates: focused source-derived valid,
 boundary, condition, DPL, GDS return-code, authorization/audit,
@@ -9540,9 +9435,9 @@ and generated documentation checks pass. LOGONMSG
 SET allocation is invalidated at the next EXTRACT LOGONMSG and has a focused
 interpreter test. The full provider suite completed its conversation tests but
 was interrupted after unrelated terminal/CardDemo timeout tests ran for
-several minutes. `cargo xtask schemas --check` stopped on an unchanged 0.8
+several minutes. `cargo xtask schemas --check` stopped on an unchanged jes.execution
 CardDemo evidence string exceeding its 256-character schema bound, before the
-0.9 schemas were reached. Neither interrupted nor blocked gate is marked pass.
+cics.application-api schemas were reached. Neither interrupted nor blocked gate is marked pass.
 `cargo xtask architecture-fast --check` also stopped on an unchanged
 `CARDDEMO` literal in
 `crates/contracts/mainframe-env-host-api/src/canonical/tests.rs`; no
@@ -9617,7 +9512,7 @@ The clean external CardDemo corpus remained at commit
 `a1253e31c839f78d1f185b01771ba956da63b005`. The scope is the
 compiler/IR/interpreter/provider path for source forms reached by that corpus,
 plus the existing resource, base-online, MQ/authorization, and base-batch
-selectors. It does not certify CIC-906 or the 0.9.0 completion gate.
+selectors. It does not certify CIC-906 or the cics.application-api completion gate.
 
 | Catalog row and pinned HTML topic | Baseline | Verified topic SHA-256 |
 | --- | --- | --- |
@@ -9655,7 +9550,7 @@ The bounded CardDemo selectors passed on the source branch:
 | `carddemo-resources --check` | 25 transactions, 21 BMS maps, eight files, and all 25 transaction cross references; resource digest `41469c76b57cf1a92f12ffcff0d469e8e98d62fd61c0a54e47c084b8a36cba3e` |
 | `carddemo-base-online --check` | Nine journeys, 17 source-backed transactions and 17 installed maps; journey digest `664900bb2f08a694888c79da51ed294d6f09d03ff817a629cb27319b14388e0e` |
 | `carddemo-mq-authorization --check` | Four journeys and historical authorization digest `f1d26e800741be38968d77a4be33d8dab9ca99a6f20d1842eea29bbb6653f451`; affected trigger programs compile, while this selector drives MQ/IMS service APIs rather than executing trigger COBOL |
-| `carddemo-base-batch --check` | Three journeys; dataset and spool byte maps match the versioned 0.8 receipt, with journey digest `0cd4f5d879d384d5286a1cb2698d0c0687503802163f29b04060e04550b51d85` |
+| `carddemo-base-batch --check` | Three journeys; dataset and spool byte maps match the versioned jes.execution receipt, with journey digest `0cd4f5d879d384d5286a1cb2698d0c0687503802163f29b04060e04550b51d85` |
 
 On the integrated 184-typed checkout, the bounded MQ/authorization selector
 passed again. One base-batch attempt stopped in `CREASTMT.JCL`: the utility
@@ -9680,32 +9575,11 @@ not refreshed or credited. The architecture aggregate is not marked pass.
 
 ### CIC-906.carddemo-host-v09: versioned host comparison
 
-The immutable CD-008 receipt predates CD-024 and pins 20 SQL HIR statements,
-one `SQL.INCLUDE`, two `SQL.SELECT`, and no `SQL.DECLARE`. CD-024 commit
-`3d1a55b1719e150042467e381fc5f8f609510dd6` added SQL INCLUDE
-precompilation and cursor declaration hoisting. In the pinned corpus,
-`COTRTLIC.cbl` declares forward and backward cursors at lines 338 and 354,
-then includes `CSDB2RPY` at line 2055; that copybook contains the priming
-SELECT at line 24. The accepted CD-024 receipt records nine include
-expansions, two DECLAREs, and three SELECTs. Current HIR therefore has 22 SQL
-statements: `INCLUDE` 1→0, `DECLARE` 0→2, and `SELECT` 2→3. DECLARE registers
-cursor text for later OPEN and returns without a database effect. The older
-INCLUDE opcode represented an unexpanded precompiler directive.
-
-`conformance/0.9/evidence/carddemo-host-preservation.json` stores the
-comparison observation from clean commit `46da64da4730984b0cda70789ea5c4b122a27ce2`,
-tree `fa720980d5f01b650d7f5ffe138d50a084e8670c`, explicitly as
-comparison data. Its full host token digest captures the current CICS operands
-alongside the SQL delta. The new `carddemo-v09-host --check` selector requires
-a clean checkout, checks CD-008 against its historical completion commit,
-rejects every opcode drift except the three listed SQL changes, and compares
-the current full host receipt exactly with that versioned observation. It also
-rederives the CD-010 transaction/BMS/resource receipt and CD-019 nine-journey
-online receipt. The printed bounded receipt records the actual candidate
-commit and tree; the committed comparison file makes no final-candidate pass
-claim. Historical CD-008 and the prior focused IBM CICS source pins remain
-unchanged. No IBM language or subsystem behavior was changed in the
-candidate-comparison selector itself.
+The current host integration gate reruns the host operand, resource, and base
+online checks against the clean pinned CardDemo repository. Run
+`cargo xtask carddemo-host-integration --check` with `CARDDEMO_CORPUS_DIR` set.
+Historical host-preservation receipts are removed; report live validation scope
+and any unavailable environment alongside the candidate change.
 
 ### #173 reviewed CICS source re-pin (2026-09-28)
 

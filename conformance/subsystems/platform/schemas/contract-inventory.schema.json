@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "mainframe-env.contract-inventory@1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "rust",
+    "profiles",
+    "contracts",
+    "sql_schema",
+    "migration_head",
+    "fixture_schema",
+    "evidence_schema"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mainframe-env.contract-inventory@1"
+    },
+    "rust": {
+      "type": "object"
+    },
+    "profiles": {
+      "type": "object"
+    },
+    "contracts": {
+      "type": "object"
+    },
+    "sql_schema": {
+      "type": "integer"
+    },
+    "migration_head": {
+      "type": "string"
+    },
+    "fixture_schema": {
+      "type": "string"
+    },
+    "evidence_schema": {
+      "type": "string"
+    }
+  },
+  "title": "Current subsystem contract inventory"
+}

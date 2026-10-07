@@ -4,8 +4,7 @@ Status: **Development disclosure policy**
 
 `mainframe-env` does not currently claim production readiness or a security
 support SLA. Security reports are nevertheless handled as private,
-stop-the-line engineering work for the current development branch and latest
-published release.
+stop-the-line engineering work for the current development branch.
 
 ## Report a vulnerability
 
@@ -34,8 +33,7 @@ disclosure merely to obtain a tracking number.
 Maintainers should acknowledge receipt, reproduce against an exact candidate,
 classify impact, and agree on disclosure timing. There is no guaranteed response
 window while the project remains pre-production. A fix is not complete until it
-has a focused regression, the affected security/durability gates pass, release
-notes describe compatibility impact, and any published vulnerable artifacts
+has a focused regression, the affected security/durability gates pass, subsystem documentation describes compatibility impact, and any published vulnerable artifacts
 have an explicit disposition.
 
 ## Security model
@@ -45,7 +43,7 @@ The normative security boundaries are documented in:
 - [Security and capability architecture](docs/architecture/PLUGIN-AND-SECURITY.md)
 - [Execution and durability](docs/architecture/EXECUTION-AND-DURABILITY.md)
 - [Canonical effect encoding](docs/contracts/EFFECT-CANONICAL-V1.md)
-- [Pre-0.9 deep review](docs/reviews/PRE-0.9.0-DEEP-REVIEW.md)
+- [Subsystem engineering review](docs/reviews/SUBSYSTEM-REVIEW.md)
 
 Local conformance success, historical evidence, or a green ordinary test suite
 does not by itself establish production security or licensed IBM equivalence.

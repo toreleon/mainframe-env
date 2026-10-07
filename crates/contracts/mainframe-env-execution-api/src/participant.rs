@@ -344,6 +344,12 @@ pub struct TransactionParticipantDescriptor {
     pub dependency: &'static str,
     /// Accepted capabilities when present; pending v1 bindings carry `None`.
     pub capabilities: Option<ParticipantCapabilities>,
+    /// Optional local preparation is descriptive only; it never admits a participant.
+    pub preparation_scope: Option<&'static str>,
+    /// Optional local preparation test locator, without acceptance credit.
+    pub preparation_contract_test: Option<&'static str>,
+    /// Mandatory obligations still blocking acceptance of the prepared provider.
+    pub blocked_obligations: &'static [&'static str],
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -458,6 +464,32 @@ impl TransactionParticipantContract {
             || self.participants.len() != 4
         {
             return Err(ParticipantContractProblem::InvalidContract);
+        }
+        for participant in self.participants {
+            match participant.preparation_scope {
+                None if participant.preparation_contract_test.is_none()
+                    && participant.blocked_obligations.is_empty() => {}
+                Some("ims-local-database-provider-route")
+                    if participant.provider_id == "ims"
+                        && participant.status == ParticipantStatus::Pending
+                        && participant.capabilities.is_none()
+                        && participant.preparation_contract_test
+                            == Some(
+                                "crates/providers/mainframe-env-ims/tests/participant_contract.rs",
+                            )
+                        && participant.blocked_obligations
+                            == [
+                                "INT-1601.owner",
+                                "INT-1601.modes",
+                                "INT-1601.ordering",
+                                "INT-1601.fencing",
+                                "INT-1601.deadline-cancellation",
+                                "INT-1601.security-audit",
+                                "INT-1601.retention",
+                                "INT-1601.compatibility",
+                            ] => {}
+                _ => return Err(ParticipantContractProblem::InvalidContract),
+            }
         }
 
         let providers = self
@@ -587,6 +619,28 @@ fn validate_accepted_capabilities(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ims_preparation_never_admits_or_hides_missing_guarantees() {
+        let contract = transaction_participant_contract_v1();
+        let ims = contract.participant("ims").unwrap();
+        assert_eq!(ims.status, ParticipantStatus::Pending);
+        assert!(ims.capabilities.is_none());
+        assert_eq!(
+            ims.preparation_scope,
+            Some("ims-local-database-provider-route")
+        );
+        let mut participants = contract.participants.to_vec();
+        participants[2].blocked_obligations = &[];
+        let changed = TransactionParticipantContract {
+            participants: Box::leak(participants.into_boxed_slice()),
+            ..*contract
+        };
+        assert_eq!(
+            changed.validate(),
+            Err(ParticipantContractProblem::InvalidContract)
+        );
+    }
 
     #[test]
     fn generated_v1_is_valid_and_future_providers_stay_pending() {

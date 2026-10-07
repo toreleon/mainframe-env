@@ -3,7 +3,6 @@
 Subsystem: **cics**
 Phase: **application-api**
 
-Target version: **0.9.0**
 Completion dependencies: cobol.execution, racf.security, dataset.data
 Implementation prerequisite: accepted post-review hardening candidate (R-01–R-28)
 
@@ -16,7 +15,7 @@ requirements alongside the version-specific boundaries below.
 
 ---
 
-You are implementing **mainframe-env 0.9.0: complete CICS application API** for
+You are implementing **mainframe-env cics.application-api: complete CICS application API** for
 all 263 pinned CICS TS 6.x application commands.
 
 ## Current CIC-901 boundary
@@ -49,22 +48,22 @@ candidate selected by an application discriminator.
 
 CIC-901 carries zero execution, coverage, semantic, conformance, and licensed
 differential credit. It establishes the source-backed contract needed for
-CIC-902–CIC-905 vertical family slices; it does not make 0.9.0 release-ready.
+CIC-902–CIC-905 vertical family slices; it does not make cics.application-api release-ready.
 Do not add release automation, nested environment orchestration, or a broad licensed campaign
-at this boundary. Licensed evidence remains mandatory at the full 0.9
+at this boundary. Licensed evidence remains mandatory at the full cics.application-api
 completion gate after the applicable executable families exist.
 
 ## Read and verify first
 
 Read `docs/prompts/subsystems/README.md`,
 `docs/delivery/subsystems/cics/application-api-plan.md`, the generated CICS API catalog,
-CICS resource/EIB/condition contracts, and accepted 0.4.0 COBOL host ABI, 0.5.0
-SAF, and 0.6.0 data-authority evidence. Verify all three dependency gates before
+CICS resource/EIB/condition contracts, and accepted cobol.execution COBOL host ABI, racf.security
+SAF, and dataset.data data-authority evidence. Verify all three dependency gates before
 public integration.
 
 For CIC-901 specifically, inspect all three source projections and their
 independent reviews, plus
-`conformance/0.9/generated/cics-application-command-contracts.json` and
+`conformance/subsystems/cics/application/generated/cics-application-command-contracts.json` and
 `crates/foundation/mainframe-env-ir/src/generated/cics_application_registry.rs`.
 Preserve every bounded ambiguity as bounded; a closed row is not necessarily a
 fully resolved or executable row.
@@ -72,11 +71,11 @@ fully resolved or executable row.
 Also read and verify the current implementation baseline before editing:
 
 - `docs/delivery/subsystems/cics/application-api-status.md`;
-- `docs/reviews/PRE-0.9.0-DEEP-REVIEW.md`;
+- `docs/reviews/SUBSYSTEM-REVIEW.md`;
 - `docs/research/cics-behavioral-conformance-pilot.md`;
-- `conformance/0.9/cics/pilot-rule-review.json`;
-- `conformance/0.9/cics/pilot-fixtures.json`;
-- `conformance/0.9/cics/pilot-environment.json`;
+- `conformance/subsystems/cics/application/cics/pilot-rule-review.json`;
+- `conformance/subsystems/cics/application/cics/pilot-fixtures.json`;
+- `conformance/subsystems/cics/application/cics/pilot-environment.json`;
 - `docs/runbooks/cics-licensed-pilot.md`;
 - `docs/contracts/EFFECT-CANONICAL-V1.md`;
 - `docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md`;
@@ -94,7 +93,7 @@ for CIC-901**, backed by all 28 findings resolved and integrated, one fix commit
 per finding, focused regression references, and passing review Gates A–D on one
 unchanged candidate. Record that candidate's SHA/tree and dependency/CI
 references in the status document. Issue closure or separate green branches
-alone do not establish the entry gate. The existing 0.4/0.5/0.6 dependency
+alone do not establish the entry gate. The existing cobol.execution/racf.security/dataset.data dependency
 receipts remain required; the hardening candidate is an additional prerequisite.
 
 PR [#131](https://github.com/toreleon/mainframe-env/pull/131) merged as
@@ -117,7 +116,7 @@ existing licensed adapter covers the bounded pilot only; extend its owned
 capture/comparison boundary for each implemented family. If the licensed
 environment is unavailable, continue independent implementation after the
 hardening entry gate, keep `differential=pending`, and record the final-gate
-blocker. Never substitute local/model evidence or remove the licensed full-minor
+blocker. Never substitute local/model evidence or remove the licensed full-phase
 completion requirement.
 
 ## Implement in this order
@@ -151,9 +150,9 @@ example, separate file update, file browse, TSQ, and TDQ work under CIC-903;
 split further when a slice exceeds the repository's module review budget.
 
 The sealed CIC-901 contract/registry boundary may remain complete while the
-0.9.0 minor stays in progress. It authorizes incremental CIC-902–CIC-905 family
+cics.application-api minor stays in progress. It authorizes incremental CIC-902–CIC-905 family
 work, not release publication, 263-command execution claims, or early credit
-against CIC-906 and the full-minor completion gate.
+against CIC-906 and the full-phase completion gate.
 
 Use the common contract's slice commit/sealing rules. Commit each passing slice
 before beginning the next dependent slice, and keep the parent in progress
@@ -219,15 +218,15 @@ substitute for this route proof or complete a whole family.
 ## Version-specific invariants
 
 - At CIC-901, generate all 263 registry shapes and make every unready handler
-  fail explicitly. At full 0.9 completion, all 263 commands must have sealed
+  fail explicitly. At full cics.application-api completion, all 263 commands must have sealed
   executable registrations and every accepted option must affect semantics.
 - Preserve exact EIB, RESP/RESP2, HANDLE/IGNORE/NOHANDLE and condition behavior
   across normal, failure, cancellation, syncpoint, and restart paths.
-- File and security behavior use the 0.6/0.5 authorities; host calls use the 0.4
+- File and security behavior use the dataset.data/racf.security authorities; host calls use the cobol.execution
   ABI. No duplicate resource state or provider-local authorization is allowed.
 - APPC/MRO and DPL state is bounded, recoverable where required, and independent
   of application transaction/program names.
-- SPI and FEPI completion remain out of scope until 0.10.
+- SPI and FEPI completion remain out of scope until cics.system-api.
 
 ## Validation by changed boundary
 
@@ -238,7 +237,7 @@ actually changed, including success followed by journal failure, audit
 saturation, deny-before-mutation, stale-owner rejection, deadline/cancellation,
 restart/resume and retention that preserves replay/checkpoint recovery.
 
-The PostgreSQL durable profile is explicitly affected by 0.9. Its shared
+The PostgreSQL durable profile is explicitly affected by cics.application-api. Its shared
 artifact, concurrent-owner and restart tests are required at minor integration;
 a skipped environment test cannot satisfy them. Memory tests establish
 determinism and invariants but carry no durable process-restart credit.

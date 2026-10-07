@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CardDemo · Credit card services</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/terminal.css"><script defer src="/terminal.js"></script>
+</head>
+<body>
+<header><div class="brand">C<span>D</span></div><div><h1>CardDemo</h1><p>Credit card services</p></div><span id="connection">Disconnected</span></header>
+<main>
+<section class="intro"><h2>Your banking terminal</h2><p>Manage accounts, cards, transactions and payments.</p></section>
+<section class="workspace" aria-label="CardDemo terminal">
+<div class="toolbar"><label for="role">Workspace</label><select id="role"><option value="WEBUSER">Customer services</option><option value="WEBADM">Administration</option></select><button id="connect">Connect</button><button id="disconnect" disabled>Disconnect</button><span id="screen-name"></span></div>
+<div class="terminal-scroll"><form id="terminal-form" autocomplete="off"><div id="screen" aria-label="Application screen"><p class="welcome">Connect to begin.</p></div></form></div>
+<div id="keys" aria-label="Terminal keys"><button data-aid="125">Enter ↵</button><button data-aid="243">F3 Back</button><button data-aid="244">F4</button><button data-aid="245">F5</button><button data-aid="246">F6</button><button data-aid="247">F7 Previous</button><button data-aid="248">F8 Next</button><button data-aid="122">F10</button><button data-aid="124">F12</button><button data-aid="109">Clear</button></div>
+</section>
+<p id="status" role="status" aria-live="polite">Ready to connect.</p>
+<aside><strong>Demo sign-on</strong><span id="demo-user">USER0001 / PASSWORD</span><span>Sample account <code>00000000050</code></span><span>Tab moves between fields. Enter submits. F3 returns.</span></aside>
+</main>
+<footer>CardDemo · AWS sample application · Powered by mainframe-env</footer>
+</body></html>

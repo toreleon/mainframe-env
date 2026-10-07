@@ -4,10 +4,10 @@
   "snapshot_date": "2026-09-07",
   "snapshot_note": "Row inventories, denominators and numerators are the 2026-08-31 analysis and are unchanged. The date is bumped because every baseline source was re-pointed from a PDF to its IBM Documentation topic set on 2026-09-07; see docs/research/publication-source-probe.md.",
   "repository": {
-    "product_version": "0.1.1",
     "base_commit": "857115b907ce7098c965a51117a079048ea8182e",
     "working_tree": "dirty-user-owned",
-    "claim": "CardDemo-compatible runtime; not IBM whole-product parity"
+    "claim": "CardDemo-compatible runtime; not IBM whole-product parity",
+    "profile": "carddemo"
   },
   "coverage_gates": [
     "recognized",
@@ -47,14 +47,23 @@
           "CARDDEMO.TRANSACTION_TYPE_CATEGORY",
           "CARDDEMO.AUTHFRDS"
         ],
-        "classes": ["H1", "H3"]
+        "classes": [
+          "H1",
+          "H3"
+        ]
       },
       {
         "package": "mainframe-env-batch",
         "file": "crates/apps/mainframe-env-batch/src/service.rs",
         "hits": 3,
-        "identities": ["COBTUPDT", "CBPAUP0C"],
-        "classes": ["H1", "H3"]
+        "identities": [
+          "COBTUPDT",
+          "CBPAUP0C"
+        ],
+        "classes": [
+          "H1",
+          "H3"
+        ]
       }
     ],
     "allowed_fixture_areas": [
@@ -78,20 +87,57 @@
         "product": "SS6SG3_6.5",
         "book_href": "SS6SG3_6.5/lr/language_reference.html",
         "toc_sha256": "c3527d5e084e9749bef54ddf7bfdb1ecbbed94dd686c724417a4a3b669f671ce",
-        "manifest": "conformance/0.2/manifests/cobol-topics.json",
+        "manifest": "conformance/subsystems/coverage/manifests/cobol-topics.json",
         "topic_count": 622,
         "sha256": "9b0291045414ca38d0e8138c7cc78d7321887a3fad6c27a433efd9e9ca7fd1ad"
       },
       "units": [
-        {"name": "procedure-statements", "total": 44, "current_recognized": 42, "current_executed": 37},
-        {"name": "intrinsic-functions", "total": 82, "current_recognized": 12, "current_executed": 12},
-        {"name": "compiler-directing-statements", "total": 15, "current_recognized": 3, "current_executed": 3},
-        {"name": "compiler-directive-groups", "total": 5, "current_recognized": 1, "current_executed": 1},
-        {"name": "file-description-clauses", "total": 10, "current_recognized": null, "current_executed": null},
-        {"name": "data-description-clauses", "total": 17, "current_recognized": null, "current_executed": null}
+        {
+          "name": "procedure-statements",
+          "total": 44,
+          "current_recognized": 42,
+          "current_executed": 37
+        },
+        {
+          "name": "intrinsic-functions",
+          "total": 82,
+          "current_recognized": 12,
+          "current_executed": 12
+        },
+        {
+          "name": "compiler-directing-statements",
+          "total": 15,
+          "current_recognized": 3,
+          "current_executed": 3
+        },
+        {
+          "name": "compiler-directive-groups",
+          "total": 5,
+          "current_recognized": 1,
+          "current_executed": 1
+        },
+        {
+          "name": "file-description-clauses",
+          "total": 10,
+          "current_recognized": null,
+          "current_executed": null
+        },
+        {
+          "name": "data-description-clauses",
+          "total": 17,
+          "current_recognized": null,
+          "current_executed": null
+        }
       ],
-      "hardcode_classes": ["H2", "H3", "H4"],
-      "target_versions": ["0.3.0", "0.4.0"],
+      "hardcode_classes": [
+        "H2",
+        "H3",
+        "H4"
+      ],
+      "target_subsystems": [
+        "cobol.structure",
+        "cobol.execution"
+      ],
       "confidence": "high for denominators and statement/function numerator; medium for directive numerator; data-clause numerator requires normalized inventory"
     },
     {
@@ -106,17 +152,37 @@
         "product": "SSJL4D_6.x",
         "book_href": "SSJL4D_6.x/reference-diagnostics/eib/dfha8mf.html",
         "toc_sha256": "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a",
-        "manifest": "conformance/0.2/manifests/cics-topics.json",
+        "manifest": "conformance/subsystems/coverage/manifests/cics-topics.json",
         "topic_count": 1,
         "sha256": "8fad1a7085e08a7d9726d25c3a9c98681e20f677616f518214c4c4f3cac7d716"
       },
       "units": [
-        {"name": "api-commands", "total": 263, "current_typed_internal": 25, "current_official_mapping_estimate": 24},
-        {"name": "spi-commands-unique", "total": 269, "current_official_mapping_estimate": 1},
-        {"name": "fepi-commands", "total": 39, "current_official_mapping_estimate": 0}
+        {
+          "name": "api-commands",
+          "total": 263,
+          "current_typed_internal": 25,
+          "current_official_mapping_estimate": 24
+        },
+        {
+          "name": "spi-commands-unique",
+          "total": 269,
+          "current_official_mapping_estimate": 1
+        },
+        {
+          "name": "fepi-commands",
+          "total": 39,
+          "current_official_mapping_estimate": 0
+        }
       ],
-      "hardcode_classes": ["H2", "H3", "H5"],
-      "target_versions": ["0.9.0", "0.10.0"],
+      "hardcode_classes": [
+        "H2",
+        "H3",
+        "H5"
+      ],
+      "target_subsystems": [
+        "cics.application-api",
+        "cics.system-api"
+      ],
       "confidence": "high for official denominators; medium for current mapping until operation-to-command normalization"
     },
     {
@@ -132,20 +198,60 @@
         "product": "SSLTBW_3.2.0",
         "book_href": "SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/abstract.htm",
         "toc_sha256": "477a3de1989e3cb185f2dacdc7cea9bab8304ef148e7c9e5e8be55fe3f77dc2b",
-        "manifest": "conformance/0.2/manifests/jcl-jes2-topics.json",
+        "manifest": "conformance/subsystems/coverage/manifests/jcl-jes2-topics.json",
         "topic_count": 1985,
         "sha256": "84cb6bd003c34eeae3398e2e04b7a915bb9194715484009e1da8e20fa347bc1b"
       },
       "units": [
-        {"name": "jcl-statements", "total": 20, "current_recognized": 14, "current_semantic_estimate": 10},
-        {"name": "jes2-jecl-statements", "total": 13, "current_recognized": 0, "current_executed": 0},
-        {"name": "dd-parameters", "total": 74, "current_recognized": 10, "current_executed": 10, "partial": true},
-        {"name": "exec-parameters", "total": 19, "current_recognized": 4, "current_executed": 4, "partial": true},
-        {"name": "job-parameters", "total": 35, "current_recognized": 3, "current_executed": 3},
-        {"name": "output-parameters", "total": 76, "current_recognized": 0, "current_executed": 0}
+        {
+          "name": "jcl-statements",
+          "total": 20,
+          "current_recognized": 14,
+          "current_semantic_estimate": 10
+        },
+        {
+          "name": "jes2-jecl-statements",
+          "total": 13,
+          "current_recognized": 0,
+          "current_executed": 0
+        },
+        {
+          "name": "dd-parameters",
+          "total": 74,
+          "current_recognized": 10,
+          "current_executed": 10,
+          "partial": true
+        },
+        {
+          "name": "exec-parameters",
+          "total": 19,
+          "current_recognized": 4,
+          "current_executed": 4,
+          "partial": true
+        },
+        {
+          "name": "job-parameters",
+          "total": 35,
+          "current_recognized": 3,
+          "current_executed": 3
+        },
+        {
+          "name": "output-parameters",
+          "total": 76,
+          "current_recognized": 0,
+          "current_executed": 0
+        }
       ],
-      "hardcode_classes": ["H1", "H2", "H3", "H5"],
-      "target_versions": ["0.7.0", "0.8.0"],
+      "hardcode_classes": [
+        "H1",
+        "H2",
+        "H3",
+        "H5"
+      ],
+      "target_subsystems": [
+        "jcl.planning",
+        "jes.execution"
+      ],
       "confidence": "high"
     },
     {
@@ -161,16 +267,32 @@
         "product": "SSLTBW_3.2.0",
         "book_href": "SSLTBW_3.2.0/com.ibm.zos.v3r2.idai200/abstract.htm",
         "toc_sha256": "477a3de1989e3cb185f2dacdc7cea9bab8304ef148e7c9e5e8be55fe3f77dc2b",
-        "manifest": "conformance/0.2/manifests/dataset-vsam-ams-topics.json",
+        "manifest": "conformance/subsystems/coverage/manifests/dataset-vsam-ams-topics.json",
         "topic_count": 516,
         "sha256": "a1798761a230fbcdf0c772900c28f3656bb04b6a9210bc4b782c2aeeffafbdc1"
       },
       "units": [
-        {"name": "ams-functional-commands", "total": 31, "current_recognized_estimate": 8, "current_executed_estimate": 8},
-        {"name": "vsam-primary-organizations", "total": 5, "current_recognized_estimate": 4, "current_executed_estimate": 4}
+        {
+          "name": "ams-functional-commands",
+          "total": 31,
+          "current_recognized_estimate": 8,
+          "current_executed_estimate": 8
+        },
+        {
+          "name": "vsam-primary-organizations",
+          "total": 5,
+          "current_recognized_estimate": 4,
+          "current_executed_estimate": 4
+        }
       ],
-      "hardcode_classes": ["H2", "H3", "H5"],
-      "target_versions": ["0.6.0"],
+      "hardcode_classes": [
+        "H2",
+        "H3",
+        "H5"
+      ],
+      "target_subsystems": [
+        "dataset.data"
+      ],
       "confidence": "high for AMS denominator; medium for normalized VSAM numerator"
     },
     {
@@ -185,18 +307,32 @@
         "product": "SSLTBW_3.2.0",
         "book_href": "SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/abstract.htm",
         "toc_sha256": "477a3de1989e3cb185f2dacdc7cea9bab8304ef148e7c9e5e8be55fe3f77dc2b",
-        "manifest": "conformance/0.2/manifests/racf-saf-topics.json",
+        "manifest": "conformance/subsystems/coverage/manifests/racf-saf-topics.json",
         "topic_count": 109,
         "sha256": "8ebad84cd96572fe1c0612798a6b3a4be4752742d2496505ee3f7fcaec7d952f",
         "racroute_topic": "SSLTBW_3.2.0/com.ibm.zos.v3r2.ichc600/racri.htm",
         "racroute_sha256": "acebd6ebc34ffd70843db61620351ae35df699c8e29bd3da486a409d9854db3a"
       },
       "units": [
-        {"name": "racf-command-families", "total": 34, "current_equivalent_estimate": 6},
-        {"name": "racroute-request-types", "total": 14, "current_equivalent": 3}
+        {
+          "name": "racf-command-families",
+          "total": 34,
+          "current_equivalent_estimate": 6
+        },
+        {
+          "name": "racroute-request-types",
+          "total": 14,
+          "current_equivalent": 3
+        }
       ],
-      "hardcode_classes": ["H2", "H3", "H5"],
-      "target_versions": ["0.5.0"],
+      "hardcode_classes": [
+        "H2",
+        "H3",
+        "H5"
+      ],
+      "target_subsystems": [
+        "racf.security"
+      ],
       "confidence": "high for denominator; medium for command-equivalent numerator"
     },
     {
@@ -211,16 +347,31 @@
         "product": "SSLTBW_3.2.0",
         "book_href": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/abstract.htm",
         "toc_sha256": "477a3de1989e3cb185f2dacdc7cea9bab8304ef148e7c9e5e8be55fe3f77dc2b",
-        "manifest": "conformance/0.2/manifests/zosmf-topics.json",
+        "manifest": "conformance/subsystems/coverage/manifests/zosmf-topics.json",
         "topic_count": 395,
         "sha256": "146cb3faaebd146c6396cc57b04ad6e48b49533b37dfa34f1eca2411518cea9b"
       },
       "units": [
-        {"name": "rest-service-families", "total": 27, "current_recognized": 5, "current_executed": 5},
-        {"name": "direct-guide-operation-headings", "total": 189, "current_declared_routes": 23, "normalization_required": true}
+        {
+          "name": "rest-service-families",
+          "total": 27,
+          "current_recognized": 5,
+          "current_executed": 5
+        },
+        {
+          "name": "direct-guide-operation-headings",
+          "total": 189,
+          "current_declared_routes": 23,
+          "normalization_required": true
+        }
       ],
-      "hardcode_classes": ["H2", "H3"],
-      "target_versions": ["0.11.0"],
+      "hardcode_classes": [
+        "H2",
+        "H3"
+      ],
+      "target_subsystems": [
+        "zosmf.rest"
+      ],
       "confidence": "high for service-family denominator; endpoint denominator must be normalized in 0.2.0"
     },
     {
@@ -235,17 +386,37 @@
         "product": "SSEPEK_13.0.0",
         "book_href": "SSEPEK_13.0.0/sqlref/src/tpc/db2z_structuredquerylanguage.html",
         "toc_sha256": "b083904697db57a7e746e79491f73c22c7e58c267dd83ea6e4ce39eb401071fb",
-        "manifest": "conformance/0.2/manifests/db2-topics.json",
+        "manifest": "conformance/subsystems/coverage/manifests/db2-topics.json",
         "topic_count": 832,
         "sha256": "83f04d82753771425aab203c7913dd9fea1c768766cf315df421100015e72463"
       },
       "units": [
-        {"name": "sql-statements", "total": 158, "current_internal_operations": 14, "current_statement_equivalent_estimate": 12, "comparable": false},
-        {"name": "sql-pl-statements", "total": null, "current_statement_equivalent_estimate": 0, "normalization_required": true}
+        {
+          "name": "sql-statements",
+          "total": 158,
+          "current_internal_operations": 14,
+          "current_statement_equivalent_estimate": 12,
+          "comparable": false
+        },
+        {
+          "name": "sql-pl-statements",
+          "total": null,
+          "current_statement_equivalent_estimate": 0,
+          "normalization_required": true
+        }
       ],
       "production_application_hardcode_hits": 29,
-      "hardcode_classes": ["H1", "H2", "H3", "H4", "H5"],
-      "target_versions": ["0.12.0", "0.13.0"],
+      "hardcode_classes": [
+        "H1",
+        "H2",
+        "H3",
+        "H4",
+        "H5"
+      ],
+      "target_subsystems": [
+        "db2.core",
+        "db2.programming"
+      ],
       "confidence": "high for SQL statement denominator and hardcode count; current operations are not semantically comparable to complete SQL statements"
     },
     {
@@ -260,15 +431,26 @@
         "product": "SSEPH2_15.6.0",
         "book_href": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
         "toc_sha256": "aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618",
-        "manifest": "conformance/0.2/manifests/ims-topics.json",
+        "manifest": "conformance/subsystems/coverage/manifests/ims-topics.json",
         "topic_count": 1,
         "sha256": "7748d88614c92c7261c9ae430027ef8954a48f3edf921ac2283b88cfb9a6f07d"
       },
       "units": [
-        {"name": "dli-call-families", "total": 25, "current_equivalent_estimate": 9}
+        {
+          "name": "dli-call-families",
+          "total": 25,
+          "current_equivalent_estimate": 9
+        }
       ],
-      "hardcode_classes": ["H2", "H3", "H4", "H5"],
-      "target_versions": ["0.14.0"],
+      "hardcode_classes": [
+        "H2",
+        "H3",
+        "H4",
+        "H5"
+      ],
+      "target_subsystems": [
+        "ims.programming"
+      ],
       "confidence": "high for call-family denominator; medium for current equivalent numerator"
     },
     {
@@ -283,38 +465,310 @@
         "product": "SSFKSJ_9.4.0",
         "book_href": "SSFKSJ_9.4.0/refdev/q101650_.html",
         "toc_sha256": "5b23147424db490f5292bd56afe1a0dd2a6ccdde3a08388a79d599998e002bd4",
-        "manifest": "conformance/0.2/manifests/mq-topics.json",
+        "manifest": "conformance/subsystems/coverage/manifests/mq-topics.json",
         "topic_count": 27,
         "sha256": "f84ebe8cee4ef5d798a8d001e2c6aca44f25ed99cd9647f1808d495e8fc3001d"
       },
       "units": [
-        {"name": "mqi-calls-unique", "total": 26, "documentation_rows": 27, "current_recognized": 7, "current_executed": 7}
+        {
+          "name": "mqi-calls-unique",
+          "total": 26,
+          "documentation_rows": 27,
+          "current_recognized": 7,
+          "current_executed": 7
+        }
       ],
-      "hardcode_classes": ["H2", "H3", "H4", "H5"],
-      "target_versions": ["0.15.0"],
+      "hardcode_classes": [
+        "H2",
+        "H3",
+        "H4",
+        "H5"
+      ],
+      "target_subsystems": [
+        "mq.programming"
+      ],
       "confidence": "high"
     }
   ],
   "milestones": [
-    {"version": "0.2.0", "objective": "official coverage authority and zero H1 production hardcode", "estimated_engineer_months": [6, 9], "dependencies": [], "exit": ["official catalogs pinned", "six-gate coverage schema", "generated dispatch available", "production H1 hits = 0", "CardDemo 20/20"]},
-    {"version": "0.3.0", "objective": "complete COBOL grammar, directives, clauses, type and layout system", "estimated_engineer_months": [10, 15], "dependencies": ["0.2.0"], "exit": ["44/44 statements recognized", "82/82 functions cataloged", "all pinned clauses and directives validated", "no compiler-owned host ABI assets"]},
-    {"version": "0.4.0", "objective": "complete COBOL execution and differential semantics", "estimated_engineer_months": [12, 18], "dependencies": ["0.3.0"], "exit": ["all COBOL rows executed", "all applicable COBOL rows recovered", "licensed COBOL differential pass"]},
-    {"version": "0.5.0", "objective": "complete RACF command language and SAF", "estimated_engineer_months": [16, 24], "dependencies": ["0.2.0"], "exit": ["34/34 RACF commands", "14/14 RACROUTE requests", "ACEE/token/policy/certificate/audit/recovery complete"]},
-    {"version": "0.6.0", "objective": "complete dataset, VSAM, catalog, locking and AMS programming surface", "estimated_engineer_months": [18, 30], "dependencies": ["0.2.0"], "exit": ["31/31 AMS functional commands", "all pinned dataset organizations and access modes", "RLS/TVS and restart matrix"]},
-    {"version": "0.7.0", "objective": "complete JCL converter and planner", "estimated_engineer_months": [10, 16], "dependencies": ["0.2.0"], "exit": ["20/20 JCL statements", "74/74 DD parameters", "19/19 EXEC parameters", "35/35 JOB parameters", "76/76 OUTPUT parameters", "13/13 JES2 JECL recognized"]},
-    {"version": "0.8.0", "objective": "complete JES2 execution, spool, NJE/MAS and utility semantics", "estimated_engineer_months": [14, 22], "dependencies": ["0.5.0", "0.6.0", "0.7.0"], "exit": ["no batch program-name dispatch", "no summary utility routes", "JES operational and differential pass"]},
-    {"version": "0.9.0", "objective": "complete CICS application API", "estimated_engineer_months": [18, 28], "dependencies": ["0.4.0", "0.5.0", "0.6.0"], "exit": ["263/263 API commands complete"]},
-    {"version": "0.10.0", "objective": "complete CICS SPI and FEPI", "estimated_engineer_months": [18, 30], "dependencies": ["0.9.0"], "exit": ["269/269 unique SPI commands complete", "39/39 FEPI commands complete"]},
-    {"version": "0.11.0", "objective": "complete z/OSMF 3.2 REST programming portfolio", "estimated_engineer_months": [12, 20], "dependencies": ["0.5.0", "0.6.0", "0.8.0", "0.10.0"], "exit": ["27/27 service families", "normalized route catalog complete", "exact protocol/security/error differential pass"]},
-    {"version": "0.12.0", "objective": "generic Db2 parser, catalog, relational executor and common SQL", "estimated_engineer_months": [24, 36], "dependencies": ["0.2.0", "0.4.0", "0.5.0"], "exit": ["Db2 production H1 hits = 0", "158 statements and SQL PL recognized", "common DDL/DML/query/transaction rows pass"]},
-    {"version": "0.13.0", "objective": "complete Db2 13 programming surface", "estimated_engineer_months": [24, 36], "dependencies": ["0.12.0"], "exit": ["all Db2 mandatory rows complete", "licensed Db2 differential pass"]},
-    {"version": "0.14.0", "objective": "complete IMS 15.6 programming surface", "estimated_engineer_months": [20, 32], "dependencies": ["0.4.0", "0.5.0", "0.6.0"], "exit": ["25/25 DL/I call families", "DBD/PSB/SSA and pinned organizations complete", "licensed IMS differential pass"]},
-    {"version": "0.15.0", "objective": "complete IBM MQ 9.4 programming surface", "estimated_engineer_months": [16, 26], "dependencies": ["0.4.0", "0.5.0"], "exit": ["26/26 unique MQI calls", "object/pubsub/property/callback/transaction/security/recovery rows complete", "licensed MQ differential pass"]},
-    {"version": "0.16.0", "objective": "complete cross-resource transactions, security and failure recovery", "estimated_engineer_months": [14, 22], "dependencies": ["0.8.0", "0.10.0", "0.13.0", "0.14.0", "0.15.0"], "exit": ["mixed commit/rollback/heuristic/unknown-outcome matrix", "restart and overload matrix", "no cross-principal leak"]},
-    {"version": "0.17.0", "objective": "licensed IBM differential certification and 1.0 rehearsal", "estimated_engineer_months": [12, 20], "dependencies": ["0.11.0", "0.16.0"], "exit": ["every mandatory programming-surface row complete in every applicable gate", "no accepted unsupported row", "reproducible certification pack"]},
-    {"version": "1.0.0", "objective": "stable pinned programming-surface release", "estimated_engineer_months": null, "dependencies": ["0.17.0"], "exit": ["unchanged certified source identity", "cutover and rollback rehearsal", "support and upgrade contracts"]}
+    {
+      "objective": "official coverage authority and zero H1 production hardcode",
+      "estimated_engineer_months": [
+        6,
+        9
+      ],
+      "dependencies": [],
+      "exit": [
+        "official catalogs pinned",
+        "six-gate coverage schema",
+        "generated dispatch available",
+        "production H1 hits = 0",
+        "CardDemo 20/20"
+      ],
+      "phase": "coverage.foundation"
+    },
+    {
+      "objective": "complete COBOL grammar, directives, clauses, type and layout system",
+      "estimated_engineer_months": [
+        10,
+        15
+      ],
+      "dependencies": [
+        "coverage.foundation"
+      ],
+      "exit": [
+        "44/44 statements recognized",
+        "82/82 functions cataloged",
+        "all pinned clauses and directives validated",
+        "no compiler-owned host ABI assets"
+      ],
+      "phase": "cobol.structure"
+    },
+    {
+      "objective": "complete COBOL execution and differential semantics",
+      "estimated_engineer_months": [
+        12,
+        18
+      ],
+      "dependencies": [
+        "cobol.structure"
+      ],
+      "exit": [
+        "all COBOL rows executed",
+        "all applicable COBOL rows recovered",
+        "licensed COBOL differential pass"
+      ],
+      "phase": "cobol.execution"
+    },
+    {
+      "objective": "complete RACF command language and SAF",
+      "estimated_engineer_months": [
+        16,
+        24
+      ],
+      "dependencies": [
+        "coverage.foundation"
+      ],
+      "exit": [
+        "34/34 RACF commands",
+        "14/14 RACROUTE requests",
+        "ACEE/token/policy/certificate/audit/recovery complete"
+      ],
+      "phase": "racf.security"
+    },
+    {
+      "objective": "complete dataset, VSAM, catalog, locking and AMS programming surface",
+      "estimated_engineer_months": [
+        18,
+        30
+      ],
+      "dependencies": [
+        "coverage.foundation"
+      ],
+      "exit": [
+        "31/31 AMS functional commands",
+        "all pinned dataset organizations and access modes",
+        "RLS/TVS and restart matrix"
+      ],
+      "phase": "dataset.data"
+    },
+    {
+      "objective": "complete JCL converter and planner",
+      "estimated_engineer_months": [
+        10,
+        16
+      ],
+      "dependencies": [
+        "coverage.foundation"
+      ],
+      "exit": [
+        "20/20 JCL statements",
+        "74/74 DD parameters",
+        "19/19 EXEC parameters",
+        "35/35 JOB parameters",
+        "76/76 OUTPUT parameters",
+        "13/13 JES2 JECL recognized"
+      ],
+      "phase": "jcl.planning"
+    },
+    {
+      "objective": "complete JES2 execution, spool, NJE/MAS and utility semantics",
+      "estimated_engineer_months": [
+        14,
+        22
+      ],
+      "dependencies": [
+        "racf.security",
+        "dataset.data",
+        "jcl.planning"
+      ],
+      "exit": [
+        "no batch program-name dispatch",
+        "no summary utility routes",
+        "JES operational and differential pass"
+      ],
+      "phase": "jes.execution"
+    },
+    {
+      "objective": "complete CICS application API",
+      "estimated_engineer_months": [
+        18,
+        28
+      ],
+      "dependencies": [
+        "cobol.execution",
+        "racf.security",
+        "dataset.data"
+      ],
+      "exit": [
+        "263/263 API commands complete"
+      ],
+      "phase": "cics.application-api"
+    },
+    {
+      "objective": "complete CICS SPI and FEPI",
+      "estimated_engineer_months": [
+        18,
+        30
+      ],
+      "dependencies": [
+        "cics.application-api"
+      ],
+      "exit": [
+        "269/269 unique SPI commands complete",
+        "39/39 FEPI commands complete"
+      ],
+      "phase": "cics.system-api"
+    },
+    {
+      "objective": "complete z/OSMF 3.2 REST programming portfolio",
+      "estimated_engineer_months": [
+        12,
+        20
+      ],
+      "dependencies": [
+        "racf.security",
+        "dataset.data",
+        "jes.execution",
+        "cics.system-api"
+      ],
+      "exit": [
+        "27/27 service families",
+        "normalized route catalog complete",
+        "exact protocol/security/error differential pass"
+      ],
+      "phase": "zosmf.rest"
+    },
+    {
+      "objective": "generic Db2 parser, catalog, relational executor and common SQL",
+      "estimated_engineer_months": [
+        24,
+        36
+      ],
+      "dependencies": [
+        "coverage.foundation",
+        "cobol.execution",
+        "racf.security"
+      ],
+      "exit": [
+        "Db2 production H1 hits = 0",
+        "158 statements and SQL PL recognized",
+        "common DDL/DML/query/transaction rows pass"
+      ],
+      "phase": "db2.core"
+    },
+    {
+      "objective": "complete Db2 13 programming surface",
+      "estimated_engineer_months": [
+        24,
+        36
+      ],
+      "dependencies": [
+        "db2.core"
+      ],
+      "exit": [
+        "all Db2 mandatory rows complete",
+        "licensed Db2 differential pass"
+      ],
+      "phase": "db2.programming"
+    },
+    {
+      "objective": "complete IMS 15.6 programming surface",
+      "estimated_engineer_months": [
+        20,
+        32
+      ],
+      "dependencies": [
+        "cobol.execution",
+        "racf.security",
+        "dataset.data"
+      ],
+      "exit": [
+        "25/25 DL/I call families",
+        "DBD/PSB/SSA and pinned organizations complete",
+        "licensed IMS differential pass"
+      ],
+      "phase": "ims.programming"
+    },
+    {
+      "objective": "complete IBM MQ 9.4 programming surface",
+      "estimated_engineer_months": [
+        16,
+        26
+      ],
+      "dependencies": [
+        "cobol.execution",
+        "racf.security"
+      ],
+      "exit": [
+        "26/26 unique MQI calls",
+        "object/pubsub/property/callback/transaction/security/recovery rows complete",
+        "licensed MQ differential pass"
+      ],
+      "phase": "mq.programming"
+    },
+    {
+      "objective": "complete cross-resource transactions, security and failure recovery",
+      "estimated_engineer_months": [
+        14,
+        22
+      ],
+      "dependencies": [
+        "jes.execution",
+        "cics.system-api",
+        "db2.programming",
+        "ims.programming",
+        "mq.programming"
+      ],
+      "exit": [
+        "mixed commit/rollback/heuristic/unknown-outcome matrix",
+        "restart and overload matrix",
+        "no cross-principal leak"
+      ],
+      "phase": "integration.transactions"
+    },
+    {
+      "objective": "licensed IBM differential certification and 1.0 rehearsal",
+      "estimated_engineer_months": [
+        12,
+        20
+      ],
+      "dependencies": [
+        "zosmf.rest",
+        "integration.transactions"
+      ],
+      "exit": [
+        "every mandatory programming-surface row complete in every applicable gate",
+        "no accepted unsupported row",
+        "reproducible certification pack"
+      ],
+      "phase": "certification.licensed"
+    }
   ],
-  "estimated_total_engineer_months": [244, 384],
+  "estimated_total_engineer_months": [
+    244,
+    384
+  ],
   "immediate_0_2_work_items": [
     "official source receipts and coverage schema",
     "normalized official catalogs",

@@ -15,15 +15,16 @@ use mainframe_env_ir::CodecLimits;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-const FIXTURE_BYTES: &[u8] =
-    include_bytes!("../../../../conformance/0.4/cobol/statement-phrase-runtime-fixtures.json");
+const FIXTURE_BYTES: &[u8] = include_bytes!(
+    "../../../../conformance/subsystems/cobol/execution/cobol/statement-phrase-runtime-fixtures.json"
+);
 const PREFIX: &str = "cobol.statement-phrase-runtime.";
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Catalog {
     schema_version: String,
-    target_version: String,
+    target_subsystem: String,
     fixtures: Vec<Fixture>,
 }
 
@@ -71,7 +72,7 @@ pub fn verify_cobol_statement_phrase_runtime_fixtures() -> Result<(), String> {
     let mut ids = BTreeSet::new();
     let mut bindings = BTreeSet::new();
     if catalog.schema_version != "mainframe-env.cobol-statement-phrase-runtime-fixtures@1"
-        || catalog.target_version != "0.4.0"
+        || catalog.target_subsystem != "cobol.execution"
         || catalog.fixtures.is_empty()
         || catalog.fixtures.len() > 256
     {

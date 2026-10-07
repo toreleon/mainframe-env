@@ -1,38 +1,31 @@
 # Subsystem implementation status
 
-Progress is grouped by subsystem and phase. The table is generated from the
-registered progress records with `cargo xtask docs`; edit the linked record to
-update a phase. A record describes its named candidate and is not automatically
-proof for the current workspace. Target releases identify compatibility scope.
-Published releases do not imply licensed differential completion.
+Progress is grouped by subsystem and phase. The table is generated from each
+registered progress document. Edit the owning record, then run `cargo xtask docs`.
+Recorded implementation scope and pending licensed work remain explicit; rerun
+executable checks for the current checkout. Historical receipts and release
+records are not part of the repository's management model.
 
 <!-- BEGIN GENERATED SUBSYSTEM INDEX -->
-| Subsystem | Phase | Recorded progress | Target release |
-|---|---|---|---|
-| Coverage and conformance | Coverage authority | [Complete implementation candidate; not released](subsystems/coverage/foundation-status.md) | 0.2.0 |
-| COBOL | Grammar and types | [CB-306 complete; full-minor acceptance next](subsystems/cobol/structure-status.md) | 0.3.0 |
-| COBOL | Execution semantics | [CB-401 through CB-406 locally complete — pass-with-licensed-differential-pending](subsystems/cobol/execution-status.md) | 0.4.0 |
-| RACF / SAF | Commands and authorization | [Implementation candidate; pass with licensed differential pending; not released](subsystems/racf/security-status.md) | 0.5.0 |
-| Datasets / VSAM / AMS | Dataset services | [DAT-601 through DAT-606 complete — pass-with-licensed-differential-pending](subsystems/dataset/data-status.md) | 0.6.0 |
-| JCL | Converter and planner | [JCL-701 through JCL-706 complete; minor exit gate passed](subsystems/jcl/planning-status.md) | 0.7.0 |
-| JES2 and utilities | Jobs, spool and utilities | [JES-801 through JES-806 complete — pass-with-licensed-differential-pending](subsystems/jes/execution-status.md) | 0.8.0 |
-| CICS | Application API | [Implementation in progress; application API acceptance and licensed differential remain incomplete](subsystems/cics/application-api-status.md) | 0.9.0 |
-| CICS | SPI and FEPI | [SPI-1001 identity foundation retained; command-body pins sealed; source-map candidates and nine FEPI context pins prepared with qualified-row gaps; semantic review, shared gates and application dependency pending; 0.10.0 remains Proposed](subsystems/cics/system-api-status.md) | 0.10.0 |
-| z/OSMF | REST portfolio | [ZMF-1101 operation-normalization foundation complete; no new routes advertised](subsystems/zosmf/rest-status.md) | 0.11.0 |
-| Db2 | Engine and common SQL | [Proposed — reuse observations, statement identities, lexer, AST primitives, transaction, host-reference, dynamic syntax, common expressions, prepared cursor syntax, SELECT core, CREATE TABLE subset, and common type compatibility recovered](subsystems/db2/core-status.md) | 0.12.0 |
-| Db2 | Complete programming surface | [No progress record](subsystems/db2/programming-plan.md) | 0.13.0 |
-| IMS | DB / TM programming surface | [Proposed](subsystems/ims/programming-status.md) | 0.14.0 |
-| IBM MQ | MQI programming surface | [Implementation active](subsystems/mq/programming-status.md) | 0.15.0 |
-| Cross-resource integration | Transactions and recovery | [Early INT-1601 participant boundary sealed; 0.16.0 is not complete](subsystems/integration/transactions-status.md) | 0.16.0 |
-| Licensed certification | Differential certification | [CER-1701 shared harness foundation in progress; all licensed differentials pending](subsystems/certification/licensed-status.md) | 0.17.0 |
-| Licensed certification | Stable release promotion | [No progress record](subsystems/certification/stable-release-plan.md) | 1.0.0 |
+| Subsystem | Phase | Recorded progress |
+|---|---|---|
+| Coverage and conformance | Coverage authority | [Complete implementation candidate](subsystems/coverage/foundation-status.md) |
+| COBOL | Grammar and types | [CB-306 complete; full-phase acceptance next](subsystems/cobol/structure-status.md) |
+| COBOL | Execution semantics | [CB-401 through CB-406 locally complete — pass-with-licensed-differential-pending](subsystems/cobol/execution-status.md) |
+| RACF / SAF | Commands and authorization | [Implementation candidate; pass with licensed differential pending](subsystems/racf/security-status.md) |
+| Datasets / VSAM / AMS | Dataset services | [DAT-601 through DAT-606 complete — pass-with-licensed-differential-pending](subsystems/dataset/data-status.md) |
+| JCL | Converter and planner | [JCL-701 through JCL-706 complete; phase exit gate passed](subsystems/jcl/planning-status.md) |
+| JES2 and utilities | Jobs, spool and utilities | [JES-801 through JES-806 complete — pass-with-licensed-differential-pending](subsystems/jes/execution-status.md) |
+| CICS | Application API | [Implementation in progress; application API acceptance and licensed differential remain incomplete](subsystems/cics/application-api-status.md) |
+| CICS | SPI and FEPI | [Source-backed private preparation implemented; public SPI/FEPI execution and licensed acceptance pending](subsystems/cics/system-api-status.md) |
+| z/OSMF | REST portfolio | [ZMF-1101 operation-normalization foundation complete; no new routes advertised](subsystems/zosmf/rest-status.md) |
+| Db2 | Engine and common SQL | [In progress — second/third-wave pure surfaces sealed; catalog/binder and execution pending](subsystems/db2/core-status.md) |
+| Db2 | Complete programming surface | [No progress record](subsystems/db2/programming-plan.md) |
+| IMS | DB / TM programming surface | [Proposed](subsystems/ims/programming-status.md) |
+| IBM MQ | MQI programming surface | [Implementation active](subsystems/mq/programming-status.md) |
+| Cross-resource integration | Transactions and recovery | [Early INT-1601 participant boundary sealed; integration.transactions is not complete](subsystems/integration/transactions-status.md) |
+| Licensed certification | Differential certification | [CER-1701 shared harness foundation in progress; all licensed differentials pending](subsystems/certification/licensed-status.md) |
 <!-- END GENERATED SUBSYSTEM INDEX -->
 
-Use the [subsystem plans](subsystems/README.md) for scope and acceptance gates,
-the [dependency map](subsystems/DEPENDENCIES.md) for sequencing, and the
-[implementation prompts](../prompts/subsystems/README.md) to start bounded work.
-Phases without a record have no implementation progress recorded here.
-
-The original [0.1 / CardDemo implementation status](history/INITIAL-IMPLEMENTATION-STATUS.md)
-is retained as a historical record. Release state is owned by `VERSION`,
-`release.toml`, release notes, tags, and their original evidence.
+Use the [plans](subsystems/README.md), [dependencies](subsystems/DEPENDENCIES.md),
+and [implementation prompts](../prompts/subsystems/README.md) to select work.

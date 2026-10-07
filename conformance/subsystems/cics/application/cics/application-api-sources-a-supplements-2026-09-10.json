@@ -1,0 +1,264 @@
+{
+  "schema_version": "mainframe-env.cics-source-supplements@1",
+  "target_subsystem": "cics.application-api",
+  "work_package": "CIC-901.sources-a-corpus",
+  "source_kind": "browser-verified-direct-content",
+  "toc_claimed": false,
+  "target": {
+    "catalog_baseline": "ibm-cics-ts-6x-2026-08-31",
+    "product_key": "SSJL4D_6.x",
+    "target_product": "CICS Transaction Server for z/OS 6.x"
+  },
+  "semantic_authority": false,
+  "execution_authority": false,
+  "automatic_registration": false,
+  "semantic_credit": 0,
+  "execution_credit": 0,
+  "registration_credit": 0,
+  "coverage_credit": 0,
+  "differential_credit": 0,
+  "capture": {
+    "observed_on": "2026-09-10",
+    "browser": "user-chrome-browser-control",
+    "representation": "document.body.innerHTML encoded as UTF-8",
+    "source_origin": "https://www.ibm.com/docs/",
+    "raw_publication_retained_in_repository": false,
+    "topics_requested": 5,
+    "topics_loaded": 5,
+    "reproduction_count": 2,
+    "all_reproductions_identical": true,
+    "identity_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-supplement-identity@1, one NUL byte (0x00), then one UTF-8 '<topic_path> <bytes> <sha256>\\n' line per observed topic sorted by topic_path",
+    "identity_sha256": "sha256:7670272cc60ecb5d88dd498e2951b5ab0b9fcee7242dfd15f7ea44db6caef389",
+    "equivalence_controls": [
+      {
+        "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_dumptransaction.html",
+        "expected_bytes": 56995,
+        "expected_sha256": "165e1964974c535a90fc4d18084012225b4ead00f55b214be59a3ee5aabc12d5",
+        "observed_bytes": 56995,
+        "observed_sha256": "165e1964974c535a90fc4d18084012225b4ead00f55b214be59a3ee5aabc12d5",
+        "result": "exact"
+      },
+      {
+        "topic_path": "SSJL4D_6.x/reference-diagnostics/modules/dfhs3c001248.html",
+        "expected_bytes": 1847,
+        "expected_sha256": "1067e330e46667f52c4ae07002e73d1b13b35f0db8f1a69fbd3809eab5f2d109",
+        "observed_bytes": 1847,
+        "observed_sha256": "1067e330e46667f52c4ae07002e73d1b13b35f0db8f1a69fbd3809eab5f2d109",
+        "result": "exact"
+      },
+      {
+        "topic_path": "SSJL4D_6.x/reference-diagnostics/components/dfhs34k.html",
+        "expected_bytes": 172664,
+        "expected_sha256": "dcd764843508284b5fe4aa5dc7ae0fa47989be8c0b1f1049cb089174d21babea",
+        "observed_bytes": 172664,
+        "observed_sha256": "dcd764843508284b5fe4aa5dc7ae0fa47989be8c0b1f1049cb089174d21babea",
+        "result": "exact"
+      }
+    ]
+  },
+  "receipt_contract": {
+    "schema": {
+      "path": "conformance/subsystems/cics/application/schemas/cics-source-supplements.schema.json",
+      "file_sha256": "sha256:8456f9bb14224112bf2567390550d3370b2a8142270ac850f19f85167ea3be85"
+    },
+    "checker": {
+      "path": "conformance/subsystems/cics/application/tools/cache_cics_application_source_supplements.py",
+      "version": "cics-source-supplements-cache@1",
+      "file_sha256": "sha256:ea9cedbad212a1dc0f9b460c1364cde8d9db23e34acfcb13e25362c8a7aa152e"
+    }
+  },
+  "topics": [
+    {
+      "topic_path": "SSNAQ8_11.1.0/reference-api/r_dump.html",
+      "public_url": "https://www.ibm.com/docs/en/cics-tx/11.1.0?topic=commands-dump",
+      "content_url": "https://www.ibm.com/docs/api/v1/content/SSNAQ8_11.1.0/reference-api/r_dump.html?parsebody=true&lang=en",
+      "source_product": "CICS TX 11.1",
+      "product_key": "SSNAQ8_11.1.0",
+      "heading": "DUMP",
+      "last_modified": "2022-04-06",
+      "bytes": 44235,
+      "sha256": "0234352759c3d24a0e56db00eaa8a0ad509e4e936889dc2af7ebf1cc6bdd14ee",
+      "cache_key": "topic-c045eb2baa70bcb3a7e3f09d5a545fec5a88d453f6b533b61d1c11f33ba5bb65-sha256-0234352759c3d24a0e56db00eaa8a0ad509e4e936889dc2af7ebf1cc6bdd14ee.html",
+      "source_role": "cross-product-explicit-compatibility",
+      "target_authority_boundary": "cross-product-not-target-authority",
+      "target_product_authority": false,
+      "semantic_authority": false,
+      "coverage_credit": 0,
+      "applies_to_rows": [
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0056"
+      ],
+      "allowed_evidence_dimensions": [
+        "syntax",
+        "options"
+      ],
+      "limitations": [
+        "cross-product-not-target-authority",
+        "compatibility-statement-limited-to-dump-option-table-names",
+        "condition-section-absent-does-not-prove-target-absence"
+      ]
+    },
+    {
+      "topic_path": "SSNAQ8_11.1.0/reference-api/r_enter.html",
+      "public_url": "https://www.ibm.com/docs/en/cics-tx/11.1.0?topic=commands-enter",
+      "content_url": "https://www.ibm.com/docs/api/v1/content/SSNAQ8_11.1.0/reference-api/r_enter.html?parsebody=true&lang=en",
+      "source_product": "CICS TX 11.1",
+      "product_key": "SSNAQ8_11.1.0",
+      "heading": "ENTER",
+      "last_modified": "2022-04-06",
+      "bytes": 22142,
+      "sha256": "60856d9bcd4062d58b54f80080d40b5f3210fcb8d6945b23c9873a70fa6af5dd",
+      "cache_key": "topic-1f74d2e1411e8527a29759297ebe4aa41fd14d3c529359d811b14ed1174d1d2d-sha256-60856d9bcd4062d58b54f80080d40b5f3210fcb8d6945b23c9873a70fa6af5dd.html",
+      "source_role": "cross-product-explicit-compatibility",
+      "target_authority_boundary": "cross-product-not-target-authority",
+      "target_product_authority": false,
+      "semantic_authority": false,
+      "coverage_credit": 0,
+      "applies_to_rows": [
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0065"
+      ],
+      "allowed_evidence_dimensions": [
+        "syntax",
+        "options",
+        "operand-directions",
+        "conditions"
+      ],
+      "limitations": [
+        "cross-product-not-target-authority",
+        "explicit-target-compatibility-limited-to-account-option",
+        "target-command-equivalence-not-established"
+      ]
+    },
+    {
+      "topic_path": "SSXJAJ_14.1.0/com.ibm.faultanalyzer.doc_14.1/idiug166.html",
+      "public_url": "https://www.ibm.com/docs/en/fafz/14.1.0?topic=cics-ivp-exec-dump-dumpcodefad1",
+      "content_url": "https://www.ibm.com/docs/api/v1/content/SSXJAJ_14.1.0/com.ibm.faultanalyzer.doc_14.1/idiug166.html?parsebody=true&lang=en",
+      "source_product": "Fault Analyzer for z/OS 14.1",
+      "product_key": "SSXJAJ_14.1.0",
+      "heading": "CICS IVP: EXEC CICS DUMP DUMPCODE(FAD1)",
+      "last_modified": "2021-05-26",
+      "bytes": 1633,
+      "sha256": "1dec488da7449f3254cef9181be320d4fcebb2d4e9766cfef3a706d5150a100c",
+      "cache_key": "topic-efffcb78c2e6ac0cbdfdf12457644c204b84eefe9e0b7a040dbc47dbc1d9cd61-sha256-1dec488da7449f3254cef9181be320d4fcebb2d4e9766cfef3a706d5150a100c.html",
+      "source_role": "target-platform-interface-example",
+      "target_authority_boundary": "target-platform-example-only",
+      "target_product_authority": false,
+      "semantic_authority": false,
+      "coverage_credit": 0,
+      "applies_to_rows": [
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0056"
+      ],
+      "allowed_evidence_dimensions": [
+        "syntax",
+        "execution-context"
+      ],
+      "limitations": [
+        "product-adjacent-example-only",
+        "exact-invocation-subset-only",
+        "no-command-section-closure"
+      ]
+    },
+    {
+      "topic_path": "SSGMCP_5.5.0/reference/commands-api/dfhp4_entertracenum.html",
+      "public_url": "https://www.ibm.com/docs/en/SSGMCP_5.5.0/reference/commands-api/dfhp4_entertracenum.html",
+      "content_url": "https://www.ibm.com/docs/api/v1/content/SSGMCP_5.5.0/reference/commands-api/dfhp4_entertracenum.html?parsebody=true&lang=en",
+      "source_product": "CICS Transaction Server for z/OS 5.5",
+      "product_key": "SSGMCP_5.5.0",
+      "heading": "ENTER TRACENUM",
+      "last_modified": "2025-01-07",
+      "bytes": 19409,
+      "sha256": "549e208c306f3b0f5d21038d0e65fc7c1eec2322263023bd6359a63f08fdb712",
+      "cache_key": "topic-cebaff0679722b1efd8cd3f4fb9d11ea20fede1312b882b1c4206a718db34ca1-sha256-549e208c306f3b0f5d21038d0e65fc7c1eec2322263023bd6359a63f08fdb712.html",
+      "source_role": "target-product-version-compatibility",
+      "target_authority_boundary": "target-product-older-version-compatibility",
+      "target_product_authority": false,
+      "semantic_authority": false,
+      "coverage_credit": 0,
+      "applies_to_rows": [
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0065"
+      ],
+      "allowed_evidence_dimensions": [
+        "execution-context"
+      ],
+      "limitations": [
+        "older-version-not-current-target-authority",
+        "compatibility-statement-only",
+        "not-syntax-options-or-conditions-alias"
+      ]
+    },
+    {
+      "topic_path": "SSGMCP_5.5.0/reference/resources/transaction/dfha4_attributes.html",
+      "public_url": "https://www.ibm.com/docs/en/SSGMCP_5.5.0/reference/resources/transaction/dfha4_attributes.html",
+      "content_url": "https://www.ibm.com/docs/api/v1/content/SSGMCP_5.5.0/reference/resources/transaction/dfha4_attributes.html?parsebody=true&lang=en",
+      "source_product": "CICS Transaction Server for z/OS 5.5",
+      "product_key": "SSGMCP_5.5.0",
+      "heading": "TRANSACTION attributes",
+      "last_modified": "2025-01-07",
+      "bytes": 200069,
+      "sha256": "90a4db1fb717a6f400b470219f4149b96c73680ade80f2a962f8972f8ca3c6dd",
+      "cache_key": "topic-7aba208cb295eae6ba5d2934af7f9b00f0521910bf01e95767dd622d1b1c78d5-sha256-90a4db1fb717a6f400b470219f4149b96c73680ade80f2a962f8972f8ca3c6dd.html",
+      "source_role": "target-product-version-compatibility",
+      "target_authority_boundary": "target-product-older-version-context",
+      "target_product_authority": false,
+      "semantic_authority": false,
+      "coverage_credit": 0,
+      "applies_to_rows": [
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0056"
+      ],
+      "allowed_evidence_dimensions": [
+        "execution-context"
+      ],
+      "limitations": [
+        "older-version-not-current-target-authority",
+        "applicability-statement-only",
+        "no-syntax-or-options-closure"
+      ]
+    }
+  ],
+  "source_resolutions": [
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0027",
+      "label": "CICSMESSAGE",
+      "eibfn": "6C12",
+      "state": "target-internal-only",
+      "target_topic_sources": [
+        "SSJL4D_6.x/reference-diagnostics/components/dfhs34k.html",
+        "SSJL4D_6.x/reference-diagnostics/eib/dfha8mf.html"
+      ],
+      "supplemental_topic_sources": []
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0056",
+      "label": "DUMP",
+      "eibfn": "1C02",
+      "state": "triangulated-compatibility-evidence",
+      "target_topic_sources": [
+        "SSJL4D_6.x/reference-diagnostics/components/dfhs34k.html",
+        "SSJL4D_6.x/reference-diagnostics/eib/dfha8mf.html"
+      ],
+      "supplemental_topic_sources": [
+        "SSNAQ8_11.1.0/reference-api/r_dump.html",
+        "SSXJAJ_14.1.0/com.ibm.faultanalyzer.doc_14.1/idiug166.html",
+        "SSGMCP_5.5.0/reference/resources/transaction/dfha4_attributes.html"
+      ]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0065",
+      "label": "ENTER TRACEID",
+      "eibfn": "1A04",
+      "state": "triangulated-compatibility-evidence",
+      "target_topic_sources": [
+        "SSJL4D_6.x/reference-applications/commands-api/dfhp4_entertracenum.html",
+        "SSJL4D_6.x/reference-applications/commands-api/dfhp4_monitor.html",
+        "SSJL4D_6.x/reference-diagnostics/components/dfhs34k.html",
+        "SSJL4D_6.x/reference-diagnostics/eib/dfha8mf.html",
+        "SSJL4D_6.x/reference-diagnostics/modules/dfhs3c001248.html"
+      ],
+      "supplemental_topic_sources": [
+        "SSNAQ8_11.1.0/reference-api/r_enter.html",
+        "SSGMCP_5.5.0/reference/commands-api/dfhp4_entertracenum.html"
+      ]
+    }
+  ],
+  "supplement_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-supplements@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of the complete receipt with supplements_sha256 omitted",
+  "supplements_sha256": "sha256:6a6b24137273eca47d1693ff4491d39304fec9af5ad73df173f7f727d1a0f584"
+}

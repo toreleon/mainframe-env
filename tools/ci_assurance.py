@@ -17,15 +17,15 @@ ALL = frozenset({'architecture', 'evidence', 'runtime', 'compiler', 'store', 'mu
 BUILD_OBLIGATIONS = ALL - {DOCS}
 SHARED = {
     'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'rustfmt.toml',
-    'clippy.toml', 'deny.toml', 'release.toml', 'VERSION', 'Jenkinsfile',
+    'clippy.toml', 'deny.toml', 'Jenkinsfile',
 }
 PROSE = {'README.md', 'CHANGELOG.md', 'LICENSE', 'LICENSE.md', 'CONTRIBUTING.md', 'AGENTS.md'}
 PRIMARY = ['fmt', 'spec', 'cobol', 'python-tooling-tests', 'api-docs', 'tests', 'clippy']
 POLICY = ['supply-chain', 'cargo-deny', 'license-notices']
 FULL = [
     'targets', 'documentation', 'docs', 'conformance', 'certification',
-    'evidence-seal', 'runtime-architecture', 'fuzz-smoke', 'fuzz-periodic',
-    'model-check', 'coverage-baseline', 'archive-reproduction',
+    'runtime-architecture', 'fuzz-smoke', 'fuzz-periodic',
+    'model-check', 'coverage-baseline',
 ]
 SHA = re.compile(r'[0-9a-f]{40}\Z')
 EVENTS = frozenset({'local', 'push', 'pull_request', 'schedule', 'manual', 'tag'})
@@ -45,7 +45,7 @@ def obligations(paths: list[str]) -> list[str]:
             selected.update(ALL)
         elif path.startswith(('docs/contracts/', 'docs/architecture/', 'docs/decisions/', 'docs/compatibility/', 'docs/generated/', 'conformance/spec/')):
             selected.update(ALL)
-        elif path.startswith(('conformance/', 'release/', 'docs/releases/')):
+        elif path.startswith(('conformance/',)):
             # Evidence and obligations can refer to any subsystem. Prefer a bounded
             # superset to skipping a shared-contract obligation.
             selected.update(ALL)
@@ -74,7 +74,7 @@ def make_plan(root: Path, event: dict, event_name: str, ref: str, base: str | No
               provider: str = 'local') -> dict:
     if event_name not in EVENTS:
         raise ValueError(f'unsupported CI event: {event_name}')
-    full = event_name in {'schedule', 'manual', 'tag'} or ref.startswith('refs/tags/mainframe-env-v')
+    full = event_name in {'schedule', 'manual', 'tag'}
     reason = 'full-tier' if full else 'changed-paths'
     paths: list[str] = []
     if not full:
@@ -99,7 +99,7 @@ def make_plan(root: Path, event: dict, event_name: str, ref: str, base: str | No
     merge_push = event_name == 'push' and event.get('merge_commit', False)
     msrv = build and (full or not merge_push)
     # Dependency and license policy is intentionally unconditional: prose-only
-    # pull requests, scheduled/full runs, and release tags all remain blocked by
+    # pull requests, scheduled/full runs, and tag builds all remain blocked by
     # a red locked dependency policy.
     gates = list(POLICY)
     if build:
@@ -107,7 +107,6 @@ def make_plan(root: Path, event: dict, event_name: str, ref: str, base: str | No
     if msrv:
         gates.append('msrv')
     if 'architecture' in selected and not full: gates.append('architecture-fast')
-    if 'evidence' in selected and not full: gates.append('evidence-fast')
     if 'mutation' in selected: gates.append('mutation')
     if docs: gates.append('docs')
     if build and event_name != 'pull_request': gates.extend(['targets', 'documentation'])
@@ -206,10 +205,9 @@ def jenkins_context(root: Path, environ: dict[str, str], requested_event: str = 
     if event == 'auto':
         event = environ.get('MAINFRAME_ENV_CI_EVENT', '')
     if event == 'auto' or not event:
-        branch = environ.get('TAG_NAME') or environ.get('BRANCH_NAME', '')
         if environ.get('CHANGE_ID'):
             event = 'pull_request'
-        elif branch.startswith('mainframe-env-v'):
+        elif environ.get('TAG_NAME'):
             event = 'tag'
         elif environ.get('BUILD_CAUSE') == 'TIMERTRIGGER':
             event = 'schedule'

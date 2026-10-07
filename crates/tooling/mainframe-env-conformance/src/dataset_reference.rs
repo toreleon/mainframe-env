@@ -9,10 +9,11 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 const OFFICIAL_CATALOG: &str =
-    include_str!("../../../../conformance/0.2/catalogs/dataset-vsam-ams.json");
+    include_str!("../../../../conformance/subsystems/coverage/catalogs/dataset-vsam-ams.json");
 const ORGANIZATION_FIXTURES: &str =
-    include_str!("../../../../conformance/0.6/fixtures/dataset-organizations.json");
-const AMS_FIXTURES: &str = include_str!("../../../../conformance/0.6/fixtures/ams-commands.json");
+    include_str!("../../../../conformance/subsystems/dataset/fixtures/dataset-organizations.json");
+const AMS_FIXTURES: &str =
+    include_str!("../../../../conformance/subsystems/dataset/fixtures/ams-commands.json");
 
 const MAX_DATASETS: usize = 64;
 const MAX_RECORDS: usize = 256;

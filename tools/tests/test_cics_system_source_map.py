@@ -17,14 +17,15 @@ import cics_system_source_map as source_map  # noqa: E402
 class CicsSystemSourceMapTests(unittest.TestCase):
     def fixture(self, root):
         paths = [
-            "conformance/0.2/catalogs/cics.json",
-            "conformance/0.2/manifests/cics-topics.json",
-            "conformance/0.10/cics/spi-fepi-source-authority.json",
+            "conformance/subsystems/coverage/catalogs/cics.json",
+            "conformance/subsystems/coverage/manifests/cics-topics.json",
+            "conformance/subsystems/cics/system/cics/spi-fepi-source-authority.json",
             str(source_map.FORM_LOCATORS),
-            "conformance/0.10/generated/cics-spi-fepi-identity-catalog.json",
-            "conformance/0.10/manifests/index.json",
-            "conformance/0.10/manifests/cics-spi-command-topics.json",
-            "conformance/0.10/manifests/cics-fepi-command-topics.json",
+            "conformance/subsystems/cics/system/generated/cics-spi-fepi-identity-catalog.json",
+            "conformance/subsystems/cics/system/manifests/index.json",
+            *(row["manifest"] for row in json.loads(
+                (ROOT / "conformance/subsystems/cics/system/manifests/index.json").read_text()
+            )["manifests"]),
             *(str(p) for family in ["spi", "fepi"] for p in source_map.artifact_paths(family)),
         ]
         for relative in paths:

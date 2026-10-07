@@ -12,12 +12,12 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CATALOG_PATH = Path("conformance/0.9/cics/command-descriptors.json")
+CATALOG_PATH = Path("conformance/subsystems/cics/application/cics/command-descriptors.json")
 LEGACY_EXECUTION_CATALOG_PATH = Path(
-    "conformance/0.9/cics/legacy-execution-options.json"
+    "conformance/subsystems/cics/application/cics/legacy-execution-options.json"
 )
 TYPED_EXECUTION_REGISTRATIONS_PATH = Path(
-    "conformance/0.9/cics/typed-execution-registrations.json"
+    "conformance/subsystems/cics/application/cics/typed-execution-registrations.json"
 )
 OUTPUT_PATH = Path("crates/providers/mainframe-env-cics/src/generated/command_descriptors.rs")
 LOOKUP_OUTPUT_PATH = Path(
@@ -34,10 +34,10 @@ IR_REGISTRY_OUTPUT_PATH = Path(
     "crates/foundation/mainframe-env-ir/src/generated/cics_application_registry.rs"
 )
 CONTRACT_OUTPUT_PATH = Path(
-    "conformance/0.9/generated/cics-application-command-contracts.json"
+    "conformance/subsystems/cics/application/generated/cics-application-command-contracts.json"
 )
 CONTRACT_SCHEMA_PATH = Path(
-    "conformance/0.9/schemas/cics-application-command-contracts.schema.json"
+    "conformance/subsystems/cics/application/schemas/cics-application-command-contracts.schema.json"
 )
 COMPILER_SPI_COMPAT_OUTPUT_PATH = Path(
     "crates/kernel/mainframe-env-compiler/src/hir/typed/"
@@ -633,22 +633,22 @@ CONTRACT_BATCHES = (
         "sources-a",
         1,
         88,
-        Path("conformance/0.9/generated/cics-application-api-sources-a-candidates.json"),
-        Path("conformance/0.9/cics/application-api-sources-a-review.json"),
+        Path("conformance/subsystems/cics/application/generated/cics-application-api-sources-a-candidates.json"),
+        Path("conformance/subsystems/cics/application/cics/application-api-sources-a-review.json"),
     ),
     (
         "sources-b",
         89,
         176,
-        Path("conformance/0.9/generated/cics-application-api-sources-b-candidates.json"),
-        Path("conformance/0.9/cics/application-api-sources-b-review.json"),
+        Path("conformance/subsystems/cics/application/generated/cics-application-api-sources-b-candidates.json"),
+        Path("conformance/subsystems/cics/application/cics/application-api-sources-b-review.json"),
     ),
     (
         "sources-c",
         177,
         263,
-        Path("conformance/0.9/generated/cics-application-api-sources-c-candidates.json"),
-        Path("conformance/0.9/cics/application-api-sources-c-review.json"),
+        Path("conformance/subsystems/cics/application/generated/cics-application-api-sources-c-candidates.json"),
+        Path("conformance/subsystems/cics/application/cics/application-api-sources-c-review.json"),
     ),
 )
 SOURCE_DIMENSIONS = (
@@ -1701,7 +1701,7 @@ def _load_legacy_execution_options(
     catalog = _read_json(path)
     expected_fields = {
         "schema_version",
-        "target_version",
+        "target_subsystem",
         "source_baseline",
         "application_identity_set_sha256",
         "routes",
@@ -1710,7 +1710,7 @@ def _load_legacy_execution_options(
         raise DescriptorError(f"{path} fields differ")
     if (
         catalog["schema_version"] != "mainframe-env.cics-legacy-execution-options@1"
-        or catalog["target_version"] != "0.9.0"
+        or catalog["target_subsystem"] != "cics.application-api"
         or catalog["source_baseline"] != OFFICIAL_BASELINE
         or catalog["application_identity_set_sha256"]
         != application_identity_digest(commands)
@@ -1767,13 +1767,13 @@ def _load_typed_execution_registrations(
     catalog = _read_json(path)
     if set(catalog) != {
         "schema_version",
-        "target_version",
+        "target_subsystem",
         "application_identity_set_sha256",
         "registrations",
     } or (
         catalog["schema_version"]
         != "mainframe-env.cics-typed-execution-registrations@1"
-        or catalog["target_version"] != "0.9.0"
+        or catalog["target_subsystem"] != "cics.application-api"
         or catalog["application_identity_set_sha256"]
         != application_identity_digest(commands)
     ):
@@ -2179,7 +2179,7 @@ def load_catalog(
     catalog = _read_json(path)
     expected = {
         "schema_version",
-        "target_version",
+        "target_subsystem",
         "official_catalog",
         "official_catalog_sha256",
         "application_catalog",
@@ -2190,7 +2190,7 @@ def load_catalog(
             f"{path} fields differ: missing={sorted(expected - set(catalog))} "
             f"unknown={sorted(set(catalog) - expected)}"
         )
-    if catalog["schema_version"] != SCHEMA_VERSION or catalog["target_version"] != "0.9.0":
+    if catalog["schema_version"] != SCHEMA_VERSION or catalog["target_subsystem"] != "cics.application-api":
         raise DescriptorError(f"{path} has an unsupported schema or target version")
 
     official_relative = Path(_text(catalog["official_catalog"], "official_catalog"))
@@ -5249,7 +5249,7 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
     descriptor_path = root / CATALOG_PATH
     artifact: dict[str, Any] = {
         "schema_version": CONTRACT_SCHEMA_VERSION,
-        "target_version": "0.9.0",
+        "target_subsystem": "cics.application-api",
         "work_package": "CIC-901.command-contract",
         "status": artifact_status,
         "automatic_registration": False,

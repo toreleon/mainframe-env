@@ -3,7 +3,7 @@
 Status: **Accepted by repository owner**
 Owner: **compiler, execution, and subsystem maintainers**
 Scope: **language HIR, executable semantic IR, host effects, and compatibility boundaries**
-Applies from: **mainframe-env 0.9.0 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Context
 
@@ -313,10 +313,15 @@ exact compatibility profile before installation, execution, or resume:
 | --- | --- | --- |
 | environment profile | `mainframe-env.cobol.reference@1` | Host compatibility is owned by the product environment, not deferred to a provider effect |
 | source artifact contract | `mainframe-env.artifact@2` or `mainframe-env.artifact@3` | `@2` is the retained pre-dialect-manifest reader; writers emit only `@3`; every other version is rejected |
-| compiler generation and target | exactly `mainframe-env-cobol-0.8.3` and `reference` | No cross-generation semantic compatibility is inferred |
+| compiler generation and target | shared `COBOL_COMPILER_GENERATION` (`mainframe-env-cobol-0.8.3`) and `reference` | No cross-generation semantic compatibility is inferred |
 | normalized options | exactly `cobol.effective-arith` (`compatible` or `extended`), `cobol.effective-dispsign` (`compatible` or `separate`), and `cobol.effective-lp` (`32` or `64`) | Unknown, missing, or payload-config-mismatched semantic options are rejected |
 | host ABI set | exactly `mainframe-env.host@1` and `mainframe-env.cics@1` | Capability and resource authorization still occur at dispatch |
 | IR envelope | exactly `mainframe-env.ir-envelope@1` | Canonical bytes and the registered executable profile are revalidated |
+
+The compiler-generation identity is an artifact compatibility contract. The compiler
+and server share this constant independently of the Cargo package version; resetting
+public package metadata to `0.1.0` preserves the accepted artifact bytes, semantic
+identities and admission checks.
 
 For `@2`, the reader derives the missing dialect set only in the admitted
 in-memory view; it preserves the original payload, content digest, source
@@ -356,7 +361,7 @@ The current family routes and retirement conditions are intentionally bounded:
 | COBOL `ADD CORRESPONDING` with unmodified, unsubscripted eligible group operands | COBOL HIR resolves relative-qualified, bilaterally unique pairs and emits `mainframe.decimal@2.assign` | A valid selected table-group subscript uses the explicit core-COBOL route; missing required subscripts, reference modification, UTF-8 groups in this slice, and numeric national-byte pairs fail before publication rather than falling through | Add a versioned typed selected-group reference/offset contract, runtime bounds checks, qualification/exclusion tests on both routes, and exact byte evidence before retiring this compatibility route |
 | COBOL executable layout forms touched by typed plans | Scalar `PIC X`/`PIC U` DYNAMIC items and bounded fixed/ODO/unbounded tables retain the existing machine | DYNAMIC items with their own OCCURS, beneath any table, or participating in REDEFINES fail before HIR/publication because the current machine has neither per-occurrence dynamic buffers nor dynamic alias storage; omission of a DYNAMIC LIMIT remains an inherited unsupported frontend form | Add an explicit per-occurrence dynamic-storage and alias contract with execution/restart tests before admitting those combinations; separately materialize the baseline default limit before accepting omitted LIMIT |
 | COBOL level-88 values reached by current execution | Numeric DISPLAY/PACKED/BINARY literals and increasing ranges plus bounded alphanumeric literals/figuratives are normalized and validated in the frontend and executable ABI | NATIONAL/DBCS/UTF-8, edited/group, `WHEN SET TO FALSE`, `ALL`, symbolic-character, and collation-dependent ranges fail closed rather than using incomplete raw-token behavior | Add explicit literal class/encoding/collation policies and byte-exact SET/condition tests before admitting each deferred class |
-| Migrated CICS commands with statically resolved option direction and bindings | Typed CICS plan through the existing machine, coordinator, typed host request, and provider | Commands/options outside the declared pilot remain on their documented existing route; a malformed typed plan never falls back to token interpretation | Extend the authoritative descriptors and binding verifier with command-specific transition/recovery tests before moving each additional command family; do not infer completion of all CICS 0.9 work |
+| Migrated CICS commands with statically resolved option direction and bindings | Typed CICS plan through the existing machine, coordinator, typed host request, and provider | Commands/options outside the declared pilot remain on their documented existing route; a malformed typed plan never falls back to token interpretation | Extend the authoritative descriptors and binding verifier with command-specific transition/recovery tests before moving each additional command family; do not infer completion of all CICS cics.application-api work |
 | Published decimal operation/plan major `@1` | Read-only version-selected compatibility handler | Historical bytes and semantic identities remain immutable | Retain for the documented artifact range; removal requires an explicit compatibility/version decision and is independent of source-route cutover |
 
 There is one default route for each recognized form: typed selection happens in

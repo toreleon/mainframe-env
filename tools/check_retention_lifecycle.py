@@ -43,8 +43,16 @@ def read(path: Path, *, production: bool = False) -> str:
     return source
 
 
-def require(path: Path, fragments: tuple[str, ...], *, production: bool = False) -> str:
+def require(
+    path: Path,
+    fragments: tuple[str, ...],
+    *,
+    production: bool = False,
+    companions: tuple[Path, ...] = (),
+) -> str:
     source = read(path, production=production)
+    for companion in companions:
+        source += "\n" + read(companion, production=production)
     missing = [fragment for fragment in fragments if fragment not in source]
     if missing:
         relative = path.relative_to(ROOT)
@@ -382,6 +390,19 @@ def check_provider_codecs(root: Path) -> None:
         for reserved in ("cics.nested-effect-origin", "cics.outer-effect-origin"):
             if reserved not in retention:
                 raise ValueError(f"{provider} full codec omits trusted {reserved} provenance")
+        if provider == "ims":
+            execution = require(
+                root / "crates/providers/mainframe-env-ims/src/service/execution.rs",
+                ("fn execute_operands_at(", "Result<feedback::ExecutionOutput, HostProblem>",
+                 "application_backout::prepare_database_call(",
+                 "application_backout::settle_database_call(", "feedback::project(",
+                 "generic::integrity::persist(", "undefined_length: output.undefined_length"),
+                production=True,
+            )
+            if execution.count("fn execute_operands_at(") != 1 or "settles_batch_uow" in execution:
+                raise ValueError("IMS execution owner is ambiguous or restores Batch autocommit")
+            if execution.index("feedback::project(") > execution.index("generic::integrity::persist("):
+                raise ValueError("IMS feedback projection follows atomic publication")
         require(
             root / f"crates/providers/mainframe-env-{provider}/src/service.rs",
             (
@@ -391,6 +412,8 @@ def check_provider_codecs(root: Path) -> None:
                 "HostProblem::UnknownOutcome",
             ),
             production=True,
+            companions=(root / "crates/providers/mainframe-env-ims/src/service/execution.rs",)
+            if provider == "ims" else (),
         )
 
     require(
@@ -447,11 +470,21 @@ def check_provider_codecs(root: Path) -> None:
             "CICS_NESTED_EFFECT_ORIGIN_BINDING",
             "CICS_OUTER_EFFECT_ORIGIN_BINDING",
             "fn reject_reserved_nested_origin(",
+            "HostProblem::UnknownOutcome",
+        ),
+        production=True,
+    )
+    require(
+        root / "crates/providers/mainframe-env-cics/src/handlers/host_boundary.rs",
+        (
             "fn invocation_with_nested_origin(",
-            "invocation.bindings.len().saturating_add(2)",
+            "reject_reserved_nested_origin(invocation)?",
+            "saturating_add(2 + usize::from(needs_context))",
+            'bindings.contains_key("cics.execution-context")',
+            '"mainframe-env.cics.execution-context@1"',
+            'b"local".to_vec()',
             "key.as_str().as_bytes().to_vec()",
             "outer_effect_key.as_bytes().to_vec()",
-            "HostProblem::UnknownOutcome",
         ),
         production=True,
     )
@@ -518,15 +551,30 @@ def check_provider_codecs(root: Path) -> None:
         if fragment not in descriptor:
             raise ValueError(f"COBOL live-instance protection drifted: {fragment}")
     finish = normalized(rust_block(instance, "pub(super) fn finish_run_unit"))
+    for fragment in ("terminal::plan_end(", "mutate_provider_states_atomic(mutations)"):
+        if fragment not in finish:
+            raise ValueError(f"COBOL terminal instance cleanup drifted: {fragment}")
+    if "mod terminal;" not in instance:
+        raise ValueError("COBOL terminal instance cleanup owner is disconnected")
+    terminal = read(
+        root / "crates/apps/mainframe-env-server/src/cobol/instance/terminal.rs",
+        production=True,
+    )
+    plan = normalized(rust_block(terminal, "pub(super) fn plan_end"))
     for fragment in (
         "ProviderStateMutation::Delete",
         "state.ended = true",
         "state.ended_tick = Some(ended_tick)",
         "state.programs.clear()",
-        "mutate_provider_states_atomic(mutations)",
     ):
-        if fragment not in finish:
+        if fragment not in plan:
             raise ValueError(f"COBOL terminal instance cleanup drifted: {fragment}")
+    native = normalized(rust_block(terminal, "pub(in super::super) fn prepare_native_run_end"))
+    for fragment in ("plan_end(", "RootClosureSnapshot", "verify_captured_cleanup("):
+        if fragment not in native:
+            raise ValueError(f"COBOL captured terminal cleanup drifted: {fragment}")
+    if "mutate_provider_states_atomic" in terminal:
+        raise ValueError("COBOL captured terminal planner must not publish sequentially")
     require(
         root / "crates/apps/mainframe-env-server/src/console_retention.rs",
         (

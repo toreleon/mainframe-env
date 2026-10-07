@@ -37,10 +37,45 @@ const HANDLE_NAMESPACE: &str = "mq-v1-handle-index";
 const PENDING_NAMESPACE: &str = "mq-v1-unit-of-work";
 pub(crate) const REPLAY_NAMESPACE: &str = "mq-v1-replay";
 
-mod row_store;
-use row_store::{
-    commit_row_changes, encode_object_row, load_or_migrate, load_row_map, row_changes,
-};
+#[path = "service_rows.rs"]
+mod rows;
+pub(crate) use rows::encode_object_row;
+use rows::{commit_row_changes, load_or_migrate, load_row_map, row_changes};
+// Closed Rust integration facade. This does not attest installed/JES provenance.
+pub use selection::operations::producer::{ProducerBatchContext, ProducerGmt, ProducerSource};
+pub(crate) use selection::operations::{PointFacts, StructureFacts};
+
+#[path = "service_legacy_delivery_import.rs"]
+pub(crate) mod legacy_delivery_import;
+
+#[path = "service_rich_state.rs"]
+mod rich_state;
+
+#[path = "service_retention_selected.rs"]
+mod retention_selected;
+pub(crate) use retention_selected::selected_retention_dependencies;
+
+#[path = "service_selection.rs"]
+mod selection;
+use selection::LegacyAccess;
+pub(crate) use selection::operations::native_terminal::SelectedTerminalPreparation;
+
+pub(crate) fn selected_terminal_namespaces() -> Vec<String> {
+    [
+        STATE_NAMESPACE,
+        QUEUE_NAMESPACE,
+        CATALOG_NAMESPACE,
+        HANDLE_NAMESPACE,
+        PENDING_NAMESPACE,
+        REPLAY_NAMESPACE,
+        selection::operations::receipt::NAMESPACE,
+    ]
+    .into_iter()
+    .chain(selection::operations::terminal_ownership_namespaces())
+    .chain(crate::delivery::checkpoint::rows::TERMINAL_NAMESPACES)
+    .map(str::to_owned)
+    .collect()
+}
 
 #[path = "service_object_integration.rs"]
 mod object_integration;
@@ -212,10 +247,10 @@ struct RowStoreManifest {
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct ObjectRow<T> {
-    schema_version: String,
-    object_key: String,
-    value: T,
+pub(crate) struct ObjectRow<T> {
+    pub(crate) schema_version: String,
+    pub(crate) object_key: String,
+    pub(crate) value: T,
 }
 
 type RowVersions = BTreeMap<(String, String), u64>;
@@ -228,16 +263,26 @@ struct DurableState {
 /// Trusted durable logical-time source used to age newly persisted replay rows.
 pub trait MqReplayClock: Send + Sync {
     /// Observe the current nonzero durable logical tick.
+    /// Callbacks must be bounded/nonblocking and must not reenter a service,
+    /// publish, perform cleanup or wait for cross-thread service work. Native
+    /// point observations contain panics and refuse selected-service reentry;
+    /// returned ticks never replace physical core/provider dependency checks.
     fn now_tick(&self) -> Result<u64, HostProblem>;
 }
 
 pub struct MqService {
     store: Arc<dyn ProviderStateStore>,
     limits: MqLimits,
-    durable: Mutex<DurableState>,
+    durable: Mutex<rich_state::StoredAuthority>,
+    // Selected composition derives both trait views from this same Arc.
+    selected_store: Option<Arc<dyn mainframe_env_store_api::PlatformStore>>,
     unknown_after_persist: AtomicBool,
     authorizer: Option<Arc<dyn EnterpriseAuthorizer>>,
     replay_clock: Option<Arc<dyn MqReplayClock>>,
+    producer_sources: Option<selection::operations::producer::ProducerSources>,
+    producer_sampling: AtomicBool,
+    pub(crate) rfh2_source:
+        Option<Arc<dyn crate::trusted_batch_embedding::MqBatchLeDllCodesetSource>>,
 }
 
 impl MqService {
@@ -285,10 +330,17 @@ impl MqService {
         Ok(Arc::new(Self {
             store,
             limits,
-            durable: Mutex::new(DurableState { versions, state }),
+            durable: Mutex::new(rich_state::StoredAuthority::Legacy(DurableState {
+                versions,
+                state,
+            })),
+            selected_store: None,
+            rfh2_source: None,
             unknown_after_persist: AtomicBool::new(false),
             authorizer,
             replay_clock,
+            producer_sources: None,
+            producer_sampling: AtomicBool::new(false),
         }))
     }
 
@@ -532,10 +584,18 @@ impl MqService {
             .ok_or(HostProblem::NotFound)
     }
 
-    fn lock(&self) -> Result<MutexGuard<'_, DurableState>, HostProblem> {
-        self.durable
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)
+    fn lock(&self) -> Result<LegacyAccess<'_>, HostProblem> {
+        if crate::trusted_batch_embedding::rfh2_source_capturing() {
+            return Err(HostProblem::Unsupported);
+        }
+        if self.selected_store.is_some() {
+            return Err(HostProblem::Unsupported);
+        }
+        LegacyAccess::new(
+            self.durable
+                .lock()
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+        )
     }
 
     fn persist(&self, durable: &mut DurableState, state: State) -> Result<(), HostProblem> {
@@ -544,7 +604,9 @@ impl MqService {
             &state,
             &durable.versions,
             self.limits,
-            false,
+            // Every publication, including a new pending row, must conflict
+            // with retirement of this legacy authority.
+            true,
         )?;
         commit_row_changes(&*self.store, changes, &mut durable.versions)?;
         durable.state = state;
@@ -1069,6 +1131,11 @@ pub fn mq_providers(
     service: Arc<MqService>,
     limits: InvocationLimits,
 ) -> Vec<Arc<dyn HostProvider>> {
+    // Selected composition cannot advertise the legacy sequential route or
+    // typed MQI readiness before its composed participant proof.
+    if service.selected_store.is_some() {
+        return Vec::new();
+    }
     ["host.mq.read", "host.mq.write"]
         .into_iter()
         .map(|capability| {
@@ -2441,13 +2508,12 @@ mod tests {
                 .unwrap(),
             queue_b_before
         );
-        assert_eq!(
-            store
-                .get_provider_state(STATE_NAMESPACE, STATE_KEY)
-                .unwrap()
-                .unwrap(),
-            manifest_before
-        );
+        let manifest_after = store
+            .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+            .unwrap()
+            .unwrap();
+        assert_eq!(manifest_after.payload, manifest_before.payload);
+        assert_eq!(manifest_after.version, manifest_before.version + 1);
         assert!(
             store
                 .get_provider_state(
@@ -2629,7 +2695,7 @@ mod tests {
     }
 
     #[test]
-    fn independent_queue_rows_commit_from_separate_service_instances_without_global_cas() {
+    fn independent_queue_rows_contend_on_the_legacy_manifest_dependency() {
         let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
         let installer = MqService::open(store.clone(), Default::default()).unwrap();
         installer
@@ -2663,19 +2729,46 @@ mod tests {
             put.message = b"RIGHT".to_vec();
             right.execute(&invocation("right-row"), &put)
         });
-        left_worker.join().unwrap().unwrap();
-        right_worker.join().unwrap().unwrap();
+        let left_result = left_worker.join().unwrap();
+        let right_result = right_worker.join().unwrap();
+        assert_eq!(
+            usize::from(left_result.is_ok()) + usize::from(right_result.is_ok()),
+            1
+        );
+        for result in [&left_result, &right_result] {
+            assert!(result.is_ok() || *result == Err(HostProblem::IdempotencyConflict));
+        }
 
         let reopened = MqService::open(store.clone(), Default::default()).unwrap();
-        assert_eq!(reopened.queue_messages("LEFT.Q").unwrap(), [b"LEFT"]);
-        assert_eq!(reopened.queue_messages("RIGHT.Q").unwrap(), [b"RIGHT"]);
+        assert_eq!(
+            reopened.queue_messages("LEFT.Q").unwrap(),
+            if left_result.is_ok() {
+                vec![b"LEFT".to_vec()]
+            } else {
+                vec![]
+            }
+        );
+        assert_eq!(
+            reopened.queue_messages("RIGHT.Q").unwrap(),
+            if right_result.is_ok() {
+                vec![b"RIGHT".to_vec()]
+            } else {
+                vec![]
+            }
+        );
         assert_eq!(
             store
-                .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+                .list_provider_state(REPLAY_NAMESPACE, 3)
                 .unwrap()
-                .unwrap(),
-            manifest
+                .len(),
+            1
         );
+        let manifest_after = store
+            .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+            .unwrap()
+            .unwrap();
+        assert_eq!(manifest_after.payload, manifest.payload);
+        assert_eq!(manifest_after.version, manifest.version + 1);
     }
 
     #[test]

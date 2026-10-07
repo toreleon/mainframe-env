@@ -39,12 +39,13 @@ pub use carddemo::{
     CardDemoLayoutReceipt, CardDemoMqAuthorizationReceipt, CardDemoPackageReceipt,
     CardDemoProgramReceipt, CardDemoResourceReceipt, CardDemoSecurityReceipt, CardDemoSeedReceipt,
     CardDemoSourceReceipt, CardDemoTerminalReceipt, CardDemoUtilityReceipt, CardDemoVsamReceipt,
-    CorpusProblem, capture_carddemo_readacct_from_env,
-    verify_carddemo_application_package_from_env, verify_carddemo_base_batch_from_env,
-    verify_carddemo_base_online_from_env, verify_carddemo_batch_programs_from_env,
-    verify_carddemo_cics_abi_from_env, verify_carddemo_cics_runtime_from_env,
-    verify_carddemo_control_flow_from_env, verify_carddemo_core_semantics_from_env,
-    verify_carddemo_corpus, verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
+    CorpusProblem, capture_carddemo_readacct_from_env, serve_carddemo_application,
+    serve_carddemo_from_env, verify_carddemo_application_package_from_env,
+    verify_carddemo_base_batch_from_env, verify_carddemo_base_online_from_env,
+    verify_carddemo_batch_programs_from_env, verify_carddemo_cics_abi_from_env,
+    verify_carddemo_cics_runtime_from_env, verify_carddemo_control_flow_from_env,
+    verify_carddemo_core_semantics_from_env, verify_carddemo_corpus,
+    verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
     verify_carddemo_dataset_catalog_from_env, verify_carddemo_db2_from_env,
     verify_carddemo_file_call_semantics_from_env, verify_carddemo_full_from_env,
     verify_carddemo_host_operands_from_env, verify_carddemo_ims_from_env,
@@ -215,7 +216,8 @@ mod tests {
     }
     #[test]
     fn openmainframe_hello_fixture_matches_exact_oracle_output() {
-        let source = include_str!("../../../../conformance/0.1/fixtures/cobol/HELLO.cbl");
+        let source =
+            include_str!("../../../../conformance/subsystems/platform/fixtures/cobol/HELLO.cbl");
         let result = CobolCompiler::default()
             .compile(CompilerRequest {
                 source: source_bundle_with_format(source, SourceFormat::Fixed),

@@ -1,9 +1,9 @@
 # ADR-0015: Bind CICS operator replies to durable command positions
 
-Status: **Proposed for v0.9 development; acceptance gate pending**
+Status: **Proposed for cics.application-api development; acceptance gate pending**
 Owner: **CICS and console maintainers**
 Scope: **WRITE OPERATOR, virtual console ingress, and suspended COBOL tasks**
-Applies from: **mainframe-env 0.9.0 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Context
 

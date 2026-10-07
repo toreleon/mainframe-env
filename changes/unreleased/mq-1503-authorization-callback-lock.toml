@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Release the private MQ authorization capture collection mutex before real authorizer callbacks, with bounded reservations and cleanup on error or panic."

@@ -6,7 +6,7 @@ selection, retained rollback generations, program artifacts, BMS/CSD resources,
 and dataset catalogs.
 
 The `mainframe-env.application-package@1` reader remains available for accepted
-0.1.1 packages. Version 2 adds host ABI libraries, SQL schemas and rows, IMS
+profile.carddemo packages. Version 2 adds host ABI libraries, SQL schemas and rows, IMS
 definitions and rows, MQ resources, batch controllers, and security resources.
 The optional IMS metadata section is additive for old v2 readers and binds the
 shared versioned DBD/PSB contract into the signed package identity. Every
@@ -30,3 +30,7 @@ Non-goals: provider state, application-specific behavior, native executable
 loading, or a plugin marketplace. Verify with
 `cargo test -p mainframe-env-application --locked` and
 `cargo xtask application-packages --check`.
+
+## Documentation
+
+[Documentation portal](../../../docs/README.md) · [Current package map](../../../docs/architecture/PACKAGE-MAP.md) · [Embedding guide](../../../docs/guides/EMBEDDING.md) · [Contribution and verification](../../../CONTRIBUTING.md)

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a private quiescent MQ legacy delivery import plan with exact row retirement CAS, replay preservation, bounded compatibility projection and a manifest dependency fence for all legacy publications; public upgrade selection remains pending."

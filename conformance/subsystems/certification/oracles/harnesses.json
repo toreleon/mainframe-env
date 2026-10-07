@@ -1,0 +1,129 @@
+{
+  "schema_version": "mainframe-env.oracle-harness-registry@1",
+  "target_subsystem": "certification.licensed",
+  "environment_contract": "mainframe-env.licensed-environment-manifest@1",
+  "receipt_contract": "mainframe-env.oracle-harness-receipt@1",
+  "credit_policy": {
+    "cer1701_licensed_differential_credit": 0,
+    "subsystem_validator_remains_authority": true,
+    "local_or_synthetic_credit": 0,
+    "empty_or_pending_credit": 0
+  },
+  "candidate_binding": {
+    "contract": "mainframe-env.oracle-candidate-binding@1",
+    "required_components": ["source-commit", "source-tree", "artifacts", "catalogs", "conformance-spec", "fixture", "oracle-adapter", "normalization-policy", "environment-manifest", "harness-registry"],
+    "change_policy": "invalidate-affected-receipts-unless-explicit-identity-compatibility-proof"
+  },
+  "slots": [
+    {
+      "slot_id": "cobol",
+      "campaign_state": "pending",
+      "required_baselines": ["ibm-enterprise-cobol-6.5-2026-05-31"],
+      "fixture": {"state": "ready", "authority": "independent-from-candidate-handler", "path": "conformance/subsystems/cobol/execution/cobol/statement-runtime-fixtures.json", "digest": "sha256:7ee4aa19f06e9aeebff0679387e8f99bebf2d7a351425224be8c0561c7f0779a", "digest_rule": "cobol-four-fixture-length-prefix-sha256"},
+      "adapter": {"state": "ready", "policy_path": "conformance/subsystems/cobol/execution/oracles/cobol-licensed-differential.json", "accepted_read_versions": ["mainframe-env.cobol-licensed-differential-receipt@1"], "read_rule": "exact-v1-plus-cer1701-envelope", "validator_argv": ["cargo", "xtask", "spec", "--check"], "subsystem_validator_required": true},
+      "capture": {"protocol": "legacy-receipt", "raw_outputs_outside_git": true, "protected_attestation_required": true, "required_environment_variables": ["MAINFRAME_ENV_COBOL65_LICENSED_ORACLE_RECEIPT"]},
+      "normalization": {"state": "pending-review", "policy_id": "cobol.receipt-declared-normalization@1", "policy_digest": null, "rules": []},
+      "bounds": {"expected_cases": 153, "max_raw_capture_bytes": 4194304, "max_normalized_bytes": 4194304, "timeout_seconds": 86400},
+      "blockers": ["licensed environment unavailable", "normalization rules require named review", "final source and artifacts unavailable"]
+    },
+    {
+      "slot_id": "racf-saf",
+      "campaign_state": "pending",
+      "required_baselines": ["ibm-zos-3.2-racf-saf-2026"],
+      "fixture": {"state": "pending", "authority": "independent-from-candidate-handler", "path": null, "digest": null, "digest_rule": "pending"},
+      "adapter": {"state": "ready", "policy_path": "conformance/subsystems/racf/schemas/racf-oracle-campaign.schema.json", "accepted_read_versions": ["mainframe-env.racf-oracle-campaign@1"], "read_rule": "exact-v1-plus-cer1701-envelope", "validator_argv": ["cargo", "xtask", "racf-catalog", "--check"], "subsystem_validator_required": true},
+      "capture": {"protocol": "legacy-receipt", "raw_outputs_outside_git": true, "protected_attestation_required": true, "required_environment_variables": []},
+      "normalization": {"state": "reviewed", "policy_id": "racf.exact-observation-json@1", "policy_digest": "sha256:ad01f0d590e7eb029b7732f246191e22c2ed48b604e29cad3911164e152e9fc0", "rules": [{"field": "observation", "operation": "exact", "reason": "The v1 reader compares bounded structured observations without nondeterministic-field removal."}]},
+      "bounds": {"expected_cases": 48, "max_raw_capture_bytes": 8388608, "max_normalized_bytes": 3145728, "timeout_seconds": 86400},
+      "blockers": ["licensed environment unavailable", "independent fixture manifest missing", "candidate and environment binding absent from v1 receipt"]
+    },
+    {
+      "slot_id": "dataset-vsam-ams",
+      "campaign_state": "pending",
+      "required_baselines": ["ibm-zos-3.2-dfsms-ams-2026-06"],
+      "fixture": {"state": "pending", "authority": "independent-from-candidate-handler", "path": null, "digest": null, "digest_rule": "pending"},
+      "adapter": {"state": "ready", "policy_path": "conformance/subsystems/dataset/schemas/dataset-oracle-receipt.schema.json", "accepted_read_versions": ["mainframe-env.dataset-oracle-receipt@1"], "read_rule": "exact-v1-plus-cer1701-envelope", "validator_argv": ["cargo", "xtask", "dataset-oracle", "--check"], "subsystem_validator_required": true},
+      "capture": {"protocol": "legacy-receipt", "raw_outputs_outside_git": true, "protected_attestation_required": true, "required_environment_variables": ["MAINFRAME_ENV_ZOS_AMS_ORACLE_RECEIPT"]},
+      "normalization": {"state": "pending-review", "policy_id": "dataset.normalization-pending@1", "policy_digest": null, "rules": []},
+      "bounds": {"expected_cases": 36, "max_raw_capture_bytes": 8388608, "max_normalized_bytes": 4194304, "timeout_seconds": 86400},
+      "blockers": ["licensed environment unavailable", "independent fixture manifest missing", "normalization and result detail absent from v1 receipt"]
+    },
+    {
+      "slot_id": "jes2",
+      "campaign_state": "pending",
+      "required_baselines": ["ibm-zos-3.2-jcl-jes2-2026-06"],
+      "fixture": {"state": "pending", "authority": "independent-from-candidate-handler", "path": null, "digest": null, "digest_rule": "pending"},
+      "adapter": {"state": "ready", "policy_path": "conformance/subsystems/jes/oracles/jes-licensed-differential.json", "accepted_read_versions": ["mainframe-env.jes-licensed-differential-receipt@1"], "read_rule": "exact-v1-plus-cer1701-envelope", "validator_argv": ["cargo", "xtask", "jes-oracle", "--check"], "subsystem_validator_required": true},
+      "capture": {"protocol": "legacy-receipt", "raw_outputs_outside_git": true, "protected_attestation_required": true, "required_environment_variables": ["MAINFRAME_ENV_JES_LICENSED_ORACLE_RECEIPT"]},
+      "normalization": {"state": "pending-review", "policy_id": "jes2.normalization-pending@1", "policy_digest": null, "rules": []},
+      "bounds": {"expected_cases": 16, "max_raw_capture_bytes": 8388608, "max_normalized_bytes": 4194304, "timeout_seconds": 86400},
+      "blockers": ["licensed environment unavailable", "independent fixture manifest missing", "normalization policy absent from v1 receipt"]
+    },
+    {
+      "slot_id": "cics",
+      "campaign_state": "pending",
+      "required_baselines": ["ibm-cics-ts-6x-2026-08-31"],
+      "fixture": {"state": "ready", "authority": "independent-from-candidate-handler", "path": "conformance/subsystems/cics/application/cics/pilot-fixtures.json", "digest": "sha256:5cce953c42c1ddeca1166750f5b7a1bffb2765c4db40f289c64d8af1567b5a5b", "digest_rule": "file-bytes-sha256"},
+      "adapter": {"state": "ready", "policy_path": "conformance/subsystems/cics/application/oracles/cics-licensed-differential.json", "accepted_read_versions": ["mainframe-env.cics-oracle-capture@1"], "read_rule": "exact-v1-plus-cer1701-envelope", "validator_argv": ["cargo", "xtask", "cics-oracle", "--capture", "EXTERNAL_CAPTURE", "--public-key", "EXTERNAL_PUBLIC_KEY"], "subsystem_validator_required": true},
+      "capture": {"protocol": "signed-capture", "raw_outputs_outside_git": true, "protected_attestation_required": true, "required_environment_variables": ["MAINFRAME_ENV_CICS_ORACLE_PUBLIC_KEY"]},
+      "normalization": {"state": "reviewed", "policy_id": "cics.file-uow-exact@1", "policy_digest": "sha256:111f3304ea7c6c9f3a7d380756ebb7cc5180283b59fa4e38dc8f12d358cd2ce9", "rules": [{"field": "observations.application_output", "operation": "exact", "reason": "Reviewed application-visible output is compared exactly."}, {"field": "observations.record_hex", "operation": "exact", "reason": "Read-back record bytes are compared exactly."}]},
+      "bounds": {"expected_cases": 12, "max_raw_capture_bytes": 1048576, "max_normalized_bytes": 524288, "timeout_seconds": 86400},
+      "blockers": ["licensed environment unavailable", "protected runner key unavailable", "pilot does not close the complete CICS denominator"]
+    },
+    {
+      "slot_id": "db2",
+      "campaign_state": "pending",
+      "required_baselines": ["ibm-db2-for-zos-13-2026-08-13"],
+      "fixture": {"state": "pending", "authority": "independent-from-candidate-handler", "path": null, "digest": null, "digest_rule": "pending"},
+      "adapter": {"state": "pending", "policy_path": null, "accepted_read_versions": [], "read_rule": "pending-no-reader", "validator_argv": [], "subsystem_validator_required": true},
+      "capture": {"protocol": "pending", "raw_outputs_outside_git": true, "protected_attestation_required": true, "required_environment_variables": []},
+      "normalization": {"state": "pending-review", "policy_id": "db2.normalization-pending@1", "policy_digest": null, "rules": []},
+      "bounds": {"expected_cases": null, "max_raw_capture_bytes": 67108864, "max_normalized_bytes": 16777216, "timeout_seconds": 172800},
+      "blockers": ["provider-lane adapter missing", "independent fixture manifest missing", "retained documentation scope incomplete", "licensed environment unavailable"]
+    },
+    {
+      "slot_id": "ims",
+      "campaign_state": "pending",
+      "required_baselines": ["ibm-ims-15.6-dli-2026-08-31"],
+      "fixture": {"state": "pending", "authority": "independent-from-candidate-handler", "path": null, "digest": null, "digest_rule": "pending"},
+      "adapter": {"state": "pending", "policy_path": null, "accepted_read_versions": [], "read_rule": "pending-no-reader", "validator_argv": [], "subsystem_validator_required": true},
+      "capture": {"protocol": "pending", "raw_outputs_outside_git": true, "protected_attestation_required": true, "required_environment_variables": []},
+      "normalization": {"state": "pending-review", "policy_id": "ims.normalization-pending@1", "policy_digest": null, "rules": []},
+      "bounds": {"expected_cases": null, "max_raw_capture_bytes": 67108864, "max_normalized_bytes": 16777216, "timeout_seconds": 172800},
+      "blockers": ["provider-lane adapter missing", "independent fixture manifest missing", "licensed environment unavailable"]
+    },
+    {
+      "slot_id": "mq",
+      "campaign_state": "pending",
+      "required_baselines": ["ibm-mq-9.4-mqi-2026-08-31"],
+      "fixture": {"state": "pending", "authority": "independent-from-candidate-handler", "path": null, "digest": null, "digest_rule": "pending"},
+      "adapter": {"state": "pending", "policy_path": null, "accepted_read_versions": [], "read_rule": "pending-no-reader", "validator_argv": [], "subsystem_validator_required": true},
+      "capture": {"protocol": "pending", "raw_outputs_outside_git": true, "protected_attestation_required": true, "required_environment_variables": []},
+      "normalization": {"state": "pending-review", "policy_id": "mq.normalization-pending@1", "policy_digest": null, "rules": []},
+      "bounds": {"expected_cases": null, "max_raw_capture_bytes": 67108864, "max_normalized_bytes": 16777216, "timeout_seconds": 172800},
+      "blockers": ["provider-lane adapter missing", "independent fixture manifest missing", "one retained source topic unavailable", "licensed environment unavailable"]
+    },
+    {
+      "slot_id": "zosmf",
+      "campaign_state": "pending",
+      "required_baselines": ["ibm-zosmf-3.2-2026-07-27"],
+      "fixture": {"state": "pending", "authority": "independent-from-candidate-handler", "path": null, "digest": null, "digest_rule": "pending"},
+      "adapter": {"state": "pending", "policy_path": null, "accepted_read_versions": [], "read_rule": "pending-no-reader", "validator_argv": [], "subsystem_validator_required": true},
+      "capture": {"protocol": "pending", "raw_outputs_outside_git": true, "protected_attestation_required": true, "required_environment_variables": []},
+      "normalization": {"state": "pending-review", "policy_id": "zosmf.normalization-pending@1", "policy_digest": null, "rules": []},
+      "bounds": {"expected_cases": null, "max_raw_capture_bytes": 67108864, "max_normalized_bytes": 16777216, "timeout_seconds": 172800},
+      "blockers": ["provider-lane adapter missing", "operation-level backend ownership handoff missing", "licensed environment unavailable"]
+    },
+    {
+      "slot_id": "cross-resource",
+      "campaign_state": "pending",
+      "required_baselines": ["ibm-cics-ts-6x-2026-08-31", "ibm-db2-for-zos-13-2026-08-13", "ibm-ims-15.6-dli-2026-08-31", "ibm-mq-9.4-mqi-2026-08-31"],
+      "fixture": {"state": "pending", "authority": "independent-from-candidate-handler", "path": null, "digest": null, "digest_rule": "pending"},
+      "adapter": {"state": "pending", "policy_path": null, "accepted_read_versions": [], "read_rule": "pending-no-reader", "validator_argv": [], "subsystem_validator_required": true},
+      "capture": {"protocol": "pending", "raw_outputs_outside_git": true, "protected_attestation_required": true, "required_environment_variables": []},
+      "normalization": {"state": "pending-review", "policy_id": "cross-resource.normalization-pending@1", "policy_digest": null, "rules": []},
+      "bounds": {"expected_cases": null, "max_raw_capture_bytes": 134217728, "max_normalized_bytes": 33554432, "timeout_seconds": 604800},
+      "blockers": ["0.16 participant composition not accepted", "ScenarioSpec handoff missing", "shared licensed topology unavailable", "exact final candidate unavailable"]
+    }
+  ]
+}

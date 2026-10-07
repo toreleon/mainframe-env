@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add bounded exact assignment from opaque Db2 numeric literals to resolved SMALLINT/INTEGER/BIGINT/DECIMAL targets, preserving whole parts, owned target/value/span proofs and explicit fractional-truncation and integer temporary-type metadata; binder/default legality, SQLCA, execution and licensed differential remain pending."

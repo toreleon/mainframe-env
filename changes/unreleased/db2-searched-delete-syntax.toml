@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add bounded searched Db2 DELETE FROM syntax with optional structural search conditions, decoded owned identifiers, aggregate expression limits and original-source spans. Positioned and undeclared extensions fail explicitly; binding and deletion remain pending, with no whole-row or official coverage credit."

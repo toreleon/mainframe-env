@@ -38,7 +38,7 @@ job logs containing secrets, or unredacted system configuration in the capture.
 2. Create the disposable recoverable KSDS and seed `AA11` through supported CICS
    resource and data-management paths.
 3. Compile and run the twelve obligation-scoped observations named in
-   `conformance/0.9/oracles/cics-licensed-differential.json` through the licensed
+   `conformance/subsystems/cics/application/oracles/cics-licensed-differential.json` through the licensed
    Enterprise COBOL and CICS entry points. Shared setup/program execution is
    allowed, but the capture must emit one exact observation per name. The
    durable-restart observation includes all three declared fault boundaries.
@@ -85,10 +85,10 @@ candidate, compiled-spec, fixture, accepted-review, comparison-policy and
 environment identities from the current checkout; a capture for any other
 candidate fails instead of being normalized or re-bound.
 
-## Bounded v0.9 BIF family extension
+## Bounded BIF family extension
 
 The sealed `bif-builtins-v1` manifest at
-`conformance/0.9/oracles/cics-licensed-family-bif-builtins-v1.json` covers only
+`conformance/subsystems/cics/application/oracles/cics-licensed-family-bif-builtins-v1.json` covers only
 catalog rows `0013 BIF DEEDIT` and `0014 BIF DIGEST`. Its six named observations
 and exact UTF-8 application output and output-field bytes are in
 `cics-bif-builtins-fixtures.json`. The `record_hex` capture field means the

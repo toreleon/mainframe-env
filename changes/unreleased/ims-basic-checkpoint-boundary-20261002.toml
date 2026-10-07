@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Make metadata-selected IMS checkpoints commit pending database undo and clear position and holds atomically, with replay and Memory/SQLite reopen regressions."

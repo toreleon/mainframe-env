@@ -2,11 +2,10 @@
 
 Subsystem: **zosmf**
 Phase: **rest**
-Target release: **0.11.0**
 
 Status: **ZMF-1101 operation-normalization foundation complete; no new routes advertised**
 
-Candidate branch: `codex/parallel-v0.11-zmf1101`
+Candidate branch: `codex/parallel-zosmf.rest-zmf1101`
 
 Rebased integration parent: `782c65830845ae2c0ddc7289977521fcaf3fa3fa`
 (`origin/main` on 2026-09-24).
@@ -18,13 +17,13 @@ Original preparation parent: `5ab706b1dd069e26db7cb9a2b66e921c9001fc39`
 
 This lane owns only ZMF-1101: the source normalization and generated contract
 foundation for the pinned z/OSMF 3.2 portfolio. It does not implement ZMF-1102
-through ZMF-1106, publish a new route, or claim the 0.11.0 exit gate.
+through ZMF-1106, publish a new route, or claim the zosmf.rest exit gate.
 
-The checked-in 0.5, 0.6, and 0.8 status records identify accepted local
+The checked-in racf.security, dataset.data, and jes.execution status records identify accepted local
 RACF/SAF, dataset/AMS, and JES/spool implementations, with their licensed
 differentials still explicitly pending. No `cics/system-api-status.md` or accepted
-0.10.0 SPI/FEPI candidate exists at this parent. CICS-backed z/OSMF operations
-therefore cannot be assigned an accepted 0.10 backend here. The same rule is
+cics.system-api SPI/FEPI candidate exists at this parent. CICS-backed z/OSMF operations
+therefore cannot be assigned an accepted cics.system-api backend here. The same rule is
 applied to every other family: an architectural package that might eventually
 host an operation is not recorded as an accepted capability unless the current
 source and evidence expose that typed backend.
@@ -33,18 +32,18 @@ source and evidence expose that typed backend.
 
 | Slice | Parent | Semantic scope | Dependencies | Acceptance gates | State |
 |---|---|---|---|---|---|
-| `ZMF-1101.source-normalization` | `ZMF-1101` | Map all 27 family rows and all 189 direct-guide heading rows to hash-pinned source identities, explicit dispositions, aliases, and source-proven operation/method/path variants | immutable 0.2 z/OSMF catalog and manifest | offline source verifier, catalog schema, positive/negative/mutation tests, `git diff --check` | pass; rebased commit `a4219a9f` |
+| `ZMF-1101.source-normalization` | `ZMF-1101` | Map all 27 family rows and all 189 direct-guide heading rows to hash-pinned source identities, explicit dispositions, aliases, and source-proven operation/method/path variants | immutable coverage.foundation z/OSMF catalog and manifest | offline source verifier, catalog schema, positive/negative/mutation tests, `git diff --check` | pass; rebased commit `a4219a9f` |
 | `ZMF-1101.generated-contracts` | `ZMF-1101` | Generate route, operation, schema, error, backend-ownership, collision, and closure artifacts from the one normative catalog without changing public registration | source-normalization slice | deterministic regeneration, Draft 2020-12 validation, route collision/closure and official/custom separation tests, gateway regressions, architecture/docs/format/policy checks | pass; sealed by the bounded completion commit containing this status |
 
 The parent ZMF-1101 milestone is complete because both declared slices pass and
 the generated closure agrees with the normative catalog. This is not the
-0.11.0 exit gate: ZMF-1102 through ZMF-1106 remain separate later work packages.
+zosmf.rest exit gate: ZMF-1102 through ZMF-1106 remain separate later work packages.
 
 ## Source authority
 
 - Baseline: `ibm-zosmf-3.2-2026-07-27`.
 - Product/publication: z/OSMF 3.2 Programming Guide, `SSLTBW_3.2.0`, pinned by
-  `conformance/0.2/manifests/zosmf-topics.json`.
+  `conformance/subsystems/coverage/manifests/zosmf-topics.json`.
 - Manifest identity:
   `sha256:146cb3faaebd146c6396cc57b04ad6e48b49533b37dfa34f1eca2411518cea9b`
   over 395 topics and 9,761,388 bytes.
@@ -104,14 +103,14 @@ claim nor makes an unowned family executable.
 
 ## Current blockers carried forward
 
-- There is no accepted 0.10.0 SPI/FEPI dependency candidate in this checkout.
+- There is no accepted cics.system-api SPI/FEPI dependency candidate in this checkout.
 - Most pinned z/OSMF families have no accepted typed backend capability in the
   current product. Planned ownership is recorded separately from accepted
   capability evidence.
 - Detailed request/response/error field normalization remains explicit where a
   heading proves a route but this bounded slice has not yet frozen every payload
   property. Such operations remain withheld from publication.
-- Licensed z/OSMF 3.2 differential execution belongs to ZMF-1106/0.17 and is
+- Licensed z/OSMF 3.2 differential execution belongs to ZMF-1106/certification.licensed and is
   not available or claimed by this source-review foundation.
 
 ## Source-normalization result
@@ -150,14 +149,14 @@ The deterministic generator emits:
 
 The generated gateway module is metadata only. It contains 27 family backend
 rows and the mapping of the frozen 23 routes to normalized operation identities;
-`official_routes::register` remains generated solely from the 0.1/0.2 frozen
+`official_routes::register` remains generated solely from the platform.runtime-integration/coverage.foundation frozen
 route authority.
 
 Artifact SHA-256 identities for the accepted generated bytes are:
 
-- contracts: `ff0eaeed7f9ce391bdd064f250f1a542c4fb7775082b7b0e64dc6bdd25629665`;
-- collision report: `0dedff2a2b9ff1e41e32f2dfaee6e5e1e6840139a4e485861e889164017f4f13`;
-- closure report: `ea961aec28f5be898e055df081479ac42bcda4b403bdd1a2432ccf5b0874fe9c`;
+- contracts: `e36a0c4e4f219d7bf990dd7b3b2386c53cd739a94e3d0099c4e0a4c78544cf8a`;
+- collision report: `5f2d554aea1fdbf4193c4f897d971dcfa4c49e19824fa1caeda205a68174b5ec`;
+- closure report: `e81312673e767ccf202f19b0cb22b76e7e7bc6500058a6fe3248931a7b5de79e`;
   and
 - gateway metadata: `a260751dc6ad399b6d127c4a72aba59ed44669827079a50788224758210a52e3`.
 
@@ -182,7 +181,7 @@ Passing checks on this candidate:
 - `git diff --check`.
 
 The repository-wide `cargo xtask schemas --check` reached and accepted the new
-0.11 schema/catalog validation, then stopped on the unchanged 0.8
+zosmf.rest schema/catalog validation, then stopped on the unchanged jes.execution
 `carddemo-base-batch.json` note exceeding its unrelated 256-character schema
 bound. That evidence file and its schema are unchanged by ZMF-1101. The rebased
 mainline resolves the other inherited findings recorded during initial
@@ -194,5 +193,5 @@ were not repeated merely because the branch base changed.
 
 Resolve one backend-bounded family slice under ZMF-1102 or ZMF-1103, including
 its 13 still-blocked shared-dispatch keys where applicable, before proposing any
-new route publication. The 0.10 SPI/FEPI dependency and licensed z/OSMF
+new route publication. The cics.system-api SPI/FEPI dependency and licensed z/OSMF
 differential environment remain external prerequisites to their later gates.

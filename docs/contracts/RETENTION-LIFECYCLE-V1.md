@@ -3,7 +3,7 @@
 Status: **Implemented**
 Owner: **store-contract, provider, and core-server maintainers**
 Scope: **all durable source families, provider replay and recovery graphs, age observations, retained archives, and offline maintenance**
-Applies from: **mainframe-env 0.8.3 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 The `mainframe-env.retention@1` contract prevents a healthy bounded store from
 becoming permanently full without weakening replay, checkpoint, effect, audit,
@@ -86,6 +86,32 @@ Changing this order, omitting a target, or inventing an unregistered target is a
 contract change.
 
 ## Provider full codecs and dependency proofs
+
+### Private IMS recovery presence amendment
+
+For `IMS-1405.private-recovery-retention-fence`, IMS owns a conservative
+presence predicate over the reserved `ims-recovery-v1-` namespace prefix.
+The existing prefix API requests one row: any returned row is sufficient,
+including malformed bytes or unknown versions/subnamespaces. A successful empty
+query proves absence; an error fails closed. This is not a private graph decoder
+or attribution/age proof. The server ORs presence into its existing `unowned`
+core dependency inventory between the existing epoch reads. Store forecast and
+archive/delete use the same snapshot, and the archive transaction rechecks the
+exact provider epoch and existing source CAS.
+
+Presence globally protects `resolved-effects`, `terminal-work`,
+`lifecycle-events` and `terminal-executions`, even for unrelated owners. This may
+prevent core retention progress indefinitely and leave bounded stores full.
+There is no private expiry/cleanup authority or additional target/order/lifetime.
+Ordinary IMS replay still uses its existing full codec and archive proof.
+`audit` and `delivered-outbox` are outside this unowned fence. Legacy `ims-state`,
+ordinary session/checkpoint/session-index/undo and generic undo families outside
+the reserved prefix receive no additional protection from this amendment.
+Older maintenance clients must be drained before retention over private graphs;
+unchanged payload/SQL compatibility does not make their inventory safe. See
+[ADR-0037](../decisions/0037-private-ims-recovery-retention-fence.md).
+
+### Existing provider codec boundaries
 
 The core server asks the owning provider to fully decode every provider source
 row before constructing a plan. A descriptor binds the exact namespace, key,
@@ -230,7 +256,26 @@ The store accepts that inventory only at its exact provider-state epoch and
 rechecks it inside the core archive transaction; it never tries to reconstruct
 provider ownership from prefixes or partial payload fields.
 
+Selected MQ state additionally enters that same core dependency inventory through
+the owning complete captured-snapshot reader: marker, catalog, delivery rows,
+control, unit owners and lossless occurrence receipts are validated together.
+Every receipt execution/original effect key and every retained unit's logical
+execution/original CONNECT key remains blocked, including empty and finalized
+units. Unknown, orphaned, malformed or over-budget selected state sets the
+conservative unowned fence. This read-only protection neither opens a runtime
+nor establishes a terminal age. The pre-publication receipt tick is not an age;
+selected receipt/unit retirement and post-persistence age reconciliation remain
+separate owning protocols. No new target or selected archival permit is added.
+
 ## Legacy age observations
+
+Native root membership protects every indexed actor and its existing core
+references regardless of a terminal execution row. The framework root terminal
+transaction supplies no retention age or release permit. Retention must not
+recycle uncertain root history, scope indexes, effects, CALLs or checkpoints
+using transport revocation or a completed row alone. Shared owning recovery/age
+closure and exact release remain pending; see
+[ADR 0034](../decisions/0034-mq-root-terminal-publication.md).
 
 Absence of a trustworthy intrinsic tick protects a structurally valid legacy
 row; it never makes the row old. Partial new metadata is corruption, not a

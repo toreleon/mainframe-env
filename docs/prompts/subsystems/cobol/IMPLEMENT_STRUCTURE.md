@@ -3,7 +3,6 @@
 Subsystem: **cobol**
 Phase: **structure**
 
-Target version: **0.3.0**
 Completion dependencies: coverage.foundation
 
 Use this prompt from the repository root. The
@@ -11,9 +10,9 @@ Use this prompt from the repository root. The
 
 ---
 
-You are implementing **mainframe-env 0.3.0: complete COBOL structure and type
+You are implementing **mainframe-env cobol.structure: complete COBOL structure and type
 system**. Deliver complete recognition and validation for the pinned Enterprise
-COBOL 6.5 structure without claiming 0.4 execution semantics.
+COBOL 6.5 structure without claiming cobol.execution execution semantics.
 
 ## Read and verify first
 
@@ -21,10 +20,10 @@ Read `docs/prompts/subsystems/README.md`,
 `docs/delivery/subsystems/cobol/structure-plan.md`, the official COBOL baseline receipt
 and normalized catalogs, `docs/architecture/CONFORMANCE-IR.md`,
 compiler/IR/source/diagnostic contracts, and relevant ADRs. Verify accepted
-0.2.0 receipts for catalog generation, packages, coverage, source provenance,
+coverage.foundation receipts for catalog generation, packages, coverage, source provenance,
 and handler identity before public integration.
 
-If 0.2.0 is not accepted, only isolated grammar/catalog/fixture preparation is
+If coverage.foundation is not accepted, only isolated grammar/catalog/fixture preparation is
 allowed. Do not merge a new public compiler artifact format or claim coverage.
 
 ## Implement in this order
@@ -91,7 +90,7 @@ allowed. Do not merge a new public compiler artifact format or claim coverage.
   statements, five directive groups, ten file-description clauses, and seventeen
   data-description clauses with immutable row identities.
 - Preserve every accepted token/form and bounded provenance through AST/HIR.
-- Unsupported 0.4 runtime semantics must block executable publication with a
+- Unsupported cobol.execution runtime semantics must block executable publication with a
   typed diagnostic; never lower them to no-op or generic success.
 - Keep CICS, Db2, IMS, MQ, LE, DFHAID, DFHBMSCA, SQLCA, and MQ ABI knowledge out
   of compiler ownership.
@@ -108,7 +107,7 @@ allowed. Do not merge a new public compiler artifact format or claim coverage.
 Do not finish until 44/44 statement families recognize valid forms and reject
 invalid ones; 82/82 functions have exact signature/type metadata; every pinned
 clause/directive validates; every syntax/semantic node has stable bounded
-provenance; incomplete execution cannot publish; and accepted 0.1.1 artifacts
+provenance; incomplete execution cannot publish; and accepted profile.carddemo artifacts
 remain readable within the declared compatibility window.
 
 Require `cargo xtask spec --check` to compile the complete COBOL specification,
@@ -120,4 +119,4 @@ and affected-scope repository validation once on the unchanged minor candidate.
 Generate the ledger exclusively from obligation verdict events.
 At handoff, report denominators and recognition/validation numerators with exact
 row/obligation/test bindings; leave execution/recovery/differential pending
-where 0.4 or 0.17 owns them.
+where cobol.execution or certification.licensed owns them.

@@ -15,3 +15,7 @@ metadata without registering any of the 352 candidate route variants. Missing,
 partial, or unresolved backends and identity-only payload schemas remain
 publication blockers; the existing 23 official routes and seven custom routes
 are unchanged.
+
+## Documentation
+
+[Documentation portal](../../../docs/README.md) · [Current package map](../../../docs/architecture/PACKAGE-MAP.md) · [Embedding guide](../../../docs/guides/EMBEDDING.md) · [Contribution and verification](../../../CONTRIBUTING.md)

@@ -29,8 +29,10 @@
 mod audit;
 mod context;
 mod identity;
+mod lifecycle_notification;
 mod machine;
 mod participant;
+mod root_terminal;
 
 pub use audit::{
     AUDIT_RECORD_CONTRACT, AuditDecision, AuditRecord, AuditResourceDigest,
@@ -44,6 +46,7 @@ pub use identity::{
     ArtifactRef, CancellationId, CapabilityId, ExecutionId, IdempotencyKey, IdentityProblem,
     PrincipalId, RequestId, RunUnitId, Selector, TraceId,
 };
+pub use lifecycle_notification::lifecycle_notification_payload;
 pub use machine::{
     Abend, AbendDumpDisposition, ChildInvocation, Completion, Condition, ExecutionOutcome, Frame,
     FrameId, LifecycleEvent, LifecycleEventKind, Machine, MachineDrive, MachineResume, Quantum,
@@ -58,6 +61,10 @@ pub use participant::{
     TRANSACTION_PARTICIPANT_VERSION, TransactionParticipantContract,
     TransactionParticipantDescriptor, read_transaction_participant_contract,
     transaction_participant_contract_v1,
+};
+pub use root_terminal::{
+    AuditSubjectRecord, ROOT_TERMINAL_AUDIT_CONTRACT, RootTerminalAudit, RootTerminalAuditRole,
+    RootTerminalDisposition, RootTerminalResourceDigest,
 };
 
 /// Stable identifier for this execution contract generation.

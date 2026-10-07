@@ -2,10 +2,9 @@
 
 Subsystem: **jcl**
 Phase: **planning**
-Target release: **0.7.0**
 
 Status: **Proposed**
-Start gate: 0.2 catalog, diagnostic, source-provenance, and plan contracts frozen
+Start gate: coverage.foundation catalog, diagnostic, source-provenance, and plan contracts frozen
 Completion dependencies: coverage.foundation
 Estimate: 10–16 engineer-months
 
@@ -41,10 +40,10 @@ typed execution planner for the pinned z/OS 3.2 JCL and JES2 JECL inventories.
 
 Statement parsing, parameter validation, procedures/symbols, and JECL can run
 as separate cohorts once diagnostic and plan schemas freeze. DD allocation
-fields must share the 0.6 catalog vocabulary; changes to that vocabulary are
+fields must share the dataset.data catalog vocabulary; changes to that vocabulary are
 coordinated through its owner.
 
-0.7 can run with 0.3, 0.5, and 0.6. It provides a typed plan to 0.8; it does not
+jcl.planning can run with cobol.structure, racf.security, and dataset.data. It provides a typed plan to jes.execution; it does not
 need to wait for the JES runtime to be implemented.
 
 ## Exit gate
@@ -61,4 +60,4 @@ need to wait for the JES runtime to be implemented.
 ## Non-goals
 
 - JES scheduling, spool lifecycle, job execution, and utility behavior, which
-  belong to 0.8.
+  belong to jes.execution.

@@ -1,9 +1,9 @@
 # Dataset, VSAM, catalog, and AMS authority
 
-Status: **Normative from 0.6.0**
+Status: **Normative from dataset.data**
 Owner: **dataset provider maintainers**
 Scope: **dataset, VSAM, catalog, and AMS authority**
-Applies from: **mainframe-env 0.6.0**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Authority boundary
 
@@ -22,10 +22,10 @@ same selected dataset authority.
 ## Frozen programming surface
 
 The normative detailed inventory is
-`conformance/0.6/inventory/dataset-programming-surface.json`. It contains 131
+`conformance/subsystems/dataset/inventory/dataset-programming-surface.json`. It contains 131
 typed surface descriptors in ten families, including all 31 frozen AMS command
 rows and exact mappings for the five official VSAM organization rows. It adds
-obligations beneath the immutable 0.2 denominator; it does not invent new IBM
+obligations beneath the immutable coverage.foundation denominator; it does not invent new IBM
 coverage rows.
 
 `cargo xtask dataset-contract --check` compiles the Draft 2020-12 schemas,
@@ -67,8 +67,8 @@ Corrupt, over-limit, cross-reference-invalid, or capability-invalid state fails
 before publication.
 
 The portable state, diagnostic, capability, and migration schemas live in
-`conformance/0.6/schemas`. The non-destructive migration contract is
-`conformance/0.6/migrations/dataset-state-v2-to-v3.json`,
+`conformance/subsystems/dataset/schemas`. The non-destructive migration contract is
+`conformance/subsystems/dataset/migrations/dataset-state-v2-to-v3.json`,
 `dataset-state-v3-to-v4.json`, `dataset-state-v4-to-v5.json`, and
 `dataset-state-v5-to-v6.json`. MEDS4 records materialize `NONRLS`; MEDS5 persists
 the explicit access mode, and MEDS6 persists catalog creation dates for
@@ -185,7 +185,7 @@ mutation until atomic dependent cleanup is available.
 
 ## Generated AMS language and handlers
 
-`conformance/0.6/ams/grammar.json` is the 31-command modal grammar inventory.
+`conformance/subsystems/dataset/ams/grammar.json` is the 31-command modal grammar inventory.
 `cargo xtask dataset-contract` validates it against the frozen AMS command order
 and the detailed programming surface, then generates the batch grammar table.
 Its `keywords` are the command name words and nothing more: the file is a
@@ -198,7 +198,7 @@ cannot leave earlier catalog mutations behind.
 
 The operand contract lives in two other places, and reading `grammar.json`
 alone would leave a reader believing there is none.
-`conformance/0.6/inventory/dataset-programming-surface.json` is the typed-effect
+`conformance/subsystems/dataset/inventory/dataset-programming-surface.json` is the typed-effect
 inventory: 131 descriptors in ten families carrying 161 operand spellings, each
 bound to an organization, access-mode, DCB, allocation, SMS, volume, catalog,
 lifecycle or provider-capability effect this emulator performs. `ams_operand_allowed`
@@ -210,7 +210,7 @@ every top-level term outside it with `UnsupportedCapability` on capability
 `ams-operand`, before any effect runs.
 
 That accepted set is deliberately far narrower than the publication's, and the
-narrowness is the point. `conformance/0.6/generated/ams-html-parameter-projection.json`
+narrowness is the point. `conformance/subsystems/dataset/generated/ams-html-parameter-projection.json`
 reads 688 parameters and 193 values over the same 31 commands from 89
 documentation topics, 392 of the parameters distinct by spelling, and it carries
 zero coverage credit. An operand is admitted here when it can be carried to a
@@ -267,7 +267,7 @@ incompatible dispositions, and test identities that no longer resolve.
 DAT-606 includes a tooling-only bounded pure-state reference simulation. It
 owns its organization, record, catalog, alias, AIX, path, GDG, snapshot,
 register, condition, and transition types and reads only the frozen official
-catalog plus reviewed 0.6 fixtures. A repository check rejects imports or calls
+catalog plus reviewed dataset.data fixtures. A repository check rejects imports or calls
 to production dataset, AMS, host, or provider-store authorities from the model.
 
 The simulation covers the five VSAM organization rows and all 31 AMS command

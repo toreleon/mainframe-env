@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Hardened sandbox reference publication, controller credential routing, snapshot entry bounds, compiler responses, startup log reads, and checkout-owned build cleanup; repaired a CI regression script and added syntax checks for every tracked Python file; documented public naming conventions and replaced obsolete MQ release labels with subsystem acceptance scope."

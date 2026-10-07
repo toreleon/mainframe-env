@@ -2,15 +2,14 @@
 
 Subsystem: **certification**
 Phase: **licensed**
-Target release: **0.17.0**
 
 Status: **CER-1701 shared harness foundation in progress; all licensed differentials pending**
 
 This lane starts from `origin/main` commit
 `5ab706b1dd069e26db7cb9a2b66e921c9001fc39` on branch
-`codex/parallel-v0.17-cer1701`. It prepares only the shared licensed-environment
+`codex/parallel-certification.licensed-cer1701`. It prepares only the shared licensed-environment
 and oracle-harness contracts allowed to proceed alongside provider lanes. The
-0.11 and 0.16 completion dependencies have not been consumed, no final
+zosmf.rest and integration.transactions completion dependencies have not been consumed, no final
 certification candidate exists, and no licensed campaign is run or credited by
 CER-1701.
 
@@ -139,7 +138,7 @@ additive receipt validator pass their focused registry and cross-authority
 tests. RACF and CICS have reviewed exact-observation normalization policies;
 COBOL, dataset, JES2, Db2, IMS, MQ, z/OSMF, and cross-resource normalization
 remains explicitly pending review. The repository-wide
-`cargo xtask schemas --check` reaches the pre-existing 0.8 CardDemo base-batch
+`cargo xtask schemas --check` reaches the pre-existing jes.execution CardDemo base-batch
 artifact and fails because its `supersession.reason` text exceeds that
 historical schema's 256-character limit; CER-1701 does not modify either file.
 The synthetic environment, CICS v1 capture, and CER-1701 envelope pass both the
@@ -173,7 +172,7 @@ The final CER-1701 foundation ran these affected checks:
 - `cargo fmt --all -- --check` and `git diff --check`: pass.
 
 Three broader baseline checks were diagnosed once and not weakened or repaired
-outside CER-1701 scope. `cargo xtask schemas --check` reaches an unchanged 0.8
+outside CER-1701 scope. `cargo xtask schemas --check` reaches an unchanged jes.execution
 CardDemo artifact whose `supersession.reason` exceeds its schema's
 256-character limit. `cargo xtask architecture --check` reaches an unchanged
 `carddemo-operator-submit` mention in dataset `replay_index.rs`. The standalone

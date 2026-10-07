@@ -76,17 +76,17 @@ coverage or licensed execution credit.
 
 ## Register later source-review manifests
 
-The immutable 0.2 catalog index remains unchanged. Later zero-credit source
+The immutable coverage.foundation catalog index remains unchanged. Later zero-credit source
 sets are registered separately in a target-owned
 `conformance/<minor>/manifests/index.json`. The shared offline reader currently
-loads the 0.9, 0.10 and 0.14 registries. Each registry row binds the exact manifest
+loads the cics.application-api, cics.system-api, ims.programming and mq.programming registries. Each registry row binds the exact manifest
 bytes, topic-set digest, count, baseline, subsystem and scope while fixing
 `semantic_authority=false` and `coverage_credit=0`. The shared registry schema,
 offline reader, and xtask checker reject unregistered, missing, changed or
 cross-version manifests. Adding another target registry requires extending the
 shared bounded registry list; do not create a target-specific reader.
 
-The 0.10 `cics-spi-command-bodies` and `cics-fepi-command-bodies` scopes
+The cics.system-api `cics-spi-command-bodies` and `cics-fepi-command-bodies` scopes
 pin retained CICS TS 6.x command HTML from the 2026-09-12 archive against the
 already pinned CICS TOC. The SPI scope contains 277 command-topic bodies;
 the FEPI scope contains 36. These are topic counts, not the official 269 SPI
@@ -110,17 +110,17 @@ python3 -B conformance/tools/ibm_docs.py status --scope cics-fepi-command-bodies
 python3 -B conformance/tools/ibm_docs.py status --scope cics-fepi-context-candidates
 ```
 
-The shared CICS mapper checks the private 0.10 projections and row-map candidates
+The shared CICS mapper checks the private cics.system-api projections and row-map candidates
 with `python3 -B tools/generate_cics_source_map.py --family spi --check`
 (or `--family fepi`). Add both `--toc <external-pinned-toc>` and
 `--cache <external-topic-cache>` to independently reproduce TOC/body headings
 and the bounded command-form fragment locators. Without those inputs the check
 validates committed bindings and canonical freshness only. Three qualified SPI
 row equivalences remain explicitly unresolved; map presence never grants
-grammar or execution authority. The default 0.9 application batches remain
+grammar or execution authority. The default cics.application-api batches remain
 owned by the same generator and schema.
 
-The 0.14 IMS programming-contract scope is checked offline with:
+The ims.programming IMS programming-contract scope is checked offline with:
 
 ```bash
 python3 -B conformance/tools/ibm_docs.py status --scope ims-programming-contracts
@@ -129,6 +129,56 @@ python3 -B conformance/tools/ibm_docs.py status --scope ims-programming-contract
 It pins only the reviewed SSA, PCB/status, get/position, processing-option and
 call-family topics needed by the declared IMS contract slices. It grants no
 behavioral or licensed differential credit.
+
+The separately identified mq.programming MQ programming-supplements scope is checked with:
+
+```bash
+python3 -B conformance/tools/ibm_docs.py status --scope mq-programming-supplements
+```
+
+It registers exactly 80 selected retained MQ 9.4 structure, field, constant,
+attribute and reason-reference topics under
+`ibm-mq-9.4-programming-supplements-2026-09-12`, with the existing pinned MQ TOC.
+The immutable coverage.foundation call baseline and its 26-call/27-position denominator remain
+unchanged. Required `last_modified` values come from hash-verified publication
+`lastModifiedDate` metadata, not archive fetch dates. The archive work run is
+still marked in-progress, has no independent browser-reproduction receipt, and
+predates the MQINQ issue337 re-pin. Heading, link and product metadata do not
+establish freshness, snapshot equivalence or semantic acceptance. Registration
+enables subsequent explicit review; all ten pending reason declarations remain
+pending and no numeric/layout, execution, licensed or coverage credit is granted.
+
+The independent mq.programming `mq-producer-attribute-sources` scope registers nine
+retained MQ 9.4 topics under
+`ibm-mq-9.4-producer-attribute-sources-2026-09-12`: QM CCSID, QM and queue
+maximum message lengths, maximum priority, default put response/persistence/
+priority, message delivery sequence and the MQAT application-type declaration.
+Use the same offline reader with this exact scope and SHA selection. Original
+27 call positions, 26 unique calls, supplements80, layout12, property12 and
+recovery1 pins and baselines remain unchanged. The new scope grants zero
+semantic authority, execution, licensed or coverage credit; it changes no
+runtime numeric projection, producer context, generated ID or queue policy.
+
+Its bounded archive metadata and pinned TOC identify retained HTML only. The
+archive run remains in-progress, has no independent browser-reproduction
+receipt and predates the MQINQ issue337 re-pin. Publication `last_modified`
+comes from each hash-verified HTML `lastModifiedDate`, not fetch time. This
+registration establishes neither freshness nor snapshot equivalence. Read
+and review sources before a separate admitted producer implementation; source
+presence and a numeric declaration are not execution permission.
+
+The independent mq.programming `mq-message-handle-sources` scope registers only
+`SSFKSJ_9.4.0/refdev/q091560_.html` (MQHM message-handle constants) under
+`ibm-mq-9.4-message-handle-sources-2026-09-12`. Use the shared offline reader
+with this exact scope and SHA selection. The manifest binds 2409 retained bytes
+and the existing pinned MQ 9.4 TOC. Publication `last_modified` comes from the
+hash-verified HTML `lastModifiedDate` element, not archive fetch time. Original
+call and later source manifests remain unchanged. Registration grants zero
+semantic authority, coverage, execution, native or licensed credit; numeric
+projection and message-handle disposition implementation require later review.
+The archive remains in-progress, predates the MQINQ re-pin and has no independent
+browser reproduction, freshness or same-snapshot claim. Complete IMPO
+corroboration is outside this one-topic scope.
 
 For a new CICS source corpus:
 
@@ -154,7 +204,7 @@ topic, TOC, and full one-hop source closure with:
 python3 -B conformance/tools/ibm_docs.py status --scope cics-application-api-sources-a
 python3 -B conformance/tools/ibm_docs.py status --scope cics-application-api-sources-b
 python3 -B conformance/tools/ibm_docs.py status --scope cics-application-api-sources-c
-python3 -B conformance/0.9/tools/fetch_cics_application_sources.py --batch all --check --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
+python3 -B conformance/subsystems/cics/application/tools/fetch_cics_application_sources.py --batch all --check --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
 ```
 
 The first command checks the manifest topics and TOC. The second also
@@ -171,7 +221,7 @@ Five authority-bounded HTML supplements close the three map-stage gaps. They
 have no TOC claim and are verified separately:
 
 ```bash
-python3 -B conformance/0.9/tools/cache_cics_application_source_supplements.py --check --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
+python3 -B conformance/subsystems/cics/application/tools/cache_cics_application_source_supplements.py --check --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
 ```
 
 ## Reproduce the CICS application structural projections
@@ -180,9 +230,9 @@ The committed projection can be checked without mounting the documentation
 cache:
 
 ```bash
-python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch a --check
-python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch b --check
-python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch c --check
+python3 -B conformance/subsystems/cics/application/tools/extract_cics_application_sources.py --batch a --check
+python3 -B conformance/subsystems/cics/application/tools/extract_cics_application_sources.py --batch b --check
+python3 -B conformance/subsystems/cics/application/tools/extract_cics_application_sources.py --batch c --check
 ```
 
 This form verifies the exact plan, map, corpus, manifest, browser receipt,
@@ -191,9 +241,9 @@ and projection digest. To re-read every pinned HTML body and regenerate the
 candidate bytes before comparing them to Git, use the cache-backed form:
 
 ```bash
-python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch a --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
-python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch b --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
-python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch c --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B conformance/subsystems/cics/application/tools/extract_cics_application_sources.py --batch a --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B conformance/subsystems/cics/application/tools/extract_cics_application_sources.py --batch b --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B conformance/subsystems/cics/application/tools/extract_cics_application_sources.py --batch c --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
 ```
 
 Both forms are offline and preserve the zero-credit boundary. The projection
@@ -205,12 +255,12 @@ independent verifier directly before checking each compact automatic receipt;
 this keeps extraction and verification implementations separate:
 
 ```bash
-python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch a --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
-python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch b --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
-python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch c --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
-python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch a --check --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
-python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch b --check --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
-python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch c --check --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
+python3 -B conformance/subsystems/cics/application/tools/verify_cics_application_sources.py --batch a --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
+python3 -B conformance/subsystems/cics/application/tools/verify_cics_application_sources.py --batch b --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
+python3 -B conformance/subsystems/cics/application/tools/verify_cics_application_sources.py --batch c --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
+python3 -B conformance/subsystems/cics/application/tools/review_cics_application_sources.py --batch a --check --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
+python3 -B conformance/subsystems/cics/application/tools/review_cics_application_sources.py --batch b --check --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
+python3 -B conformance/subsystems/cics/application/tools/review_cics_application_sources.py --batch c --check --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
 ```
 
 If a later check needs another HTML topic, add and reproduce it through the
@@ -221,7 +271,7 @@ checks neither perform release nor licensed execution work.
 ## Reverify immutable baseline pins
 
 The network-capable re-verifier remains scoped to immutable baselines in the
-0.2 index:
+coverage.foundation index:
 
 ```bash
 python3 conformance/tools/fetch_pinned_sources.py --subsystem cobol

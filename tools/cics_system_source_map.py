@@ -16,7 +16,7 @@ import sys
 import generate_cics_source_map as shared
 
 sys.path.insert(0, str(shared.ROOT / "conformance/tools"))
-sys.path.insert(0, str(shared.ROOT / "conformance/0.10/tools"))
+sys.path.insert(0, str(shared.ROOT / "conformance/subsystems/cics/system/tools"))
 import ibm_docs  # noqa: E402
 import generate_spi1001_catalog as identities  # noqa: E402
 
@@ -35,7 +35,7 @@ MAP_DEFINITION = (
     "separators=(',', ':')) excluding mapping_sha256 and mapping_digest_definition"
 )
 COUNTS = {"spi": (269, 277, 267), "fepi": (39, 36, 36)}
-FORM_LOCATORS = Path("conformance/0.10/cics/command-form-locators.json")
+FORM_LOCATORS = Path("conformance/subsystems/cics/system/cics/command-form-locators.json")
 BRANCHES = {
     "spi": ("SSJL4D_6.x/reference-system-programming/commands-spi/dfha81j.html",),
     "fepi": (
@@ -73,7 +73,7 @@ def require(condition: bool, message: str) -> None:
 
 def artifact_paths(family: str) -> tuple[Path, Path]:
     require(family in COUNTS, f"unknown administrative family {family}")
-    directory = Path("conformance/0.10/cics")
+    directory = Path("conformance/subsystems/cics/system/cics")
     return directory / f"{family}-command-topics.json", directory / f"{family}-command-source-map.json"
 
 
@@ -87,12 +87,12 @@ def core(value: dict, digest_field: str) -> dict:
 
 
 def source_scope(root: Path, family: str) -> tuple[ibm_docs.Scope, dict, list[dict]]:
-    sources = ibm_docs.registered_sources(root / "conformance/0.10/manifests/index.json", root)
+    sources = ibm_docs.registered_sources(root / "conformance/subsystems/cics/system/manifests/index.json", root)
     matches = [(scope, manifest, topics) for scope, manifest, topics, _, _ in sources
                if scope.scope_id == f"cics-{family}-command-bodies"]
     require(len(matches) == 1, f"{family} body scope is not uniquely registered")
     scope, manifest, topics = matches[0]
-    require(scope.target_version == "0.10.0" and len(topics) == COUNTS[family][1]
+    require(scope.target_subsystem == "cics.system-api" and len(topics) == COUNTS[family][1]
             and "sha256:" + manifest["toc_sha256"] == shared.TOC_SHA256
             and manifest["toc_url"] == shared.TOC_URL, f"{family} source scope drift")
     return scope, manifest, topics
@@ -156,7 +156,7 @@ def projection_from_source(root: Path, family: str, toc_body: bytes, cache: Path
                        "toc_label": node["label"], **heading.headings[0],
                        "sha256": "sha256:" + pin["sha256"], "bytes": pin["bytes"]})
     result = {
-        "schema_version": PROJECTION_VERSION, "target_version": "0.10.0", "family": family,
+        "schema_version": PROJECTION_VERSION, "target_subsystem": "cics.system-api", "family": family,
         "source_toc_url": shared.TOC_URL, "source_toc_sha256": shared.TOC_SHA256,
         "branches": list(BRANCHES[family]), "manifest": scope.manifest,
         "manifest_sha256": sha256(root / scope.manifest),
@@ -173,13 +173,13 @@ def projection_from_source(root: Path, family: str, toc_body: bytes, cache: Path
 def validate_projection(root: Path, family: str, projection: dict) -> None:
     scope, manifest, pins = source_scope(root, family)
     require(set(projection) == {
-        "schema_version", "target_version", "family", "source_toc_url", "source_toc_sha256",
+        "schema_version", "target_subsystem", "family", "source_toc_url", "source_toc_sha256",
         "branches", "manifest", "manifest_sha256", "topic_manifest_sha256", "semantic_authority",
         "coverage_credit", "retained_source_bytes", "topic_count", "topics",
         "projection_digest_definition", "projection_sha256",
     }, "administrative projection fields differ")
     require(projection["schema_version"] == PROJECTION_VERSION
-            and projection["target_version"] == "0.10.0" and projection["family"] == family
+            and projection["target_subsystem"] == "cics.system-api" and projection["family"] == family
             and projection["source_toc_url"] == shared.TOC_URL
             and projection["source_toc_sha256"] == shared.TOC_SHA256
             and projection["branches"] == list(BRANCHES[family])
@@ -213,7 +213,7 @@ def build_mapping(root: Path, family: str, projection: dict) -> dict:
     require((root / path).read_bytes() == identities.pretty_bytes(catalog), "SPI/FEPI identity catalog drift")
     forms = shared.read_json(root / FORM_LOCATORS)
     require(forms["schema_version"] == "mainframe-env.cics-command-form-locators@1"
-            and forms["target_version"] == "0.10.0" and forms["semantic_authority"] is False
+            and forms["target_subsystem"] == "cics.system-api" and forms["semantic_authority"] is False
             and forms["coverage_credit"] == 0, "command-form locator boundary drift")
     identity_source = catalog["commands"][0]["source"]
     require(forms["identity_topic"] == {"topic_path": identity_source["topic_path"],
@@ -248,7 +248,7 @@ def build_mapping(root: Path, family: str, projection: dict) -> dict:
     require(len(rows) == COUNTS[family][0] and len(usage) == COUNTS[family][2], "administrative row denominator drift")
     projection_path, _ = artifact_paths(family)
     result = {
-        "schema_version": MAP_VERSION, "target_version": "0.10.0", "family": family,
+        "schema_version": MAP_VERSION, "target_subsystem": "cics.system-api", "family": family,
         "work_package": "SPI-1001.command-source-maps", "status": "source-identity-only",
         "semantic_authority": False, "automatic_registration": False, "public_routes": False,
         "coverage_credit": 0, "differential_credit": 0,

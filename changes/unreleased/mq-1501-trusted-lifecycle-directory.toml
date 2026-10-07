@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added private bounded MQ host lifecycle leases with non-reused numeric owners, explicit CICS frame inheritance, IMS volatile syncpoint retirement and shared-handle process termination; actual host attestation, durable UOW and public service acceptance remain pending."

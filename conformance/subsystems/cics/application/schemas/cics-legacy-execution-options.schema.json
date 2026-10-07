@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/cics-legacy-execution-options-v1.json",
+  "title": "mainframe-env CICS raw-compatibility execution option catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_subsystem",
+    "source_baseline",
+    "application_identity_set_sha256",
+    "routes"
+  ],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.cics-legacy-execution-options@1"},
+    "target_subsystem": {"const": "cics.application-api"},
+    "source_baseline": {"const": "ibm-cics-ts-6x-2026-08-31"},
+    "application_identity_set_sha256": {
+      "const": "sha256:a18057164564781563252d53586a8afbc401f2783950db456b3b98177fc60b94"
+    },
+    "routes": {
+      "type": "array",
+      "minItems": 20,
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["official_row", "runtime_operation", "execution_options"],
+        "properties": {
+          "official_row": {
+            "type": "string",
+            "pattern": "^ibm-cics-ts-6x-2026-08-31:api-commands:[0-9]{4}$"
+          },
+          "runtime_operation": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Za-z0-9]*$"
+          },
+          "execution_options": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9-]*$"
+            }
+          }
+        }
+      }
+    }
+  }
+}

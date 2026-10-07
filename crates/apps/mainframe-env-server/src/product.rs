@@ -6,7 +6,11 @@ mod batch_controller;
 use batch_controller::decode_application_batch_controller;
 mod system_providers;
 use system_providers::*;
+mod dataset_input;
+use dataset_input::wildcard;
 mod cics_security;
+mod ims;
+mod services;
 use cics_security::{MAX_AUTH_SESSIONS_PER_USER, terminal_principal};
 
 use crate::cobol::{artifact::admit_executable_artifact, bind_compatible_runtime_services};
@@ -59,7 +63,8 @@ use mainframe_env_host_api::{
 };
 use mainframe_env_ims::{
     ImsReplayClock, ImsService, TmCall, TmCallResult, TmCancelReceipt, TmEnqueueReceipt,
-    TmInputMessage, TmLimits, TmPackageBinding, TmScheduleReceipt, TmService, ims_providers,
+    TmInputMessage, TmLimits, TmPackageBinding, TmScheduleReceipt, TmService,
+    ims_providers_with_recovery,
 };
 use mainframe_env_interpreter::{CoordinatorLimits, ExecutionCoordinator, ReferenceMachine};
 use mainframe_env_ir::CodecLimits;
@@ -751,7 +756,11 @@ impl ProductServer {
             enterprise_replay_clock.clone(),
         )?;
         let mut enterprise_providers = db2_providers(db2.clone(), InvocationLimits::default());
-        enterprise_providers.extend(ims_providers(ims.clone(), InvocationLimits::default()));
+        enterprise_providers.extend(ims_providers_with_recovery(
+            ims.clone(),
+            store.clone(),
+            InvocationLimits::default(),
+        ));
         enterprise_providers.extend(mq_providers(mq.clone(), InvocationLimits::default()));
         let inner_program: Arc<dyn HostProvider> = program.clone();
         let inner = scoped_host(
@@ -775,7 +784,11 @@ impl ProductServer {
         let auth = cics_security::RacfCicsSecurityAuthority::new(racf_security, secrets.clone());
         cics.bind_security_authority(Arc::new(auth))?;
         let mut enterprise_providers = db2_providers(db2.clone(), InvocationLimits::default());
-        enterprise_providers.extend(ims_providers(ims.clone(), InvocationLimits::default()));
+        enterprise_providers.extend(ims_providers_with_recovery(
+            ims.clone(),
+            store.clone(),
+            InvocationLimits::default(),
+        ));
         enterprise_providers.extend(mq_providers(mq.clone(), InvocationLimits::default()));
         enterprise_providers.extend(spool_providers(spool.clone(), InvocationLimits::default()));
         let host = scoped_host(
@@ -941,298 +954,6 @@ impl ProductServer {
         product.recover_application_publications()?;
         product.recover_local_wakeups()?;
         Ok(product)
-    }
-
-    pub fn memory(config: ServerConfig) -> Result<Arc<Self>, HostProblem> {
-        let store: Arc<dyn PlatformStore> = Arc::new(MemoryStore::new(Default::default()));
-        let secrets = Arc::new(MemorySecretResolver::default());
-        let program = default_program_router();
-        Self::open(config, store, secrets, program)
-    }
-
-    pub fn memory_with_package_trust(
-        config: ServerConfig,
-        package_trust: Arc<dyn PackageSignatureVerifier>,
-    ) -> Result<Arc<Self>, HostProblem> {
-        let store: Arc<dyn PlatformStore> = Arc::new(MemoryStore::new(Default::default()));
-        let secrets = Arc::new(MemorySecretResolver::default());
-        let program = default_program_router();
-        Self::open_with_package_trust(config, store, secrets, program, package_trust)
-    }
-
-    #[must_use]
-    pub fn application_installer(&self) -> ApplicationInstaller {
-        self.applications.clone()
-    }
-
-    #[must_use]
-    pub fn cics_service(&self) -> Arc<CicsService> {
-        self.cics.clone()
-    }
-
-    #[must_use]
-    pub fn batch_service(&self) -> Arc<BatchService> {
-        self.batch.clone()
-    }
-
-    #[must_use]
-    pub fn dataset_service(&self) -> Arc<DatasetService> {
-        self.dataset.clone()
-    }
-
-    #[must_use]
-    pub fn db2_service(&self) -> Arc<Db2Service> {
-        self.db2.clone()
-    }
-
-    #[must_use]
-    pub fn ims_service(&self) -> Arc<ImsService> {
-        self.ims.clone()
-    }
-
-    /// Execute with the catalog from the selected, published application package.
-    pub fn ims_execute_selected(
-        &self,
-        application: &str,
-        invocation: &Invocation,
-        request: &mainframe_env_host_api::ImsRequest,
-    ) -> Result<mainframe_env_host_api::ImsResult, HostProblem> {
-        let _publication = self
-            .application_publication
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let selected = self
-            .applications_v2
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?
-            .installer
-            .selected_generation(application)
-            .map_err(application_install_problem)?
-            .ok_or(HostProblem::NotFound)?;
-        let catalog = selected
-            .package()
-            .sections
-            .ims_metadata
-            .as_ref()
-            .ok_or(HostProblem::NotFound)?;
-        let published = self
-            .ims
-            .selected_metadata_generation(application)?
-            .ok_or(HostProblem::NotFound)?;
-        if published.generation != selected.record().generation
-            || published.package_identity != selected.record().identity
-            || &published.catalog != catalog
-        {
-            return Err(HostProblem::IdempotencyConflict);
-        }
-        let publication = self
-            .store
-            .get_provider_state(
-                APPLICATION_PUBLICATION_NAMESPACE,
-                &selected.record().package.to_ascii_uppercase(),
-            )
-            .map_err(store_error)?
-            .ok_or(HostProblem::NotFound)?;
-        let state: ApplicationPublicationState = serde_json::from_slice(&publication.payload)
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        if !state.complete || state.identity != selected.record().identity {
-            return Err(HostProblem::NotFound);
-        }
-        self.ims.install_metadata(published.catalog)?;
-        self.ims.execute(invocation, request)
-    }
-
-    /// Admit a message only against the complete selected signed package.
-    pub fn ims_tm_enqueue(
-        &self,
-        application: &str,
-        invocation: &Invocation,
-        message: TmInputMessage,
-    ) -> Result<TmEnqueueReceipt, HostProblem> {
-        let _publication = self
-            .application_publication
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        self.selected_ims_tm_application(application)?;
-        self.ims_tm.enqueue(invocation, message)
-    }
-
-    pub fn ims_tm_claim(
-        &self,
-        application: &str,
-        transaction: &str,
-        worker: &str,
-        now_tick: u64,
-        lease_ticks: u64,
-    ) -> Result<Option<WorkRecord>, HostProblem> {
-        let _publication = self
-            .application_publication
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        self.selected_ims_tm_application(application)?;
-        self.ims_tm
-            .claim(transaction, worker, now_tick, lease_ticks)
-    }
-
-    pub fn ims_tm_start(
-        &self,
-        application: &str,
-        invocation: &Invocation,
-        work: &WorkRecord,
-    ) -> Result<TmScheduleReceipt, HostProblem> {
-        self.verify_ims_tm_binding(application, &self.ims_tm.package_for_work(work)?)?;
-        self.ims_tm.start(invocation, work)
-    }
-
-    pub fn ims_tm_claim_retained(
-        &self,
-        application: &str,
-        generation: u64,
-        package_identity: &str,
-        transaction: &str,
-        worker: &str,
-        now_tick: u64,
-        lease_ticks: u64,
-    ) -> Result<Option<WorkRecord>, HostProblem> {
-        let binding = TmPackageBinding {
-            application: application.to_ascii_uppercase(),
-            generation,
-            package_identity: package_identity.into(),
-        };
-        self.verify_ims_tm_binding(application, &binding)?;
-        self.ims_tm.claim_retained(
-            application,
-            generation,
-            package_identity,
-            transaction,
-            worker,
-            now_tick,
-            lease_ticks,
-        )
-    }
-
-    pub fn ims_tm_call(
-        &self,
-        application: &str,
-        invocation: &Invocation,
-        call: TmCall,
-    ) -> Result<TmCallResult, HostProblem> {
-        self.verify_ims_tm_binding(
-            application,
-            &self.ims_tm.package_for_call(invocation, &call)?,
-        )?;
-        self.ims_tm.call(invocation, call)
-    }
-
-    pub fn ims_tm_cancel(
-        &self,
-        application: &str,
-        invocation: &Invocation,
-        message_id: &str,
-    ) -> Result<TmCancelReceipt, HostProblem> {
-        self.verify_ims_tm_binding(application, &self.ims_tm.package_for_message(message_id)?)?;
-        self.ims_tm.cancel(invocation, message_id)
-    }
-
-    fn selected_ims_tm_application(&self, application: &str) -> Result<(), HostProblem> {
-        let selected = self
-            .applications_v2
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?
-            .installer
-            .selected_generation(application)
-            .map_err(application_install_problem)?
-            .ok_or(HostProblem::NotFound)?;
-        if selected.record().state != InstallState::Ready
-            || selected.package().sections.ims_tm.is_none()
-            || !self.ims_tm.selected_package_matches(
-                &selected.record().package,
-                selected.record().generation,
-                &selected.record().identity,
-            )?
-        {
-            return Err(HostProblem::NotFound);
-        }
-        let publication = self
-            .store
-            .get_provider_state(
-                APPLICATION_PUBLICATION_NAMESPACE,
-                &selected.record().package.to_ascii_uppercase(),
-            )
-            .map_err(store_error)?
-            .ok_or(HostProblem::NotFound)?;
-        let state: ApplicationPublicationState = serde_json::from_slice(&publication.payload)
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        if !state.complete || state.identity != selected.record().identity {
-            return Err(HostProblem::NotFound);
-        }
-        Ok(())
-    }
-
-    fn verify_ims_tm_binding(
-        &self,
-        application: &str,
-        binding: &TmPackageBinding,
-    ) -> Result<(), HostProblem> {
-        if !binding.application.eq_ignore_ascii_case(application) {
-            return Err(HostProblem::Unauthorized);
-        }
-        let retained = self
-            .applications_v2
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?
-            .installer
-            .generation(
-                &binding.application,
-                binding.generation,
-                &binding.package_identity,
-            )
-            .map_err(application_install_problem)?
-            .ok_or(HostProblem::NotFound)?;
-        let definitions = retained.package().sections.ims_tm.as_ref();
-        if retained.record().state != InstallState::Ready
-            || definitions.is_none()
-            || !self.ims_tm.retained_package_matches(
-                &binding.application,
-                binding.generation,
-                &binding.package_identity,
-                definitions.ok_or(HostProblem::NotFound)?,
-            )?
-        {
-            return Err(HostProblem::NotFound);
-        }
-        Ok(())
-    }
-
-    #[must_use]
-    pub fn mq_service(&self) -> Arc<MqService> {
-        self.mq.clone()
-    }
-
-    #[must_use]
-    pub fn racf_service(&self) -> Arc<RacfService> {
-        self.racf.clone()
-    }
-
-    pub fn online_trace(&self, session: &str) -> Result<Vec<CicsTraceEntry>, HostProblem> {
-        Ok(self
-            .online_traces
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?
-            .get(session)
-            .cloned()
-            .unwrap_or_default())
-    }
-
-    pub fn online_operation_count(&self, operation: CicsOperation) -> Result<usize, HostProblem> {
-        Ok(self
-            .online_traces
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?
-            .values()
-            .flatten()
-            .filter(|entry| entry.operation == operation)
-            .count())
     }
 
     pub fn install_online_application(
@@ -1738,26 +1459,6 @@ impl ProductServer {
             identity: selected.record().identity.clone(),
             controllers,
         })
-    }
-
-    fn apply_application_ims_metadata(
-        &self,
-        selected: &SelectedApplicationGeneration,
-    ) -> Result<(), HostProblem> {
-        let package = selected.package();
-        self.ims.publish_metadata_generation(
-            &package.base.manifest.name,
-            package.generation,
-            &selected.record().identity,
-            package.sections.ims_metadata.as_ref(),
-        )?;
-        self.ims_tm.publish_package_definitions(
-            &package.base.manifest.name,
-            package.generation,
-            &selected.record().identity,
-            package.sections.ims_tm.as_ref(),
-        )?;
-        Ok(())
     }
 
     fn apply_application_db2_catalog(
@@ -4749,10 +4450,11 @@ impl ProductServer {
                 },
             )?;
         }
-        let capability = dataset_mutation(&request)
-            .is_some()
-            .then_some("host.dataset.write")
-            .unwrap_or("host.dataset.read");
+        let capability = if dataset_mutation(&request).is_some() {
+            "host.dataset.write"
+        } else {
+            "host.dataset.read"
+        };
         let invocation = self
             .invocation(
                 principal,
@@ -5711,14 +5413,6 @@ fn hex_digest(bytes: &[u8]) -> String {
     output
 }
 
-fn wildcard(pattern: &str, value: &str) -> bool {
-    pattern == "*"
-        || pattern.eq_ignore_ascii_case(value)
-        || pattern
-            .strip_suffix('*')
-            .is_some_and(|prefix| value.starts_with(prefix))
-}
-
 pub(crate) fn job_capabilities(
     store: &dyn ProviderStateStore,
     plan: &mainframe_env_batch::JobPlan,
@@ -5965,6 +5659,10 @@ mod tests {
     use super::*;
     #[path = "ims_package_tests.rs"]
     mod ims_package_tests;
+    #[path = "sequential_layout_admission_tests.rs"]
+    mod sequential_layout_admission_tests;
+    #[path = "shisam_fixed_admission_tests.rs"]
+    mod shisam_fixed_admission_tests;
     use crate::jes_worker::ManualJesClock;
     use axum::body::{Body, to_bytes};
     use axum::http::{Method, Request};
@@ -8461,10 +8159,11 @@ mod tests {
             "cf5de374e76c07ff001af9a20053fd8692f55337a4ebece2085ce62c436d58db";
         const HISTORICAL_SEMANTIC_ID: &str =
             "semantic-sha256:f27f98bc6fa22cc145c9df52483b26346b2e1a9aac3272df49fa14f731ec45c9";
-        const HISTORICAL_B64: &str =
-            include_str!("../../../../conformance/0.9/cobol/artifact-v2-c029219.b64");
+        const HISTORICAL_B64: &str = include_str!(
+            "../../../../conformance/subsystems/cics/application/cobol/artifact-v2-c029219.b64"
+        );
         let provenance: Value = serde_json::from_str(include_str!(
-            "../../../../conformance/0.9/cobol/artifact-v2-c029219.json"
+            "../../../../conformance/subsystems/cics/application/cobol/artifact-v2-c029219.json"
         ))
         .unwrap();
         assert_eq!(provenance["source_commit"], HISTORICAL_SOURCE_COMMIT);
@@ -22224,8 +21923,9 @@ mod tests {
                 10_000,
             )
             .unwrap();
-        let der =
-            include_bytes!("../../../../conformance/0.9/cics/fixtures/cics-client-certificate.der");
+        let der = include_bytes!(
+            "../../../../conformance/subsystems/cics/application/cics/fixtures/cics-client-certificate.der"
+        );
         let owner = CicsCertificateName {
             common_name: b"CLIENT-EXAMPLE".to_vec(),
             country: b"US".to_vec(),

@@ -3,12 +3,12 @@
 This bounded validation slice was authored from `ec6225b0` and integrated on
 the sealed `3f749203` aggregate with 175 typed, 0 legacy, and 88 unready CICS
 application routes. It adds no command semantics, registry
-entries, schema migration, or final-candidate credit. The full 0.9 backend,
+entries, schema migration, or final-candidate credit. The full cics.application-api backend,
 licensed differential, and release gates remain pending.
 
 ## Contract inventory
 
-| 0.9 boundary | Already present at the base | Added in this slice |
+| cics.application-api boundary | Already present at the base | Added in this slice |
 |---|---|---|
 | Shared immutable artifacts | `postgres_quota_and_shared_artifact_contract` proves competing adapters, content conflict, quota, rollback, reopen, and corruption rejection. | `bts_selected_link_reconciles_outer_receipt_after_postgres_reopen` binds separate PostgreSQL state and artifact adapters on both CICS service opens, validating the installed program artifact before replay. |
 | Concurrent ownership and fencing | `postgres_work_deadlines_and_fencing_contract`, `concurrent_global_enqueue_uses_one_postgres_owner_and_fifo_promotion`, `concurrent_task_association_uses_postgres_cas_and_reopen`, and BTS child ownership cover durable CAS and stale owners. | No duplicate test. |
@@ -29,7 +29,7 @@ adapter reopen in one test process does not claim a separate-process crash
 result. The SQLite fault-injection selector and generic PostgreSQL durable
 resume selector remain distinct evidence. Full product composition, all
 command-family coverage, licensed IBM differential, and exact final-candidate
-acceptance remain pending under the 0.9 matrix.
+acceptance remain pending under the cics.application-api matrix.
 
 ## Separate-process BTS LINK validation
 

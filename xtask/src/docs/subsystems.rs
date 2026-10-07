@@ -16,7 +16,6 @@ pub(super) struct Subsystem {
 struct Phase {
     id: String,
     label: String,
-    target_version: String,
     plan: String,
     status: Option<String>,
     prompt: Option<String>,
@@ -47,17 +46,6 @@ pub(super) fn parse(source: &Value) -> Result<Vec<Subsystem>> {
             if !phase_ids.insert(phase_id.to_string()) {
                 return Err(format!("subsystem {id} repeats phase {phase_id}"));
             }
-            let version = required_text(value, "target_version")?;
-            let parts = version.split('.').collect::<Vec<_>>();
-            if parts.len() != 3
-                || parts
-                    .iter()
-                    .any(|part| part.is_empty() || !part.bytes().all(|byte| byte.is_ascii_digit()))
-            {
-                return Err(format!(
-                    "{id}.{phase_id} has invalid target release {version}"
-                ));
-            }
             let plan = required_text(value, "plan")?;
             owned_path(plan, DELIVERY, id)?;
             if plan != format!("{DELIVERY}{id}/{phase_id}-plan.md") {
@@ -85,7 +73,6 @@ pub(super) fn parse(source: &Value) -> Result<Vec<Subsystem>> {
             phases.push(Phase {
                 id: phase_id.into(),
                 label: label(required_text(value, "label")?)?.into(),
-                target_version: version.into(),
                 plan: plan.into(),
                 status,
                 prompt,
@@ -204,14 +191,9 @@ pub(super) fn generate(
     documents: &BTreeMap<String, String>,
 ) -> Result<BTreeMap<String, (String, String)>> {
     let mut owned = BTreeSet::new();
-    let mut plans = String::from(
-        "| Subsystem | Phase | Target release | Plan | Progress |\n|---|---|---|---|---|\n",
-    );
-    let mut progress = String::from(
-        "| Subsystem | Phase | Recorded progress | Target release |\n|---|---|---|---|\n",
-    );
-    let mut prompts =
-        String::from("| Subsystem | Phase | Prompt | Target release |\n|---|---|---|---|\n");
+    let mut plans = String::from("| Subsystem | Phase | Plan | Progress |\n|---|---|---|---|\n");
+    let mut progress = String::from("| Subsystem | Phase | Recorded progress |\n|---|---|---|\n");
+    let mut prompts = String::from("| Subsystem | Phase | Prompt |\n|---|---|---|\n");
     let mut dependencies =
         String::from("| Subsystem phase | Completion dependencies |\n|---|---|\n");
     for subsystem in subsystems {
@@ -229,9 +211,6 @@ pub(super) fn generate(
                 let header = text.lines().take(16).collect::<Vec<_>>().join("\n");
                 if !header.contains(&format!("Subsystem: **{}**", subsystem.id))
                     || !header.contains(&format!("Phase: **{}**", phase.id))
-                    || !(header.contains(&format!("Target release: **{}**", phase.target_version))
-                        || header
-                            .contains(&format!("Target version: **{}**", phase.target_version)))
                 {
                     return Err(format!(
                         "subsystem document metadata disagrees with registry: {path}"
@@ -258,8 +237,8 @@ pub(super) fn generate(
                 |path| format!("[Progress]({})", path.strip_prefix(DELIVERY).unwrap()),
             );
             plans.push_str(&format!(
-                "| {} | {} | {} | [Plan]({plan}) | {record} |\n",
-                subsystem.label, phase.label, phase.target_version,
+                "| {} | {} | [Plan]({plan}) | {record} |\n",
+                subsystem.label, phase.label,
             ));
             let state = if let Some(path) = &phase.status {
                 let state = recorded_status(path, &documents[path])?;
@@ -269,16 +248,15 @@ pub(super) fn generate(
                 format!("[No progress record](subsystems/{plan})")
             };
             progress.push_str(&format!(
-                "| {} | {} | {state} | {} |\n",
-                subsystem.label, phase.label, phase.target_version,
+                "| {} | {} | {state} |\n",
+                subsystem.label, phase.label,
             ));
             if let Some(path) = &phase.prompt {
                 prompts.push_str(&format!(
-                    "| {} | {} | [Implement]({}) | {} |\n",
+                    "| {} | {} | [Implement]({}) |\n",
                     subsystem.label,
                     phase.label,
                     path.strip_prefix(PROMPTS).unwrap(),
-                    phase.target_version,
                 ));
             }
             let required = if phase.dependencies.is_empty() {
@@ -360,7 +338,7 @@ mod tests {
     fn source() -> Value {
         json!({"subsystems":[{
             "id":"cics", "label":"CICS", "phases":[{
-                "id":"application-api", "label":"Application API", "target_version":"0.9.0",
+                "id":"application-api", "label":"Application API", "target_subsystem":"cics.application-api",
                 "plan":"docs/delivery/subsystems/cics/application-api-plan.md",
                 "status":"docs/delivery/subsystems/cics/application-api-status.md",
                 "prompt":"docs/prompts/subsystems/cics/IMPLEMENT_APPLICATION_API.md",

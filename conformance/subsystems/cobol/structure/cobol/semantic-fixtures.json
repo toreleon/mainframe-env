@@ -1,0 +1,986 @@
+{
+  "schema_version": "mainframe-env.cobol-semantic-fixtures@1",
+  "target_subsystem": "cobol.structure",
+  "fixtures": [
+    {
+      "id": "file-external",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0001",
+      "target_kind": "file-clause",
+      "target_id": "external",
+      "valid": [
+        {
+          "declaration": "FD TEST-FILE EXTERNAL",
+          "expect": [
+            {
+              "name": "TEST-RECORD",
+              "category": "alphanumeric",
+              "usage": "display",
+              "length": 80,
+              "source_spans_min": 1
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "SD TEST-FILE EXTERNAL"
+        }
+      ]
+    },
+    {
+      "id": "file-global",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0002",
+      "target_kind": "file-clause",
+      "target_id": "global",
+      "valid": [
+        {
+          "declaration": "FD TEST-FILE GLOBAL",
+          "expect": [
+            {
+              "name": "TEST-RECORD",
+              "category": "alphanumeric",
+              "usage": "display",
+              "length": 80,
+              "source_spans_min": 1
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "SD TEST-FILE GLOBAL"
+        }
+      ]
+    },
+    {
+      "id": "file-block-contains",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0003",
+      "target_kind": "file-clause",
+      "target_id": "block-contains",
+      "valid": [
+        {
+          "declaration": "FD TEST-FILE BLOCK CONTAINS 1 TO 10 RECORDS",
+          "expect": [
+            {
+              "name": "TEST-RECORD",
+              "category": "alphanumeric",
+              "usage": "display",
+              "length": 80,
+              "source_spans_min": 1
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "FD TEST-FILE BLOCK CONTAINS TEN RECORDS"
+        }
+      ]
+    },
+    {
+      "id": "file-record",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0004",
+      "target_kind": "file-clause",
+      "target_id": "record",
+      "valid": [
+        {
+          "declaration": "FD TEST-FILE RECORD CONTAINS 1 TO 80 CHARACTERS",
+          "expect": [
+            {
+              "name": "TEST-RECORD",
+              "category": "alphanumeric",
+              "usage": "display",
+              "length": 80,
+              "source_spans_min": 1
+            }
+          ]
+        },
+        {
+          "declaration": "FD TEST-FILE RECORD IS VARYING IN SIZE FROM 1 TO 80 CHARACTERS DEPENDING ON RECORD-LENGTH",
+          "expect": [
+            {
+              "name": "TEST-RECORD",
+              "category": "alphanumeric",
+              "usage": "display",
+              "length": 80,
+              "source_spans_min": 1
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "FD TEST-FILE RECORD CONTAINS 80 TO 1 CHARACTERS"
+        }
+      ]
+    },
+    {
+      "id": "file-label-records",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0005",
+      "target_kind": "file-clause",
+      "target_id": "label-records",
+      "valid": [
+        {
+          "declaration": "FD TEST-FILE LABEL RECORDS ARE STANDARD",
+          "expect": [
+            {
+              "name": "TEST-RECORD",
+              "category": "alphanumeric",
+              "usage": "display",
+              "length": 80,
+              "source_spans_min": 1
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "FD TEST-FILE LABEL RECORDS ARE"
+        }
+      ]
+    },
+    {
+      "id": "file-value-of",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0006",
+      "target_kind": "file-clause",
+      "target_id": "value-of",
+      "valid": [
+        {
+          "declaration": "FD TEST-FILE VALUE OF FILE-ID IS 'TEST'",
+          "expect": [
+            {
+              "name": "TEST-RECORD",
+              "category": "alphanumeric",
+              "usage": "display",
+              "length": 80,
+              "source_spans_min": 1
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "FD TEST-FILE VALUE OF FILE-ID IS"
+        }
+      ]
+    },
+    {
+      "id": "file-data-records",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0007",
+      "target_kind": "file-clause",
+      "target_id": "data-records",
+      "valid": [
+        {
+          "declaration": "FD TEST-FILE DATA RECORDS ARE TEST-RECORD",
+          "expect": [
+            {
+              "name": "TEST-RECORD",
+              "category": "alphanumeric",
+              "usage": "display",
+              "length": 80,
+              "source_spans_min": 1
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "FD TEST-FILE DATA RECORDS ARE"
+        }
+      ]
+    },
+    {
+      "id": "file-linage",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0008",
+      "target_kind": "file-clause",
+      "target_id": "linage",
+      "valid": [
+        {
+          "declaration": "FD TEST-FILE LINAGE IS 60 LINES WITH FOOTING AT 55 LINES AT TOP 3 LINES AT BOTTOM 2",
+          "expect": [
+            {
+              "name": "TEST-RECORD",
+              "category": "alphanumeric",
+              "usage": "display",
+              "length": 80,
+              "source_spans_min": 1
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "FD TEST-FILE LINAGE IS 0 LINES"
+        }
+      ]
+    },
+    {
+      "id": "file-recording-mode",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0009",
+      "target_kind": "file-clause",
+      "target_id": "recording-mode",
+      "valid": [
+        {
+          "declaration": "FD TEST-FILE RECORDING MODE IS F",
+          "expect": [
+            {
+              "name": "TEST-RECORD",
+              "category": "alphanumeric",
+              "usage": "display",
+              "length": 80,
+              "source_spans_min": 1
+            }
+          ]
+        },
+        {
+          "declaration": "FD TEST-FILE RECORDING MODE IS S",
+          "expect": [
+            {
+              "name": "TEST-RECORD",
+              "category": "alphanumeric",
+              "usage": "display",
+              "length": 80,
+              "source_spans_min": 1
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "FD TEST-FILE RECORDING MODE IS Q"
+        }
+      ]
+    },
+    {
+      "id": "file-code-set",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0010",
+      "target_kind": "file-clause",
+      "target_id": "code-set",
+      "valid": [
+        {
+          "declaration": "FD TEST-FILE CODE-SET IS EBCDIC",
+          "expect": [
+            {
+              "name": "TEST-RECORD",
+              "category": "alphanumeric",
+              "usage": "display",
+              "length": 80,
+              "source_spans_min": 1
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "FD TEST-FILE CODE-SET IS"
+        }
+      ]
+    },
+    {
+      "id": "data-blank-when-zero",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0001",
+      "target_kind": "data-clause",
+      "target_id": "blank-when-zero",
+      "valid": [
+        {
+          "declaration": "01 TEST-ITEM PIC ZZ9 BLANK WHEN ZERO",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "numeric-edited",
+              "usage": "display",
+              "length": 3,
+              "blank_when_zero": true,
+              "source_spans_min": 1
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "01 TEST-ITEM PIC ZZ9 BLANK WHEN NULL"
+        }
+      ]
+    },
+    {
+      "id": "data-dynamic-length",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0002",
+      "target_kind": "data-clause",
+      "target_id": "dynamic-length",
+      "valid": [
+        {
+          "declaration": "01 TEST-ITEM PIC X DYNAMIC LENGTH LIMIT IS 100",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "alphanumeric",
+              "usage": "display",
+              "length": 0,
+              "element_length": 1,
+              "dynamic": true,
+              "dynamic_limit": 100,
+              "allocated": true,
+              "source_spans_min": 1
+            }
+          ]
+        },
+        {
+          "declaration": "01 TEST-ITEM PIC U DYNAMIC",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "utf8",
+              "usage": "utf8",
+              "length": 0,
+              "element_length": 4,
+              "dynamic": true,
+              "allocated": true,
+              "source_spans_min": 1
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "01 TEST-ITEM PIC X DYNAMIC LENGTH LIMIT IS 0"
+        },
+        {
+          "declaration": "01 TEST-ITEM PIC X(2) DYNAMIC"
+        },
+        {
+          "declaration": "01 TEST-ITEM PIC 9 DYNAMIC"
+        }
+      ]
+    },
+    {
+      "id": "data-external",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0003",
+      "target_kind": "data-clause",
+      "target_id": "external",
+      "valid": [
+        {
+          "declaration": "01 TEST-ITEM PIC X EXTERNAL AS 'SHARED'",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "alphanumeric",
+              "length": 1,
+              "external_name": "SHARED",
+              "allocated": true,
+              "source_spans_min": 1
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "05 TEST-ITEM PIC X EXTERNAL"
+        }
+      ]
+    },
+    {
+      "id": "data-global",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0004",
+      "target_kind": "data-clause",
+      "target_id": "global",
+      "valid": [
+        {
+          "declaration": "01 TEST-ITEM PIC X GLOBAL",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "length": 1,
+              "source_spans_min": 1,
+              "global": true
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "05 TEST-ITEM PIC X GLOBAL"
+        }
+      ]
+    },
+    {
+      "id": "data-justified",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0005",
+      "target_kind": "data-clause",
+      "target_id": "justified",
+      "valid": [
+        {
+          "declaration": "01 TEST-ITEM PIC X JUSTIFIED RIGHT",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "alphanumeric",
+              "justified_right": true,
+              "source_spans_min": 1
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "01 TEST-GROUP JUSTIFIED RIGHT"
+        },
+        {
+          "declaration": "01 TEST-ITEM PIC 9 JUSTIFIED RIGHT"
+        },
+        {
+          "declaration": "01 TEST-ITEM PIC U UTF-8 JUSTIFIED RIGHT"
+        }
+      ]
+    },
+    {
+      "id": "data-group-usage",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0006",
+      "target_kind": "data-clause",
+      "target_id": "group-usage",
+      "valid": [
+        {
+          "declaration": "01 TEST-GROUP GROUP-USAGE IS NATIONAL. 05 TEST-ITEM PIC N(2)",
+          "expect": [
+            {
+              "name": "TEST-GROUP",
+              "category": "national-group",
+              "usage": "national",
+              "length": 4,
+              "source_spans_min": 1
+            },
+            {
+              "name": "TEST-ITEM",
+              "category": "national",
+              "usage": "national",
+              "length": 4,
+              "source_spans_min": 1
+            }
+          ]
+        },
+        {
+          "declaration": "01 TEST-GROUP GROUP-USAGE IS UTF-8. 05 TEST-ITEM PIC U(2) BYTE-LENGTH 6",
+          "expect": [
+            {
+              "name": "TEST-GROUP",
+              "category": "utf8-group",
+              "usage": "utf8",
+              "length": 6,
+              "source_spans_min": 1
+            },
+            {
+              "name": "TEST-ITEM",
+              "category": "utf8",
+              "usage": "utf8",
+              "length": 6,
+              "byte_length": 6,
+              "source_spans_min": 1
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "01 TEST-GROUP GROUP-USAGE IS DISPLAY"
+        },
+        {
+          "declaration": "01 TEST-GROUP GROUP-USAGE NATIONAL. 05 TEST-ITEM PIC X DISPLAY"
+        }
+      ]
+    },
+    {
+      "id": "data-occurs",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0007",
+      "target_kind": "data-clause",
+      "target_id": "occurs",
+      "valid": [
+        {
+          "declaration": "01 ROOT. 05 TEST-COUNT PIC 9. 05 TEST-ITEM OCCURS 0 TO 10 TIMES DEPENDING ON TEST-COUNT PIC X",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "alphanumeric",
+              "occurs_min": 0,
+              "occurs_max": 10,
+              "element_length": 1,
+              "length": 10,
+              "depending_on": "TEST-COUNT",
+              "source_spans_min": 1
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "01 TEST-ITEM OCCURS 0 TIMES PIC X"
+        },
+        {
+          "declaration": "01 TEST-ITEM OCCURS 2 TIMES PIC X"
+        },
+        {
+          "declaration": "01 ROOT. 05 TEST-COUNT PIC X. 05 TEST-ITEM OCCURS 1 TO 10 TIMES DEPENDING ON TEST-COUNT PIC X"
+        }
+      ]
+    },
+    {
+      "id": "data-picture",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0008",
+      "target_kind": "data-clause",
+      "target_id": "picture",
+      "valid": [
+        {
+          "declaration": "01 TEST-ITEM PICTURE IS X(10)",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "alphanumeric",
+              "usage": "display",
+              "length": 10,
+              "source_spans_min": 1
+            }
+          ]
+        },
+        {
+          "declaration": "01 TEST-ITEM PIC A(3)",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "alphabetic",
+              "usage": "display",
+              "length": 3,
+              "source_spans_min": 1
+            }
+          ]
+        },
+        {
+          "declaration": "01 TEST-ITEM PIC G(2) DISPLAY-1",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "dbcs",
+              "usage": "display-1",
+              "length": 4,
+              "source_spans_min": 1
+            }
+          ]
+        },
+        {
+          "declaration": "01 TEST-ITEM PIC N(2) NATIONAL",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "national",
+              "usage": "national",
+              "length": 4,
+              "source_spans_min": 1
+            }
+          ]
+        },
+        {
+          "declaration": "01 TEST-ITEM PIC U(2) BYTE-LENGTH 6 UTF-8",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "utf8",
+              "usage": "utf8",
+              "length": 6,
+              "byte_length": 6,
+              "source_spans_min": 1
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "01 TEST-ITEM PIC"
+        },
+        {
+          "declaration": "01 TEST-ITEM PIC X(0)"
+        },
+        {
+          "declaration": "01 TEST-ITEM PIC U BYTE-LENGTH 0 UTF-8"
+        }
+      ]
+    },
+    {
+      "id": "data-redefines",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0009",
+      "target_kind": "data-clause",
+      "target_id": "redefines",
+      "valid": [
+        {
+          "declaration": "01 BASE-ITEM PIC X. 01 TEST-ITEM REDEFINES BASE-ITEM PIC X",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "alphanumeric",
+              "offset": 0,
+              "length": 1,
+              "alias_of": "BASE-ITEM",
+              "source_spans_min": 1
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "01 BASE-ITEM PIC X. 01 TEST-ITEM PIC X REDEFINES BASE-ITEM"
+        },
+        {
+          "declaration": "01 BASE-ITEM PIC X EXTERNAL. 01 TEST-ITEM REDEFINES BASE-ITEM PIC X(2)"
+        },
+        {
+          "declaration": "01 BASE-ITEM PIC X. 01 TEST-ITEM REDEFINES BASE-ITEM PIC X VALUE 'A'"
+        }
+      ]
+    },
+    {
+      "id": "data-renames",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0010",
+      "target_kind": "data-clause",
+      "target_id": "renames",
+      "valid": [
+        {
+          "declaration": "01 BASE-GROUP. 05 BASE-ITEM PIC X. 05 END-ITEM PIC X. 66 TEST-ITEM RENAMES BASE-ITEM THRU END-ITEM",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "rename",
+              "offset": 0,
+              "length": 2,
+              "alias_of": "BASE-GROUP.BASE-ITEM",
+              "allocated": false,
+              "source_spans_min": 1
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "01 BASE-ITEM PIC X. 05 TEST-ITEM RENAMES BASE-ITEM"
+        },
+        {
+          "declaration": "01 BASE-GROUP. 05 FIRST-ITEM PIC X. 05 LAST-ITEM PIC X. 66 TEST-ITEM RENAMES LAST-ITEM THRU FIRST-ITEM"
+        }
+      ]
+    },
+    {
+      "id": "data-sign",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0011",
+      "target_kind": "data-clause",
+      "target_id": "sign",
+      "valid": [
+        {
+          "declaration": "01 TEST-ITEM PIC S9(4) SIGN IS LEADING SEPARATE CHARACTER",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "numeric-display",
+              "usage": "display",
+              "length": 5,
+              "signed": true,
+              "sign_leading": true,
+              "sign_separate": true,
+              "source_spans_min": 1
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "01 TEST-ITEM PIC 9(4) SIGN IS LEADING"
+        }
+      ]
+    },
+    {
+      "id": "data-synchronized",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0012",
+      "target_kind": "data-clause",
+      "target_id": "synchronized",
+      "valid": [
+        {
+          "declaration": "01 ROOT. 05 PREFIX PIC X. 05 TEST-ITEM PIC S9(9) BINARY SYNCHRONIZED RIGHT",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "binary",
+              "usage": "binary",
+              "offset": 4,
+              "length": 4,
+              "alignment": 4,
+              "synchronized": true,
+              "source_spans_min": 1
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "88 TEST-ITEM VALUE 1 SYNC"
+        }
+      ]
+    },
+    {
+      "id": "data-typedef",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0013",
+      "target_kind": "data-clause",
+      "target_id": "typedef",
+      "valid": [
+        {
+          "declaration": "01 TEST-TYPE TYPEDEF PIC 9(5)",
+          "expect": [
+            {
+              "name": "TEST-TYPE",
+              "category": "numeric-display",
+              "usage": "display",
+              "length": 5,
+              "typedef": true,
+              "allocated": false,
+              "source_spans_min": 1
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "01 TEST-TYPE TYPEDEF PIC 9(5) EXTERNAL"
+        }
+      ]
+    },
+    {
+      "id": "data-type",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0014",
+      "target_kind": "data-clause",
+      "target_id": "type",
+      "valid": [
+        {
+          "declaration": "01 BASE-TYPE TYPEDEF PIC 9(5). 01 TEST-ITEM TYPE BASE-TYPE",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "numeric-display",
+              "usage": "display",
+              "length": 5,
+              "typedef": false,
+              "allocated": true,
+              "source_spans_min": 2
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "01 TEST-ITEM TYPE MISSING-TYPE"
+        }
+      ]
+    },
+    {
+      "id": "data-usage",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0015",
+      "target_kind": "data-clause",
+      "target_id": "usage",
+      "valid": [
+        {
+          "declaration": "01 TEST-ITEM PIC S9(9) USAGE IS COMP-5",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "binary",
+              "usage": "native-binary",
+              "length": 4,
+              "source_spans_min": 1
+            }
+          ]
+        },
+        {
+          "declaration": "01 TEST-ITEM PIC U(2) BYTE-LENGTH 6 UTF-8",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "utf8",
+              "usage": "utf8",
+              "length": 6,
+              "source_spans_min": 1
+            }
+          ]
+        },
+        {
+          "declaration": "01 TEST-ITEM COMP-1",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "float-short",
+              "usage": "float-short",
+              "length": 4,
+              "source_spans_min": 1
+            }
+          ]
+        },
+        {
+          "declaration": "01 TEST-ITEM COMP-2",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "float-long",
+              "usage": "float-long",
+              "length": 8,
+              "source_spans_min": 1
+            }
+          ]
+        },
+        {
+          "declaration": "01 TEST-ITEM POINTER",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "pointer",
+              "usage": "pointer",
+              "length": 4,
+              "source_spans_min": 1
+            }
+          ]
+        },
+        {
+          "declaration": "01 TEST-ITEM POINTER-32",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "pointer-32",
+              "usage": "pointer-32",
+              "length": 4,
+              "source_spans_min": 1
+            }
+          ]
+        },
+        {
+          "declaration": "01 TEST-ITEM PROCEDURE-POINTER",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "procedure-pointer",
+              "usage": "procedure-pointer",
+              "length": 8,
+              "source_spans_min": 1
+            }
+          ]
+        },
+        {
+          "declaration": "01 TEST-ITEM FUNCTION-POINTER",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "function-pointer",
+              "usage": "function-pointer",
+              "length": 4,
+              "source_spans_min": 1
+            }
+          ]
+        },
+        {
+          "declaration": "01 TEST-ITEM OBJECT REFERENCE",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "object-reference",
+              "usage": "object-reference",
+              "length": 4,
+              "source_spans_min": 1
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "88 TEST-ITEM VALUE 1 USAGE DISPLAY"
+        },
+        {
+          "declaration": "01 TEST-ITEM PIC X COMP"
+        },
+        {
+          "declaration": "01 TEST-ITEM PIC 9 COMP-1"
+        },
+        {
+          "declaration": "01 TEST-ITEM PIC X POINTER"
+        }
+      ]
+    },
+    {
+      "id": "data-value",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0016",
+      "target_kind": "data-clause",
+      "target_id": "value",
+      "valid": [
+        {
+          "declaration": "01 TEST-ITEM PIC X VALUE 'A'",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "initial_hex": "41",
+              "source_spans_min": 1
+            }
+          ]
+        },
+        {
+          "declaration": "01 CONDITION-ITEM PIC 9. 88 TEST-VALUE VALUES ARE 1 THRU 9",
+          "expect": [
+            {
+              "name": "TEST-VALUE",
+              "category": "condition",
+              "allocated": false,
+              "source_spans_min": 1
+            }
+          ]
+        },
+        {
+          "declaration": "01 TEST-ITEM PIC S9(4) COMP-3 VALUE -12",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "packed-decimal",
+              "initial_hex": "00012d",
+              "source_spans_min": 1
+            }
+          ]
+        },
+        {
+          "declaration": "01 TEST-ITEM PIC S9(9) BINARY VALUE -1",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "category": "binary",
+              "initial_hex": "ffffffff",
+              "source_spans_min": 1
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "01 TEST-ITEM PIC X VALUE"
+        }
+      ]
+    },
+    {
+      "id": "data-volatile",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0017",
+      "target_kind": "data-clause",
+      "target_id": "volatile",
+      "valid": [
+        {
+          "declaration": "01 TEST-ITEM PIC X VOLATILE",
+          "expect": [
+            {
+              "name": "TEST-ITEM",
+              "source_spans_min": 1,
+              "volatile": true
+            }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "declaration": "88 TEST-ITEM VALUE 'A' VOLATILE"
+        }
+      ]
+    }
+  ]
+}

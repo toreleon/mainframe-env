@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Split unchanged IMS/MQ row persistence, application preflight, machine/product accessors and host dispatch/IMS records into bounded modules; removed or lowered all affected module exemptions and repaired equivalent server lints without changing canonical or retained bytes."

@@ -17,21 +17,16 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 mod artifact;
+pub(crate) mod root_terminal;
 use artifact::{decode_artifact, encode_artifact};
 
 pub(crate) const AUDIT_NAMESPACE: &str = "durable-audit-v1";
 
-pub(crate) fn audit_storage_key(execution_id: &ExecutionId, suffix: &str) -> String {
-    format!(
-        "{:03}:{}:{}",
-        execution_id.as_str().len(),
-        execution_id,
-        suffix
-    )
-}
+pub(crate) use root_terminal::routing::audit_storage_key;
+use root_terminal::routing::{root_audit_methods, root_journal_methods};
 
 macro_rules! durable_implementations {
-    ($store:ty) => {
+    ($store:ident) => {
         impl ExecutionStore for $store {
             fn create_execution(&self, record: ExecutionRecord) -> Result<(), StoreError> {
                 validation::new_execution(&record)?;
@@ -983,6 +978,7 @@ macro_rules! durable_implementations {
         }
 
         impl AuditSink for $store {
+            root_audit_methods!($store);
             fn record_audit(&self, record: AuditRecord) -> Result<(), StoreError> {
                 validation::audit(&record)?;
                 let key_prefix = audit_storage_key(&record.execution_id, "direct:");
@@ -1050,6 +1046,7 @@ macro_rules! durable_implementations {
         }
 
         impl JournalStore for $store {
+            root_journal_methods!($store);
             fn admit_execution(
                 &self,
                 execution: ExecutionRecord,

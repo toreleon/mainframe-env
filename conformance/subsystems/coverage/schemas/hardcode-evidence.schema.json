@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/hardcode-evidence@1",
+  "title": "mainframe-env 0.2 hardcode scan evidence",
+  "type": "object",
+  "required": ["schema_version", "scope", "before", "after"],
+  "properties": {
+    "schema_version": {
+      "enum": [
+        "mainframe-env.application-hardcode-scan@1",
+        "mainframe-env.host-abi-ownership-scan@1",
+        "mainframe-env.no-application-hardcode@1",
+        "mainframe-env.no-string-dispatch@1"
+      ]
+    },
+    "scope": {"type": "string", "minLength": 1},
+    "target_subsystem": {"const": "coverage.foundation"},
+    "work_package": {"type": "string", "pattern": "^CV-[0-9]{3}$"},
+    "method": {"type": "string", "minLength": 1},
+    "before": {"type": "object"},
+    "after": {"type": "object"}
+  }
+}

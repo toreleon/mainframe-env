@@ -857,7 +857,7 @@ mod tests {
     #[test]
     fn normative_schemas_compile_and_validate_runtime_and_migration_examples() {
         let schema: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../conformance/0.8/schemas/jes-runtime.schema.json"
+            "../../../../conformance/subsystems/jes/schemas/jes-runtime.schema.json"
         ))
         .unwrap();
         let validator = jsonschema::draft202012::options()
@@ -889,11 +889,11 @@ mod tests {
             .unwrap();
 
         let migration_schema: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../conformance/0.8/schemas/jes-state-migration.schema.json"
+            "../../../../conformance/subsystems/jes/schemas/jes-state-migration.schema.json"
         ))
         .unwrap();
         let migration: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../conformance/0.8/migrations/jes-durable-job-v1-to-v2.json"
+            "../../../../conformance/subsystems/jes/migrations/jes-durable-job-v1-to-v2.json"
         ))
         .unwrap();
         jsonschema::draft202012::options()
@@ -904,11 +904,11 @@ mod tests {
             .unwrap();
 
         let differential_schema: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../conformance/0.8/schemas/jes-licensed-differential-adapter.schema.json"
+            "../../../../conformance/subsystems/jes/schemas/jes-licensed-differential-adapter.schema.json"
         ))
         .unwrap();
         let differential: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../conformance/0.8/oracles/jes-licensed-differential.json"
+            "../../../../conformance/subsystems/jes/oracles/jes-licensed-differential.json"
         ))
         .unwrap();
         jsonschema::draft202012::options()

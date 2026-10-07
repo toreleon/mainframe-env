@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Verify exact Memory/SQLite root terminal publication rollback, lost-acknowledgement refusal and retained Uncertain fences across owned SQLite reopen."

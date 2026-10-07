@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Corrected three informational AMS source line locators in the publication probe record without changing runtime behavior, accepted rules, or official and licensed coverage credit."

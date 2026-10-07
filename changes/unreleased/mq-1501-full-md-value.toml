@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a complete lossless MQMD1/2 value primitive, projection through the existing generated raw layout and a strict bounded canonical value codec with its own domain; old partial descriptors, requests, results, replay and delivery formats remain unchanged, and complete-message execution integration remains pending."

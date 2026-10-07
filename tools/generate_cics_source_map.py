@@ -22,11 +22,11 @@ import generate_cics_descriptors as descriptors
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TOC_PROJECTION_PATH = Path("conformance/0.9/cics/command-summary-topics.json")
-MAP_PATH = Path("conformance/0.9/cics/application-api-sources-a-map.json")
+TOC_PROJECTION_PATH = Path("conformance/subsystems/cics/application/cics/command-summary-topics.json")
+MAP_PATH = Path("conformance/subsystems/cics/application/cics/application-api-sources-a-map.json")
 TOC_SCHEMA_VERSION = "mainframe-env.cics-command-summary-topics@1"
 MAP_SCHEMA_VERSION = "mainframe-env.cics-command-source-map@1"
-TARGET_VERSION = "0.9.0"
+TARGET_SUBSYSTEM = "cics.application-api"
 WORK_PACKAGE = "CIC-901.sources-a-map"
 TOC_URL = "https://www.ibm.com/docs/api/v1/toc/cics-ts/6.x?lang=en"
 TOC_SHA256 = "sha256:f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a"
@@ -153,7 +153,7 @@ SOURCES_B = BatchConfig(
     batch_id="sources-b",
     first_index=88,
     row_count=88,
-    map_path=Path("conformance/0.9/cics/application-api-sources-b-map.json"),
+    map_path=Path("conformance/subsystems/cics/application/cics/application-api-sources-b-map.json"),
     work_package="CIC-901.sources-b-map",
     source_gaps=frozenset(),
     variant_counts={
@@ -203,7 +203,7 @@ SOURCES_C = BatchConfig(
     batch_id="sources-c",
     first_index=176,
     row_count=87,
-    map_path=Path("conformance/0.9/cics/application-api-sources-c-map.json"),
+    map_path=Path("conformance/subsystems/cics/application/cics/application-api-sources-c-map.json"),
     work_package="CIC-901.sources-c-map",
     source_gaps=frozenset({"SET ASSOCIATION USERCORRDATA", "TRACE"}),
     variant_counts={
@@ -415,7 +415,7 @@ def projection_from_toc(
         topics.append(topic)
     projection: dict[str, Any] = {
         "schema_version": TOC_SCHEMA_VERSION,
-        "target_version": TARGET_VERSION,
+        "target_subsystem": TARGET_SUBSYSTEM,
         "source_toc_url": TOC_URL,
         "source_toc_sha256": actual_sha256,
         "retained_source_bytes": False,
@@ -439,7 +439,7 @@ def projection_from_toc(
 def validate_projection(projection: dict[str, Any]) -> None:
     expected_fields = {
         "schema_version",
-        "target_version",
+        "target_subsystem",
         "source_toc_url",
         "source_toc_sha256",
         "retained_source_bytes",
@@ -455,7 +455,7 @@ def validate_projection(projection: dict[str, Any]) -> None:
     topics = array_value(projection["topics"], "projected topics")
     if (
         projection["schema_version"] != TOC_SCHEMA_VERSION
-        or projection["target_version"] != TARGET_VERSION
+        or projection["target_subsystem"] != TARGET_SUBSYSTEM
         or projection["source_toc_url"] != TOC_URL
         or projection["source_toc_sha256"] != TOC_SHA256
         or projection["retained_source_bytes"] is not False
@@ -617,7 +617,7 @@ def build_mapping(
 
     mapping: dict[str, Any] = {
         "schema_version": MAP_SCHEMA_VERSION,
-        "target_version": TARGET_VERSION,
+        "target_subsystem": TARGET_SUBSYSTEM,
         "work_package": config.work_package,
         "status": "candidate",
         "semantic_authority": False,

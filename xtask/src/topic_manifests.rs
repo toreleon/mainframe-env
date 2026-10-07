@@ -1,6 +1,6 @@
 //! Every committed topic manifest, checked against the explicit pin that names it.
 //!
-//! `conformance/0.2/catalogs/index.json` stopped pinning a file's bytes when the
+//! `conformance/subsystems/coverage/catalogs/index.json` stopped pinning a file's bytes when the
 //! baselines moved onto documentation topics: a `documentation-topics` source
 //! pins `topic_manifest_digest`, a digest over the whole book's topic list, and
 //! names the manifest that list lives in. Nothing in Rust recomputed it, so a
@@ -15,34 +15,40 @@
 
 use super::*;
 
-const INDEX_PATH: &str = "conformance/0.2/catalogs/index.json";
-const MANIFEST_DIRECTORY: &str = "conformance/0.2/manifests";
-const MANIFEST_PREFIX: &str = "conformance/0.2/manifests/";
+const INDEX_PATH: &str = "conformance/subsystems/coverage/catalogs/index.json";
+const MANIFEST_DIRECTORY: &str = "conformance/subsystems/coverage/manifests";
+const MANIFEST_PREFIX: &str = "conformance/subsystems/coverage/manifests/";
 struct LaterRegistry {
     registry_path: &'static str,
     manifest_directory: &'static str,
     manifest_prefix: &'static str,
-    target_version: &'static str,
+    target_subsystem: &'static str,
 }
 
 const LATER_REGISTRIES: &[LaterRegistry] = &[
     LaterRegistry {
-        registry_path: "conformance/0.9/manifests/index.json",
-        manifest_directory: "conformance/0.9/manifests",
-        manifest_prefix: "conformance/0.9/manifests/",
-        target_version: "0.9.0",
+        registry_path: "conformance/subsystems/cics/application/manifests/index.json",
+        manifest_directory: "conformance/subsystems/cics/application/manifests",
+        manifest_prefix: "conformance/subsystems/cics/application/manifests/",
+        target_subsystem: "cics.application-api",
     },
     LaterRegistry {
-        registry_path: "conformance/0.10/manifests/index.json",
-        manifest_directory: "conformance/0.10/manifests",
-        manifest_prefix: "conformance/0.10/manifests/",
-        target_version: "0.10.0",
+        registry_path: "conformance/subsystems/cics/system/manifests/index.json",
+        manifest_directory: "conformance/subsystems/cics/system/manifests",
+        manifest_prefix: "conformance/subsystems/cics/system/manifests/",
+        target_subsystem: "cics.system-api",
     },
     LaterRegistry {
-        registry_path: "conformance/0.14/manifests/index.json",
-        manifest_directory: "conformance/0.14/manifests",
-        manifest_prefix: "conformance/0.14/manifests/",
-        target_version: "0.14.0",
+        registry_path: "conformance/subsystems/ims/manifests/index.json",
+        manifest_directory: "conformance/subsystems/ims/manifests",
+        manifest_prefix: "conformance/subsystems/ims/manifests/",
+        target_subsystem: "ims.programming",
+    },
+    LaterRegistry {
+        registry_path: "conformance/subsystems/mq/manifests/index.json",
+        manifest_directory: "conformance/subsystems/mq/manifests",
+        manifest_prefix: "conformance/subsystems/mq/manifests/",
+        target_subsystem: "mq.programming",
     },
 ];
 
@@ -57,7 +63,8 @@ const DIGEST_DEFINITION: &str = "sha256 over the concatenation, sorted by topic_
 pub(super) fn check(root: &Path) -> TaskResult {
     let index_path = root.join(INDEX_PATH);
     let index = json(&index_path)?;
-    let manifest_schema = json(&root.join("conformance/0.2/schemas/topic-manifest.schema.json"))?;
+    let manifest_schema =
+        json(&root.join("conformance/subsystems/coverage/schemas/topic-manifest.schema.json"))?;
     let mut pinned = BTreeSet::new();
     for baseline in array(&index, "baselines", &index_path)? {
         let id = text(baseline, "id", &index_path)?;
@@ -90,7 +97,7 @@ pub(super) fn check(root: &Path) -> TaskResult {
         // not the one the manifest lists.
         require(
             text(&manifest, "schema_version", &manifest_path)? == "mainframe-env.topic-manifest@1"
-                && text(&manifest, "target_version", &manifest_path)? == "0.2.0"
+                && text(&manifest, "target_subsystem", &manifest_path)? == "coverage.foundation"
                 && text(&manifest, "baseline_id", &manifest_path)? == id
                 && text(&manifest, "subsystem", &manifest_path)? == subsystem,
             &format!("{relative} identity differs from baseline {id}"),
@@ -155,7 +162,7 @@ pub(super) fn check(root: &Path) -> TaskResult {
     }
     require(
         present == pinned,
-        "conformance/0.2/manifests holds a manifest no baseline pins, or is missing one",
+        "conformance/subsystems/coverage/manifests holds a manifest no baseline pins, or is missing one",
     )?;
     for registry in LATER_REGISTRIES {
         check_later_registry(root, registry)?;
@@ -166,16 +173,19 @@ pub(super) fn check(root: &Path) -> TaskResult {
 fn check_later_registry(root: &Path, config: &LaterRegistry) -> TaskResult {
     let registry_path = root.join(config.registry_path);
     let registry = json(&registry_path)?;
-    let registry_schema = root.join("conformance/0.9/schemas/topic-manifest-registry.schema.json");
+    let registry_schema = root.join(
+        "conformance/subsystems/cics/application/schemas/topic-manifest-registry.schema.json",
+    );
     validate_schema_instance(&json(&registry_schema)?, &registry, &registry_path)?;
     require(
-        text(&registry, "target_version", &registry_path)? == config.target_version,
+        text(&registry, "target_subsystem", &registry_path)? == config.target_subsystem,
         &format!(
             "{} does not own target version {}",
-            config.registry_path, config.target_version
+            config.registry_path, config.target_subsystem
         ),
     )?;
-    let manifest_schema = root.join("conformance/0.2/schemas/topic-manifest.schema.json");
+    let manifest_schema =
+        root.join("conformance/subsystems/coverage/schemas/topic-manifest.schema.json");
     let mut pinned = BTreeSet::new();
     let mut scopes = BTreeSet::new();
     for entry in array(&registry, "manifests", &registry_path)? {
@@ -201,7 +211,7 @@ fn check_later_registry(root: &Path, config: &LaterRegistry) -> TaskResult {
         let digest = recompute(&manifest, &path)?;
         require(
             text(&manifest, "schema_version", &path)? == "mainframe-env.topic-manifest@1"
-                && text(&manifest, "target_version", &path)? == config.target_version
+                && text(&manifest, "target_subsystem", &path)? == config.target_subsystem
                 && text(&manifest, "baseline_id", &path)?
                     == text(entry, "baseline_id", &registry_path)?
                 && text(&manifest, "subsystem", &path)?
@@ -370,6 +380,486 @@ fn recompute(manifest: &Value, path: &Path) -> TaskResult<String> {
 mod tests {
     use super::*;
 
+    struct RegistryFixture(PathBuf);
+
+    impl Drop for RegistryFixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn registry_015() -> (RegistryFixture, Value, Value, PathBuf, PathBuf) {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let root = (0..64)
+            .find_map(|_| {
+                let path = std::env::temp_dir().join(format!(
+                    "mainframe-env-topic-registry-{}-{}",
+                    std::process::id(),
+                    NEXT.fetch_add(1, Ordering::Relaxed)
+                ));
+                match fs::create_dir(&path) {
+                    Ok(()) => Some(path),
+                    Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => None,
+                    Err(error) => panic!("registry fixture: {error}"),
+                }
+            })
+            .expect("bounded registry fixture allocation");
+        let fixture = RegistryFixture(root);
+        let repository = repository_root().expect("repository");
+        for schema in [
+            "conformance/subsystems/coverage/schemas/topic-manifest.schema.json",
+            "conformance/subsystems/cics/application/schemas/topic-manifest-registry.schema.json",
+        ] {
+            let destination = fixture.0.join(schema);
+            fs::create_dir_all(destination.parent().unwrap()).unwrap();
+            fs::copy(repository.join(schema), destination).unwrap();
+        }
+        let relative = "conformance/subsystems/mq/manifests/synthetic-topics.json";
+        let path = fixture.0.join(relative);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let mut manifest = manifest(&[
+            ("pp/a.html", &"a".repeat(64)),
+            ("pp/b.html", &"b".repeat(64)),
+        ]);
+        for (field, value) in [
+            ("schema_version", json!("mainframe-env.topic-manifest@1")),
+            ("target_subsystem", json!("mq.programming")),
+            ("baseline_id", json!("mq-synthetic-baseline")),
+            ("subsystem", json!("mq")),
+            ("product", json!("pp")),
+            ("book_label", json!("Synthetic review set")),
+            ("book_href", json!("pp/a.html")),
+            ("snapshot_date", json!("2026-01-01")),
+            (
+                "toc_url",
+                json!("https://www.ibm.com/docs/api/v1/toc/pp?lang=en"),
+            ),
+            ("toc_sha256", json!("c".repeat(64))),
+            (
+                "content_url_template",
+                json!(
+                    "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en"
+                ),
+            ),
+            ("topic_count", json!(2)),
+            ("total_bytes", json!(2)),
+            (
+                "topic_manifest_digest",
+                json!("4ab19e1be17658544a4ce6017c52548269441649e0d2f30728dec17e65e4c667"),
+            ),
+            ("coverage_credit", json!(0)),
+            ("retained_in_repository", json!(false)),
+        ] {
+            manifest[field] = value;
+        }
+        fs::write(&path, serde_json::to_vec_pretty(&manifest).unwrap()).unwrap();
+        let registry = json!({
+            "schema_version": "mainframe-env.topic-manifest-registry@1",
+            "target_subsystem": "mq.programming", "semantic_authority": false, "coverage_credit": 0,
+            "manifests": [{
+                "scope_id": "mq-synthetic", "subsystem": "mq", "baseline_id": "mq-synthetic-baseline",
+                "manifest": relative,
+                "manifest_sha256": format!("sha256:{:x}", Sha256::digest(fs::read(&path).unwrap())),
+                "topic_count": 2,
+                "topic_manifest_sha256": "sha256:4ab19e1be17658544a4ce6017c52548269441649e0d2f30728dec17e65e4c667",
+                "semantic_authority": false, "coverage_credit": 0,
+            }]
+        });
+        let registry_path = path.parent().unwrap().join("index.json");
+        fs::write(
+            &registry_path,
+            serde_json::to_vec_pretty(&registry).unwrap(),
+        )
+        .unwrap();
+        (fixture, manifest, registry, path, registry_path)
+    }
+
+    fn config_015() -> &'static LaterRegistry {
+        LATER_REGISTRIES
+            .iter()
+            .find(|config| config.target_subsystem == "mq.programming")
+            .unwrap()
+    }
+
+    #[test]
+    fn later_015_uses_the_existing_schema_and_offline_checker() {
+        let (fixture, _, _, _, _) = registry_015();
+        check_later_registry(&fixture.0, config_015()).expect("registered synthetic scope");
+    }
+
+    #[test]
+    fn later_015_shipped_property_scope_preserves_independent_zero_credit_bindings() {
+        let root = repository_root().expect("repository");
+        check_later_registry(&root, config_015()).expect("shipped independent scopes");
+        let registry = json(&root.join(config_015().registry_path)).unwrap();
+        let entries = registry["manifests"].as_array().unwrap();
+        let scopes = entries
+            .iter()
+            .map(|entry| entry["scope_id"].as_str().unwrap())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(entries.len(), 8);
+        assert_eq!(
+            scopes,
+            BTreeSet::from([
+                "mq-programming-supplements",
+                "mq-point-layout-sources",
+                "mq-property-sources",
+                "mq-recovery-policy-sources",
+                "mq-producer-attribute-sources",
+                "mq-rfh2-sources",
+                "mq-message-handle-sources",
+                "mq-inquiry-attribute-sources",
+            ])
+        );
+        for (scope, count) in [
+            ("mq-programming-supplements", 80),
+            ("mq-point-layout-sources", 12),
+            ("mq-property-sources", 12),
+            ("mq-recovery-policy-sources", 1),
+            ("mq-producer-attribute-sources", 9),
+            ("mq-rfh2-sources", 15),
+            ("mq-message-handle-sources", 1),
+            ("mq-inquiry-attribute-sources", 4),
+        ] {
+            let entry = entries
+                .iter()
+                .find(|entry| entry["scope_id"] == scope)
+                .unwrap();
+            assert_eq!(entry["topic_count"], count);
+            assert_eq!(entry["semantic_authority"], false);
+            assert_eq!(entry["coverage_credit"], 0);
+        }
+        let inquiry = entries
+            .iter()
+            .find(|entry| entry["scope_id"] == "mq-inquiry-attribute-sources")
+            .unwrap();
+        assert_eq!(
+            inquiry["manifest_sha256"],
+            "sha256:2a015ae7e74819b603d2b07a0d7af5eef172623550be86f7fc8e74189b3eb294"
+        );
+        assert_eq!(
+            inquiry["topic_manifest_sha256"],
+            "sha256:463e5ba10a4b572cd5a73ff08066820b66c59e3133b37910ecd4c1c9af5ce527"
+        );
+        let manifest = json(&root.join(inquiry["manifest"].as_str().unwrap())).unwrap();
+        assert_eq!(
+            manifest["baseline_id"],
+            "ibm-mq-9.4-inquiry-attribute-sources-2026-09-12"
+        );
+        let topics = manifest["topics"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|topic| {
+                (
+                    topic["topic_path"].as_str().unwrap(),
+                    topic["sha256"].as_str().unwrap(),
+                    topic["bytes"].as_u64().unwrap(),
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            topics,
+            vec![
+                (
+                    "SSFKSJ_9.4.0/refdev/q092480_.html",
+                    "ac5de9d74f62635456e566bfcbba7706699686cef14580ab30aa22166b2fb1ba",
+                    4661
+                ),
+                (
+                    "SSFKSJ_9.4.0/refdev/q102690_.html",
+                    "d488b1433fe1fe6b5051459af841e02801df4d62d43bbfc3f9f0954575b411b4",
+                    1247
+                ),
+                (
+                    "SSFKSJ_9.4.0/refdev/q103420_.html",
+                    "27228d1ae3bf316c77949becc2ed9b26fe9bb4aad97f974a4d31b95caccc3861",
+                    2105
+                ),
+                (
+                    "SSFKSJ_9.4.0/refdev/q103490_.html",
+                    "93bd55632f95b85f9790e3cba75c623bff93c1a679983115546edf32ce527639",
+                    2267
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn later_015_message_handle_scope_matches_independent_identity_fixture() {
+        let root = repository_root().expect("repository");
+        check_later_registry(&root, config_015()).expect("registered message-handle source");
+        let fixture =
+            json(&root.join("conformance/tools/tests/fixtures/mq-message-handle-source-pins.json"))
+                .unwrap();
+        let path =
+            root.join("conformance/subsystems/mq/manifests/mq-message-handle-sources-topics.json");
+        let manifest = json(&path).unwrap();
+        assert_eq!(manifest["topics"], fixture["topics"]);
+        assert_eq!(manifest["baseline_id"], fixture["baseline_id"]);
+        assert_eq!(manifest["product"], "SSFKSJ_9.4.0");
+        assert_eq!(manifest["topic_count"], 1);
+        assert_eq!(manifest["total_bytes"], 2409);
+        assert_eq!(
+            format!("sha256:{:x}", Sha256::digest(fs::read(&path).unwrap())),
+            fixture["manifest_sha256"].as_str().unwrap()
+        );
+        assert_eq!(
+            manifest["topic_manifest_digest"],
+            fixture["topic_manifest_digest"]
+        );
+        assert_eq!(manifest["toc_sha256"], fixture["toc_sha256"]);
+        assert_eq!(manifest["coverage_credit"], 0);
+    }
+
+    #[test]
+    fn later_015_rfh2_scope_matches_the_independent_reference_fixture() {
+        let root = repository_root().expect("repository");
+        check_later_registry(&root, config_015()).expect("registered RFH2 source pins");
+        let fixture =
+            json(&root.join("conformance/tools/tests/fixtures/mq-rfh2-source-pins.json")).unwrap();
+        let manifest_path =
+            root.join("conformance/subsystems/mq/manifests/mq-rfh2-sources-topics.json");
+        let manifest = json(&manifest_path).unwrap();
+        assert_eq!(manifest["topics"], fixture["topics"]);
+        assert_eq!(manifest["baseline_id"], fixture["baseline_id"]);
+        assert_eq!(manifest["product"], "SSFKSJ_9.4.0");
+        assert_eq!(manifest["topic_count"], 15);
+        assert_eq!(manifest["total_bytes"], 478_640);
+        assert_eq!(
+            format!(
+                "sha256:{:x}",
+                Sha256::digest(fs::read(&manifest_path).unwrap())
+            ),
+            fixture["manifest_sha256"].as_str().unwrap()
+        );
+        assert_eq!(
+            manifest["topic_manifest_digest"],
+            fixture["topic_manifest_digest"]
+        );
+        assert_eq!(manifest["toc_sha256"], fixture["toc_sha256"]);
+        assert_eq!(manifest["coverage_credit"], 0);
+    }
+
+    #[test]
+    fn later_015_recovery_scope_binds_exact_harden_get_backout_source() {
+        let root = repository_root().expect("repository");
+        check_later_registry(&root, config_015()).expect("registered recovery source");
+        let manifest = json(
+            &root
+                .join("conformance/subsystems/mq/manifests/mq-recovery-policy-sources-topics.json"),
+        )
+        .unwrap();
+        assert_eq!(
+            manifest["baseline_id"],
+            "ibm-mq-9.4-recovery-policy-sources-2026-09-12"
+        );
+        assert_eq!(manifest["product"], "SSFKSJ_9.4.0");
+        assert_eq!(manifest["topic_count"], 1);
+        assert_eq!(manifest["total_bytes"], 3691);
+        assert_eq!(
+            manifest["topics"],
+            serde_json::json!([{
+                "topic_path": "SSFKSJ_9.4.0/refdev/q103230_.html",
+                "sha256": "22ee650c2f0fb23bc181d928ff70d401f0b4e288a0039d47110a012b9702a8a1",
+                "bytes": 3691,
+                "last_modified": "2026-05-18"
+            }])
+        );
+    }
+
+    #[test]
+    fn later_015_producer_scope_binds_exact_attributes_and_application_declaration() {
+        let root = repository_root().expect("repository");
+        check_later_registry(&root, config_015()).expect("registered producer sources");
+        let manifest =
+            json(&root.join(
+                "conformance/subsystems/mq/manifests/mq-producer-attribute-sources-topics.json",
+            ))
+            .unwrap();
+        assert_eq!(manifest["product"], "SSFKSJ_9.4.0");
+        assert_eq!(manifest["topic_count"], 9);
+        assert_eq!(manifest["total_bytes"], 36295);
+        assert_eq!(manifest["coverage_credit"], 0);
+        assert_eq!(manifest["retained_in_repository"], false);
+        assert_eq!(
+            manifest["baseline_id"],
+            "ibm-mq-9.4-producer-attribute-sources-2026-09-12"
+        );
+        let topics = manifest["topics"].as_array().unwrap();
+        for (row, name) in topics.iter().zip([
+            "q090310_", "q102230_", "q102510_", "q102520_", "q103140_", "q103180_", "q103190_",
+            "q103280_", "q103300_",
+        ]) {
+            assert_eq!(
+                row["topic_path"],
+                format!("SSFKSJ_9.4.0/refdev/{name}.html")
+            );
+            assert_eq!(row["last_modified"], "2026-05-18");
+        }
+        assert_eq!(
+            topics[0]["sha256"],
+            "99c5eb46d8046b6ab2ce7aad0c8284e79bb4f0ae24c0d1942664bec451fa3c2d"
+        );
+    }
+
+    #[test]
+    fn later_015_independent_second_scope_preserves_the_first_file_binding() {
+        let (fixture, mut second, mut registry, first_path, registry_path) = registry_015();
+        let first_bytes = fs::read(&first_path).unwrap();
+        let first_entry = registry["manifests"][0].clone();
+        second["baseline_id"] = json!("mq-layout-baseline");
+        second["topics"][0]["topic_path"] = json!("pp/layout-a.html");
+        second["topics"][1]["topic_path"] = json!("pp/layout-b.html");
+        let path = first_path.with_file_name("layout-topics.json");
+        second["topic_manifest_digest"] = json!(recompute(&second, &path).unwrap());
+        fs::write(&path, serde_json::to_vec_pretty(&second).unwrap()).unwrap();
+        let mut entry = first_entry.clone();
+        entry["scope_id"] = json!("mq-layout");
+        entry["baseline_id"] = json!("mq-layout-baseline");
+        entry["manifest"] = json!("conformance/subsystems/mq/manifests/layout-topics.json");
+        entry["manifest_sha256"] = json!(format!(
+            "sha256:{:x}",
+            Sha256::digest(fs::read(&path).unwrap())
+        ));
+        entry["topic_manifest_sha256"] = json!(format!(
+            "sha256:{}",
+            second["topic_manifest_digest"].as_str().unwrap()
+        ));
+        registry["manifests"].as_array_mut().unwrap().push(entry);
+        fs::write(
+            &registry_path,
+            serde_json::to_vec_pretty(&registry).unwrap(),
+        )
+        .unwrap();
+        check_later_registry(&fixture.0, config_015()).expect("two independent scopes");
+        assert_eq!(fs::read(&first_path).unwrap(), first_bytes);
+        assert_eq!(registry["manifests"][0], first_entry);
+        registry["manifests"][1]["semantic_authority"] = json!(true);
+        fs::write(
+            &registry_path,
+            serde_json::to_vec_pretty(&registry).unwrap(),
+        )
+        .unwrap();
+        assert!(check_later_registry(&fixture.0, config_015()).is_err());
+    }
+
+    #[test]
+    fn later_015_registry_pin_identity_and_credit_mutants_are_rejected() {
+        let (fixture, _, original, _, registry_path) = registry_015();
+        for (field, value) in [
+            (
+                "manifest_sha256",
+                json!(format!("sha256:{}", "0".repeat(64))),
+            ),
+            (
+                "topic_manifest_sha256",
+                json!(format!("sha256:{}", "0".repeat(64))),
+            ),
+            ("topic_count", json!(3)),
+            ("subsystem", json!("ims")),
+            ("baseline_id", json!("wrong-baseline")),
+            ("coverage_credit", json!(1)),
+            ("semantic_authority", json!(true)),
+            (
+                "manifest",
+                json!("conformance/subsystems/ims/manifests/synthetic-topics.json"),
+            ),
+            (
+                "manifest",
+                json!("conformance/subsystems/mq/manifests/missing.json"),
+            ),
+        ] {
+            let mut registry = original.clone();
+            registry["manifests"][0][field] = value;
+            fs::write(
+                &registry_path,
+                serde_json::to_vec_pretty(&registry).unwrap(),
+            )
+            .unwrap();
+            assert!(
+                check_later_registry(&fixture.0, config_015()).is_err(),
+                "{field}"
+            );
+        }
+        for (field, value) in [
+            ("target_subsystem", json!("ims.programming")),
+            ("semantic_authority", json!(true)),
+            ("coverage_credit", json!(1)),
+        ] {
+            let mut registry = original.clone();
+            registry[field] = value;
+            fs::write(
+                &registry_path,
+                serde_json::to_vec_pretty(&registry).unwrap(),
+            )
+            .unwrap();
+            assert!(
+                check_later_registry(&fixture.0, config_015()).is_err(),
+                "{field}"
+            );
+        }
+        for repeat_path in [false, true] {
+            let mut registry = original.clone();
+            let mut entry = registry["manifests"][0].clone();
+            if repeat_path {
+                entry["scope_id"] = json!("another-scope");
+            } else {
+                entry["manifest"] = json!("conformance/subsystems/mq/manifests/another.json");
+            }
+            registry["manifests"].as_array_mut().unwrap().push(entry);
+            fs::write(
+                &registry_path,
+                serde_json::to_vec_pretty(&registry).unwrap(),
+            )
+            .unwrap();
+            assert!(check_later_registry(&fixture.0, config_015()).is_err());
+        }
+    }
+
+    #[test]
+    fn later_015_manifest_mutants_fail_with_updated_file_binding() {
+        let (fixture, original, registry, path, registry_path) = registry_015();
+        for (field, value) in [
+            ("target_subsystem", json!("ims.programming")),
+            ("subsystem", json!("ims")),
+            ("topic_manifest_digest", json!("0".repeat(64))),
+            ("coverage_credit", json!(1)),
+            ("retained_in_repository", json!(true)),
+            ("semantic_authority", json!(true)),
+            (
+                "topics",
+                json!([original["topics"][0].clone(), original["topics"][0].clone()]),
+            ),
+        ] {
+            let mut manifest = original.clone();
+            manifest[field] = value;
+            fs::write(&path, serde_json::to_vec_pretty(&manifest).unwrap()).unwrap();
+            let mut updated = registry.clone();
+            updated["manifests"][0]["manifest_sha256"] = json!(format!(
+                "sha256:{:x}",
+                Sha256::digest(fs::read(&path).unwrap())
+            ));
+            fs::write(&registry_path, serde_json::to_vec_pretty(&updated).unwrap()).unwrap();
+            assert!(
+                check_later_registry(&fixture.0, config_015()).is_err(),
+                "{field}"
+            );
+        }
+    }
+
+    #[test]
+    fn later_015_unregistered_and_missing_paths_are_rejected() {
+        let (fixture, _, _, path, _) = registry_015();
+        let extra = path.with_file_name("unregistered.json");
+        fs::write(&extra, b"{}").unwrap();
+        assert!(check_later_registry(&fixture.0, config_015()).is_err());
+        fs::remove_file(extra).unwrap();
+        fs::remove_file(path).unwrap();
+        assert!(check_later_registry(&fixture.0, config_015()).is_err());
+    }
+
     fn manifest(topics: &[(&str, &str)]) -> Value {
         json!({
             "product": "p",
@@ -437,10 +927,12 @@ mod tests {
     #[test]
     fn repins_use_the_same_schema_as_a_single_repin() {
         let root = repository_root().expect("repository root");
-        let schema = json(&root.join("conformance/0.2/schemas/topic-manifest.schema.json"))
-            .expect("manifest schema");
+        let schema =
+            json(&root.join("conformance/subsystems/coverage/schemas/topic-manifest.schema.json"))
+                .expect("manifest schema");
         let mut manifest =
-            json(&root.join("conformance/0.2/manifests/mq-topics.json")).expect("MQ manifest");
+            json(&root.join("conformance/subsystems/coverage/manifests/mq-topics.json"))
+                .expect("MQ manifest");
         let repin = manifest.as_object_mut().unwrap().remove("repin").unwrap();
         manifest["repins"] = json!([repin]);
         validate_schema_instance(&schema, &manifest, Path::new("in-memory")).expect("valid repins");
@@ -448,13 +940,13 @@ mod tests {
         assert!(validate_schema_instance(&schema, &manifest, Path::new("in-memory")).is_err());
     }
 
-    /// Every locator in `conformance/0.3/cobol/language.json` -- the 173 official
+    /// Every locator in `conformance/subsystems/cobol/structure/cobol/language.json` -- the 173 official
     /// rows and the 28 special registers alike -- names a topic the COBOL
     /// baseline actually read.
     #[test]
     fn the_cobol_catalog_cites_only_pinned_topics() {
         let root = repository_root().expect("repository root");
-        let path = root.join("conformance/0.3/cobol/language.json");
+        let path = root.join("conformance/subsystems/cobol/structure/cobol/language.json");
         crate::check_cobol_language_catalog(&root, &path).expect("COBOL language catalog");
     }
 }

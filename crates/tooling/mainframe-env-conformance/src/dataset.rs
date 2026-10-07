@@ -27,8 +27,9 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 const FIXTURES: &str =
-    include_str!("../../../../conformance/0.6/fixtures/dataset-organizations.json");
-const AMS_FIXTURES: &str = include_str!("../../../../conformance/0.6/fixtures/ams-commands.json");
+    include_str!("../../../../conformance/subsystems/dataset/fixtures/dataset-organizations.json");
+const AMS_FIXTURES: &str =
+    include_str!("../../../../conformance/subsystems/dataset/fixtures/ams-commands.json");
 
 const FIXTURE_IDS: [&str; 10] = [
     "dataset.esds.invalid",

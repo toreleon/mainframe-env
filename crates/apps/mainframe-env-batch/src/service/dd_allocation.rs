@@ -3,19 +3,20 @@ use super::*;
 impl BatchService {
     pub(super) fn dataset_attributes(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         dataset: &DatasetName,
         effect_sequence: &mut u64,
     ) -> Result<DatasetAttributes, HostProblem> {
+        invocation.check()?;
         let sequence = next_effect_sequence(invocation, effect_sequence)?;
         let result = self.invoke_host(
             invocation,
-            invocation.deadline_tick.saturating_sub(1),
+            invocation.original().deadline_tick.saturating_sub(1),
             false,
             EffectRequest {
-                run_unit: invocation.run_unit_id.clone(),
+                run_unit: invocation.original().run_unit_id.clone(),
                 sequence,
-                deadline_tick: invocation.deadline_tick,
+                deadline_tick: invocation.original().deadline_tick,
                 idempotency_key: None,
                 request: HostRequest::Dataset(DatasetRequest::Attributes {
                     dataset: dataset.clone(),
@@ -26,17 +27,19 @@ impl BatchService {
         else {
             return Err(HostProblem::ProviderFailure);
         };
+        invocation.check()?;
         Ok(attributes)
     }
 
     pub(super) fn effective_dd_attributes(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &Job,
         step: &StepPlan,
         dd_index: usize,
         effect_sequence: &mut u64,
     ) -> Result<DatasetAttributes, HostProblem> {
+        invocation.check()?;
         let step_index = job
             .plan
             .steps
@@ -57,7 +60,7 @@ impl BatchService {
     #[allow(clippy::too_many_arguments)]
     fn resolve_dcb_attributes(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &Job,
         step_index: usize,
         dd_index: usize,
@@ -65,6 +68,7 @@ impl BatchService {
         depth: usize,
         effect_sequence: &mut u64,
     ) -> Result<DatasetAttributes, HostProblem> {
+        invocation.check()?;
         if depth > 64 {
             return Err(HostProblem::ResourceExhausted);
         }
@@ -149,17 +153,20 @@ impl BatchService {
         if let Some(ccsid) = dd.ccsid {
             attributes.ccsid = Some(ccsid);
         }
+        invocation.check()?;
         Ok(attributes)
     }
 
     pub(super) fn resolve_dd_access_path(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         dataset: &DatasetName,
         effect_sequence: &mut u64,
     ) -> Result<DatasetName, HostProblem> {
+        invocation.check()?;
         let mut current = dataset.clone();
         for _ in 0..2 {
+            invocation.check()?;
             let DatasetResult::CatalogEntries { entries, .. } = self.ams_dataset_read(
                 invocation,
                 effect_sequence,
@@ -184,6 +191,7 @@ impl BatchService {
                 return Err(HostProblem::NotFound);
             }
             current = entry.related.ok_or(HostProblem::InfrastructureFailure)?;
+            invocation.check()?;
         }
         Ok(current)
     }

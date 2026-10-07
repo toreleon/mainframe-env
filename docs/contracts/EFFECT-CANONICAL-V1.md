@@ -1,15 +1,27 @@
 # Canonical host effect representation, version 1
 
-- Status: **Frozen contract; implementation deviations tracked before 0.9.0**
+- Status: **Frozen contract; implementation deviations tracked before cics.application-api**
 - Owner: execution and host-contract maintainers
 - Scope: canonical persisted host request/result digest representation
-- Applies from: mainframe-env 0.8.2 hardening
+- Applies from: mainframe-env current subsystem contracts
 
 `mainframe-env.effect-canonical@1` is a frozen binary representation of the typed
 `HostRequest` and `Result<HostResult, HostProblem>` values. It is not Rust Debug,
 JSON text, a COBOL data layout, or a licensed mainframe representation.
 
 ## Bytes and hashing
+
+Native root lifecycle subjects use independent bounded streaming domains
+`mainframe-env.root-terminal-setup@1` and
+`mainframe-env.root-terminal-resource@1`. They encode the frozen original
+compiled setup and actual pre-terminal machine observation/complete closure,
+respectively, through the same Encoder authority. They are neither application
+HostRequest effects nor replacements for HostCanonicalV1. Matching their digest
+does not attest physical host/store/control/provider identity or finality. See
+[ADR 0034](../decisions/0034-mq-root-terminal-publication.md). Every existing
+request/result golden byte and original effect identity remains unchanged.
+These domains belong to the root-publication framework prerequisite; they do
+not establish compiled pending-PUT or removed-GET terminal acceptance.
 
 The request preimage begins with the ASCII bytes `mainframe-env.effect-request@1`
 followed by a zero byte; the result preimage uses `mainframe-env.effect-result@1`
@@ -20,6 +32,91 @@ and a zero byte. SHA-256 hashes that domain prefix and the canonical value.
 `canonical/generated.rs`, preserving the same frozen wire identifiers.
 Public type and variant names appearing there are wire identifiers and must remain
 fixed within version 1, even if Rust types are renamed later.
+
+The additive `HostRequest::MqMqi(MqMqiHostRequest)` and
+`HostResult::MqMqi(MqMqiHostResult)` names are distinct from the retained legacy
+`Mq` variants. `canonical/mq.rs` retains the legacy MQ implementations
+mechanically; `canonical/mq_mqi.rs` frames the new host records through the same
+streaming encoder. Existing `Mq` names, bytes, validators and grants are unchanged.
+The new request object encodes `envelope` then `mutation`; the result object
+encodes `limits` then `result`. Their values use the existing exhaustive MQI,
+Mutation and limits implementations directly, without standalone MQI preimages
+or digests replacing host payloads.
+
+Every typed MQI occurrence conservatively uses `host.mq.write` and the existing
+mutation journal/replay admission path, including inquiries and cursor-bearing
+observations. This classification does not claim that every MQI call changes
+queue state. The original `EffectRequest` sequence and required idempotency key
+must match its embedded `Mutation`. `mq_mqi_occurrence` validates and borrows
+that one immutable effect; envelope and mutation extraction cannot accept a
+separately substituted payload. Run-unit identity remains in the outer effect,
+while execution/principal, trusted context, provider constraints, live deadline
+and cancellation, grants and SAF remain their existing dispatch authorities.
+
+Before structural validation can clone bounded MQ fields, the shared encoder
+counts the actual host request or Ok/result preimage under the original explicit
+MQI canonical limit and the 64 MiB host ceiling. Host name, record, field,
+record-count and property aggregate ceilings also apply, including requested
+output capacities and reported truncation lengths. Result call/status, payload
+and validation limits remain explicit. The future provider must compare the
+result with its original request, capacities, UOW and handle lifetimes before
+publication; standalone result validation does not attest that relationship.
+
+Private MQI admission consumes the host API's validated original occurrence,
+with no separate envelope, mutation or metadata-only effect argument. Its
+trusted scope requires the already-admitted host Invocation, independently
+minted lifecycle owner, provider descriptor and HostLimits; constructing that
+scope does not attest arbitrary bindings. Admission compares the complete
+Invocation and derives payload, mutation, run, sequence, key and deadline from
+the one original borrow. It retains the full shared canonical HostRequest
+digest and bounded byte count, explicitly distinct from standalone MQI shape
+digests. Existing context and nested/outer origin decoders remain authoritative;
+valid origin provenance never selects an application syncpoint coordinator.
+
+The private result preflight binds the existing EffectResult sequence, exact
+MQI call and original limits, then streams the complete host result budget and
+uses ordinary host/result validation, including call-specific reviewed statuses.
+Copied MQGET bodies, inquiry arrays, property name/value bytes and conversion
+buffers must fit the original requested capacities. The existing get-disposition
+validator preserves required lengths above capacity while checking actual copied
+bytes and original mode/truncation intent. Property/conversion required-length
+payload forms absent from the frozen vocabulary remain pending; reviewed
+size-reporting status identities do not justify fabricated payloads or wire
+equivalence. Pending, unknown and duplicate observations retain their identities,
+and explicit shared UnknownOutcome keeps its existing precedence over corrupt
+reply metadata. Preflight is not a returned-handle, context, UOW or state permit.
+The actual service must still apply registry/state authority, SAF and atomic
+publication, and translate post-dispatch uncertainty through the shared effect
+authority. Live controls remain rechecked at owned boundaries.
+
+This freezes a typed boundary, not a handler, executable route or accepted MQ
+transaction participant. Pending structures, selectors, contexts and status
+mapping retain their typed pending identities; validation does not turn pending
+public dispatch into success. The MQ 9.4 baseline
+`ibm-mq-9.4-mqi-2026-08-31`, catalog rows `0001`–`0026`, preserves 26 call
+identities and 27 source positions, including both MQMHBUF positions.
+`MQCB_FUNCTION` (row `0005`, `SSFKSJ_9.4.0/refdev/q101730_.html`) describes
+callback parameters without an application entry point, so this command/reply
+boundary rejects it. Source review and unit tests grant zero licensed or
+conformance execution credit.
+
+`MqMqiOutcome::ReviewedOutput` is an additive named variant (tag `41`, type
+`MqMqiOutcome`, variant `ReviewedOutput`, two fields `output` then `status`).
+It retains the reviewed call return and its bounded typed observations in the
+complete `Ok(HostResult::MqMqi(...))` result preimage. Host limits inspect the
+output, and provider preflight checks its original request relationship before
+publication. Existing canonical domains, old outcome bytes, status catalog
+digest and retained receipts are unchanged. The
+[MQ programming boundary](../architecture/MQ-PROGRAMMING-SURFACE.md) defines
+the explicitly admitted shapes and their source locators.
+
+Older storage/replay codecs cannot consume this new variant without an explicit
+lossless extension. They must reject it rather than discard output, substitute
+status-only replies, mint fresh handles or re-execute an old effect. Historical
+results retain their original form and digest; there is no rewrite or automatic
+migration. This addition supplies neither a durable replay decoder nor registry
+authority for handle-bearing outputs. Manager integration must extend the strict
+typed non-handle replay codec and separately resolve historical handle authority.
 
 All lengths/counts are unsigned 64-bit little-endian numbers. Integers are fixed
 width little-endian with distinct signed/unsigned type tags; `usize` uses u64,
@@ -58,6 +155,18 @@ disposition are additive named variants: they do not alter the canonical bytes
 of any existing value, and their exact variant-name bytes are frozen by golden
 tests.
 
+`HostRequest::ImsNavigation` is an additive tuple variant containing
+`ImsNavigationRequest`, whose sorted fields are `context`, `request`, and `ssas`.
+The embedded `ImsRequest` uses its existing encoding; each SSA is an exact raw
+byte vector in an ordered sequence. The context, selected PCB, binary comparative
+values and mutation identity therefore participate in replay identity. The
+678-byte golden preimage has SHA-256
+`5041ceeecb7d1766c994d0bd120dea0c2dba666f4c9de86020be2eb5b4e88c0b`.
+The variant returns the existing `ImsResult` encoding and introduces no durable
+row schema. Older binaries cannot dispatch the new variant; stop new navigation
+calls before downgrading and retain completed canonical replay receipts without
+rewriting or redispatching them. Existing IMS request/result bytes remain fixed.
+
 `SecurityRequest::ValidatePrincipal` is likewise an additive named variant. It
 contains only the bounded `PrincipalId`, is non-mutating, and returns the
 existing `SecurityDecision` vocabulary. Its exact canonical variant, field, and
@@ -66,6 +175,30 @@ authorization, and audit request bytes are unchanged. The security request
 principal-field helper is isolated from the large generated encoder without
 changing its wire domain or version.
 
+`HostRequest::ImsGsam` and `HostResult::ImsGsam` are additive tuple variants.
+`ImsGsamRequest` sorts fields as `context`, `request`, `save_address`, `search`;
+`ImsGsamResult` sorts `address`, `result`. The embedded historical IMS objects
+retain their exact encodings. `ImsGsamAddress` sorts `database`, `token`, with
+the 32-byte token encoded as raw bytes. `ImsGsamSearchArgument` is Beginning
+(zero fields) or Record (tuple field `0`). Independent binary goldens freeze
+the 829-byte request at
+`ccc805d540fca887179e009db58f91780ea84c29921729688a36919698c9b980`
+and 502-byte result at
+`ee1eea1457dcca61a8318540879282c91e93d54a9bf5022583754b0095801821`.
+These are owned logical addresses, not IBM RSA bytes. Existing IMS preimages
+remain fixed. Replay output and downgrade rules are in
+[ADR-0034](../decisions/0034-gsam-logical-address.md); retention hashes the
+additive result variant without relabeling historical receipts.
+
+For owned U records, present `undefined_length` adds one sorted final field to
+either GSAM object (five request fields, three result fields). Its value is the
+canonical u32 primitive, tag `0x12` followed by four little-endian bytes. Absence
+omits both name and value and preserves the historical four/two-field preimages
+above. The explicit length is covered by request conflict and result integrity
+digests. Format metadata is bound by signed package/metadata identity and saved
+checkpoint format identity rather than embedded in each call. See
+[ADR-0029](../decisions/0030-gsam-application-record-formats.md).
+
 A terminal CICS ABEND records `ABEND.DUMP` in the response output map with
 schema `mainframe-env.cics.abend-dump@1` and exact value `requested` or
 `suppressed`. The entry therefore participates in the ordinary canonical result
@@ -73,6 +206,21 @@ digest without changing the `CicsResponse` object shape. Historical retained
 responses that lack the entry remain readable and make no dump claim.
 
 ## Typed size budgets
+
+`HostRequest::ImsPcbFeedbackV1` and `HostResult::ImsPcbFeedbackV1` are additive
+tuple variants with separately named V1 objects. Request fields sort as
+`context`, `key_capacity`, `request`, `ssas`; result fields as `feedback`,
+`result`. Feedback fields sort as `database`, `key`, `pcb`,
+`processing_options`, `sensitive_segment_count`, `transferred_data_length`.
+Key `Valid` sorts `bytes`, `segment_level`, `segment_name`;
+`InvalidatedSecondaryReplace` has no fields and `Unsupported` has tuple field
+`0` naming a closed missing-authority variant. Existing embedded IMS objects
+keep their encodings. Independent vectors and exact availability classes are
+in the [class review](../delivery/subsystems/ims/selected-pcb-feedback.md).
+The optional retained output participates in the existing result hash and
+receipt authority; replay never reconstructs feedback from later cursor state.
+Downgrade requires a compatible receipt reader or coherent pre-feature restore
+as described in [ADR-0035](../decisions/0035-selected-pcb-feedback.md).
 
 `CapabilityDescriptor.max_request_bytes` and `.max_result_bytes` now count the
 canonical preimage, including domain prefix, tags, field identifiers and lengths.
@@ -189,6 +337,51 @@ second child. Fresh installed-call protocol schema 3 explicitly admits this
 domain; counter-era active protocol state cannot authorize it. Retained unknown
 calls are not redispatched to reconstruct a frame.
 
+## Private MQI core-intent binding
+
+The private MQ service binding accepts only an actual original
+`MqMqiAdmission::ServiceValidation` with ordinary `CoreEffect` provenance. It
+borrows one `PlatformStore` for both `IdempotencyStore::effect` observation and
+audited provider publication; no separately supplied intent or store can replace
+them. Trusted host/lifecycle admission remains a construction precondition.
+Nested CICS actor/root composition is pending: its outer key cannot substitute
+for a same-actor canonical intent.
+
+The observed record must be an unresolved, unrecovered canonical-host intent
+matching the original execution/run, sequence/key, full shared HostRequest
+digest, dispatch owner/attempt, capability, canonical audit resource and
+invocation key. Creation is positive and no later than observation; the finite
+recovery boundary equals the coordinator's minimum invocation/effect deadline.
+The current execution must match the original principal, attempt, program
+selector and artifact and remain running. The retained epoch is observed, never
+inferred from an envelope or reconstructed. Backend lock/transaction checks
+remain the final intent, execution, lease, clock and CAS authority.
+
+Preparation rechecks live controls and monotonic observations, validates exact
+typed audit identity, and bounds MQ-owned `mq-` mutation shapes to the shared
+4,096-mutation ceiling and 64 MiB aggregate payload/identity budget. This is not
+a row-schema or queue/UOW semantic validator. Only an actual successful decision
+may accompany mutations; other known decisions are audit-only. Explicit unknown
+outcome fails through shared `HostProblem::UnknownOutcome`. An audit decision is
+not a SAF permit. The caller must first obtain the real resource/state/output
+decision, preserving pending/unknown/duplicate outcomes and source-specific
+statuses rather than treating result preflight as execution permission.
+
+The borrowed prepared publication cannot replace the intent/store and is
+consumed by the existing `publish_provider_states_audited` transaction. Its
+final observation must equal the audit's decision tick; if time advances, the
+caller drops/reprepares with a newly observed actual audit. Live cancellation,
+deadline and time regression are checked again before publication. Failure has
+no sequential row/audit fallback or automatic retry.
+
+Publication does not complete the core intent/outbox or adopt queue state.
+Binding is not at-most-once: the caller supplies actual replay/UOW/CAS
+dependencies, adopts next state only after commit, and translates uncertainty
+after dispatch through shared effect reconciliation. Selected queue authority,
+durable UOW ownership, SAF, typed result/replay/retention, nested composition and
+participant/public-route readiness remain separately required. No durable
+schema, legacy canonical bytes or licensed credit changes here.
+
 ## Golden digests
 
 HostRequest::State(StateRequest::Get { key: "one" }): 150 preimage bytes,
@@ -209,3 +402,10 @@ Provider replay golden digests are:
 - RACROUTE: `f12a7fce354c0f3c1a42b54376597d9230b956d729186932208c9f519824f503`.
 - Credential-redacted RACF command:
   `5b150c202f1af2c3d1f63a24875153e7055dcc894d28daa90de9f3eb5356035e`.
+
+The typed MQI host golden request (MQCONN, owner IDs 1/2/3/4/epoch 5,
+queue manager QMGR, sequence 7, key `mqi-host-golden`, default MQI limits) is
+`433a011034843ece80caaef730dd18d990c3fba577df9d1dd84663004cf68b8f`.
+The typed MQI host golden result (MQDISC, source-pinned OkNone/NoOutput,
+default explicit limits) is
+`feb3c22c6f1150b7a39bf17cee6612d0b722f524edc582e43b8a401b72826c27`.

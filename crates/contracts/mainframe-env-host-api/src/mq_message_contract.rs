@@ -8,16 +8,21 @@
 pub const MQ_MESSAGE_CONTRACT: &str = "mainframe-env.mq-message@1";
 
 /// Pinned IBM MQ 9.4 call-topic identities reviewed for this vocabulary.
-/// Rows refer to `conformance/0.2/catalogs/mq.json`, baseline
+/// Rows refer to `conformance/subsystems/coverage/catalogs/mq.json`, baseline
 /// `ibm-mq-9.4-mqi-2026-08-31`; hashes refer to its topic manifest.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MqMessageSource {
+    /// Catalog row suffix identifying the reviewed call topic.
     pub row: &'static str,
+    /// Call label used to join the shared MQI signature catalog.
     pub call: &'static str,
+    /// Committed pinned topic locator, without embedded publication text.
     pub topic_path: &'static str,
+    /// Expected source-body SHA-256 identity.
     pub topic_sha256: &'static str,
 }
 
+/// Reviewed message-vocabulary source locators; this list grants no execution admission.
 pub const MQ_MESSAGE_SOURCES: &[MqMessageSource] = &[
     MqMessageSource {
         row: "0003",
@@ -90,15 +95,25 @@ pub const MQ_MESSAGE_SOURCES: &[MqMessageSource] = &[
 /// Product resource ceilings, independent of queue and queue-manager limits.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MqMessageLimits {
+    /// Maximum body length in bytes; default 1 MiB.
     pub body_bytes: usize,
+    /// Maximum nonempty identifier length in bytes; default 64.
     pub identifier_bytes: usize,
+    /// Maximum format-name length in bytes; default 32.
     pub format_bytes: usize,
+    /// Maximum message property count; default 128.
     pub properties: usize,
+    /// Maximum property-name length in bytes; default 256.
     pub property_name_bytes: usize,
+    /// Maximum single property-value length in bytes; default 64 KiB.
     pub property_value_bytes: usize,
+    /// Maximum aggregate property name/value length in bytes; default 1 MiB.
     pub property_total_bytes: usize,
+    /// Maximum distribution-result item count; default 256.
     pub distribution_items: usize,
+    /// Maximum destination-name length in bytes; default 256.
     pub destination_bytes: usize,
+    /// Maximum positive wait in host logical ticks; default 1,000,000.
     pub wait_ticks: u64,
 }
 
@@ -150,17 +165,27 @@ impl MqMessageLimits {
 /// later execution evidence. Consumers must not treat this as a support list.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MqMessagePending {
+    /// Exact numeric descriptor legality still requires separate authority.
     DescriptorNumericLegality,
+    /// Exact descriptor encoding and wire layout remain pending.
     DescriptorEncoding,
+    /// Conversion from host ticks to IBM expiry units remains pending.
     ExpiryUnitMapping,
+    /// Full source-defined property-name legality remains pending.
     PropertyNameRules,
+    /// Property encoding and conversion behavior remain pending.
     PropertyEncodingAndConversion,
+    /// Exact selector/option values and combinations remain pending.
     SelectorOptionLegality,
+    /// Numeric group/segment flag mapping remains pending.
     GroupAndSegmentFlagMapping,
+    /// Exact per-destination completion/reason mapping remains pending.
     DistributionCompletionMapping,
+    /// Delivery and recovery execution proof remains pending.
     DeliveryAndRecovery,
 }
 
+/// Complete explicit list of unclosed message-contract semantics; it is not a support list.
 pub const MQ_MESSAGE_PENDING: &[MqMessagePending] = &[
     MqMessagePending::DescriptorNumericLegality,
     MqMessagePending::DescriptorEncoding,
@@ -174,29 +199,50 @@ pub const MQ_MESSAGE_PENDING: &[MqMessagePending] = &[
 ];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Local message shape or bound rejection, distinct from an MQI completion/reason code.
 pub enum MqMessageProblem {
+    /// A local limit is zero or exceeds the frozen product ceiling.
     Limits,
+    /// Body or requested buffer capacity exceeds the byte ceiling.
     BodyTooLong,
+    /// A present identifier is empty or exceeds its byte ceiling.
     Identifier,
+    /// A present format name violates local name bounds.
     Format,
+    /// A relative host-tick expiry is zero.
     Expiry,
+    /// Property collection exceeds its count ceiling.
     PropertyCount,
+    /// A property query/name violates the local admitted shape.
     PropertyName,
+    /// Value byte length conflicts with its type or local ceiling.
     PropertyValueLength,
+    /// Aggregate property name/value bytes overflow or exceed the ceiling.
     PropertyTotalLength,
+    /// Property names repeat within one message.
     DuplicateProperty,
+    /// Group identity, sequence or last-in-group flags are incoherent.
     Group,
+    /// Segment offset/length or last-segment flags are incoherent.
     Segment,
+    /// Distribution item count or destination name violates local bounds.
     Distribution,
+    /// Wait duration or result disposition conflicts with the request.
     Wait,
+    /// A cursor-bearing get mode carries a zero identity.
     Cursor,
+    /// Reported lengths or removal disposition conflict with buffer capacity and policy.
     Truncation,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
+/// Optional opaque identifiers; present values must be nonempty and bounded, while None requests no identity.
 pub struct MqMessageIdentifiers {
+    /// Optional opaque message identity bytes.
     pub message_id: Option<Vec<u8>>,
+    /// Optional opaque correlation identity bytes.
     pub correlation_id: Option<Vec<u8>>,
+    /// Optional opaque group identity bytes; presence must match a group sequence.
     pub group_id: Option<Vec<u8>>,
 }
 
@@ -218,23 +264,33 @@ impl MqMessageIdentifiers {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Owned expiry request; relative values use host ticks and assert no IBM-unit conversion.
 pub enum MqExpiry {
+    /// No relative expiry requested.
     Unlimited,
     /// Host logical ticks; IBM MQ expiry units still require a pinned mapping.
     RelativeHostTicks(u64),
+    /// Expiry semantics remain unresolved rather than synthesized.
     PendingSource,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Owned persistence request; flags do not by themselves establish durable delivery.
 pub enum MqPersistence {
+    /// Use the selected queue's persistence default.
     QueueDefault,
+    /// Request persistent delivery through a separately admitted execution route.
     Persistent,
+    /// Request nonpersistent delivery through a separately admitted execution route.
     NonPersistent,
+    /// Persistence mapping remains unresolved.
     PendingSource,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Owned priority selector, with exact numeric range validation explicitly pending.
 pub enum MqPriority {
+    /// Use the selected queue default instead of supplying a numeric priority.
     QueueDefault,
     /// Raw requested value with IBM range validation pending.
     PendingNumeric(i32),
@@ -243,10 +299,15 @@ pub enum MqPriority {
 /// Source-visible MQMD group/segment concepts; numeric flags remain pending.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MqMessageOrdering {
+    /// Positive sequence when group_id is present; None when no group is identified.
     pub group_sequence: Option<u32>,
+    /// Whether this is the last group member; requires a group identity.
     pub last_in_group: bool,
+    /// Optional byte offset whose end plus body length fits the local body ceiling.
     pub segment_offset: Option<u64>,
+    /// Whether this is the last segment; requires a segment offset.
     pub last_segment: bool,
+    /// Declared segmentation permission; numeric flag mapping remains pending.
     pub segmentation_allowed: bool,
 }
 
@@ -277,27 +338,44 @@ impl MqMessageOrdering {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Owned message metadata; validation covers local shape without implementing MQMD encoding.
 pub struct MqMessageDescriptor {
+    /// Optional opaque message, correlation and group identities.
     pub identifiers: MqMessageIdentifiers,
     /// Opaque MQMD-like format name; exact IBM field layout is pending.
     pub format: Option<String>,
+    /// Unlimited, host-relative or explicitly pending expiry selector.
     pub expiry: MqExpiry,
+    /// Queue-default, requested or explicitly pending persistence selector.
     pub persistence: MqPersistence,
+    /// Queue-default or pending numeric priority selector.
     pub priority: MqPriority,
+    /// Group and segment coherence metadata.
     pub ordering: MqMessageOrdering,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Property byte-shape classification; encoding and conversion remain separately owned.
 pub enum MqPropertyType {
+    /// Boolean property requiring four bytes in this local shape validator.
     Boolean,
+    /// Variable-length opaque property bytes.
     ByteString,
+    /// Integer property requiring one byte.
     Int8,
+    /// Integer property requiring two bytes.
     Int16,
+    /// Integer property requiring four bytes.
     Int32,
+    /// Integer property requiring eight bytes.
     Int64,
+    /// Floating-point property requiring four bytes.
     Float32,
+    /// Floating-point property requiring eight bytes.
     Float64,
+    /// Variable-length string property bytes without encoding conversion here.
     String,
+    /// Null property requiring an empty byte value.
     Null,
 }
 
@@ -317,8 +395,11 @@ impl MqPropertyType {
 /// MQSETMP-style typed value bytes. Encoding and conversion stay pending.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MqMessageProperty {
+    /// Nonempty bounded property identity, unique within the message.
     pub name: String,
+    /// Byte-shape type used to check fixed or variable value length.
     pub kind: MqPropertyType,
+    /// Exact property bytes; validation checks length rather than interpreting encoding.
     pub value: Vec<u8>,
 }
 
@@ -342,11 +423,14 @@ impl MqMessageProperty {
 /// documented for inquire and message-handle-to-buffer operations only.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MqPropertyQuery {
+    /// Match a nonempty exact property name with no percent wildcard.
     Exact(String),
+    /// Match a prefix, which may be empty; the stored prefix cannot contain percent wildcards.
     Prefix(String),
 }
 
 impl MqPropertyQuery {
+    /// Validate local exact/prefix name shape and bounds without granting inquiry execution.
     pub fn validate(&self, limits: MqMessageLimits) -> Result<(), MqMessageProblem> {
         limits.validate()?;
         let (name, allow_empty) = match self {
@@ -371,12 +455,16 @@ fn validate_name(name: &str, maximum: usize, allow_empty: bool) -> Result<(), ()
 /// A bounded value container, reusable by put, get, publish, and replay lanes.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MqMessage {
+    /// Owned descriptor selectors and coherence metadata.
     pub descriptor: MqMessageDescriptor,
+    /// Exact message body bytes; an empty body still denotes a message.
     pub body: Vec<u8>,
+    /// Bounded distinct property names and typed value bytes.
     pub properties: Vec<MqMessageProperty>,
 }
 
 impl MqMessage {
+    /// Validate local limits, descriptor coherence and aggregate body/property bounds.
     pub fn validate(&self, limits: MqMessageLimits) -> Result<(), MqMessageProblem> {
         limits.validate()?;
         if self.body.len() > limits.body_bytes {
@@ -419,15 +507,24 @@ impl MqMessage {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
+/// Optional identifier selection for a get request; absence supplies no identifier constraint.
 pub struct MqMessageMatch {
+    /// Opaque identifier constraints whose present bytes must be nonempty and bounded.
     pub identifiers: MqMessageIdentifiers,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Owned get/browse disposition, without executable delivery authority.
 pub enum MqGetMode {
+    /// Request removal through the admitted delivery route.
     Remove,
+    /// Request the initial browse observation without removal.
     BrowseFirst,
+    /// Request the next browse observation using a positive cursor identity.
+    /// The owned cursor is not an MQI pointer or physical address.
     BrowseNext { cursor: u64 },
+    /// Request removal at the identified positive browse cursor.
+    /// The owned cursor is not an MQI pointer or physical address.
     RemoveUnderCursor { cursor: u64 },
 }
 
@@ -438,27 +535,40 @@ impl MqGetMode {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Owned wait policy with finite host-tick bounds.
 pub enum MqWait {
+    /// Request immediate observation without waiting.
     NoWait,
+    /// Request a positive finite wait in host logical ticks, bounded by wait_ticks.
     BoundedHostTicks(u64),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Caller policy for a body larger than the supplied byte capacity.
 pub enum MqTruncation {
+    /// Reject truncation and retain the message according to the result contract.
     Reject,
+    /// Accept a truncated copy with explicit browsed/removed disposition.
     Accept,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Bounded owned get request, with selection, cursor, wait and truncation policy.
 pub struct MqGetContract {
+    /// Optional opaque identifier selection constraints.
     pub selection: MqMessageMatch,
+    /// Removal or browse mode and any required cursor identity.
     pub mode: MqGetMode,
+    /// Immediate or bounded host-tick wait policy.
     pub wait: MqWait,
+    /// Whether a truncated body copy is accepted.
     pub truncation: MqTruncation,
+    /// Caller output capacity in bytes; zero is allowed and remains distinct from no message.
     pub buffer_capacity: usize,
 }
 
 impl MqGetContract {
+    /// Check identifiers, finite wait, positive cursors and capacity against local ceilings.
     pub fn validate(&self, limits: MqMessageLimits) -> Result<(), MqMessageProblem> {
         limits.validate()?;
         self.selection.identifiers.validate(limits)?;
@@ -484,13 +594,21 @@ impl MqGetContract {
 /// lane determines whether a truncated message remains on the queue.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MqTruncationDisposition {
+    /// Complete body length in bytes, at most the supplied buffer capacity.
     Complete { length: usize },
+    /// Truncation was rejected and the message remains retained.
+    /// `required` is the full byte length exceeding capacity; `copied` is at most capacity.
     RejectedRetained { required: usize, copied: usize },
+    /// Truncation was accepted in a removal mode.
+    /// `required` is the full byte length exceeding capacity; `copied` is at most capacity.
     AcceptedRemoved { required: usize, copied: usize },
+    /// Truncation was accepted in a browse mode without removal.
+    /// `required` is the full byte length exceeding capacity; `copied` is at most capacity.
     AcceptedBrowsed { required: usize, copied: usize },
 }
 
 impl MqTruncationDisposition {
+    /// Check lengths and retained/browsed/removed outcome against the request's policy and mode.
     pub fn validate(self, request: &MqGetContract) -> Result<(), MqMessageProblem> {
         let capacity = request.buffer_capacity;
         match self {
@@ -527,13 +645,18 @@ impl MqTruncationDisposition {
 /// Exact MQ completion/reason mapping remains with the later delivery lane.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MqGetDisposition {
+    /// A message was observed, including zero-length bodies, with explicit copy disposition.
     Message(MqTruncationDisposition),
+    /// No message was observed for a NoWait request.
     NoMessage,
+    /// A bounded wait elapsed without a message result.
     WaitExpired,
+    /// The result cannot yet establish the authoritative get outcome.
     UnknownOutcome,
 }
 
 impl MqGetDisposition {
+    /// Check message truncation and distinguish immediate absence from bounded-wait expiry.
     pub fn validate(self, request: &MqGetContract) -> Result<(), MqMessageProblem> {
         match self {
             Self::Message(truncation) => truncation.validate(request),
@@ -549,26 +672,36 @@ impl MqGetDisposition {
 /// mapping belongs to later source-bound execution work.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MqDeliveryOutcome {
+    /// Delivery outcome remains pending.
     Pending,
+    /// Delivery was reported accepted, without an exactly-once claim.
     Accepted,
     /// Item failure; exact MQ completion/reason mapping remains pending.
     Rejected,
+    /// Duplicate delivery remains possible and must not be collapsed into success.
     DuplicatePossible,
+    /// Authoritative delivery completion is unresolved.
     UnknownOutcome,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// One destination's explicit delivery disposition, without numeric MQI completion mapping.
 pub struct MqDistributionItemResult {
+    /// Nonempty bounded destination identity.
     pub destination: String,
+    /// Explicit accepted, rejected, pending, duplicate-possible or unknown disposition.
     pub outcome: MqDeliveryOutcome,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Bounded nonempty per-destination delivery observations.
 pub struct MqDistributionResult {
+    /// Destination outcomes retained individually rather than collapsed into one success.
     pub items: Vec<MqDistributionItemResult>,
 }
 
 impl MqDistributionResult {
+    /// Validate item count and destination names; numeric completion mapping remains separate.
     pub fn validate(&self, limits: MqMessageLimits) -> Result<(), MqMessageProblem> {
         limits.validate()?;
         if self.items.is_empty() || self.items.len() > limits.distribution_items {

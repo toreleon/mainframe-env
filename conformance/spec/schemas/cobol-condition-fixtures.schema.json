@@ -2,10 +2,10 @@
   "$schema":"https://json-schema.org/draft/2020-12/schema",
   "$id":"https://mainframe-env.example/schemas/cobol-condition-fixtures.schema.json",
   "type":"object","additionalProperties":false,
-  "required":["schema_version","target_version","fixtures"],
+  "required":["schema_version","target_subsystem","fixtures"],
   "properties":{
     "schema_version":{"const":"mainframe-env.cobol-condition-fixtures@1"},
-    "target_version":{"const":"0.4.0"},
+    "target_subsystem":{"const":"cobol.execution"},
     "fixtures":{"type":"array","minItems":10,"maxItems":512,"items":{
       "type":"object","additionalProperties":false,
       "required":["id","row_id","source","host_behavior","expected_output","expected_terminal"],

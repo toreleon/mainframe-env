@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Prepared bounded IMS DB candidates and independent Memory/SQLite fixtures through a thin public-host driver and the shared Conformance IR compiler/runner; human rule acceptance, official IMS credit and licensed differential remain pending."

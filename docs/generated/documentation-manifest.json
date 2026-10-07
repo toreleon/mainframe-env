@@ -1,48 +1,56 @@
 {
   "counts": {
-    "markdown_documents": 228,
-    "navigation_groups": 6,
-    "normative_documents": 62,
-    "xtask_commands": 214
+    "markdown_documents": 234,
+    "navigation_groups": 8,
+    "normative_documents": 97,
+    "xtask_commands": 164
   },
   "documents": [
     {
       "normative": false,
       "path": "AGENTS.md",
       "relative_links": 5,
-      "sha256": "sha256:f1a2d40b9ba62e6ce682bb5e8bfadeb7e2c65f3b2866e52c1b2d3fd904f7b874",
+      "sha256": "sha256:d4bee014a70bdf8af0137329b6cd4ca73e07144ba2aef05dfa1edad87bd9035a",
       "title": "Repository Guidelines",
       "xtask_commands": 3
     },
     {
       "normative": false,
       "path": "CHANGELOG.md",
-      "relative_links": 2,
-      "sha256": "sha256:819c0fe319bd13a3128c077a5102a8c109af38fd0440b2b185015b0943dba537",
+      "relative_links": 0,
+      "sha256": "sha256:12ab36d5f0dbbbf7d0c243ce7156ca5d537ba55369e2032c76e9265f512966d4",
       "title": "Changelog",
-      "xtask_commands": 6
+      "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "CONTRIBUTING.md",
-      "relative_links": 9,
-      "sha256": "sha256:ff8e975477d1f12246f32437ac54e31b68f137ade46896db4deb646f1ca714aa",
-      "title": "Contributing to mainframe-env",
-      "xtask_commands": 7
+      "relative_links": 13,
+      "sha256": "sha256:792147a8afc75d7fb7a2d2fe8b7467b0a7de83be346c796dc24ae9118a183914",
+      "title": "Contributing to Mainframe Sandbox",
+      "xtask_commands": 11
+    },
+    {
+      "normative": false,
+      "path": "LICENSES/README.md",
+      "relative_links": 0,
+      "sha256": "sha256:a539efc51fc1ff2cc1b6d22192146ac9f0ef9a9c982f0d7733f4f4de3fe0ed5b",
+      "title": "Retained third-party license texts",
+      "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "README.md",
-      "relative_links": 23,
-      "sha256": "sha256:aa25f80a4dc30d063d035d1a64b1246be9bb5d8092e45fab79db930c80a9d2ab",
-      "title": "mainframe-env",
-      "xtask_commands": 4
+      "relative_links": 24,
+      "sha256": "sha256:641fb0564cc7ce1d5c05225f879ad9f11cfd3240df16d79d398ecb1958be247b",
+      "title": "Mainframe Sandbox",
+      "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "SECURITY.md",
       "relative_links": 5,
-      "sha256": "sha256:4308b9ccfd35791b26fb65e95d6f7847545dc31ca72ec76614b5612d084b04bd",
+      "sha256": "sha256:5e0a2fdad5dddd18e2f8a9150c82d4f1c3de5b09ab54f99c9d6a05bfd44072d1",
       "title": "Security policy",
       "xtask_commands": 0
     },
@@ -56,51 +64,19 @@
     },
     {
       "normative": false,
-      "path": "conformance/0.1/evidence/MAINFRAME_ENV_0_1_EXIT_REPORT.md",
-      "relative_links": 0,
-      "sha256": "sha256:d31301d3acfd15036218d6b4754bd199373900201499e41c7ae0f63689dfb1af",
-      "title": "MAINFRAME-ENV 0.1 exit report",
+      "path": "conformance/README.md",
+      "relative_links": 3,
+      "sha256": "sha256:417d97d5037693d344c1b2602be5a932ed56e810f31aa271af2c85d8ce735287",
+      "title": "Conformance inputs",
       "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "conformance/0.11/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:21a280a38d439d60c09f49196a0901d15ac700b0e6bef68d02c9ce3b454cc146",
-      "title": "z/OSMF 3.2 normalization authority",
-      "xtask_commands": 2
-    },
-    {
-      "normative": false,
-      "path": "conformance/0.2/catalogs/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:33d3dabd7679a54810fa9f5b1a45ef109304099e5ab17f522f606fe00a04aee7",
-      "title": "Catalog source locators",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "conformance/0.3/tools/AUTHORING.md",
-      "relative_links": 0,
-      "sha256": "sha256:41ce2289ea52b9530910f438ba81393ff00b2ded56edd4bd143fbc2e45dc22b1",
-      "title": "Authoring conventions for the COBOL language catalog",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "conformance/0.5/racf/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:f9d269b139ba7183bff656e690ba0927d9feff6b40e59ee5c4b0bba7b9d7ff2d",
-      "title": "RACF/SAF 0.5 conformance inputs",
-      "xtask_commands": 4
     },
     {
       "normative": false,
       "path": "conformance/spec/README.md",
       "relative_links": 0,
-      "sha256": "sha256:30e5824717f946cf358039655fb4d10b738fdd73a64db769716a15c737dcc6d0",
+      "sha256": "sha256:b9c8b2ea1272a51a174b8b54366351ca211ef3caf578576b7e6991d6ca1ea424",
       "title": "Shared Conformance IR v1",
-      "xtask_commands": 1
+      "xtask_commands": 3
     },
     {
       "normative": false,
@@ -112,212 +88,252 @@
     },
     {
       "normative": false,
-      "path": "crates/apps/mainframe-env-batch/README.md",
+      "path": "conformance/subsystems/cobol/structure/tools/AUTHORING.md",
       "relative_links": 0,
-      "sha256": "sha256:bffb911c882204bad62e0d86846e4875d5592bf46880592107a4f9c632290d21",
+      "sha256": "sha256:0ea4ef74341fb4c6c44ea2fb5e38bb200a8bb68ee8a347153c55c1106cd42030",
+      "title": "Authoring conventions for the COBOL language catalog",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "conformance/subsystems/coverage/catalogs/README.md",
+      "relative_links": 0,
+      "sha256": "sha256:33d3dabd7679a54810fa9f5b1a45ef109304099e5ab17f522f606fe00a04aee7",
+      "title": "Catalog source locators",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "conformance/subsystems/racf/racf/README.md",
+      "relative_links": 0,
+      "sha256": "sha256:3719e275c22bc565ce4f91bd40bb4a9e7b31d9d2473e0c56cd04520ff3ab827d",
+      "title": "RACF/SAF 0.5 conformance inputs",
+      "xtask_commands": 4
+    },
+    {
+      "normative": false,
+      "path": "conformance/subsystems/zosmf/README.md",
+      "relative_links": 0,
+      "sha256": "sha256:a513b4cdd5e620b9cf3646c5ec0b2f97c1c5d995e27bac6f6afcd746dfd83659",
+      "title": "z/OSMF 3.2 normalization authority",
+      "xtask_commands": 2
+    },
+    {
+      "normative": false,
+      "path": "crates/apps/mainframe-env-batch/README.md",
+      "relative_links": 4,
+      "sha256": "sha256:4f92d5854b338fa5d1d7b4ddddb94c3ab1c19d25e296a3e960802c1c6e548fed",
       "title": "mainframe-env-batch",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "crates/apps/mainframe-env-cli/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:af8e7b94e25678ee6fe3cdd360bc9759586ca5e7643eed19267c666ae77cc2d2",
+      "relative_links": 4,
+      "sha256": "sha256:c5c1aefdd2b4c52d90484f79cf152e7a4243dda1884513de75a17f540e7fc858",
       "title": "mainframe-env-cli",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "crates/apps/mainframe-env-server/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:073db7972b5da005e02cb52d40f8d0dc2c40b79810f907f3f351f16f8b5d6a22",
+      "relative_links": 5,
+      "sha256": "sha256:1eb1c489ed83ccc4fd491a3a960ecf43501b2948a8b2eb8ce6e966abab537edf",
       "title": "mainframe-env-server",
       "xtask_commands": 0
     },
     {
       "normative": false,
-      "path": "crates/contracts/mainframe-env-compiler-api/README.md",
+      "path": "crates/apps/mainframe-env-server/src/retention_maintenance/provider/selected_mq_fixture.md",
       "relative_links": 0,
-      "sha256": "sha256:f135345400d8c90b2580c0f3234c00952b98e22e5dc62427fcc7d2bae2f18980",
+      "sha256": "sha256:238939f6c82bd1975c531f38d6954a4a6d52b6ca62a360623dd81f4551cdfd00",
+      "title": "Selected MQ retention fixture",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "crates/contracts/mainframe-env-compiler-api/README.md",
+      "relative_links": 4,
+      "sha256": "sha256:ca0c69cbae342e77eafacbad006e8863c4b5cd0f5087a57180c68a6819c1308a",
       "title": "mainframe-env-compiler-api",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "crates/contracts/mainframe-env-coverage/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:a0e9e578a4acdc544ddf0fef6eee2902406934ef6562c856d58155abf9617dfe",
+      "relative_links": 4,
+      "sha256": "sha256:b007a69b0d2d31294ad319d4abe1bd0b6892a64e1cf84274057d590631400467",
       "title": "mainframe-env-coverage",
       "xtask_commands": 2
     },
     {
       "normative": false,
       "path": "crates/contracts/mainframe-env-execution-api/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:753e0c1116341d1baff6badc47538b68ed87f50ff78aac5274c2c20a62dabe79",
+      "relative_links": 4,
+      "sha256": "sha256:f5173290c6b233149a5ea9549f699f792a6ed936f9ed0cbddfeb53fc73ec8e90",
       "title": "mainframe-env-execution-api",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "crates/contracts/mainframe-env-host-api/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:d2ca82620540cbc6b7b1ee01a44d15eb893bc1a04ea415471a7f08bb1197f1ee",
+      "relative_links": 5,
+      "sha256": "sha256:6f715444b2c08fa30dd04b327fd5d6e3030b8babf6099d2a2ad7ec68f02b1342",
       "title": "mainframe-env-host-api",
       "xtask_commands": 1
     },
     {
       "normative": false,
       "path": "crates/contracts/mainframe-env-store-api/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:71de6b5500fe2ae2e7e88bd3e9133221b41ebf3e2f1dc48d5911f463791474fb",
+      "relative_links": 4,
+      "sha256": "sha256:c1a11356381309c3035d010b4fe826296f0642f7cb88179cb6299216edcb3f93",
       "title": "mainframe-env-store-api",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "crates/foundation/mainframe-env-diagnostics/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:aec8f9ad85551383ac2aeb3beb6fb00953169706d7f23348b8be0b5889f13c15",
+      "relative_links": 4,
+      "sha256": "sha256:4fb5722f43cf950b1231553e4d45f73752d5ab6b6a3c985311ac50eb78973ff5",
       "title": "mainframe-env-diagnostics",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "crates/foundation/mainframe-env-encoding/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:b2ce2b2c3bbe40b71276137573274e218f214a80cfa56b5f78e8fb2593eb70ce",
+      "relative_links": 4,
+      "sha256": "sha256:8e0c297ba004b43134469dff85c27fbc9178eb9e999e04ec0ca9b6f5fbf9cea6",
       "title": "mainframe-env-encoding",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "crates/foundation/mainframe-env-ir/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:e5db7bdb495948239e8915bf49d6257a8d41a4b5275cabc0d3f4d3286d12214e",
+      "relative_links": 4,
+      "sha256": "sha256:9c43ea5941158ccc57ec8e24adc02af93a534973bbacaf6d88ca85f5e40706de",
       "title": "mainframe-env-ir",
       "xtask_commands": 1
     },
     {
       "normative": false,
       "path": "crates/foundation/mainframe-env-source/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:5c451789bcfe4a00520f07d287499c00bd738f66f4c708914a28e77f5a00554a",
+      "relative_links": 4,
+      "sha256": "sha256:2f4d8a8bf6650ad9700d1a9cd413d49d4405f4075d9850a19d04ca0b88612f0d",
       "title": "mainframe-env-source",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "crates/gateways/mainframe-env-zosmf/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:fc497b640c7f5f7aaaa328fa09b2d59fec0f18a73bcc64c49b2b4cbee072ffe9",
+      "relative_links": 4,
+      "sha256": "sha256:013a14976789c6e452b6191cf636f77321f711ff7fb1728b966b4b2648303f70",
       "title": "mainframe-env-zosmf",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "crates/kernel/mainframe-env-application/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:c89ebe2a958c67460e551379808b40073dc063f5793db74c0905db1833d427b0",
+      "relative_links": 4,
+      "sha256": "sha256:4cd0d64c1ddbb1984491fd47dd50b30423e1bc0f0ddffae1b146a31a0d61aea6",
       "title": "mainframe-env-application",
       "xtask_commands": 1
     },
     {
       "normative": false,
       "path": "crates/kernel/mainframe-env-compiler/README.md",
-      "relative_links": 1,
-      "sha256": "sha256:a49d88abd1de5556e7ac3abd83ae5cce35c014197a2d81bfaf389ee6bf31f0be",
+      "relative_links": 5,
+      "sha256": "sha256:e0ab011830020e41dadff6704d42836b7cd14b28005b3250ccc166d5d483052a",
       "title": "mainframe-env-compiler",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "crates/kernel/mainframe-env-interpreter/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:96de29fcca957ea958f816e5e65ca0259e44d5cf9864a46996b20f304ababad4",
+      "relative_links": 4,
+      "sha256": "sha256:6e2038456a491986915c3bf76a6c715d7e17f57008dd78a531f800dff3babc74",
       "title": "mainframe-env-interpreter",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "crates/providers/mainframe-env-cics/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:6b2b1328dbb2c4ccc24ec8487278ec98d3a4f245a3ccf9c7db5cffb906e737d7",
+      "relative_links": 4,
+      "sha256": "sha256:4dadd6b47e41db483befeb4ff8961f13c9f3494432cfc63694f10a88f34cba65",
       "title": "mainframe-env-cics",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "crates/providers/mainframe-env-dataset/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:2134290640b8c6c98169c1f0f7da8757911e66beee68ff857176c692f94fe9bb",
+      "relative_links": 4,
+      "sha256": "sha256:7988269012d3848e2f545aec42881489eda802013e250479045738d57c7214d4",
       "title": "mainframe-env-dataset",
       "xtask_commands": 1
     },
     {
       "normative": false,
       "path": "crates/providers/mainframe-env-db2/README.md",
-      "relative_links": 1,
-      "sha256": "sha256:165035f2e30394e5ba6245b7dc3051125e877ac99e74a08ccc857e5ecd30fa5c",
+      "relative_links": 5,
+      "sha256": "sha256:cb0e0b2ade775bf68e95d7423dc9be91e840e553f177aa5dc63e67c590458d17",
       "title": "mainframe-env-db2",
       "xtask_commands": 2
     },
     {
       "normative": false,
       "path": "crates/providers/mainframe-env-ims/README.md",
-      "relative_links": 2,
-      "sha256": "sha256:c3fd3c9a6ff1e6338cec3d1451cbede29cead963bbd9e97beefd13eb02a97985",
+      "relative_links": 11,
+      "sha256": "sha256:8b5e884b67f50ecbf584342d507af37d3927cd41c6790a53b8e67d3ff176397d",
       "title": "mainframe-env-ims",
       "xtask_commands": 1
     },
     {
       "normative": false,
       "path": "crates/providers/mainframe-env-mq/README.md",
-      "relative_links": 2,
-      "sha256": "sha256:498623982e1a9c951a477e58014752aca447894010cf9fb77b74a8a226a78874",
+      "relative_links": 6,
+      "sha256": "sha256:4379cde3614cb9e088d048e04ba96d9565e68243ae91a5f392fbe96bfe472c00",
       "title": "mainframe-env-mq",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "crates/providers/mainframe-env-racf/README.md",
-      "relative_links": 1,
-      "sha256": "sha256:52be40bd4a6c4d138d70f0e0a78855d81bed1c4247e8c2b119778ba7bf7df35d",
+      "relative_links": 5,
+      "sha256": "sha256:1c1d912b36a4e3a3b0752e3c340edb509d7be782e3cc3e6162b984c563b2821e",
       "title": "mainframe-env-racf",
       "xtask_commands": 2
     },
     {
       "normative": false,
       "path": "crates/providers/mainframe-env-spool/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:e43cedb5bfca02441f57f77263ac035792a465d0fc4a8a9e4e61ca64caef2aa9",
+      "relative_links": 4,
+      "sha256": "sha256:0c6346f9627fb4f5cc916075f4530f5ab7ed8dd065fa12a46f4c18991f141054",
       "title": "mainframe-env-spool",
       "xtask_commands": 1
     },
     {
       "normative": false,
       "path": "crates/stores/mainframe-env-store/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:574c44e305cabc2a731ffcce5df313e482eab7c3dd9626e98ae1f7396aef850b",
+      "relative_links": 4,
+      "sha256": "sha256:87d5fb1aae14ec396a31868fdc0f60982b8918d11ff26f1099356fc4ec5237f1",
       "title": "mainframe-env-store",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "crates/tooling/mainframe-env-conformance/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:627ff2bc4ee334504216d409afc2e2a83571b01503afe3d1ec234e244b37954b",
+      "relative_links": 4,
+      "sha256": "sha256:bc444732a8011afaf1b0b9a693326f1731eb2cd717e1ea3a8fbbb2558710b4af",
       "title": "mainframe-env-conformance",
       "xtask_commands": 1
     },
     {
-      "applies_from": "mainframe-env 0.1.0",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "repository owner",
       "path": "docs/CHARTER.md",
       "relative_links": 0,
       "scope": "product charter, initial boundary, and governance invariants",
-      "sha256": "sha256:33ec4647b01f85785b0eb6fd2e2e2457df751273da2e596f9843ef50e3c969d3",
+      "sha256": "sha256:179135163a41ebebe3fd04fefbe352175f18022894eea40b980f83edf328e2af",
       "status": "Accepted by repository owner",
       "title": "mainframe-env Rewrite Charter",
       "xtask_commands": 0
@@ -325,735 +341,1127 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 118,
-      "sha256": "sha256:d152f44bd0eaf0bfb2bb8379fc5c77cc10f64c34bc5b8ff384278a06f73376e8",
-      "title": "Documentation portal",
+      "relative_links": 177,
+      "sha256": "sha256:cc56bfe7419efd37264d0ec859bfc7e1517acef0e9042d8173732c521c7037b5",
+      "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
     {
-      "applies_from": "mainframe-env 0.2.0",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "application-package maintainers",
       "path": "docs/architecture/APPLICATION-PACKAGES.md",
       "relative_links": 0,
       "scope": "application package generation and installation contract",
-      "sha256": "sha256:2b5b04a1e11ed4d05d9681d750e2aae7975b70979ac34d26e9980315cfa54acb",
-      "status": "Frozen for mainframe-env 0.2.0",
+      "sha256": "sha256:837c3d7abb312eedaadfc4f412052d91a6ea490b634704fd5dbddf6b660fd6cc",
+      "status": "Frozen for mainframe-env coverage.foundation",
       "title": "Application package generation contract",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.2.0",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "batch and application maintainers",
       "path": "docs/architecture/BATCH-CONTROLLER-REGISTRY.md",
       "relative_links": 0,
       "scope": "installed batch-controller selection and generation registry",
-      "sha256": "sha256:b6b7bc66624343b3e7cac694aabd831c4fcb452fe763387566f93cef2b8a0535",
-      "status": "Frozen for mainframe-env 0.2.0",
+      "sha256": "sha256:5a495889f0795176aa16a03b4c07e8f25ca4b3130dea7b6a94d93aef24d09bbd",
+      "status": "Frozen for mainframe-env coverage.foundation",
       "title": "Installed batch-controller registry",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.9.0 development",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "CICS provider maintainers",
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
       "relative_links": 24,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:33450905d5dab48df0e72226a5fcc58c68e3274cd331e3a19bb3e6ebfc8f208e",
+      "sha256": "sha256:0a82258f640d283389f817a42c5b295947c41a2b4b2faf31cbe36eb8b4a4fc6f",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
     },
     {
-      "applies_from": "mainframe-env 0.9.0 development",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "CICS provider maintainers",
       "path": "docs/architecture/CICS-TERMINAL-CONTROL.md",
       "relative_links": 0,
       "scope": "typed terminal-control routes and durable terminal state",
-      "sha256": "sha256:7109e621d5425b78f3e49d490c7f286ef9714b40567e549e6742d25c161e1656",
+      "sha256": "sha256:432350e4f3408d78ad994e0d9e6c6f51cb9cbf8e8403307edd43961133f8d8b9",
       "status": "Implemented incrementally",
-      "title": "CICS terminal control in the v0.9 typed route",
+      "title": "CICS terminal control in the cics.application-api typed route",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.4.0",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "compiler and interpreter maintainers",
       "path": "docs/architecture/COBOL-RUNTIME-SEMANTICS.md",
       "relative_links": 0,
       "scope": "COBOL runtime semantic contracts",
-      "sha256": "sha256:c38a90a4df52113d0495d41d81cbec93f4243271393ccec4600467315a92a8b1",
-      "status": "Frozen for mainframe-env 0.4.0 implementation",
+      "sha256": "sha256:ac91f6e4eec46a346d252ac43e670b59e9f784bf48aff24d10bdf038145ec59a",
+      "status": "Frozen for mainframe-env cobol.execution implementation",
       "title": "COBOL runtime semantic contracts",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.1.0",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "compiler and IR maintainers",
       "path": "docs/architecture/COMPILER-AND-IR.md",
       "relative_links": 1,
       "scope": "compiler stages, IR contracts, and publication pipeline",
-      "sha256": "sha256:097d5b8e01ad7a7010bea1f5f08df3b738452114f4c844c528cb8e837c6142e2",
+      "sha256": "sha256:76d3b6017452017e912750e5688c646b60bc502d37972b4ce309f0dff7244165",
       "status": "Accepted by repository owner",
       "title": "Compiler and IR Architecture",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.3.0",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "conformance maintainers",
       "path": "docs/architecture/CONFORMANCE-IR.md",
       "relative_links": 0,
       "scope": "conformance catalog, binding, execution, and evidence authority",
-      "sha256": "sha256:73101bdc6bf80443b29e3c632718d80972988d6efe35180a791044f12664842c",
-      "status": "Normative from 0.3.0",
+      "sha256": "sha256:312aba6e4f0d4dc977a4f6d9550ce6e26b427472618ad6d4b0e3c37e1ac57c77",
+      "status": "Normative from cobol.structure",
       "title": "Conformance IR and executable coverage",
-      "xtask_commands": 3
+      "xtask_commands": 4
     },
     {
-      "applies_from": "mainframe-env 0.2.0",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "coverage and conformance maintainers",
       "path": "docs/architecture/COVERAGE-AUTHORITY.md",
       "relative_links": 0,
       "scope": "official coverage denominators, evidence, and credit policy",
-      "sha256": "sha256:1178cd2defe795e68b0c18a96644dbe3d05dc3a6172e24508faa56cc569922ed",
-      "status": "Frozen for mainframe-env 0.2.0",
+      "sha256": "sha256:80564b557de421ca715231407f4ca0b38fc33e663b39fa9092ef4398258b0e94",
+      "status": "Frozen for mainframe-env coverage.foundation",
       "title": "Official coverage authority",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.6.0",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "dataset provider maintainers",
       "path": "docs/architecture/DATASET-VSAM-AMS.md",
       "relative_links": 0,
       "scope": "dataset, VSAM, catalog, and AMS authority",
-      "sha256": "sha256:aeefd0046cf3ac5aa8ff0c358568a6631e5a59515625f769e250f92aaf6fc8dd",
-      "status": "Normative from 0.6.0",
+      "sha256": "sha256:e69beb77f1a971c3f19e8982d1d8136883c76ca96212e66268eee9b0b4ee31c6",
+      "status": "Normative from dataset.data",
       "title": "Dataset, VSAM, catalog, and AMS authority",
       "xtask_commands": 2
     },
     {
-      "applies_from": "mainframe-env 0.2.0",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "Db2 provider maintainers",
       "path": "docs/architecture/DB2-APPLICATION-CATALOG.md",
       "relative_links": 0,
       "scope": "generic application catalog, schema, row, and generation behavior",
-      "sha256": "sha256:b69f9f7b7fc47c5f89744256b2276ab017f649a23ed0590f37e2dd306f69716e",
-      "status": "Frozen for mainframe-env 0.2.0",
+      "sha256": "sha256:14bcbb1fe92b167235562b1f25ffd17638f1556e83566b3b3bfc68858f3ab044",
+      "status": "Frozen for mainframe-env coverage.foundation",
       "title": "Generic Db2 application catalog",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.1.0",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "execution and store maintainers",
       "path": "docs/architecture/EXECUTION-AND-DURABILITY.md",
       "relative_links": 2,
       "scope": "execution lifecycle, effects, work, checkpoints, and durability",
-      "sha256": "sha256:13cf2ab09ef1cdf259c70af0392c83a202de7d7a6250a162eb26dc8c5c9ed4f3",
+      "sha256": "sha256:01e111ac430284e40edde026f952f6ad984f662d771f03e8afeb56c0c6c23120",
       "status": "Accepted by repository owner",
       "title": "Execution and Durability Architecture",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.2.0",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "host-contract and provider maintainers",
       "path": "docs/architecture/HOST-ABI-SOURCE-LIBRARIES.md",
       "relative_links": 0,
       "scope": "subsystem-owned host ABI source libraries",
-      "sha256": "sha256:280404dfa1e79083db598f5c01514224a06f46af23e1113b70f6d4bb1e9cc1ff",
-      "status": "Frozen for mainframe-env 0.2.0",
+      "sha256": "sha256:e12dc14439f2f458b86ef373aaf91241295bb9222f6d9e859ee089abdffe4660",
+      "status": "Frozen for mainframe-env coverage.foundation",
       "title": "Subsystem-owned host ABI source libraries",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.8.0",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "JES, batch, and spool maintainers",
       "path": "docs/architecture/JES-EXECUTION.md",
       "relative_links": 1,
       "scope": "JES execution, scheduling, spool, and utility behavior",
-      "sha256": "sha256:25a8e0e4a1e1dea820e3d2adf3743e57c44bba262483aad2a5b6c00f85d1b408",
-      "status": "Normative from mainframe-env 0.8.0",
+      "sha256": "sha256:36185b99ff17a072338d42faf064bb95c5e34e664b71e4b62da6f76901843df3",
+      "status": "Normative from mainframe-env jes.execution",
       "title": "JES execution, scheduling, spool, and utilities",
       "xtask_commands": 1
     },
     {
-      "applies_from": "mainframe-env 0.15.0",
+      "applies_from": "mainframe-env mq.programming",
       "normative": true,
       "owner": "`mainframe-env-host-api` contracts and `mainframe-env-mq` provider",
       "path": "docs/architecture/MQ-PROGRAMMING-SURFACE.md",
-      "relative_links": 0,
+      "relative_links": 3,
       "scope": "MQI denominator, source provenance, host context and semantic authority",
-      "sha256": "sha256:9aa7934ab60d4c55b6cb9f623b3dc10ebbb5027b07b0f06672a462ab4c0e1e94",
+      "sha256": "sha256:3b91e4802ad41e6ab01ff893703565e9a6f439b0d6b4807713caabe1a2a78319",
       "status": "Normative identity boundary; semantics are implemented incrementally",
       "title": "IBM MQ programming-surface ownership",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.1.0",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "architecture maintainers",
       "path": "docs/architecture/OVERVIEW.md",
-      "relative_links": 4,
+      "relative_links": 7,
       "scope": "system layers, dependency direction, and maintainability rules",
-      "sha256": "sha256:224e3b6ecbfc9c4e0c8f7ce156de45b70ab1711e344c8447203c849a7e47538c",
+      "sha256": "sha256:7ed884efc7e1dfc0a52f9401fdea0835bfd613c0509bd9c32d3eb831dbf75a07",
       "status": "Accepted by repository owner",
       "title": "Architecture Overview",
       "xtask_commands": 1
     },
     {
-      "applies_from": "mainframe-env 0.8.3 development",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "architecture maintainers",
       "path": "docs/architecture/PACKAGE-MAP.md",
-      "relative_links": 3,
+      "relative_links": 33,
       "scope": "current package ownership, dependency layers, and split boundaries",
-      "sha256": "sha256:699022f46d6e8f52d862653a63ff16d98eda0cc144e5cd628bf32a63028e9476",
+      "sha256": "sha256:31df37e40c54bd60e348467e72035e1aa8c944e561ca95a5f4920fc7c3bfac2a",
       "status": "Accepted; current topology governed by ADR-0009",
-      "title": "0.1 Package Map",
+      "title": "Package map",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.1.0",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "security and architecture maintainers",
       "path": "docs/architecture/PLUGIN-AND-SECURITY.md",
       "relative_links": 0,
       "scope": "capability, provider, plugin, secret, and transport boundaries",
-      "sha256": "sha256:5594b95f2700ba890718369d456c93a2a9357b1c4f5d4fe03e79d2f73d51005d",
+      "sha256": "sha256:3ed06452c30c0fa2d3be7685b6fef6d22c393e7bbdf9c0b13fda605825332bc6",
       "status": "Accepted by repository owner",
-      "title": "0.1 Security and Capability Architecture",
+      "title": "platform.runtime-integration Security and Capability Architecture",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.2.0",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "application, batch, and gateway maintainers",
       "path": "docs/architecture/PROGRAM-AND-ROUTE-REGISTRIES.md",
       "relative_links": 0,
       "scope": "generated common-program and route registries",
-      "sha256": "sha256:cc2cc6c3a288b235ae8b6634ce81e7b76bda1e00431c20fb2ef9903cffcb16ce",
-      "status": "Frozen for mainframe-env 0.2.0",
+      "sha256": "sha256:909e890cf986365bed030c2fb8b0a2de40c9a8aa0c3e56aac336d166fd62a1d9",
+      "status": "Frozen for mainframe-env coverage.foundation",
       "title": "Generated common-program and route registries",
       "xtask_commands": 4
     },
     {
-      "applies_from": "mainframe-env 0.8.3 development",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
-      "owner": "release and CI maintainers",
-      "path": "docs/architecture/RELEASE-BUILDER.md",
-      "relative_links": 0,
-      "scope": "trusted local Jenkins builder identity and signing boundary",
-      "sha256": "sha256:422659869aea5da87a4d9e8e62bcef4beb10d940761e64ceb653e003250774cb",
-      "status": "Implemented",
-      "title": "Release builder security model",
+      "owner": "documentation maintainers",
+      "path": "docs/architecture/README.md",
+      "relative_links": 20,
+      "scope": "navigation to existing architecture authorities; no new behavior",
+      "sha256": "sha256:e2266ee36707b71def87ede27b2e32e1c078b806c505191764b34633fb5b3220",
+      "status": "Accepted reference index",
+      "title": "Architecture reference",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/compatibility/CARDDEMO-COPYBOOKS.md",
       "relative_links": 0,
-      "sha256": "sha256:01075a1461bb211e26a1841e4cdb66bac5c588a4805da24925b17364137d8807",
+      "sha256": "sha256:ea0acc8d304fca039b1b667061e7feddfb1b8332898c3c13eb196e35647a6057",
       "title": "CardDemo reached compatibility copybooks",
       "xtask_commands": 2
     },
     {
-      "applies_from": "mainframe-env 0.10.0 development preparation",
+      "applies_from": "mainframe-env development",
       "normative": true,
       "owner": "CICS command, ProgramControl, security and storage maintainers",
       "path": "docs/contracts/CICS-NAMED-PROGRAM-STATUS-V1.md",
       "relative_links": 0,
       "scope": "named PROGRAM STATUS for a trusted public, local, non-Java cohort",
-      "sha256": "sha256:529b3da7448769587860553efcee1bbb9900d2ef4b025d59d2e289212ed94188",
+      "sha256": "sha256:3890ae379ffb66ec20f9a798c048f176d71c8f091a7aaaa757be17db97a05fe8",
       "status": "Proposed private prerequisite",
       "title": "Private named PROGRAM STATUS consumption boundary",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.8.3 hardening",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "store adapters and core-server composition",
       "path": "docs/contracts/DURABLE-STORAGE-PROFILE.md",
-      "relative_links": 0,
+      "relative_links": 2,
       "scope": "PostgreSQL quotas, shared immutable artifacts, and local publication durability",
-      "sha256": "sha256:0604bb711feefd94c4440780f88fe8cf8fa03d95bbbd02285ca9fd6ac1f683f0",
+      "sha256": "sha256:dab7426dcd41d94f522a614f016219a0c20c3524102d13bb2ef34467fd590d58",
       "status": "Implemented",
       "title": "Durable storage profile",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.8.2 hardening",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "execution and host-contract maintainers",
       "path": "docs/contracts/EFFECT-CANONICAL-V1.md",
-      "relative_links": 1,
+      "relative_links": 7,
       "scope": "canonical persisted host request/result digest representation",
-      "sha256": "sha256:d638b9ccecca7b1997f1ce7e536692768e1e05500c9fc4b72f789b4af0ac09e2",
-      "status": "Frozen contract; implementation deviations tracked before 0.9.0",
+      "sha256": "sha256:c74e55f77ddc7ad6a4a832edcb82bb7c78d2643865a2817beeb9683b76172aef",
+      "status": "Frozen contract; implementation deviations tracked before cics.application-api",
       "title": "Canonical host effect representation, version 1",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.8.3 development",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "Db2, IMS, MQ, and store-contract maintainers",
       "path": "docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md",
-      "relative_links": 1,
+      "relative_links": 3,
       "scope": "provider object-row envelopes, manifests, migrations, and CAS boundaries",
-      "sha256": "sha256:b00e3ce2a2c9545fcfbf12a1d8fad075b6b392e9b639e3e067301fdf59c4852c",
+      "sha256": "sha256:40b97fde72bb8416f82221f880877e2a9ec4b9be4161ea1f23ab9a031c0e456f",
       "status": "Implemented",
       "title": "Provider object-row persistence, version 1",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.8.3 development",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
-      "owner": "release and supply-chain maintainers",
-      "path": "docs/contracts/RELEASE-BUILD-V1.md",
-      "relative_links": 0,
-      "scope": "target release build inputs, outputs, and attestation contract",
-      "sha256": "sha256:cf39d539d7bb8a34734ac5f0ca21b1b37d8947a714ed72f732ba8a47af7ce1dc",
-      "status": "Implemented",
-      "title": "mainframe-env target release build type v1",
+      "owner": "documentation maintainers",
+      "path": "docs/contracts/README.md",
+      "relative_links": 7,
+      "scope": "navigation to existing contracts authorities; no new behavior",
+      "sha256": "sha256:fc20ec3a5f2520f0852f4502c0215f4f20b4386f04596066b5aaeaa376dcfb2d",
+      "status": "Accepted reference index",
+      "title": "Versioned contracts",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.8.3 development",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "store-contract, provider, and core-server maintainers",
       "path": "docs/contracts/RETENTION-LIFECYCLE-V1.md",
-      "relative_links": 3,
+      "relative_links": 5,
       "scope": "all durable source families, provider replay and recovery graphs, age observations, retained archives, and offline maintenance",
-      "sha256": "sha256:a795c945fa0701858febe260c98b150b86b102802b462695d3644af84c2e473c",
+      "sha256": "sha256:bdfdb6573a67c046b38dadf58949d46b81f1b988b5daf03d4cc9b313d499e2d3",
       "status": "Implemented",
       "title": "Durable retention lifecycle, version 1",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.16.0 early contract",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "execution-contract and coordinator maintainers",
       "path": "docs/contracts/TRANSACTION-PARTICIPANT-V1.md",
       "relative_links": 0,
       "scope": "provider-neutral transaction participant capabilities and obligations",
-      "sha256": "sha256:2156b6c40f6f381d09d7c0e07aae102aaea5685e6ba2582918a8b5234f69edcc",
+      "sha256": "sha256:f400dfc8f5052d85f54f8afb95a7655f71e7efe3837d9b03367fb5880eaba805",
       "status": "Frozen early additive INT-1601 prerequisite",
       "title": "Transaction participant contract, version 1",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.1.0",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "repository owner",
       "path": "docs/decisions/0001-technology-stack.md",
       "relative_links": 10,
       "scope": "technology stack and deferred framework boundaries",
-      "sha256": "sha256:252c6fda5d822e4696edbb586bee8309d8f6acfabd549cb545d2ded8180560d4",
+      "sha256": "sha256:29f5f7b6a180fd45d32a75865312044027f04bc7117ce7f1b2c425a62840a9f5",
       "status": "Accepted by repository owner",
-      "title": "ADR-0001: 0.1 Technology Stack",
+      "title": "ADR-0001: Technology stack",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.1.0",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "repository owner",
       "path": "docs/decisions/0002-deterministic-core.md",
       "relative_links": 0,
       "scope": "deterministic core and asynchronous infrastructure shell",
-      "sha256": "sha256:8187f839a72378212bda7c08798c347c07702d445d52266bdaf7fe9bca3a3e0b",
+      "sha256": "sha256:a6f7f8ed11875d939c819ec4b0fba15b1a44ca5b86adca46fd35e02bacf05ecf",
       "status": "Accepted by repository owner",
       "title": "ADR-0002: Deterministic Core and Asynchronous Shell",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.1.0",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "repository owner",
       "path": "docs/decisions/0003-contract-serialization.md",
       "relative_links": 2,
       "scope": "owned contracts, serialization, durable identity, and evolution",
-      "sha256": "sha256:5f8f1aa356e6548073fd94108d8e926c72b5019a6ce1cbb709c3104a679fbae2",
+      "sha256": "sha256:c175e58f2a9b2a10bc901a07f175aab68e3e31f73a16f02e8e923d2231e74e5e",
       "status": "Accepted by repository owner",
       "title": "ADR-0003: Contract, Serialization, and Identity Policy",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.1.0",
-      "normative": true,
-      "owner": "repository owner",
-      "path": "docs/decisions/0004-versioning-release-policy.md",
-      "relative_links": 0,
-      "scope": "product, contract, schema, artifact, and release versioning",
-      "sha256": "sha256:f81bcdce11ee9eaa8de6976bbd274e5d891d17f495215c2d0e752456dd7aa00f",
-      "status": "Accepted by repository owner",
-      "title": "ADR-0004: v0.1 Versioning and Release Policy",
-      "xtask_commands": 1
-    },
-    {
-      "applies_from": "mainframe-env 0.1.0",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "repository owner",
       "path": "docs/decisions/0005-package-consolidation.md",
       "relative_links": 2,
-      "scope": "historical 0.1 package consolidation and split criteria",
-      "sha256": "sha256:0c66d3b0c62744d11a9d0593062b713640a7ca14c961c41bcda548945c435f36",
+      "scope": "historical platform.runtime-integration package consolidation and split criteria",
+      "sha256": "sha256:2b9eb4639f519d90ae1f6814d92c4cffdf929af776653533bf2dae7aa25e660f",
       "status": "Superseded by ADR-0009 for current topology",
-      "title": "ADR 0005: Enforce 0.1 boundaries with twenty packages",
+      "title": "ADR 0005: Initial package boundary consolidation",
       "xtask_commands": 1
     },
     {
-      "applies_from": "mainframe-env 0.1.1",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "repository owner",
-      "path": "docs/decisions/0006-carddemo-0.1.1-profile.md",
+      "path": "docs/decisions/0006-carddemo-profile.md",
       "relative_links": 0,
       "scope": "additive CardDemo-full product profile and package boundaries",
-      "sha256": "sha256:a8d423141d66001e7577ad7d3ab4345eeb5dcac10da1f24a9586e7e69ffbe5bb",
+      "sha256": "sha256:2637888ac40e338dd5ae33135910dbd83ee5a32ac5134002a4deee9d28643739",
       "status": "Accepted by repository owner",
-      "title": "ADR-0006: Add an additive CardDemo-full profile for 0.1.1",
+      "title": "ADR-0006: Add the CardDemo-full workload profile",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.1.1",
-      "normative": true,
-      "owner": "repository owner",
-      "path": "docs/decisions/0007-carddemo-0.1.1-release.md",
-      "relative_links": 0,
-      "scope": "CardDemo-full 0.1.1 release promotion and naming authority",
-      "sha256": "sha256:8f6052e00357265480a0d8080d07d2dff363b7e98161d796004fe8ea8dfcd791",
-      "status": "Accepted by repository owner",
-      "title": "ADR-0007: Release mainframe-env 0.1.1 after CardDemo certification",
-      "xtask_commands": 0
-    },
-    {
-      "applies_from": "mainframe-env 0.8.3 development",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "repository owner",
       "path": "docs/decisions/0008-icu-license-compliance.md",
       "relative_links": 0,
       "scope": "locked ICU dependency approval and release license notices",
-      "sha256": "sha256:1d4b9d60c9598739e93d251e54cb52703a0590ca649616883917a25266664607",
+      "sha256": "sha256:f1046872afbd29cd3d3e133a19feb16f00261aceed2de16218b64d9a823b816c",
       "status": "Accepted by repository owner",
       "title": "ADR-0008: Retain decNumber under the ICU License",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.8.3 development",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "repository owner",
       "path": "docs/decisions/0009-current-package-topology.md",
       "relative_links": 4,
       "scope": "current workspace package boundaries and topology changes",
-      "sha256": "sha256:7db76b320ee10ab5cb2e8ff5b532d6fdde68d3c227af0f81051e4d8e453866ab",
+      "sha256": "sha256:0ec2c4febb5a02de2fcde2845dc7cf01b8034b8e278a95738ff5ae1ec9702e97",
       "status": "Accepted by repository owner",
       "title": "ADR-0009: Govern the current 26-package topology",
       "xtask_commands": 2
     },
     {
-      "applies_from": "mainframe-env 0.9.0 development",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "architecture maintainers",
       "path": "docs/decisions/0010-rust-module-review-budgets.md",
       "relative_links": 1,
       "scope": "Rust production-module size, crate facades, generated sources, and CICS family growth",
-      "sha256": "sha256:c3e0a0039d738a30c6351b0bdead46fec0c353d390b47fb1f486b3fd4a39ad7a",
+      "sha256": "sha256:2d073219010cde230c404c5916454ae3ceb2fba5b6a086097b700733f16e46e2",
       "status": "Accepted by repository owner",
       "title": "ADR-0010: Enforce Rust module review budgets and stable split boundaries",
       "xtask_commands": 1
     },
     {
-      "applies_from": "mainframe-env 0.9.0 development",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "compiler, execution, and subsystem maintainers",
       "path": "docs/decisions/0011-typed-language-hir-and-semantic-ir.md",
       "relative_links": 0,
       "scope": "language HIR, executable semantic IR, host effects, and compatibility boundaries",
-      "sha256": "sha256:0d0c4ad48874294cde0401d1635adb09f68605f178a0de3827f9bfa20468b75e",
+      "sha256": "sha256:acc22c7167f3bc52a4eeac19bbfc68ed31dc3d9f23f0a9d87bd4f10b8a6fd355",
       "status": "Accepted by repository owner",
       "title": "ADR-0011: Adopt language-specific HIR and versioned semantic IR dialects",
       "xtask_commands": 1
     },
     {
-      "applies_from": "mainframe-env 0.9.0 development",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "CICS and execution maintainers",
       "path": "docs/decisions/0012-checked-amode64-storage-boundary.md",
       "relative_links": 0,
       "scope": "GETMAIN64 and FREEMAIN64 typed IR, host effects, virtual addresses, and checkpoints",
-      "sha256": "sha256:4ad1c12cf41b05ab63873e2b680dbe984c8b86ef6fa05d7c4e3a225b953c4564",
-      "status": "Proposed for v0.9 development; acceptance gate pending",
+      "sha256": "sha256:ab6d48e06d2382a3f0f7861f5065b5e1744e435c73e038e7a09255842dba4c51",
+      "status": "Proposed for cics.application-api development; acceptance gate pending",
       "title": "ADR-0012: Keep AMODE(64) storage in a checked virtual task arena",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.9.0 development",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "CICS and execution maintainers",
       "path": "docs/decisions/0013-cics-web-service-control-boundary.md",
       "relative_links": 1,
       "scope": "Eight typed web-service-control rows, local service transport, and durable channel state",
-      "sha256": "sha256:2440f08ee04788c8ffbce49d9f925edd7288fe8105230b274ebb099f5ea31d68",
-      "status": "Proposed for v0.9 development; acceptance gate pending",
+      "sha256": "sha256:66f0f4237acb1722f9c169983ed5092677bf8c76a8267b54cfc22dd08f32d4ca",
+      "status": "Proposed for cics.application-api development; acceptance gate pending",
       "title": "ADR-0013: Bounded CICS web-service-control authority",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.9.0 development",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "CICS provider and execution maintainers",
       "path": "docs/decisions/0014-named-counter-authority.md",
       "relative_links": 1,
       "scope": "twelve COUNTER and DCOUNTER application rows, typed plans, and durable replay",
-      "sha256": "sha256:b93cb56eb225d021ec8802d9114e3c90b81b7daa9383a4f195bddf7ccaceb299",
-      "status": "Proposed for v0.9 development",
+      "sha256": "sha256:37d2ac669acace3e1c4ca4407b799ca2b7686278bff095b282332002d628326f",
+      "status": "Proposed for cics.application-api development",
       "title": "ADR-0014: Keep named counters in one versioned pool authority",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.9.0 development",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "CICS and console maintainers",
       "path": "docs/decisions/0015-cics-operator-reply-boundary.md",
       "relative_links": 0,
       "scope": "WRITE OPERATOR, virtual console ingress, and suspended COBOL tasks",
-      "sha256": "sha256:ab1a3863502974bc0ad8920ebff9740d12dd628750ed0de8a1cc3f4e76cf5e76",
-      "status": "Proposed for v0.9 development; acceptance gate pending",
+      "sha256": "sha256:5cc5b9deb22c7a11193717370cb3f12b2654ae0d99338b867d43c9bffb08e90c",
+      "status": "Proposed for cics.application-api development; acceptance gate pending",
       "title": "ADR-0015: Bind CICS operator replies to durable command positions",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.9.0 development",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "CICS and network maintainers",
       "path": "docs/decisions/0016-cics-tcpip-ingress-context.md",
       "relative_links": 0,
       "scope": "EXTRACT TCPIP and EXTRACT CERTIFICATE task context",
-      "sha256": "sha256:f6190a6b17425744c4339a929d7cbaf8290c0501b2061de9894cda13ca411cc9",
-      "status": "Accepted for v0.9 development; typed EXTRACT routes executable",
+      "sha256": "sha256:c510cca20962fa43d4665e1c6b1fe7c9f5317c193103f1a6384427f366437e3b",
+      "status": "Accepted for cics.application-api development; typed EXTRACT routes executable",
       "title": "ADR-0016: Keep CICS TCP/IP and certificate facts in trusted ingress context",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.9.0 development",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "CICS and server maintainers",
       "path": "docs/decisions/0017-cics-immediate-start-target-authority.md",
       "relative_links": 0,
       "scope": "START ATTACH and START BREXIT transaction admission",
-      "sha256": "sha256:88a5fd527dc84e2a69ad2bc503d0a6a54d1e70c796ffe55b8ad606d2e1884448",
-      "status": "Proposed for v0.9 development; command rows pending",
+      "sha256": "sha256:d6941f63a3e0a53a4ae2962788d514e7eca8d41cb739b0402b7c1cc57f89a4c3",
+      "status": "Proposed for cics.application-api development; command rows pending",
       "title": "ADR-0017: Resolve immediate START targets from installed durable definitions",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.9.0 development",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "CICS, compiler, and runtime maintainers",
       "path": "docs/decisions/0018-cics-start-attach-lifetime.md",
       "relative_links": 0,
       "scope": "START ATTACH row 0206",
-      "sha256": "sha256:6db692e85b6fe38fb46241ece31f47eb391810a5af2715040352a4866f20e5cf",
-      "status": "Proposed for v0.9 development; FROM route pending",
+      "sha256": "sha256:5edacce175cacce7c22674d5da8d38e7c7d04253378be7eecc5f228869f18627",
+      "status": "Proposed for cics.application-api development; FROM route pending",
       "title": "ADR-0018: Keep START ATTACH work noncancelable and address-bearing",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.9.0 development",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "CICS provider and execution maintainers",
       "path": "docs/decisions/0019-bts-lifecycle-authority.md",
       "relative_links": 0,
       "scope": "shared BTS process/activity state for 23 lifecycle application rows",
-      "sha256": "sha256:963068d0943fc6dd2d2f70a5762ee328699213b7694c2762e20b9ee7565190ba",
+      "sha256": "sha256:767fb00c5d3f1728911b2b582ed31a0fa272bbe158dd925a7d5d3d84800423e0",
       "status": "Superseded by ADR-0021 after lifecycle and child/LINK integration",
       "title": "ADR-0019: Shared BTS lifecycle authority",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.9.0 development",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "CICS provider and execution maintainers",
       "path": "docs/decisions/0020-conversation-peer-exchange-ledger.md",
       "relative_links": 1,
       "scope": "CIC-905 conversation-open CONVERSE and sibling exchange commands",
-      "sha256": "sha256:bac95432bf2c452ec582008d83ff8c360c05f9967fa8f6a139e85b5ca6201598",
-      "status": "Proposed for v0.9 development",
+      "sha256": "sha256:fb778fafe7c7e7285fb78494e7441d5ac773ca32e762ae16e9f9c15bec1161eb",
+      "status": "Proposed for cics.application-api development",
       "title": "ADR-0020: Persist explicit conversation peer frames with protocol state",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.9.0 development",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "CICS provider and execution maintainers",
       "path": "docs/decisions/0021-conversation-issue-control-staging.md",
       "relative_links": 2,
       "scope": "CIC-905 mapped and GDS ISSUE controls",
-      "sha256": "sha256:8f4be6360e115224ebd1d05b392fefc9444a5a6931951461486e0ddb6f70fd06",
-      "status": "Proposed for v0.9 development",
+      "sha256": "sha256:3acc016a8230d2ecc871156fca7044836adbd82948f2c23400d9d40a328daad4",
+      "status": "Proposed for cics.application-api development",
       "title": "ADR-0021: Stage ISSUE controls in the shared conversation ledger",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.9.0 development",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "CICS terminal and Communications Server adapter maintainers",
       "path": "docs/decisions/0022-issue-pass-target-handoff.md",
       "relative_links": 0,
       "scope": "CIC-905 ISSUE PASS and target CICS EXTRACT LOGONMSG",
-      "sha256": "sha256:86a2ca133a8c7a00f5fe18eef87d64706b872103dd16a75b9a218eaa7feebad1",
-      "status": "Proposed for v0.9 development",
+      "sha256": "sha256:e7e795fabe4778e169261166a8e666064a6fa46175290148246b6c89d7a1e80b",
+      "status": "Proposed for cics.application-api development",
       "title": "ADR-0022: Retain and claim an ISSUE PASS target handoff",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.9.0 development",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "CICS provider and execution maintainers",
       "path": "docs/decisions/0023-bts-lifecycle-authority.md",
       "relative_links": 0,
       "scope": "shared BTS process/activity state for 23 lifecycle application rows",
-      "sha256": "sha256:77302cd1e33b09d8a3d9637a1bda063528f1c07e42a88d5b4339b86d89652aeb",
+      "sha256": "sha256:05976002f171f58b319aca152076d9f87b8b2ba3237de9909dbd38cc97de686c",
       "status": "Proposed for the incremental CIC-904.bts-lifecycle slice",
       "title": "ADR-0023: Shared BTS lifecycle authority",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.8 evidence contract v2",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "conformance and xtask maintainers",
       "path": "docs/decisions/0024-per-assertion-oracle-provenance.md",
       "relative_links": 0,
-      "scope": "CardDemo 0.8 base-batch expected values and conformance credit",
-      "sha256": "sha256:90843aa45efc80794cfa11887a9fdf446234e3d21586f0b70ffd2a124b0b4359",
+      "scope": "CardDemo jes.execution base-batch expected values and conformance credit",
+      "sha256": "sha256:7d97a2f5d33d7c1551c92cf9c75139cceb6f6b4d44dea3e249becc4616fbeefd",
       "status": "Proposed for the first increment of issue #245",
       "title": "ADR-0024: Per-assertion oracle provenance for CardDemo base batch",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.17 licensed-evidence planning, subject to acceptance",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "repository owner",
       "path": "docs/decisions/0025-licence-and-provenance-policy.md",
       "relative_links": 4,
       "scope": "licensed IBM oracles, customer captures, and IBM-derived material",
-      "sha256": "sha256:07c16b23d5eb236e87df668bdac57db8e91f017e42c1a288029ed327021f64cb",
+      "sha256": "sha256:5a9696415ab1fbc7bf8cd19843876da036ca33205ce6cff6890f1409e7a7ba22",
       "status": "Proposed",
       "title": "ADR-0025: Licence and provenance policy for IBM oracle evidence",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.8 run bundle v1",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "conformance and xtask maintainers",
       "path": "docs/decisions/0026-run-bundle.md",
       "relative_links": 0,
-      "scope": "0.8 READACCT batch regression evidence",
-      "sha256": "sha256:bba7bdb3c90b2a71d6fe7c9da29e2eaddef6505e4bb2ba13369c1530c293e671",
+      "scope": "jes.execution READACCT batch regression evidence",
+      "sha256": "sha256:0c2249cae8ef01ac9a431bf6f6b7bf7cd5aa456a942c170ef30658c7bce2bb36",
       "status": "Proposed",
       "title": "ADR-0026: Self-recorded CardDemo run bundle",
       "xtask_commands": 1
     },
     {
-      "applies_from": "mainframe-env 0.9.0 development",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "CICS provider and selected execution maintainers",
       "path": "docs/decisions/0027-cics-logical-program-frames.md",
       "relative_links": 0,
       "scope": "local LINK and INVOKE APPLICATION on an existing task",
-      "sha256": "sha256:7952863083833e41f44554d67b1e4396cb8236c2afa5410289faa95305d86268",
+      "sha256": "sha256:37eff1fed09b50ce3a2e7d211a85df1dd1cde926866b0aba9fc4f51875eff377",
       "status": "Proposed for CIC-902.program-task.frames; acceptance pending",
       "title": "ADR-0027: CICS task ownership across logical program frames",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.9.0 development",
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "Db2, application-package and store-contract maintainers",
+      "path": "docs/decisions/0028-db2-typed-catalog-evolution.md",
+      "relative_links": 0,
+      "scope": "db2.core catalog/binder preparation and versioned integration",
+      "sha256": "sha256:29799df5dfc0731dda0fc8a1a870de9ecc97a8c12fbcd262b820d340682b4fde",
+      "status": "Proposed — implementation boundary, not owner acceptance",
+      "title": "ADR-0028: Db2 typed catalog evolution through existing authorities",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env development",
       "normative": true,
       "owner": "Interpreter and selected execution maintainers",
       "path": "docs/decisions/0028-explicit-bts-set-loan-lifetime.md",
       "relative_links": 0,
       "scope": "explicit BTS GET CONTAINER SET in one root machine",
-      "sha256": "sha256:200f32e338811c2e9b893b30ef3b3623aadf610619636ca234190d0b45f6a011",
+      "sha256": "sha256:5f10ddfb5baf9cdf1a498e6b6bd2abb129ba76a03c14683285eddb81aa89d9f8",
       "status": "Proposed; bounded root proofs recorded; parent acceptance pending",
       "title": "ADR-0028: Explicit BTS SET loans in the checked interpreter",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.9.0 development",
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "MQ contract and provider maintainers",
+      "path": "docs/decisions/0028-mq-shared-handle-kernel.md",
+      "relative_links": 0,
+      "scope": "private mq.programming MQ kernel composition, not public route acceptance",
+      "sha256": "sha256:e4bbd224ad9f09c45a0b51ad858870ab1d2cc6caeb5e242d4c6c85a46a033b6c",
+      "status": "Proposed",
+      "title": "Shared MQ handle-family kernel",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "store-contract and adapter maintainers",
+      "path": "docs/decisions/0029-audited-provider-publication.md",
+      "relative_links": 0,
+      "scope": "additive Memory/SQLite publication primitive for mq.programming integration",
+      "sha256": "sha256:f4281d689da6bdb510512077d940b3c9aff66f096837c9b8e009a4bf8eebc4ed",
+      "status": "Proposed",
+      "title": "Audited provider publication under a retained intent",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env development",
       "normative": true,
       "owner": "Selected execution and CICS task maintainers",
       "path": "docs/decisions/0029-cobol-storage-entry-identity.md",
       "relative_links": 0,
       "scope": "language storage identity, before atomic instance admission and close",
-      "sha256": "sha256:bd97174ef88d0d4ed9f1fa43e483f8a00d36b5cc2eb79689f84cb62e77354d31",
+      "sha256": "sha256:cb4bcbcc9152ad6ca8b934e59381ce4524552a2e698778ca869855e3ea12dcb2",
       "status": "Proposed; private codec prerequisite; runtime writers disabled",
       "title": "ADR-0029: COBOL storage-entry identity within one CICS task",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.10.0 development",
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "execution-contract, coordinator and Db2 maintainers",
+      "path": "docs/decisions/0029-db2-core-participant-evolution.md",
+      "relative_links": 0,
+      "scope": "db2.core local Db2 core and early INT-1601 participant integration",
+      "sha256": "sha256:65fff2641d2cb64c91bda22fc22faf310511f188983e882870cd85b6630f4de3",
+      "status": "Proposed — prerequisite direction, not capability acceptance",
+      "title": "ADR-0029: Versioned Db2 core participant binding before mutating integration",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env development",
       "normative": true,
       "owner": "CICS contract and verification maintainers",
       "path": "docs/decisions/0030-cics-source-condition-authority.md",
       "relative_links": 0,
       "scope": "private source-validator dependency and condition identity",
-      "sha256": "sha256:a751d85138e935c8f5683258e02e3ace270691564ee007d39d8553b11caad3ed",
+      "sha256": "sha256:c8ca54a8c06f9d61e5206a8f56a79060a3fccb3a52861d1ae0eb697a243811db",
       "status": "Proposed; private source-contract validation",
       "title": "ADR-0030: Common CICS response authority in source validation",
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "host-contract and IMS maintainers",
+      "path": "docs/decisions/0030-gsam-application-record-formats.md",
+      "relative_links": 1,
+      "scope": "IMS-1403.gsam-record-formats",
+      "sha256": "sha256:efbda004acaf7c455f35f9b07b3ce3ae0a1e5f58ce4d0323d28be1f80c75c6e4",
+      "status": "Proposed within the authorized bounded IMS leaf",
+      "title": "ADR-0030: GSAM application record formats and owned undefined length",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "MQ contract and provider maintainers",
+      "path": "docs/decisions/0030-mq-host-lifecycle-directory.md",
+      "relative_links": 0,
+      "scope": "volatile trusted-service composition, not public route acceptance",
+      "sha256": "sha256:76c9cd24f137f4d0355fb53ff958a229376615d18323d9269ec04350283ef3a7",
+      "status": "Proposed",
+      "title": "Private MQ host lifecycle directory",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "store/execution contracts and coordinator maintainers, with host and IMS owners",
+      "path": "docs/decisions/0031-ims-tm-recovery-publication.md",
+      "relative_links": 0,
+      "scope": "proposed shared publication/settlement boundary; no actual TM recovery admission",
+      "sha256": "sha256:cc7105e07c64476f3d5c52a096822699578b29ee3969b6557869d5a994273f58",
+      "status": "Proposed; shared contract-owner decision required",
+      "title": "ADR-0031: IMS TM recovery publication and work settlement",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "MQ provider and execution/store maintainers",
+      "path": "docs/decisions/0031-mq-selected-service-authority.md",
+      "relative_links": 0,
+      "scope": "private service composition, not public MQI acceptance",
+      "sha256": "sha256:6e455cc5d5d89006f770432b36a3e36c77c82eaf32348a4f8ce553d3b90ff99f",
+      "status": "Proposed",
+      "title": "One selected MQ service authority",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "program/execution and MQ maintainers",
+      "path": "docs/decisions/0032-mq-program-machine-frame.md",
+      "relative_links": 0,
+      "scope": "explicit typed installed-batch handoff, not MQ public readiness",
+      "sha256": "sha256:34349603b854fcb6220be0702aa21e043691bd44ff0b75b3f2b6e22ee79ce735",
+      "status": "Proposed",
+      "title": "MQ program-to-machine frame handoff",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "IMS recovery and database maintainers",
+      "path": "docs/decisions/0032-selected-secondary-checkpoint-position.md",
+      "relative_links": 5,
+      "scope": "IMS-1405.secondary-index-checkpoint-restart, target ims.programming",
+      "sha256": "sha256:35d4b342135c32549599f39517202d7e0223f68e7e99fd957fe471567a402b65",
+      "status": "Proposed within the user-authorized bounded IMS leaf",
+      "title": "ADR-0032: Selected secondary checkpoint positions",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "compiler, interpreter, host-contract and IMS maintainers",
+      "path": "docs/decisions/0033-cobol-dli-call-boundary.md",
+      "relative_links": 0,
+      "scope": "IMS-1401.cobol-dli-call-boundary",
+      "sha256": "sha256:454831452e229abca59b9e80d443a2dc29f599dc9a792c2abb6e1c03314d8786",
+      "status": "Proposed; raw execution blocked pending contract-owner decisions",
+      "title": "ADR-0033: Raw COBOL DL/I needs an owned CALL and PCB binding contract",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "MQ host contract maintainers",
+      "path": "docs/decisions/0033-mq-full-md-value.md",
+      "relative_links": 0,
+      "scope": "complete descriptor/message values and codecs, not executable message policy",
+      "sha256": "sha256:14d3c3f7f302baf2a5022740b29502e27e1627ef67242f1a0ce84649f688c9fc",
+      "status": "Proposed",
+      "title": "Complete MQMD value primitive",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "MQ contract and provider maintainers",
+      "path": "docs/decisions/0033-mq-historical-handle-observation.md",
+      "relative_links": 2,
+      "scope": "typed result storage and readonly existing-handle lookup, not service acceptance",
+      "sha256": "sha256:9f9fa6011d718fbbad4f1b4c3702feed090150441d1ef31a8ab201a621231ae2",
+      "status": "Proposed",
+      "title": "MQ historical handle observation",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "host-contract and IMS maintainers",
+      "path": "docs/decisions/0034-gsam-logical-address.md",
+      "relative_links": 0,
+      "scope": "IMS-1403.gsam-record-addressability; IMS-1405.gsam-checkpoint-restart",
+      "sha256": "sha256:895557a99a7de9f85196c76ddd3828f59283674e73ddbd87af5cf2c3f80a68d9",
+      "status": "Proposed within the human-authorized bounded IMS implementation",
+      "title": "ADR-0034: GSAM logical record addresses on the owned host route",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "execution coordinator, store adapters, configured COBOL host and MQ provider",
+      "path": "docs/decisions/0034-mq-root-terminal-publication.md",
+      "relative_links": 0,
+      "scope": "the explicitly configured synchronous ordinary z/OS batch root",
+      "sha256": "sha256:d25eb9798e74372bd78afbe006a45544055b4e15f7daba075879abea73df7a87",
+      "status": "Proposed (implemented framework prerequisite; native acceptance remains pending)",
+      "title": "MQ root publication framework",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "MQ host/interpreter maintainers",
+      "path": "docs/decisions/0035-mq-root-scoped-abi-aliases.md",
+      "relative_links": 0,
+      "scope": "connection alias translation, not executable handle or terminal authority",
+      "sha256": "sha256:90d10872750088f01a1730a16aeb796f5f80652704a9f877adb0213a7fa1266e",
+      "status": "Proposed",
+      "title": "Volatile task-root MQI ABI aliases",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "host-contract and IMS provider maintainers",
+      "path": "docs/decisions/0035-selected-pcb-feedback.md",
+      "relative_links": 1,
+      "scope": "IMS-1401.selected-pcb-feedback, owned host projection",
+      "sha256": "sha256:d1d5fbb752b02b557acd8c603fa278cfe09ef99760019118fc9553438faaac00",
+      "status": "Proposed",
+      "title": "ADR-0035: Versioned selected database PCB feedback",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "Conformance and MQ maintainers",
+      "path": "docs/decisions/0036-conformance-pending-obligations.md",
+      "relative_links": 0,
+      "scope": "existing shared Conformance IR v1 only",
+      "sha256": "sha256:e2baf6ffb4af20f48fbd98268865a15fb867e564cc6d6471e56690ef29122178",
+      "status": "Proposed (bounded driver foundation)",
+      "title": "ADR 0036: explicit pending Conformance IR obligations",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "host-contract and IMS provider maintainers",
+      "path": "docs/decisions/0036-null-ssa-command-slots.md",
+      "relative_links": 1,
+      "scope": "IMS-1401.null-ssa-command-slots, target ims.programming",
+      "sha256": "sha256:1b2395ed7850d413fa2f11966b347277157870971a2ce00a44149cdce77d750c",
+      "status": "Proposed within the user-authorized bounded IMS leaf",
+      "title": "ADR-0036: Literal null SSA command slots",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "IMS provider and core-server retention maintainers",
+      "path": "docs/decisions/0037-private-ims-recovery-retention-fence.md",
+      "relative_links": 0,
+      "scope": "IMS-1405.private-recovery-retention-fence, existing unowned core dependency fence",
+      "sha256": "sha256:d5786f28a2d189bc9c46507bf34cd57d500863f4dabc571a967e5ab038c0a920",
+      "status": "Proposed",
+      "title": "ADR-0037: Private IMS recovery retention fence",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "Batch and host-contract maintainers",
+      "path": "docs/decisions/0037-running-step-program-transport.md",
+      "relative_links": 0,
+      "scope": "MQ-1503.running-step-program-transport, target mq.programming",
+      "sha256": "sha256:e0ba9594ca47cffa50a313a2f9edcb575d5b411452359ca9e0d2f9cd8316b89e",
+      "status": "Accepted bounded transport prerequisite; host activation remains pending.",
+      "title": "ADR-0037: Running-step Program context transport",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "Interpreter and execution-coordinator maintainers",
+      "path": "docs/decisions/0038-coordinator-original-dispatch-extraction.md",
+      "relative_links": 1,
+      "scope": "MQ-1503.coordinator-original-dispatch-extraction, target mq.programming",
+      "sha256": "sha256:954ed6e83e0d5662ec6557ff5da9a2e620879e51213576fb877b1ad757935903",
+      "status": "Accepted bounded internal extraction; controller activation pending.",
+      "title": "ADR-0038: Private coordinator original dispatch extraction",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "IMS provider maintainers",
+      "path": "docs/decisions/0038-logical-child-physical-key-feedback.md",
+      "relative_links": 0,
+      "scope": "IMS-1403.logical-child-physical-key-feedback",
+      "sha256": "sha256:0dcdf8a07eee44598c35ba72bc394b52830f699b797f1802cca9f230e2810add",
+      "status": "Proposed",
+      "title": "ADR-0038: Real logical child physical-path key feedback",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "IMS provider maintainers",
+      "path": "docs/decisions/0039-last-direct-child-ssa-selection.md",
+      "relative_links": 0,
+      "scope": "IMS-1403.ssa-last-direct-child, bounded local runtime leaf",
+      "sha256": "sha256:4974dadd54f5a87a0a27d8af7c73b30fedcc32f314e0095915228e529a9f033d",
+      "status": "Proposed",
+      "title": "ADR-0039: Last remaining direct child SSA selection",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "Batch maintainers",
+      "path": "docs/decisions/0040-batch-run-stop-containment.md",
+      "relative_links": 0,
+      "scope": "MQ-1503.batch-run-stop-containment, target mq.programming",
+      "sha256": "sha256:e62ab96e99160c41d2999861ca12b4b268f0b7da7c5c11b69cc689afaf2239fe",
+      "status": "Accepted bounded opt-in prerequisite; enclosing host activation pending.",
+      "title": "ADR-0040: Batch run stop containment",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "IMS provider maintainers",
+      "path": "docs/decisions/0040-primary-level-position-search-boundary.md",
+      "relative_links": 0,
+      "scope": "IMS-1403.primary-level-position-closure, reviewed private design",
+      "sha256": "sha256:2818d2a50711bdccdc34104fe26f6b5da77b5031852607c0b0d5429a6a75aa02",
+      "status": "Proposed",
+      "title": "ADR-0040: Private primary level witnesses and search boundary",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "IMS provider maintainers",
+      "path": "docs/decisions/0041-first-direct-child-ssa-selection.md",
+      "relative_links": 0,
+      "scope": "IMS-1403.ssa-first-direct-child, bounded local runtime leaf",
+      "sha256": "sha256:d1187d82ceba12bc406cca69eec4e51df09e27ffb40284221a609811bc32f968",
+      "status": "Proposed",
+      "title": "ADR-0041: First direct child SSA selection",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "IMS provider maintainers",
+      "path": "docs/decisions/0042-ims-tm-output-identity-local-order.md",
+      "relative_links": 0,
+      "scope": "IMS-1404.tm-output-identity-local-order, finite local runtime leaf",
+      "sha256": "sha256:cec972e5ec40d9910d5c8e2bbd0c2ae89e298d8baccd00defa8f38caa1ab0984",
+      "status": "Proposed",
+      "title": "ADR-0042: Private IMS TM output identity and local completion order",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "Batch maintainers",
+      "path": "docs/decisions/0043-batch-contained-all-effect-loan.md",
+      "relative_links": 0,
+      "scope": "MQ-1503.batch-contained-all-effect-loan, target mq.programming",
+      "sha256": "sha256:80e76dedd19ce0a1b9695adbd7ad8174a6b4ebf00d5528ef2f157ec34469fe58",
+      "status": "Accepted bounded transport prerequisite; enclosing owner activation pending.",
+      "title": "ADR-0043: Batch contained all-effect loan",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env mq.programming",
+      "normative": true,
+      "owner": "store contract and Memory/SQLite adapter maintainers.",
+      "path": "docs/decisions/0043-inquiry-checked-read-publication.md",
+      "relative_links": 0,
+      "scope": "atomic provider read assertions, receipt/audit publication and replay fences.",
+      "sha256": "sha256:2925022c936895bd13aed44e13e2614cf9dfcf54714fb9b7afdde22d3c9904f6",
+      "status": "Implemented store prerequisite; provider/native inquiry remains pending.",
+      "title": "ADR 0043: Checked provider read publication",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env mq.programming",
+      "normative": true,
+      "owner": "host transport, interpreter original dispatch and physical store maintainers.",
+      "path": "docs/decisions/0044-checked-inquiry-replay-refusal.md",
+      "relative_links": 0,
+      "scope": "replay-only transport, bounded capture and atomic Completed refusal settlement.",
+      "sha256": "sha256:9320c62b62301c5536e802f7c064cb7140c9499974f22a1ad3e50f335bb3526e",
+      "status": "Implemented infrastructure prerequisite; configured inquiry activation remains unsupported.",
+      "title": "ADR 0044: Checked inquiry replay refusal settlement",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "Batch maintainers",
+      "path": "docs/decisions/0045-batch-prepared-selection-plan.md",
+      "relative_links": 0,
+      "scope": "MQ-1503.batch-prepared-selection-plan, target mq.programming",
+      "sha256": "sha256:38518bc73ab7b03e60ba0bdc26701bb11e761c4333de3ef5d76471ff6bcd0689",
+      "status": "Accepted bounded prerequisite; atomic joined admission remains pending.",
+      "title": "ADR-0045: Batch prepared-selection observation",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "Store and Batch maintainers",
+      "path": "docs/decisions/0046-batch-bounded-provider-prefetch.md",
+      "relative_links": 0,
+      "scope": "MQ-1503.batch-bounded-provider-prefetch, target mq.programming",
+      "sha256": "sha256:2a4d61e295df03ad98741c55f4e2a780fea179d9cdd2f53dd49d0bf5e4652fa2",
+      "status": "Accepted bounded infrastructure prerequisite; joined admission remains pending.",
+      "title": "ADR-0046: Bounded provider namespace prefetch",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "CICS, Batch, and CardDemo maintainers",
+      "path": "docs/decisions/0047-carddemo-participant-completion.md",
+      "relative_links": 1,
+      "scope": "CICS nested participant dispatch and package-owned batch controllers",
+      "sha256": "sha256:078caba6d41d8e46d225cc12803f93c2e57ea4ea18502b07293960452b9aa23d",
+      "status": "Implemented for the owned local workload",
+      "title": "ADR-0047: CardDemo participant ownership and batch completion",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "CardDemo and application maintainers",
+      "path": "docs/decisions/0048-carddemo-interactive-application.md",
+      "relative_links": 1,
+      "scope": "Application launcher and browser terminal",
+      "sha256": "sha256:8798df42f9de3b94b522c564c6c60115a5ee1fcf3f985499ef460c8268c339df",
+      "status": "Implemented for local development",
+      "title": "ADR-0048: Persistent interactive CardDemo composition",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "Application and developer tooling maintainers",
+      "path": "docs/decisions/0049-executable-agent-sandbox.md",
+      "relative_links": 1,
+      "scope": "Application profiles, lifecycle, packaging and agent access",
+      "sha256": "sha256:4ec846a61199961a4af42c979270bcd8270aec17803deb348dac466b403535c3",
+      "status": "Implemented for native and container execution; Cube integration pending",
+      "title": "ADR-0049: Executable application sandbox and agent boundary",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 30,
-      "sha256": "sha256:c6a3712c416134d644094a030b97d041c1aaf3f469d5168bdadcb5a227bd04b0",
+      "relative_links": 52,
+      "sha256": "sha256:332280c021b10c687ecc8e0305fd71f2c57ce3fb5032a866fc1ff31b0053c68b",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
     {
-      "normative": false,
-      "path": "docs/delivery/CARDDEMO-0.1.1-IMPLEMENTATION-PLAN.md",
-      "relative_links": 0,
-      "sha256": "sha256:32b6deb610709500fd5d55f089cf45e85e30bc84bf88f066791abee8d650b237",
-      "title": "CardDemo-full 0.1.1 Implementation Plan",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "docs/delivery/CARDDEMO-0.1.1-STATUS.md",
-      "relative_links": 0,
-      "sha256": "sha256:a4a75828fd68d2595b69293bc321042ee678070a200ded62189075d5a5c2e0b9",
-      "title": "CardDemo-full 0.1.1 Program Status",
-      "xtask_commands": 52
-    },
-    {
-      "applies_from": "mainframe-env 0.1.0",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "repository owner",
       "path": "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
       "relative_links": 0,
       "scope": "compatibility authority, migration, cutover, and rollback",
-      "sha256": "sha256:29fab37b7503ed0c46d1eab96e523a4e2e8655693a9713a74d78ae36d070966c",
+      "sha256": "sha256:0b5398282bce5675cac329073155cbddf05badd2dbd6ef4a8b29bb424522cbd4",
       "status": "Accepted by repository owner",
-      "title": "0.1 Compatibility and Cutover Contract",
+      "title": "Compatibility and cutover contract",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.8.3 development",
+      "applies_from": "mainframe-env subsystem management v1",
       "normative": true,
       "owner": "maintainers",
       "path": "docs/delivery/IMPLEMENTATION-ROADMAP.md",
-      "relative_links": 6,
+      "relative_links": 4,
       "scope": "subsystem progress, dependency sequencing, and acceptance boundaries",
-      "sha256": "sha256:2e74078729bf2fb56ccd52c9170cdb8710b1cedd23330468691ec29a5d624e70",
+      "sha256": "sha256:0010aae1177e4a77be3a4fbb0b648af4026431cbde532d3af086d3485da612e0",
       "status": "Accepted delivery organization",
       "title": "Subsystem implementation roadmap",
       "xtask_commands": 0
@@ -1061,188 +1469,80 @@
     {
       "normative": false,
       "path": "docs/delivery/IMPLEMENTATION-STATUS.md",
-      "relative_links": 21,
-      "sha256": "sha256:196bc489f63b54ad3fba3e2d1a4844f416ebd2aa09136a234587965de7981b3e",
+      "relative_links": 19,
+      "sha256": "sha256:78ce001e1f108ff0f2973f15bd1bf8dfe0c4aab9d83fef8b06afce78f8819bac",
       "title": "Subsystem implementation status",
       "xtask_commands": 1
     },
     {
-      "applies_from": "mainframe-env 0.1.0",
+      "normative": false,
+      "path": "docs/delivery/README.md",
+      "relative_links": 8,
+      "sha256": "sha256:f2e8485f9aa34cbd19eec9fd2544577ec024d624aff44505b977d978aedd10e0",
+      "title": "Delivery and verification",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "verification maintainers",
       "path": "docs/delivery/VERIFICATION-STRATEGY.md",
       "relative_links": 0,
       "scope": "verification layers, assurance tiers, and required evidence",
-      "sha256": "sha256:0b3dfb9d38d80d5cc391905d880a6a543decc4be6612a8f03c99a03f2854fb88",
+      "sha256": "sha256:45e645b4929dee3498ecab0092a8b27226f6efa4c3a55198e60c3e1705cba75b",
       "status": "Accepted by repository owner",
-      "title": "0.1 Verification Strategy",
+      "title": "Verification strategy",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.1.0",
-      "normative": true,
-      "owner": "release maintainers",
-      "path": "docs/delivery/VERSIONING-AND-RELEASES.md",
-      "relative_links": 0,
-      "scope": "version authorities, release gates, artifacts, and publication",
-      "sha256": "sha256:510f81ffeb3347d6c8a614090ba44496719dd235415b2f4fc8e26191396c977e",
-      "status": "Accepted by repository owner",
-      "title": "Versioning, Phase Commits, and Release Gates",
-      "xtask_commands": 1
-    },
-    {
-      "applies_from": "mainframe-env 0.1.0",
+      "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "z/OSMF gateway maintainers",
       "path": "docs/delivery/ZOSMF-API.md",
       "relative_links": 0,
       "scope": "public z/OSMF-compatible routes, requests, and responses",
-      "sha256": "sha256:40726f1c6925d459392b14c1e567a37d29642e2b5e1fc6cccc840e2a8c5e336e",
-      "status": "Frozen for mainframe-env 0.1.0",
-      "title": "z/OSMF 0.1 compatibility API",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "docs/delivery/hardening/46-final-acceptance.md",
-      "relative_links": 0,
-      "sha256": "sha256:9b022100454283877e70e2e95c19e47e7e74aa0c357e12125ee85a0eb6d526c4",
-      "title": "Hardening review #46 — integrated local acceptance",
-      "xtask_commands": 7
-    },
-    {
-      "normative": false,
-      "path": "docs/delivery/hardening/47-run-unit-instances.md",
-      "relative_links": 0,
-      "sha256": "sha256:96c2bca2fabcd7a9fd5f52ea3cbb1c183d5afcc8665df7811e316a3fbc4296e0",
-      "title": "#47 — last-used installed COBOL program instances",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "docs/delivery/hardening/48-live-controls.md",
-      "relative_links": 0,
-      "sha256": "sha256:bd5ac9537288ed7d17fba360af17b353a9f5c8196e75b4446726ba6f04c18ca3",
-      "title": "Live execution controls — issue #48",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "docs/delivery/hardening/49-unknown-outcomes.md",
-      "relative_links": 0,
-      "sha256": "sha256:4395381c9417bb1fe910e8a16d918442c546a921cef4387bee7f2321fc3aae9d",
-      "title": "Unknown-outcome propagation (#49)",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "docs/delivery/hardening/50-dcollect.md",
-      "relative_links": 0,
-      "sha256": "sha256:ebeaec75f563b4c73a1724f9dc8d9c8a6af3c21e3fba83c8811b3b4cbea57c98",
-      "title": "DCOLLECT catalog completeness (#50)",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "docs/delivery/hardening/51-provider-moves.md",
-      "relative_links": 0,
-      "sha256": "sha256:7e9014ea48459acf52eb65394d62e40bf08b176cb0404177259dfc3773bbd88f",
-      "title": "Provider-state move contract hardening (#51)",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "docs/delivery/hardening/53-dataset-mutations.md",
-      "relative_links": 0,
-      "sha256": "sha256:d3211a0b632627cbef51a9c5bee13c7352420fac1387b86e672d3acc1cb88ecf",
-      "title": "Dataset evidence terminology and source-mutation campaign (#53)",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "docs/delivery/hardening/54-assurance-tiers.md",
-      "relative_links": 0,
-      "sha256": "sha256:aba623bcc8c97e046bc3a5374ffd54da2376687e0da7271bc5f3f3ad63761af2",
-      "title": "#54 — selected PR gates and explicit full campaigns",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "docs/delivery/hardening/55-installed-call-replay.md",
-      "relative_links": 0,
-      "sha256": "sha256:976f90efe90708949f23b03856274b23dc4f9059a597225e3212482dbe4888e6",
-      "title": "Installed-call replay identity and recovery (#55)",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "docs/delivery/hardening/56-memory-store-scaling.md",
-      "relative_links": 0,
-      "sha256": "sha256:3e234483bd37bdb7b036e8a66b6375ce8b00027d5a3ed24b433aac3c6437ded3",
-      "title": "Memory-store transaction scaling investigation (#56)",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "docs/delivery/hardening/57-canonical-effects.md",
-      "relative_links": 0,
-      "sha256": "sha256:efacaf9a3d37b31fc048a4f64e5f4d407b5657c29d22d9d7f060745354f23602",
-      "title": "#57 — explicit effect digests and typed budgets",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "docs/delivery/history/INITIAL-IMPLEMENTATION-ROADMAP.md",
-      "relative_links": 1,
-      "sha256": "sha256:f0a82adf8d740cde8ac4f2512bfc9c8ac5e1a460fa51d123c0af59be8bfccb7b",
-      "title": "0.1 Greenfield Implementation Roadmap",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "docs/delivery/history/INITIAL-IMPLEMENTATION-STATUS.md",
-      "relative_links": 0,
-      "sha256": "sha256:5324f86c8c7afb6e6aa86b58e001f5fb1542ce8e82166d9e8c6c196a671b1f56",
-      "title": "mainframe-env 0.1 Implementation Status",
+      "sha256": "sha256:a68bd222c1ebeff7d0e5aca607b94b15681e6270a18adbc6cf5096666bad228f",
+      "status": "Frozen for mainframe-env platform.runtime-integration",
+      "title": "z/OSMF compatibility API",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/DEPENDENCIES.md",
-      "relative_links": 20,
-      "sha256": "sha256:b03d4dcbbbfe98f3e8d45855cc33cf05c9bd0b946119868c371285c6f80a1e35",
-      "title": "Subsystem dependencies and parallel implementation",
+      "relative_links": 16,
+      "sha256": "sha256:16b7e4cba4f06824342f85e946cd570fb77475230a7e092445cba56a5d1978f2",
+      "title": "Subsystem dependencies",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/GITHUB-PROJECT.md",
-      "relative_links": 183,
-      "sha256": "sha256:1ad630cbec11e3049de19dd3684a320fe676302e896c5c6ededaa17211423e7e",
-      "title": "Subsystem project coordination and release history",
+      "relative_links": 1,
+      "sha256": "sha256:6f1815c37f2d0c177e4540ab3ac6ea8889accce89c2a95f588285eef7f308415",
+      "title": "Track subsystem work on GitHub",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/PROFILE-TRACK.md",
       "relative_links": 7,
-      "sha256": "sha256:3ecf8f3ec2af158ece6f4359de738f08e4b7230a14f046bbc4760c66cb887075",
+      "sha256": "sha256:d5acaa20e1bf03b8e7f9ad60b8306c78c7e41a7d62fd43e513a6f567ba4dcb7d",
       "title": "Workload-profile track",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/README.md",
-      "relative_links": 65,
-      "sha256": "sha256:105c1b3574258e07754b47c3981ceb9a3c9056c5c15716a869ca5c69429304ae",
+      "relative_links": 36,
+      "sha256": "sha256:a78e10e8ffc06845af7c9976b36177d17ffd7931159303e070aa659624f86cae",
       "title": "Subsystem delivery plans",
-      "xtask_commands": 1
+      "xtask_commands": 2
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/certification/licensed-plan.md",
       "relative_links": 2,
-      "sha256": "sha256:368aaf05678cd159c38be43d6da42901421ec82228053d69ad8d4191c52adf8e",
+      "sha256": "sha256:23998b81f00b6180e3feb1d5ce30442af843216af9570c63bd9ad13ff93fca65",
       "title": "Licensed certification — Differential certification",
       "xtask_commands": 0
     },
@@ -1250,23 +1550,15 @@
       "normative": false,
       "path": "docs/delivery/subsystems/certification/licensed-status.md",
       "relative_links": 0,
-      "sha256": "sha256:5f949148421ac202b2b2997864466e0d44dba90201bf1fcfb5c5080ef2076f48",
+      "sha256": "sha256:d2e36afc2d5cc636a3a418bfebfe563c8a56b668772903587019806364b4c15e",
       "title": "Licensed certification — Differential certification progress",
       "xtask_commands": 6
     },
     {
       "normative": false,
-      "path": "docs/delivery/subsystems/certification/stable-release-plan.md",
-      "relative_links": 1,
-      "sha256": "sha256:4d7d35dba942ee2ee7cee58002ef7fc768fcc1e239465d3f9e99da9ee1851b40",
-      "title": "Licensed certification — Stable release promotion",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
       "path": "docs/delivery/subsystems/cics/CIC-906-POSTGRES-VALIDATION.md",
       "relative_links": 0,
-      "sha256": "sha256:3eb472f090a6822f7b97de8db615b05d9a5f9c2c6e4461ba6667e2ce8bb06f31",
+      "sha256": "sha256:bc75f3fac6f948bbb32ce3bcaa6ba0ab35ef8ff3e5e41181cad3ef9989013112",
       "title": "CIC-906 durable-profile validation slice",
       "xtask_commands": 0
     },
@@ -1274,7 +1566,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cics/CIC-906-SAF-AUDIT-UNCERTAINTY.md",
       "relative_links": 0,
-      "sha256": "sha256:1027ac27c6c75c935692f4e6af111a931f5384b2326606a57e9881404e3fb113",
+      "sha256": "sha256:f9cc7672a4fbe82f3aaa67fae90eceed59347d4ca52c47a43a5071c8acadb70b",
       "title": "CIC-906 representative SAF, audit, and uncertainty validation",
       "xtask_commands": 0
     },
@@ -1282,23 +1574,23 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cics/application-api-plan.md",
       "relative_links": 10,
-      "sha256": "sha256:73915cb0ea415790e0f003751078d7d321494037e3ef60e2df09af77dd3cfb59",
+      "sha256": "sha256:f33ae012037ff77c7be0bb35934689f82e306b92b92ff699b27909875fc26d3f",
       "title": "CICS — Application API",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/cics/application-api-status.md",
-      "relative_links": 93,
-      "sha256": "sha256:4a677b2d93825a7aa985b7c6eddf4d49e2ca2356d9199f0b0f5350c37bb48e37",
+      "relative_links": 32,
+      "sha256": "sha256:2e10b50dcf70b0b31fe354fc735e12018edc26aaea7933236a99d9f813bc4c6a",
       "title": "CICS — Application API progress",
-      "xtask_commands": 4
+      "xtask_commands": 5
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/cics/cic-906-bounded-validation.md",
       "relative_links": 1,
-      "sha256": "sha256:d855d43e8511c8bc6734a1d72966e28532c9ff1e3db4170bf80d447077fe60cf",
+      "sha256": "sha256:5c3eccb499c8f5ab28b3f28985c449c1badc16769e76cd087daa7b9e952e139c",
       "title": "CIC-906 bounded CICS validation slice",
       "xtask_commands": 0
     },
@@ -1306,31 +1598,31 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cics/system-api-plan.md",
       "relative_links": 2,
-      "sha256": "sha256:76f1abaabb8a001f51ac867634ce69ab2bf12f79eda48f3ea1ff12d3bcc443cc",
+      "sha256": "sha256:7468973478dda74b4870cfe6552411cf180255cc449b3104dbeab10393a5cc1e",
       "title": "CICS — SPI and FEPI",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/cics/system-api-status.md",
-      "relative_links": 1,
-      "sha256": "sha256:df0e592c9d397966e2bc66251e214b01fbbea1ab8ee52d0a538477ba8b5e7f8f",
+      "relative_links": 0,
+      "sha256": "sha256:bbdf3884a27d8aeaa0b508f491a627675589231fa99111e38b5e4cad67482927",
       "title": "CICS — SPI and FEPI progress",
-      "xtask_commands": 4
+      "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/cobol/decimal-ieee-spike.md",
       "relative_links": 0,
-      "sha256": "sha256:4d942cbdceb1e420de714830b7a94d02af7a761e9a5f841bf58ef240c50fa6db",
-      "title": "0.4.0 decimal and IEEE semantic-gap spike",
+      "sha256": "sha256:e3c1a6e3364eed41f577a4dd570c6dd8e230f03a028e6f32924af17907cc11c1",
+      "title": "cobol.execution decimal and IEEE semantic-gap spike",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/cobol/execution-plan.md",
       "relative_links": 0,
-      "sha256": "sha256:861f9ed500f31c8a8ef05b752e0ee6e529e12a534682185ef57bcc9c5449f69a",
+      "sha256": "sha256:afc0c42b974505fbde64a0347898cacfd5e49bb32ebdbe55fc46792da921b8c3",
       "title": "COBOL — Execution semantics",
       "xtask_commands": 0
     },
@@ -1338,31 +1630,31 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cobol/execution-status.md",
       "relative_links": 1,
-      "sha256": "sha256:0b9f7a9655a2080afd3f254e4fd93f38057ae82d73b7e8eca06f8f71fa320129",
+      "sha256": "sha256:b7f1d0d88ac04fafe48e16034215a1aa5e36b092f370249076ff3b4f6fd6c7d4",
       "title": "COBOL — Execution semantics progress",
-      "xtask_commands": 4
+      "xtask_commands": 3
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/cobol/local-assurance.md",
       "relative_links": 0,
-      "sha256": "sha256:1f906905b889d8156f1372e1464ce80252da6ef65d8af0f8e3a85835de9fea95",
-      "title": "mainframe-env 0.4.0 local COBOL assurance matrix",
+      "sha256": "sha256:96c7348e4914a961c101734b62a2a769e51ddde28bdb44e79f5ada441c49945b",
+      "title": "mainframe-env cobol.execution local COBOL assurance matrix",
       "xtask_commands": 1
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/cobol/report-writer-scope.md",
       "relative_links": 3,
-      "sha256": "sha256:967fdf182a00948aa0e0a543d4e9a9cace110a8624ff614772d45feed064090f",
-      "title": "COBOL 0.4.0 Report Writer scope decision",
+      "sha256": "sha256:2c47d76f9fcea43f5924561bb382756067e3b6434b5861c82e45973d5349e878",
+      "title": "COBOL cobol.execution Report Writer scope decision",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/cobol/structure-plan.md",
       "relative_links": 0,
-      "sha256": "sha256:da1017334c25f6328040effea0571eeccab9c56b9687d4d45d1b673a0a1c9b3e",
+      "sha256": "sha256:a05875169583531fd4127ec872630602b40cfb0b2b29d6fc658f14a9b6d19ebf",
       "title": "COBOL — Grammar and types",
       "xtask_commands": 0
     },
@@ -1370,7 +1662,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cobol/structure-status.md",
       "relative_links": 0,
-      "sha256": "sha256:e1269df9e3374a697103838d321ea85f3a226d6aa160546a9dc59a97f1c46ae4",
+      "sha256": "sha256:c11c00bee151de38fc69f6699f5a4649ec0ca97f3a9002af939e2f90cac36566",
       "title": "COBOL — Grammar and types progress",
       "xtask_commands": 1
     },
@@ -1378,31 +1670,31 @@
       "normative": false,
       "path": "docs/delivery/subsystems/coverage/foundation-plan.md",
       "relative_links": 0,
-      "sha256": "sha256:234fbc11e778f8b7f900b5c68f2fa0127b9cde3385aa8c17f8a52dd6f46f40ba",
+      "sha256": "sha256:2ab3f91c29c487eb6d45db74ab2ca35ead806acc862a166001d25ae86f93ce80",
       "title": "Coverage and conformance — Coverage authority",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/coverage/foundation-status.md",
-      "relative_links": 0,
-      "sha256": "sha256:2c2316d96eaf0ffc01cf25c3b197d990d32e3e623719261a566458ced68bff1f",
+      "relative_links": 2,
+      "sha256": "sha256:f3eb3cd342d3d374f3e1558b1fcb7d3fb5d5afa6d476f2ad863d48dfd3e402d8",
       "title": "Coverage and conformance — Coverage authority progress",
-      "xtask_commands": 0
+      "xtask_commands": 6
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/dataset/data-plan.md",
       "relative_links": 0,
-      "sha256": "sha256:e7f6a04177a19ea34418b293f58e3c96996b625e49a94bbe95b1def5d4158a6e",
+      "sha256": "sha256:d8414f801a7a6c3efee03609d48da685b6ab84f25245841336b4fcdca4f881e4",
       "title": "Datasets / VSAM / AMS — Dataset services",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/dataset/data-status.md",
-      "relative_links": 1,
-      "sha256": "sha256:ebc3924fee1e8bb0e3c64273e8d788bc15e8a4a74d063838f4a847c3d16a494c",
+      "relative_links": 0,
+      "sha256": "sha256:261b3b43c3b434acadc66d42ae5239ac79d2445557d6b509a792e7b359f3f4bb",
       "title": "Datasets / VSAM / AMS — Dataset services progress",
       "xtask_commands": 4
     },
@@ -1410,23 +1702,31 @@
       "normative": false,
       "path": "docs/delivery/subsystems/db2/core-plan.md",
       "relative_links": 3,
-      "sha256": "sha256:342528ec6bfc56d7fa6717904b0edfd9178b26d376767577cea4dcc6198459b8",
+      "sha256": "sha256:77e58fcf77c539a895a7af277225bd6e0a04deca4ef8fc7e88ae69035f1a5f5d",
       "title": "Db2 — Engine and common SQL",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/db2/core-status.md",
-      "relative_links": 1,
-      "sha256": "sha256:d1144bb7293d89f5ac9232f3b7542841b244207c6bbde0b46c6cf9abd24a5cfc",
+      "relative_links": 3,
+      "sha256": "sha256:4472acf104e7f7755c5441859708732ef52158fb8ba0510770d5dc020c7b2fdf",
       "title": "Db2 — Engine and common SQL progress",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "docs/delivery/subsystems/db2/decfloat-primitive-decision.md",
+      "relative_links": 1,
+      "sha256": "sha256:fcd94cc312d7ee971a465d942cee5cacef0100a602cc444027e26ab67488a8ae",
+      "title": "Finite DECFLOAT assignment primitive",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/db2/programming-plan.md",
       "relative_links": 2,
-      "sha256": "sha256:a62467123dd5cceb8b1300f9ab73010f8d2b6f1eae5d62d33322c0f8e5b3bfae",
+      "sha256": "sha256:d86095ad9ce96cb1426217e5451de37a3649616d89146362497719735a86707e",
       "title": "Db2 — Complete programming surface",
       "xtask_commands": 0
     },
@@ -1434,31 +1734,47 @@
       "normative": false,
       "path": "docs/delivery/subsystems/db2/reuse-spike.md",
       "relative_links": 0,
-      "sha256": "sha256:cba7865f928e50999b6617ed44dfbb31c7e86607179e84fc6731c0cdd1abcc6f",
-      "title": "Db2 0.12 parser and executor reuse spike",
+      "sha256": "sha256:fcc10e7a08534ee8f7f236eca83441546cd35ee455370ae205398d83caea0e37",
+      "title": "Db2 core parser and executor reuse spike",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "docs/delivery/subsystems/ims/mixed-boolean-ssa-gap.md",
+      "relative_links": 0,
+      "sha256": "sha256:ba7fc077401582eafe94adc7f91a5e983cc5e65d10625e154c86f2e2edcb8499",
+      "title": "IMS mixed Boolean SSA acceptance gap",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-plan.md",
       "relative_links": 2,
-      "sha256": "sha256:7658762291bf3f444b66c2a70a9ae6c19c3f4b209e09cb138ddcae9fb27f67ac",
+      "sha256": "sha256:9e00f37822ba6d38e7e862e78ed7192b5297a41c2afbb054dc5c9879fb4b1034",
       "title": "IMS — DB / TM programming surface",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-status.md",
-      "relative_links": 0,
-      "sha256": "sha256:e490a57ab72e47f719f8ea25fe29c320dfc3b4553cee4c62655478414f3519f9",
+      "relative_links": 11,
+      "sha256": "sha256:9a225870ee550ce87dac5d490e6abdb7efa63e8a9bfad9c1f8aea34efe029b21",
       "title": "IMS — DB / TM programming surface progress",
-      "xtask_commands": 4
+      "xtask_commands": 25
+    },
+    {
+      "normative": false,
+      "path": "docs/delivery/subsystems/ims/selected-pcb-feedback.md",
+      "relative_links": 2,
+      "sha256": "sha256:ae102006421d7ddcaca6b0a5eb7ce70f4bd64c6276164fb595280a579e1cb2dc",
+      "title": "Selected database PCB feedback: bounded contract and class review",
+      "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/integration/transactions-plan.md",
       "relative_links": 2,
-      "sha256": "sha256:937b9270a6c7baccc5773093d64f48361cdd24d23673fd341ec96e3b01aa6fe5",
+      "sha256": "sha256:6fb997d6567fc2a1588360ca35c36a2add76f7ab71e07533af1ab71a92c9abf4",
       "title": "Cross-resource integration — Transactions and recovery",
       "xtask_commands": 0
     },
@@ -1466,7 +1782,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/integration/transactions-status.md",
       "relative_links": 0,
-      "sha256": "sha256:a9ec8c3cbc0fb314c8ac7b204d4c51d6e9bcbd52dd294bc223562ba6e4bc8d9e",
+      "sha256": "sha256:7f8281cb6a090365b62f2fef11ac836c8d8460dfbb8781921a736eff9c47cea9",
       "title": "Cross-resource integration — Transactions and recovery progress",
       "xtask_commands": 0
     },
@@ -1474,7 +1790,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/jcl/planning-plan.md",
       "relative_links": 0,
-      "sha256": "sha256:d2f5e0bee1ddf280d5d20fe3b16447fab9f53fdd12d7f1cb49c3bcad03de676f",
+      "sha256": "sha256:f06b513f0eb80f3b25b5d4b117a8c1b9ea18a71e8d4a667f76aa25c13ce46a83",
       "title": "JCL — Converter and planner",
       "xtask_commands": 0
     },
@@ -1482,7 +1798,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/jcl/planning-status.md",
       "relative_links": 0,
-      "sha256": "sha256:ef435479a240ff3a78b372ff5513278f2dffbdbca7f5baf6eee3541ef8c2241d",
+      "sha256": "sha256:17b0b862838b7b7a2379134d8766cbe4d36182b15fc07b545f6ae24d42d53236",
       "title": "JCL — Converter and planner progress",
       "xtask_commands": 0
     },
@@ -1490,7 +1806,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/jes/execution-plan.md",
       "relative_links": 0,
-      "sha256": "sha256:c718ceeab58fab0b74f51a49e7d1005d47a2b9f8d4c46c6daf48c50d5797d10e",
+      "sha256": "sha256:3b27008b117f873532b0a73cdd2e7b0788ddea2035bceb9c77f355a28b568f22",
       "title": "JES2 and utilities — Jobs, spool and utilities",
       "xtask_commands": 0
     },
@@ -1498,7 +1814,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/jes/execution-status.md",
       "relative_links": 0,
-      "sha256": "sha256:37c8cdc9bc203ccc9ef15db8acd18d77d283dcd1c4b5fa2f4f0aa6bee2a6fd31",
+      "sha256": "sha256:4df3a93f7e3d545d359fadd29d084b1c85a92b6ebf186928d5ab4b6e7dc1fd5e",
       "title": "JES2 and utilities — Jobs, spool and utilities progress",
       "xtask_commands": 4
     },
@@ -1506,31 +1822,43 @@
       "normative": false,
       "path": "docs/delivery/subsystems/jes/review.md",
       "relative_links": 5,
-      "sha256": "sha256:75be6a1da0ccfa54536718d178861ba296135b034d8465e94815192c3f4319b4",
-      "title": "mainframe-env 0.8.0 review — JES2 execution and real utility semantics",
-      "xtask_commands": 4
+      "sha256": "sha256:a1b257ac9ac7644366c80a7680c4e91a33b5cb9945b9e656edfa9a9e9fcd5227",
+      "title": "mainframe-env jes.execution review — JES2 execution and real utility semantics",
+      "xtask_commands": 2
+    },
+    {
+      "applies_from": "mainframe-env mq.programming",
+      "normative": true,
+      "owner": "MQ source-review maintainers",
+      "path": "docs/delivery/subsystems/mq/inquiry-source-boundary.md",
+      "relative_links": 2,
+      "scope": "four retained inquiry attribute sources and remaining semantic gaps",
+      "sha256": "sha256:83607f8b37f32dd065a0b6ad4308a6670424b3dd957bdea09934164011685adc",
+      "status": "Normative source boundary; zero execution credit",
+      "title": "MQ inquiry attribute source boundary",
+      "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-plan.md",
       "relative_links": 3,
-      "sha256": "sha256:c71e5594fc65c65f233133a3e39d22c119eb89510eeeefd883d02fdd41c0c5d1",
+      "sha256": "sha256:dca02036dda520579fb57b00c2485137e367a3e33f45bc863169e1610e4986b6",
       "title": "IBM MQ — MQI programming surface",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
-      "relative_links": 0,
-      "sha256": "sha256:d9ea2faff266248eaaf3637b7c2ea0118679abca1625473f3122062607c9a708",
+      "relative_links": 1,
+      "sha256": "sha256:efce89f90b0ddc3406d9648217e828a3a34b61b951de93ebbf80109f8966f213",
       "title": "IBM MQ — MQI programming surface progress",
-      "xtask_commands": 0
+      "xtask_commands": 2
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/racf/security-plan.md",
       "relative_links": 0,
-      "sha256": "sha256:c897555bda5820368e08a551c85250bbf049b692d24113a4558d4573f5a6e49c",
+      "sha256": "sha256:0884c431f43e80fffab870c62bd82e96811fc4ab4123b5bcee41a1137fbff440",
       "title": "RACF / SAF — Commands and authorization",
       "xtask_commands": 0
     },
@@ -1538,7 +1866,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/racf/security-status.md",
       "relative_links": 0,
-      "sha256": "sha256:378f3e2e1b35bd7ff55078b2d7aefe4a6e57dac70b8c037f0477ff4e82146413",
+      "sha256": "sha256:8cec6a06cf49f913de7308e72a0ce223b3fbb1dad5388bf1c08f4181e8f40647",
       "title": "RACF / SAF — Commands and authorization progress",
       "xtask_commands": 0
     },
@@ -1546,7 +1874,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/zosmf/rest-plan.md",
       "relative_links": 2,
-      "sha256": "sha256:6a9f1f6222b60d2e0ee89535ead42d4cd7ab723538388f2c7b3e90b0f74b8db0",
+      "sha256": "sha256:628d09ba07812a797171294e451175e4622f807ef27c9e7a3abd2c3ad05aa95c",
       "title": "z/OSMF — REST portfolio",
       "xtask_commands": 0
     },
@@ -1554,39 +1882,91 @@
       "normative": false,
       "path": "docs/delivery/subsystems/zosmf/rest-status.md",
       "relative_links": 0,
-      "sha256": "sha256:629a454388e8b2b039c8c08dbe11e0e0ce727484c452a775afbfffe3444dd2ff",
+      "sha256": "sha256:5194e22f4f98976da857ce907b7ec505497fceefe5268d3160cba318198895ac",
       "title": "z/OSMF — REST portfolio progress",
       "xtask_commands": 4
     },
     {
       "normative": false,
-      "path": "docs/generated/jcl-0.7.0-catalog.md",
+      "path": "docs/generated/jcl-catalog.md",
       "relative_links": 0,
-      "sha256": "sha256:1a8abb5d75c298b73233bfbc420d90ef61f18bf76a5691e19a713403d1836f9a",
-      "title": "Generated JCL/JES2 0.7.0 inventory",
+      "sha256": "sha256:908be07d852eff4849f01a821642d85bb2549e3bd66d5816b8533ad7af690f43",
+      "title": "Generated JCL/JES2 inventory",
       "xtask_commands": 1
     },
     {
       "normative": false,
-      "path": "docs/prompts/IMPLEMENT_CARDDEMO_0_1_1.md",
-      "relative_links": 0,
-      "sha256": "sha256:cfdcd9b69fc2351ae44dee495908654fd7908e417772751276a540f3f6bdbdef",
-      "title": "Execution Prompt — Implement CardDemo-full for mainframe-env 0.1.1",
+      "path": "docs/guides/CAPABILITIES.md",
+      "relative_links": 32,
+      "sha256": "sha256:5b9b3986d493c7d5fda28775a057e6284309a38618584cca848fc242d8da0fd7",
+      "title": "Capabilities and limitations",
       "xtask_commands": 0
     },
     {
       "normative": false,
-      "path": "docs/prompts/IMPLEMENT_MAINFRAME_ENV_0_1.md",
-      "relative_links": 1,
-      "sha256": "sha256:ed17d3bb57db14c32cddddadf81fc1dc04247e060199654da0b7566f6880797a",
-      "title": "Execution Prompt — Implement mainframe-env 0.1 End to End",
-      "xtask_commands": 8
+      "path": "docs/guides/DISTRIBUTION.md",
+      "relative_links": 5,
+      "sha256": "sha256:59a1124a1d2f346f775575ca10680c084adc4797d4274284ba57fca1b6960cb1",
+      "title": "Public source distribution",
+      "xtask_commands": 6
+    },
+    {
+      "normative": false,
+      "path": "docs/guides/EMBEDDING.md",
+      "relative_links": 15,
+      "sha256": "sha256:ca440fe4f5c48ed0bcabb9a7e7ebafc85d4ca1c8b4fb6b8fe2bdf00cde925a36",
+      "title": "Embed mainframe-env in Rust",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "docs/guides/GETTING-STARTED.md",
+      "relative_links": 11,
+      "sha256": "sha256:d1843f493674bff12b7a74e2d45b7ac4fe07e6e053a9fe97d7399349e7274c4b",
+      "title": "Getting started",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "docs/guides/GLOSSARY.md",
+      "relative_links": 3,
+      "sha256": "sha256:bec2a669ba64099ef5f6e21ffa1eb9f4bdfeafec869fc59ecd7a11e7064e7525",
+      "title": "Framework glossary",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "Application and developer tooling maintainers",
+      "path": "docs/guides/MAINFRAME-SANDBOX.md",
+      "relative_links": 4,
+      "scope": "Executable profiles, lifecycle and agent access",
+      "sha256": "sha256:5d58f6ac9a489cd20e123f26eea4948daaee21f653b4854e9086a4ef3a08f41a",
+      "status": "Implemented for native and container execution; Cube VM validation pending",
+      "title": "Mainframe Sandbox",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "docs/guides/README.md",
+      "relative_links": 9,
+      "sha256": "sha256:8fae507f39279bc25000c441cda5eb09ecbf0bfe15707e5b33a458d0a786c720",
+      "title": "User and maintainer guides",
+      "xtask_commands": 2
+    },
+    {
+      "normative": false,
+      "path": "docs/prompts/README.md",
+      "relative_links": 2,
+      "sha256": "sha256:da2f5cc7bcdf65e96ca5c4da9dd1a263132ae888b60973f372f0cc3f08e6be16",
+      "title": "Implementation prompts",
+      "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/prompts/subsystems/README.md",
       "relative_links": 25,
-      "sha256": "sha256:7886d4918e1a102a2189f42684ecf14933464b4139f2d7c305ff0e1fca2be898",
+      "sha256": "sha256:cd1eba434d1cedee3e864cbabe8ea16b54c09a0d3ec75e3598e29f534772e357",
       "title": "Subsystem implementation prompts",
       "xtask_commands": 0
     },
@@ -1594,7 +1974,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/certification/IMPLEMENT_LICENSED.md",
       "relative_links": 4,
-      "sha256": "sha256:42f1ffaae578aa3f435d41cdfa40cdf6414465a097b6d4c766e46845f066d963",
+      "sha256": "sha256:42229b8a3a3bb8c916fd8a71152fc6e4bbd31680f4601888b2651b0b91b074c5",
       "title": "Execution Prompt — Licensed certification — Differential certification",
       "xtask_commands": 0
     },
@@ -1602,7 +1982,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/cics/IMPLEMENT_APPLICATION_API.md",
       "relative_links": 6,
-      "sha256": "sha256:77bc001748ca608c2b757a5520acb0476a7f68652869f0e0d42c56bfe2ab3037",
+      "sha256": "sha256:9d8b9db75eda917898e1eea57095b8b8fc8e7930a3f70470ae9ded804e7538c1",
       "title": "Execution Prompt — CICS — Application API",
       "xtask_commands": 0
     },
@@ -1610,7 +1990,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/cics/IMPLEMENT_SYSTEM_API.md",
       "relative_links": 4,
-      "sha256": "sha256:5f9aad0101f97ddd35f474e8099c49350e3debcf3e04ad5bb49eaf2da310ba2a",
+      "sha256": "sha256:7ebb8112d85e835312d95e560de1450e581998a4a866c6dada7ac69a70fb53c0",
       "title": "Execution Prompt — CICS — SPI and FEPI",
       "xtask_commands": 0
     },
@@ -1618,7 +1998,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/cobol/IMPLEMENT_EXECUTION.md",
       "relative_links": 1,
-      "sha256": "sha256:2e302d653cac9b74c5c087dd86a6095041ac7b5578fbdaa5c070ea9da70c82bb",
+      "sha256": "sha256:5372f824a1cad7372e2608e22caac7c3e27a617a6dd30001d97785d58e5bd28d",
       "title": "Execution Prompt — COBOL — Execution semantics",
       "xtask_commands": 0
     },
@@ -1626,7 +2006,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/cobol/IMPLEMENT_STRUCTURE.md",
       "relative_links": 1,
-      "sha256": "sha256:290899a947d10a39e3058e8c4a271ed14463507d45400b611d032e7d2a79d308",
+      "sha256": "sha256:2b3e3e76a6a77c3aa97c8cd69fd51dc8c61f5480fbd2ef96d59bd12811da8a92",
       "title": "Execution Prompt — COBOL — Grammar and types",
       "xtask_commands": 1
     },
@@ -1634,7 +2014,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/coverage/IMPLEMENT_FOUNDATION.md",
       "relative_links": 1,
-      "sha256": "sha256:53312b3615a11e32dfd5471ef8dd680df33dcf911533fda798bfbfd6178a9875",
+      "sha256": "sha256:f45192d9d732d4d0ce706632027875c8f4de635ed4505f3dbe3de789b3b28566",
       "title": "Execution Prompt — Coverage and conformance — Coverage authority",
       "xtask_commands": 0
     },
@@ -1642,7 +2022,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/dataset/IMPLEMENT_DATA.md",
       "relative_links": 1,
-      "sha256": "sha256:f1c0261cf3ad4e140589db1bf71acda794c4c80ae7247f8cbf76f9697e89f524",
+      "sha256": "sha256:8634cb5f81088f8553f1092adee330a8c1e9d32b44ac590c1051cd4b51fdfb1d",
       "title": "Execution Prompt — Datasets / VSAM / AMS — Dataset services",
       "xtask_commands": 1
     },
@@ -1650,7 +2030,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/db2/IMPLEMENT_CORE.md",
       "relative_links": 5,
-      "sha256": "sha256:b31235e3a86705df9c1b16aa2e5dadc241f6ecab4aa80ad37a40ffa67a591908",
+      "sha256": "sha256:854bf3698f202ef1408de158f60e86153873f83ff0cd6defe7b00f7f7c7fdbbb",
       "title": "Execution Prompt — Db2 — Engine and common SQL",
       "xtask_commands": 0
     },
@@ -1658,7 +2038,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/db2/IMPLEMENT_PROGRAMMING.md",
       "relative_links": 4,
-      "sha256": "sha256:31176a7397ae5b1403b128d2a8efb2e1d35821af5a27b4e108bf6e6d4bd9a0c1",
+      "sha256": "sha256:53380b9187b1925fc63dcba89541ada8534662f6c0123dde783a1059aadf4b98",
       "title": "Execution Prompt — Db2 — Complete programming surface",
       "xtask_commands": 0
     },
@@ -1666,7 +2046,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/ims/IMPLEMENT_PROGRAMMING.md",
       "relative_links": 4,
-      "sha256": "sha256:930681306b7dfba0829c9b2ab596552d001d254876350a521ae492ddd12839d3",
+      "sha256": "sha256:c4055d861eff193c488f77481a55486e570cddd8a97f252d339bd35df9d0ec2e",
       "title": "Execution Prompt — IMS — DB / TM programming surface",
       "xtask_commands": 0
     },
@@ -1674,7 +2054,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/integration/IMPLEMENT_TRANSACTIONS.md",
       "relative_links": 4,
-      "sha256": "sha256:53c8fd760b5bf598d8332e6e1775acf82a0fa333d1270b108b5a9b3c357b9bab",
+      "sha256": "sha256:3dad0a123dfa511a60e62c0f54a35e14e4a98392faa586ef51441b815eb8d305",
       "title": "Execution Prompt — Cross-resource integration — Transactions and recovery",
       "xtask_commands": 0
     },
@@ -1682,7 +2062,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/jcl/IMPLEMENT_PLANNING.md",
       "relative_links": 1,
-      "sha256": "sha256:87fdbe2366297e774250d05e042d7606d4eb8d84f31438a0e5df86b7175ae782",
+      "sha256": "sha256:5562e8057f6c0b691e59f7543f0f7f5d0fe5c1717683b8d6b3a90637117b8761",
       "title": "Execution Prompt — JCL — Converter and planner",
       "xtask_commands": 0
     },
@@ -1690,7 +2070,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/jes/IMPLEMENT_EXECUTION.md",
       "relative_links": 1,
-      "sha256": "sha256:e8adabfb632dcd9cd61d771b7bfd8f919f2aeef6253532adad10ebf1f3179a5c",
+      "sha256": "sha256:53b38520220d924b11ba43c7aa30a703953a989e8a973a6e37319282e1254144",
       "title": "Execution Prompt — JES2 and utilities — Jobs, spool and utilities",
       "xtask_commands": 1
     },
@@ -1698,7 +2078,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/mq/IMPLEMENT_PROGRAMMING.md",
       "relative_links": 4,
-      "sha256": "sha256:5eb7bae8d51b32b63ab624801591359fc852d044070231a21e25dfef7e0f10b1",
+      "sha256": "sha256:1aab7d2d480d4eccbde9a3d74b111802691fa0d347bae7635d848b82d150a737",
       "title": "Execution Prompt — IBM MQ — MQI programming surface",
       "xtask_commands": 0
     },
@@ -1706,7 +2086,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/racf/IMPLEMENT_SECURITY.md",
       "relative_links": 1,
-      "sha256": "sha256:56ef9831e5bb6b5f39865a30b8387fa1ef298d085f4cf9b410c2ebb6bc7fbc2b",
+      "sha256": "sha256:6d1fd7d2c3ad0e12853c3233736ff5c5b55f6b6ef28ef2ee7141be9327b4c9da",
       "title": "Execution Prompt — RACF / SAF — Commands and authorization",
       "xtask_commands": 0
     },
@@ -1714,87 +2094,31 @@
       "normative": false,
       "path": "docs/prompts/subsystems/zosmf/IMPLEMENT_REST.md",
       "relative_links": 4,
-      "sha256": "sha256:d79694b97be5432e96a6c398a9cd5308c2bec60b95dbf4efd66f3c6bb233491d",
+      "sha256": "sha256:d57f3a10ea15a2b126a91c0ece6609bd4526d1d414e0d30092892941d64118b7",
       "title": "Execution Prompt — z/OSMF — REST portfolio",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "docs/releases/0.1.md",
-      "relative_links": 0,
-      "sha256": "sha256:0a5e82a8708ad5b2a3d4d0d5edb542cd90f198a0ab6c1a2bc3e78a86a7b079d7",
-      "title": "mainframe-env 0.1",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "docs/releases/0.2.md",
-      "relative_links": 0,
-      "sha256": "sha256:988dd145dc9dad6d32cf00dd1148c7471062e37df5093dd018d1dca1d0ef8668",
-      "title": "mainframe-env 0.2",
-      "xtask_commands": 4
-    },
-    {
-      "normative": false,
-      "path": "docs/releases/0.3.md",
-      "relative_links": 0,
-      "sha256": "sha256:50c6dc8125033db3757a86721e6808556042fa422b8585c2ebdecd43c8804732",
-      "title": "mainframe-env 0.3",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "docs/releases/0.4.md",
-      "relative_links": 0,
-      "sha256": "sha256:14d26b1e182ebf202e21539245c2baeec9a4c9b975779bc85f6412507f3fe7ba",
-      "title": "mainframe-env 0.4",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "docs/releases/0.5.md",
-      "relative_links": 0,
-      "sha256": "sha256:02f5c8062117de9d5a25fa71b25ff48a63ff634427cd869b79a8b68e623ebeef",
-      "title": "mainframe-env 0.5",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "docs/releases/0.6.md",
-      "relative_links": 0,
-      "sha256": "sha256:b2d96dc4ffc036caf1c8b8ddf205f7f5be6cd0f6cfefd583185336ca7a5691bd",
-      "title": "mainframe-env 0.6",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "docs/releases/0.7.md",
-      "relative_links": 0,
-      "sha256": "sha256:93767ade2ddf63e5441dfb0dd63436c6e65820b61001b4fedf74e1545945d65b",
-      "title": "mainframe-env 0.7",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "docs/releases/0.8.md",
-      "relative_links": 1,
-      "sha256": "sha256:ceba88861a9a722adae3c7446a81373d9d600764e8fa266ed1f00bbd35af47f6",
-      "title": "mainframe-env 0.8 release line",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/research/IBM-OFFICIAL-COVERAGE-ROADMAP.md",
       "relative_links": 13,
-      "sha256": "sha256:c205c68354af9f88479d51d9c91e41aac6a829b4bf426440110a20c8d89a8cb9",
+      "sha256": "sha256:54b3641562da8126ff2bec6f49a394fbb3c364a0cb937a15702408ef8e51bbdc",
       "title": "IBM official coverage and de-hardcoding roadmap",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "docs/research/README.md",
+      "relative_links": 5,
+      "sha256": "sha256:83b3d3149c6f5fa82130d51b6d2b5d640ca9d8ec7127dd1bdfc4cb90ebc76f56",
+      "title": "Research and source investigations",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/research/cics-behavioral-conformance-pilot.md",
       "relative_links": 0,
-      "sha256": "sha256:7750997360544cb6e4b82b90604d3d27971b341eda37d24191cccefa859cab34",
+      "sha256": "sha256:1be23397cdc5cc41b22602e80650577b7b06fa0c3f57f8b429bb96cfdffaf69f",
       "title": "CICS file/UOW behavioral conformance pilot",
       "xtask_commands": 2
     },
@@ -1802,32 +2126,32 @@
       "normative": false,
       "path": "docs/research/publication-source-probe.md",
       "relative_links": 0,
-      "sha256": "sha256:477889aa92857ab366d0a498aa54ac5f73a7efcddf0496228e323b1aeb0eba95",
+      "sha256": "sha256:633f2c9cece55cd10e8754a048441e714b67b93d30665b5df5a178298b977b9a",
       "title": "Publication source probe",
       "xtask_commands": 0
     },
     {
       "normative": false,
-      "path": "docs/reviews/PR-163-FOLLOWUP-BOUNDARIES.md",
+      "path": "docs/reviews/CICS-COMMAND-BOUNDARIES.md",
       "relative_links": 0,
-      "sha256": "sha256:c182cdc5d19cd91b643213b175760f208350e5fe552fb17758c2e084b5d739c5",
-      "title": "PR #163 follow-up boundaries",
+      "sha256": "sha256:b5aab20482f852f652eceefdb7a0ab9295e41ee6568046948585a6f279698ca8",
+      "title": "CICS command boundaries",
       "xtask_commands": 0
     },
     {
       "normative": false,
-      "path": "docs/reviews/PRE-0.9.0-DEEP-REVIEW.md",
-      "relative_links": 32,
-      "sha256": "sha256:d421cf6aab05669a6788548a7394979fb7a0efec44797c0fc75410ec15f148fd",
-      "title": "Pre-0.9.0 deep review",
-      "xtask_commands": 5
+      "path": "docs/reviews/README.md",
+      "relative_links": 3,
+      "sha256": "sha256:d05f68e4aca6465b058f6a0ce72a6dc116eeb38f656eed47157a64f72f8395be",
+      "title": "Engineering reviews",
+      "xtask_commands": 0
     },
     {
       "normative": false,
-      "path": "docs/reviews/README.md",
-      "relative_links": 1,
-      "sha256": "sha256:7dfacd3fcb89d372d1c3bc4dadc31c7ae3e50cb82faa2b33d796f2a9fded9ed3",
-      "title": "Engineering reviews",
+      "path": "docs/reviews/SUBSYSTEM-REVIEW.md",
+      "relative_links": 11,
+      "sha256": "sha256:4f3280b6ef2c1c656f7397c59345206d1954e8b95a5c07aaf7a0c3126798d33f",
+      "title": "Subsystem engineering review",
       "xtask_commands": 0
     },
     {
@@ -1849,24 +2173,24 @@
     {
       "normative": false,
       "path": "docs/runbooks/CARDDEMO-OPERATOR.md",
-      "relative_links": 0,
-      "sha256": "sha256:c2eae35405b61ce84000117820ec7bd2d030ff1fd7fba4bb6daed0cc42049438",
+      "relative_links": 2,
+      "sha256": "sha256:23f04110bd69bd50279efbedc4cf3c0da0c76cb3f0a1929670e832ffeb4544a6",
       "title": "CardDemo operator compatibility",
-      "xtask_commands": 6
+      "xtask_commands": 4
     },
     {
       "normative": false,
       "path": "docs/runbooks/CARDDEMO-READACCT-BUNDLE.md",
-      "relative_links": 1,
-      "sha256": "sha256:396634191e01c20881b3543c7ebbc6e8d752ea8ee8838056a328f25a82cddff1",
+      "relative_links": 2,
+      "sha256": "sha256:9ac791a82a586d4db5529b48cdcc02d6d93d89c6a7ed664e226e479e9c0f751f",
       "title": "CardDemo READACCT run bundle",
-      "xtask_commands": 2
+      "xtask_commands": 1
     },
     {
       "normative": false,
       "path": "docs/runbooks/CI-SUPPLY-CHAIN.md",
       "relative_links": 0,
-      "sha256": "sha256:616ea9f5b00f2dfb2c8898bbb667c7bb72dfc863746790f19a1008f904f6e1a9",
+      "sha256": "sha256:157a880c64008d45b099782a6ec1c5218b15b1224062aa791857ba2e58dcab34",
       "title": "CI supply-chain inputs",
       "xtask_commands": 1
     },
@@ -1880,9 +2204,17 @@
     },
     {
       "normative": false,
+      "path": "docs/runbooks/CONFORMANCE-FAMILY-ROLLOUT.md",
+      "relative_links": 0,
+      "sha256": "sha256:cc37d9d36701b84ac494bd5823036dcf691f88b72a21ab9a182bc1b3dcdc87b4",
+      "title": "Incremental conformance-family rollout",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
       "path": "docs/runbooks/IBM-DOCS-CACHE.md",
       "relative_links": 3,
-      "sha256": "sha256:0d2b4607a028e6a65af1d2ae77817abd0ab6ce9bcd71ef051765958b29bd51af",
+      "sha256": "sha256:2fead1c836f5ff4460ebae2ccde95d81858efd4a4be820f8f5f7968930907c57",
       "title": "IBM documentation cache",
       "xtask_commands": 0
     },
@@ -1890,23 +2222,31 @@
       "normative": false,
       "path": "docs/runbooks/JENKINS-LOCAL.md",
       "relative_links": 1,
-      "sha256": "sha256:52f128bbba1e79186c5e84483c0668aee1e53e8a9edfa7395580d6efe01682df",
+      "sha256": "sha256:f84c57ac49eaa12e447757c5f969ecf14cac5c566a744969bc47cec19138a4a8",
       "title": "Local Jenkins CI",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/runbooks/OPERATIONS.md",
-      "relative_links": 2,
-      "sha256": "sha256:6ba9e4ea57cf66d7ab22bf139233f2c0c025480754f89dad6e91ad34492133ab",
+      "relative_links": 3,
+      "sha256": "sha256:75f2c799d3e11bbdf0adf940ff0461f99b794d29500d96919f606caf169d346d",
       "title": "Core-server operations",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "docs/runbooks/README.md",
+      "relative_links": 14,
+      "sha256": "sha256:c337551a80365884145015b08091c30c120c2d28875437503233c331be024cc7",
+      "title": "Operations and verification runbooks",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/runbooks/VERIFICATION-WORKFLOW.md",
       "relative_links": 1,
-      "sha256": "sha256:8da50bdaeb42a3b7fe559be1547d71b0713e043c84f0bd8b1fbd79c91bb1b04a",
+      "sha256": "sha256:ed0c332c80c2105c2c770f7af68f9101b86af63d644693b4f89d6aeb0ef70df9",
       "title": "Verification workflow",
       "xtask_commands": 1
     },
@@ -1914,172 +2254,88 @@
       "normative": false,
       "path": "docs/runbooks/cics-licensed-pilot.md",
       "relative_links": 0,
-      "sha256": "sha256:104f5432499b52a4a6cebab3e42d86d1e96d6416a8e14ed04abbe7451e42765c",
+      "sha256": "sha256:253370c10f0a116b989e0ecbb8e4bc28bf7ffffddd738587148cead4de54a72d",
       "title": "Licensed CICS file/UOW pilot handoff",
       "xtask_commands": 2
     },
     {
       "normative": false,
-      "path": "docs/runbooks/conformance-family-rollout.md",
-      "relative_links": 0,
-      "sha256": "sha256:fb1ba4b88cda73ab5b02831c97ab65d4e7fd87c5f19b46253f6b5f5e57621220",
-      "title": "Incremental conformance-family rollout",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "release/0.1.0-alpha.0/LICENSES.md",
-      "relative_links": 0,
-      "sha256": "sha256:3fdd41495a7c2679e00e562c81f2f324252be10d478ee01c5cbc0c723d631bc6",
-      "title": "License expressions",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "release/0.1.1/LICENSES.md",
-      "relative_links": 0,
-      "sha256": "sha256:3fdd41495a7c2679e00e562c81f2f324252be10d478ee01c5cbc0c723d631bc6",
-      "title": "License expressions",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "release/0.2.0/targets/aarch64-apple-darwin/LICENSES.md",
-      "relative_links": 0,
-      "sha256": "sha256:127803aadf60cd9d34c1b177f70ee0a32cdf701247053dbcbdd50b24b49acadb",
-      "title": "License expressions",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "release/0.2.0/targets/x86_64-unknown-linux-gnu/LICENSES.md",
-      "relative_links": 0,
-      "sha256": "sha256:127803aadf60cd9d34c1b177f70ee0a32cdf701247053dbcbdd50b24b49acadb",
-      "title": "License expressions",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "release/0.3.0/targets/aarch64-apple-darwin/LICENSES.md",
-      "relative_links": 0,
-      "sha256": "sha256:e121547765cee2a36c89d7caf7cd2bfdecfebced7d003113c4b4c735c6d30852",
-      "title": "License expressions",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "release/0.3.0/targets/x86_64-unknown-linux-gnu/LICENSES.md",
-      "relative_links": 0,
-      "sha256": "sha256:e121547765cee2a36c89d7caf7cd2bfdecfebced7d003113c4b4c735c6d30852",
-      "title": "License expressions",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "release/0.4.0/targets/aarch64-apple-darwin/LICENSES.md",
-      "relative_links": 0,
-      "sha256": "sha256:e121547765cee2a36c89d7caf7cd2bfdecfebced7d003113c4b4c735c6d30852",
-      "title": "License expressions",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "release/0.4.0/targets/x86_64-unknown-linux-gnu/LICENSES.md",
-      "relative_links": 0,
-      "sha256": "sha256:e121547765cee2a36c89d7caf7cd2bfdecfebced7d003113c4b4c735c6d30852",
-      "title": "License expressions",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "release/0.5.0/targets/aarch64-apple-darwin/LICENSES.md",
-      "relative_links": 0,
-      "sha256": "sha256:e121547765cee2a36c89d7caf7cd2bfdecfebced7d003113c4b4c735c6d30852",
-      "title": "License expressions",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "release/0.5.0/targets/x86_64-unknown-linux-gnu/LICENSES.md",
-      "relative_links": 0,
-      "sha256": "sha256:e121547765cee2a36c89d7caf7cd2bfdecfebced7d003113c4b4c735c6d30852",
-      "title": "License expressions",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "release/0.6.0/targets/aarch64-apple-darwin/LICENSES.md",
-      "relative_links": 0,
-      "sha256": "sha256:e121547765cee2a36c89d7caf7cd2bfdecfebced7d003113c4b4c735c6d30852",
-      "title": "License expressions",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "release/0.6.0/targets/x86_64-unknown-linux-gnu/LICENSES.md",
-      "relative_links": 0,
-      "sha256": "sha256:e121547765cee2a36c89d7caf7cd2bfdecfebced7d003113c4b4c735c6d30852",
-      "title": "License expressions",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "release/0.7.0/targets/aarch64-apple-darwin/LICENSES.md",
-      "relative_links": 0,
-      "sha256": "sha256:e121547765cee2a36c89d7caf7cd2bfdecfebced7d003113c4b4c735c6d30852",
-      "title": "License expressions",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "release/0.7.0/targets/x86_64-unknown-linux-gnu/LICENSES.md",
-      "relative_links": 0,
-      "sha256": "sha256:e121547765cee2a36c89d7caf7cd2bfdecfebced7d003113c4b4c735c6d30852",
-      "title": "License expressions",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "release/0.8.0/targets/aarch64-apple-darwin/LICENSES.md",
-      "relative_links": 0,
-      "sha256": "sha256:e121547765cee2a36c89d7caf7cd2bfdecfebced7d003113c4b4c735c6d30852",
-      "title": "License expressions",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "release/0.8.0/targets/x86_64-unknown-linux-gnu/LICENSES.md",
-      "relative_links": 0,
-      "sha256": "sha256:e121547765cee2a36c89d7caf7cd2bfdecfebced7d003113c4b4c735c6d30852",
-      "title": "License expressions",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "release/0.8.1/targets/aarch64-apple-darwin/LICENSES.md",
-      "relative_links": 0,
-      "sha256": "sha256:e121547765cee2a36c89d7caf7cd2bfdecfebced7d003113c4b4c735c6d30852",
-      "title": "License expressions",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": "release/0.8.1/targets/x86_64-unknown-linux-gnu/LICENSES.md",
-      "relative_links": 0,
-      "sha256": "sha256:e121547765cee2a36c89d7caf7cd2bfdecfebced7d003113c4b4c735c6d30852",
-      "title": "License expressions",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
       "path": "xtask/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:ae51b7140e515cfbd6312d9357e7912b9c9acf2aa5470f232fd2d1fea8134346",
+      "relative_links": 4,
+      "sha256": "sha256:cca1268b670a57519b0459a1b8a17c3f94883881ceafc1c2755f714213f1109e",
       "title": "xtask",
-      "xtask_commands": 10
+      "xtask_commands": 12
     }
   ],
+  "management": {
+    "authority": "docs/documentation-registry.json",
+    "committed_execution_receipts": false,
+    "model": "subsystem",
+    "tracking": "docs/delivery/IMPLEMENTATION-STATUS.md"
+  },
   "navigation": [
+    {
+      "entries": [
+        {
+          "label": "Executable sandbox and agent setup",
+          "path": "docs/guides/MAINFRAME-SANDBOX.md"
+        },
+        {
+          "label": "Capabilities and limitations",
+          "path": "docs/guides/CAPABILITIES.md"
+        },
+        {
+          "label": "Embed mainframe-env in Rust",
+          "path": "docs/guides/EMBEDDING.md"
+        },
+        {
+          "label": "Getting started",
+          "path": "docs/guides/GETTING-STARTED.md"
+        },
+        {
+          "label": "Framework glossary",
+          "path": "docs/guides/GLOSSARY.md"
+        },
+        {
+          "label": "Review public source distribution",
+          "path": "docs/guides/DISTRIBUTION.md"
+        },
+        {
+          "label": "User and maintainer guides",
+          "path": "docs/guides/README.md"
+        }
+      ],
+      "heading": "User and maintainer guides"
+    },
+    {
+      "entries": [
+        {
+          "label": "Architecture reference",
+          "path": "docs/architecture/README.md"
+        },
+        {
+          "label": "Versioned contracts",
+          "path": "docs/contracts/README.md"
+        },
+        {
+          "label": "Delivery and verification",
+          "path": "docs/delivery/README.md"
+        },
+        {
+          "label": "Operations and verification runbooks",
+          "path": "docs/runbooks/README.md"
+        },
+        {
+          "label": "Research and source investigations",
+          "path": "docs/research/README.md"
+        },
+        {
+          "label": "Implementation prompts",
+          "path": "docs/prompts/README.md"
+        }
+      ],
+      "heading": "Documentation collections"
+    },
     {
       "entries": [
         {
@@ -2131,6 +2387,10 @@
           "path": "docs/architecture/MQ-PROGRAMMING-SURFACE.md"
         },
         {
+          "label": "MQ inquiry attribute source boundary",
+          "path": "docs/delivery/subsystems/mq/inquiry-source-boundary.md"
+        },
+        {
           "label": "Application packages",
           "path": "docs/architecture/APPLICATION-PACKAGES.md"
         },
@@ -2159,10 +2419,6 @@
           "path": "docs/architecture/PROGRAM-AND-ROUTE-REGISTRIES.md"
         },
         {
-          "label": "Proposed named PROGRAM STATUS boundary",
-          "path": "docs/contracts/CICS-NAMED-PROGRAM-STATUS-V1.md"
-        },
-        {
           "label": "Durable storage profile",
           "path": "docs/contracts/DURABLE-STORAGE-PROFILE.md"
         },
@@ -2179,16 +2435,12 @@
           "path": "docs/contracts/RETENTION-LIFECYCLE-V1.md"
         },
         {
-          "label": "Target release build type",
-          "path": "docs/contracts/RELEASE-BUILD-V1.md"
-        },
-        {
           "label": "Transaction participant contract",
           "path": "docs/contracts/TRANSACTION-PARTICIPANT-V1.md"
         },
         {
-          "label": "Release builder security model",
-          "path": "docs/architecture/RELEASE-BUILDER.md"
+          "label": "Proposed named PROGRAM STATUS boundary",
+          "path": "docs/contracts/CICS-NAMED-PROGRAM-STATUS-V1.md"
         }
       ],
       "heading": "Architecture and contracts"
@@ -2208,20 +2460,12 @@
           "path": "docs/decisions/0003-contract-serialization.md"
         },
         {
-          "label": "ADR-0004: Versioning and release policy",
-          "path": "docs/decisions/0004-versioning-release-policy.md"
-        },
-        {
           "label": "ADR-0005: Historical package consolidation",
           "path": "docs/decisions/0005-package-consolidation.md"
         },
         {
-          "label": "ADR-0006: CardDemo 0.1.1 profile",
-          "path": "docs/decisions/0006-carddemo-0.1.1-profile.md"
-        },
-        {
-          "label": "ADR-0007: CardDemo 0.1.1 release",
-          "path": "docs/decisions/0007-carddemo-0.1.1-release.md"
+          "label": "ADR-0006: CardDemo workload profile",
+          "path": "docs/decisions/0006-carddemo-profile.md"
         },
         {
           "label": "ADR-0008: ICU license compliance",
@@ -2304,6 +2548,154 @@
           "path": "docs/decisions/0027-cics-logical-program-frames.md"
         },
         {
+          "label": "ADR-0028: Db2 typed catalog evolution",
+          "path": "docs/decisions/0028-db2-typed-catalog-evolution.md"
+        },
+        {
+          "label": "ADR-0028: Shared MQ handle-family kernel",
+          "path": "docs/decisions/0028-mq-shared-handle-kernel.md"
+        },
+        {
+          "label": "ADR-0029: Audited provider publication under a retained intent",
+          "path": "docs/decisions/0029-audited-provider-publication.md"
+        },
+        {
+          "label": "ADR-0029: Db2 core participant evolution",
+          "path": "docs/decisions/0029-db2-core-participant-evolution.md"
+        },
+        {
+          "label": "ADR-0030: Private MQ host lifecycle directory",
+          "path": "docs/decisions/0030-mq-host-lifecycle-directory.md"
+        },
+        {
+          "label": "ADR-0031: One selected MQ service authority",
+          "path": "docs/decisions/0031-mq-selected-service-authority.md"
+        },
+        {
+          "label": "ADR-0032: MQ program-to-machine frame handoff",
+          "path": "docs/decisions/0032-mq-program-machine-frame.md"
+        },
+        {
+          "label": "ADR-0033: Complete MQMD value primitive",
+          "path": "docs/decisions/0033-mq-full-md-value.md"
+        },
+        {
+          "label": "ADR-0033: MQ historical handle observation",
+          "path": "docs/decisions/0033-mq-historical-handle-observation.md"
+        },
+        {
+          "label": "ADR-0034: MQ root publication framework",
+          "path": "docs/decisions/0034-mq-root-terminal-publication.md"
+        },
+        {
+          "label": "ADR-0035: Volatile task-root MQI ABI aliases",
+          "path": "docs/decisions/0035-mq-root-scoped-abi-aliases.md"
+        },
+        {
+          "label": "ADR-0036: Explicit pending Conformance IR obligations",
+          "path": "docs/decisions/0036-conformance-pending-obligations.md"
+        },
+        {
+          "label": "Decision index and template",
+          "path": "docs/decisions/README.md"
+        },
+        {
+          "label": "ADR-0034: Bounded GSAM logical record addresses",
+          "path": "docs/decisions/0034-gsam-logical-address.md"
+        },
+        {
+          "label": "ADR-0031: IMS TM recovery publication and work settlement",
+          "path": "docs/decisions/0031-ims-tm-recovery-publication.md"
+        },
+        {
+          "label": "ADR-0035: Versioned selected database PCB feedback",
+          "path": "docs/decisions/0035-selected-pcb-feedback.md"
+        },
+        {
+          "label": "ADR-0037: Private IMS recovery retention fence",
+          "path": "docs/decisions/0037-private-ims-recovery-retention-fence.md"
+        },
+        {
+          "label": "ADR-0038: Real logical child physical-path key feedback",
+          "path": "docs/decisions/0038-logical-child-physical-key-feedback.md"
+        },
+        {
+          "label": "ADR-0039: Last remaining direct child SSA selection",
+          "path": "docs/decisions/0039-last-direct-child-ssa-selection.md"
+        },
+        {
+          "label": "ADR-0040: Private primary level witnesses and search boundary",
+          "path": "docs/decisions/0040-primary-level-position-search-boundary.md"
+        },
+        {
+          "label": "ADR-0041: First direct child SSA selection",
+          "path": "docs/decisions/0041-first-direct-child-ssa-selection.md"
+        },
+        {
+          "label": "ADR-0042: Private IMS TM output identity and local completion order",
+          "path": "docs/decisions/0042-ims-tm-output-identity-local-order.md"
+        },
+        {
+          "label": "ADR-0043: Checked provider read publication",
+          "path": "docs/decisions/0043-inquiry-checked-read-publication.md"
+        },
+        {
+          "label": "ADR-0044: Checked inquiry replay refusal settlement",
+          "path": "docs/decisions/0044-checked-inquiry-replay-refusal.md"
+        },
+        {
+          "label": "ADR-0033: Raw COBOL DL/I CALL and PCB binding contract",
+          "path": "docs/decisions/0033-cobol-dli-call-boundary.md"
+        },
+        {
+          "label": "ADR-0030: GSAM application record formats and owned length",
+          "path": "docs/decisions/0030-gsam-application-record-formats.md"
+        },
+        {
+          "label": "ADR-0032: Selected secondary checkpoint positions",
+          "path": "docs/decisions/0032-selected-secondary-checkpoint-position.md"
+        },
+        {
+          "label": "ADR-0036: Literal null SSA command slots",
+          "path": "docs/decisions/0036-null-ssa-command-slots.md"
+        },
+        {
+          "label": "ADR-0037: Running-step Program context transport",
+          "path": "docs/decisions/0037-running-step-program-transport.md"
+        },
+        {
+          "label": "ADR-0038: Private coordinator original dispatch extraction",
+          "path": "docs/decisions/0038-coordinator-original-dispatch-extraction.md"
+        },
+        {
+          "label": "ADR-0040: Batch run stop containment",
+          "path": "docs/decisions/0040-batch-run-stop-containment.md"
+        },
+        {
+          "label": "ADR-0043: Batch contained all-effect loan",
+          "path": "docs/decisions/0043-batch-contained-all-effect-loan.md"
+        },
+        {
+          "label": "ADR-0045: Batch prepared-selection observation",
+          "path": "docs/decisions/0045-batch-prepared-selection-plan.md"
+        },
+        {
+          "label": "ADR-0046: Bounded provider namespace prefetch",
+          "path": "docs/decisions/0046-batch-bounded-provider-prefetch.md"
+        },
+        {
+          "label": "ADR-0047: CardDemo participant ownership and batch completion",
+          "path": "docs/decisions/0047-carddemo-participant-completion.md"
+        },
+        {
+          "label": "ADR-0048: Persistent interactive CardDemo composition",
+          "path": "docs/decisions/0048-carddemo-interactive-application.md"
+        },
+        {
+          "label": "Executable application sandbox and agent boundary",
+          "path": "docs/decisions/0049-executable-agent-sandbox.md"
+        },
+        {
           "label": "ADR-0028: Explicit BTS SET loan lifetime",
           "path": "docs/decisions/0028-explicit-bts-set-loan-lifetime.md"
         },
@@ -2314,10 +2706,6 @@
         {
           "label": "ADR-0030: Common CICS source condition authority",
           "path": "docs/decisions/0030-cics-source-condition-authority.md"
-        },
-        {
-          "label": "Decision index and template",
-          "path": "docs/decisions/README.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -2342,16 +2730,12 @@
           "path": "docs/delivery/COMPATIBILITY-AND-CUTOVER.md"
         },
         {
-          "label": "Versioning and releases",
-          "path": "docs/delivery/VERSIONING-AND-RELEASES.md"
-        },
-        {
           "label": "z/OSMF compatibility API",
           "path": "docs/delivery/ZOSMF-API.md"
         }
       ],
       "heading": "Delivery and development",
-      "note": "Implementation progress is organized by subsystem and phase. Release versions identify compatibility and historical evidence."
+      "note": "Implementation progress is organized by subsystem and phase. Contract revisions and pinned IBM product baselines identify compatibility."
     },
     {
       "entries": [
@@ -2372,7 +2756,7 @@
           "path": "docs/prompts/subsystems/README.md"
         },
         {
-          "label": "Project coordination and release history",
+          "label": "Subsystem project coordination",
           "path": "docs/delivery/subsystems/GITHUB-PROJECT.md"
         },
         {
@@ -2438,10 +2822,6 @@
         {
           "label": "Licensed certification — Differential certification",
           "path": "docs/delivery/subsystems/certification/licensed-status.md"
-        },
-        {
-          "label": "Licensed certification — Stable release promotion",
-          "path": "docs/delivery/subsystems/certification/stable-release-plan.md"
         }
       ],
       "heading": "Subsystem progress"
@@ -2478,7 +2858,7 @@
         },
         {
           "label": "Conformance family rollout",
-          "path": "docs/runbooks/conformance-family-rollout.md"
+          "path": "docs/runbooks/CONFORMANCE-FAMILY-ROLLOUT.md"
         }
       ],
       "heading": "Operations"
@@ -2486,12 +2866,8 @@
     {
       "entries": [
         {
-          "label": "0.8 release notes",
-          "path": "docs/releases/0.8.md"
-        },
-        {
-          "label": "Pre-0.9 deep review",
-          "path": "docs/reviews/PRE-0.9.0-DEEP-REVIEW.md"
+          "label": "Subsystem engineering review",
+          "path": "docs/reviews/SUBSYSTEM-REVIEW.md"
         },
         {
           "label": "Review index",
@@ -2510,7 +2886,7 @@
           "path": "docs/research/cics-behavioral-conformance-pilot.md"
         }
       ],
-      "heading": "Releases, reviews, and research"
+      "heading": "Reviews and research"
     }
   ],
   "package_topology": {
@@ -2547,24 +2923,8 @@
     ]
   },
   "portal": "docs/README.md",
-  "public_version_truth": {
-    "authorities": [
-      "VERSION",
-      "Cargo.toml",
-      "release.toml",
-      "README.md",
-      "CHANGELOG.md",
-      "conformance/0.2/inventory/versions.json",
-      "docs/delivery/subsystems/README.md",
-      "docs/delivery/subsystems/GITHUB-PROJECT.md"
-    ],
-    "channel": "development",
-    "current": "0.8.3",
-    "released": "0.8.2",
-    "state": "development"
-  },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:dbfd734fb3a08bbeda9385e121954f6b24f67834b2664cb5cef8eebf7a1a2975",
+  "registry_sha256": "sha256:55fa5d7df907b055bdccade57b8edfb69def9a62ec5cdf7b35852fd68da90aa1",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {
@@ -2577,8 +2937,7 @@
           "label": "Coverage authority",
           "plan": "docs/delivery/subsystems/coverage/foundation-plan.md",
           "prompt": "docs/prompts/subsystems/coverage/IMPLEMENT_FOUNDATION.md",
-          "status": "docs/delivery/subsystems/coverage/foundation-status.md",
-          "target_version": "0.2.0"
+          "status": "docs/delivery/subsystems/coverage/foundation-status.md"
         }
       ]
     },
@@ -2594,8 +2953,7 @@
           "label": "Grammar and types",
           "plan": "docs/delivery/subsystems/cobol/structure-plan.md",
           "prompt": "docs/prompts/subsystems/cobol/IMPLEMENT_STRUCTURE.md",
-          "status": "docs/delivery/subsystems/cobol/structure-status.md",
-          "target_version": "0.3.0"
+          "status": "docs/delivery/subsystems/cobol/structure-status.md"
         },
         {
           "dependencies": [
@@ -2605,8 +2963,7 @@
           "label": "Execution semantics",
           "plan": "docs/delivery/subsystems/cobol/execution-plan.md",
           "prompt": "docs/prompts/subsystems/cobol/IMPLEMENT_EXECUTION.md",
-          "status": "docs/delivery/subsystems/cobol/execution-status.md",
-          "target_version": "0.4.0"
+          "status": "docs/delivery/subsystems/cobol/execution-status.md"
         }
       ]
     },
@@ -2622,8 +2979,7 @@
           "label": "Commands and authorization",
           "plan": "docs/delivery/subsystems/racf/security-plan.md",
           "prompt": "docs/prompts/subsystems/racf/IMPLEMENT_SECURITY.md",
-          "status": "docs/delivery/subsystems/racf/security-status.md",
-          "target_version": "0.5.0"
+          "status": "docs/delivery/subsystems/racf/security-status.md"
         }
       ]
     },
@@ -2639,8 +2995,7 @@
           "label": "Dataset services",
           "plan": "docs/delivery/subsystems/dataset/data-plan.md",
           "prompt": "docs/prompts/subsystems/dataset/IMPLEMENT_DATA.md",
-          "status": "docs/delivery/subsystems/dataset/data-status.md",
-          "target_version": "0.6.0"
+          "status": "docs/delivery/subsystems/dataset/data-status.md"
         }
       ]
     },
@@ -2656,8 +3011,7 @@
           "label": "Converter and planner",
           "plan": "docs/delivery/subsystems/jcl/planning-plan.md",
           "prompt": "docs/prompts/subsystems/jcl/IMPLEMENT_PLANNING.md",
-          "status": "docs/delivery/subsystems/jcl/planning-status.md",
-          "target_version": "0.7.0"
+          "status": "docs/delivery/subsystems/jcl/planning-status.md"
         }
       ]
     },
@@ -2675,8 +3029,7 @@
           "label": "Jobs, spool and utilities",
           "plan": "docs/delivery/subsystems/jes/execution-plan.md",
           "prompt": "docs/prompts/subsystems/jes/IMPLEMENT_EXECUTION.md",
-          "status": "docs/delivery/subsystems/jes/execution-status.md",
-          "target_version": "0.8.0"
+          "status": "docs/delivery/subsystems/jes/execution-status.md"
         }
       ]
     },
@@ -2694,8 +3047,7 @@
           "label": "Application API",
           "plan": "docs/delivery/subsystems/cics/application-api-plan.md",
           "prompt": "docs/prompts/subsystems/cics/IMPLEMENT_APPLICATION_API.md",
-          "status": "docs/delivery/subsystems/cics/application-api-status.md",
-          "target_version": "0.9.0"
+          "status": "docs/delivery/subsystems/cics/application-api-status.md"
         },
         {
           "dependencies": [
@@ -2705,8 +3057,7 @@
           "label": "SPI and FEPI",
           "plan": "docs/delivery/subsystems/cics/system-api-plan.md",
           "prompt": "docs/prompts/subsystems/cics/IMPLEMENT_SYSTEM_API.md",
-          "status": "docs/delivery/subsystems/cics/system-api-status.md",
-          "target_version": "0.10.0"
+          "status": "docs/delivery/subsystems/cics/system-api-status.md"
         }
       ]
     },
@@ -2725,8 +3076,7 @@
           "label": "REST portfolio",
           "plan": "docs/delivery/subsystems/zosmf/rest-plan.md",
           "prompt": "docs/prompts/subsystems/zosmf/IMPLEMENT_REST.md",
-          "status": "docs/delivery/subsystems/zosmf/rest-status.md",
-          "target_version": "0.11.0"
+          "status": "docs/delivery/subsystems/zosmf/rest-status.md"
         }
       ]
     },
@@ -2744,8 +3094,7 @@
           "label": "Engine and common SQL",
           "plan": "docs/delivery/subsystems/db2/core-plan.md",
           "prompt": "docs/prompts/subsystems/db2/IMPLEMENT_CORE.md",
-          "status": "docs/delivery/subsystems/db2/core-status.md",
-          "target_version": "0.12.0"
+          "status": "docs/delivery/subsystems/db2/core-status.md"
         },
         {
           "dependencies": [
@@ -2754,8 +3103,7 @@
           "id": "programming",
           "label": "Complete programming surface",
           "plan": "docs/delivery/subsystems/db2/programming-plan.md",
-          "prompt": "docs/prompts/subsystems/db2/IMPLEMENT_PROGRAMMING.md",
-          "target_version": "0.13.0"
+          "prompt": "docs/prompts/subsystems/db2/IMPLEMENT_PROGRAMMING.md"
         }
       ]
     },
@@ -2773,8 +3121,7 @@
           "label": "DB / TM programming surface",
           "plan": "docs/delivery/subsystems/ims/programming-plan.md",
           "prompt": "docs/prompts/subsystems/ims/IMPLEMENT_PROGRAMMING.md",
-          "status": "docs/delivery/subsystems/ims/programming-status.md",
-          "target_version": "0.14.0"
+          "status": "docs/delivery/subsystems/ims/programming-status.md"
         }
       ]
     },
@@ -2791,8 +3138,7 @@
           "label": "MQI programming surface",
           "plan": "docs/delivery/subsystems/mq/programming-plan.md",
           "prompt": "docs/prompts/subsystems/mq/IMPLEMENT_PROGRAMMING.md",
-          "status": "docs/delivery/subsystems/mq/programming-status.md",
-          "target_version": "0.15.0"
+          "status": "docs/delivery/subsystems/mq/programming-status.md"
         }
       ]
     },
@@ -2812,8 +3158,7 @@
           "label": "Transactions and recovery",
           "plan": "docs/delivery/subsystems/integration/transactions-plan.md",
           "prompt": "docs/prompts/subsystems/integration/IMPLEMENT_TRANSACTIONS.md",
-          "status": "docs/delivery/subsystems/integration/transactions-status.md",
-          "target_version": "0.16.0"
+          "status": "docs/delivery/subsystems/integration/transactions-status.md"
         }
       ]
     },
@@ -2830,17 +3175,7 @@
           "label": "Differential certification",
           "plan": "docs/delivery/subsystems/certification/licensed-plan.md",
           "prompt": "docs/prompts/subsystems/certification/IMPLEMENT_LICENSED.md",
-          "status": "docs/delivery/subsystems/certification/licensed-status.md",
-          "target_version": "0.17.0"
-        },
-        {
-          "dependencies": [
-            "certification.licensed"
-          ],
-          "id": "stable-release",
-          "label": "Stable release promotion",
-          "plan": "docs/delivery/subsystems/certification/stable-release-plan.md",
-          "target_version": "1.0.0"
+          "status": "docs/delivery/subsystems/certification/licensed-status.md"
         }
       ]
     }
@@ -2849,8 +3184,8 @@
     "generated_navigation": true,
     "generated_subsystem_indexes": true,
     "normative_metadata": true,
-    "public_version_truth": true,
     "relative_links_and_anchors": true,
+    "subsystem_management": true,
     "subsystem_ownership_and_dependencies": true,
     "xtask_subcommands_and_options": true
   }

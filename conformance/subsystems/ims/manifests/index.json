@@ -1,0 +1,184 @@
+{
+  "schema_version": "mainframe-env.topic-manifest-registry@1",
+  "target_subsystem": "ims.programming",
+  "semantic_authority": false,
+  "coverage_credit": 0,
+  "manifests": [
+    {
+      "scope_id": "ims-programming-contracts",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-programming-contracts-2026-09-11",
+      "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
+      "manifest_sha256": "sha256:db7535a6925525fa4a989148bc627ce4b77f45cfc699307b5581159a1288884d",
+      "topic_count": 27,
+      "topic_manifest_sha256": "sha256:119dd5e589399cb023f70c7a28fa9a1a937be1fa2c2393679ab65402ac735182",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-database-contracts",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-database-contracts-2026-09-11",
+      "manifest": "conformance/subsystems/ims/manifests/ims-database-contracts-topics.json",
+      "manifest_sha256": "sha256:003505eaa679cf4ca995a96ed509d333e7131113465317ed456cff4ccb98269b",
+      "topic_count": 20,
+      "topic_manifest_sha256": "sha256:3b819e69f7ce608d66bf1b8f195556047024333374e6f77413af29822960e38b",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-tm-contracts",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-tm-contracts-2026-09-11",
+      "manifest": "conformance/subsystems/ims/manifests/ims-tm-contracts-topics.json",
+      "manifest_sha256": "sha256:7f704285c35766c34b9c448e455885cd78311880d5c69db62def42b7f4dbfbac",
+      "topic_count": 10,
+      "topic_manifest_sha256": "sha256:dac590371f5b7be6747c7280598ae9db075ea0f7c59473a2fcd8b9c9d8c0cd36",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-metadata-contracts",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-metadata-contracts-2026-09-11",
+      "manifest": "conformance/subsystems/ims/manifests/ims-metadata-contracts-topics.json",
+      "manifest_sha256": "sha256:ea337ec04a26db5c09e9abf03bc5107e1aa2cc1768e9747538048b2c1410d12d",
+      "topic_count": 10,
+      "topic_manifest_sha256": "sha256:847166149ae438081effe2f09e7a492b9417217d285d48944bafc3b17cb671d2",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-recovery-utilities-contracts",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-recovery-utilities-2026-09-11",
+      "manifest": "conformance/subsystems/ims/manifests/ims-recovery-utilities-contracts-topics.json",
+      "manifest_sha256": "sha256:1061e63188675a5bee092738c72948e42f3d7b6b17cae865e0dc8b40df9c0ec1",
+      "topic_count": 20,
+      "topic_manifest_sha256": "sha256:7418508fe1db54bbc8374fc1b8ea4cfd45a3e9aceff75f9734b75cb0afd4bde8",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-gsam-recovery",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-gsam-recovery-2026-09-11",
+      "manifest": "conformance/subsystems/ims/manifests/ims-gsam-recovery-topics.json",
+      "manifest_sha256": "sha256:78d594ef41d1f637378aa37af55c490022586a144c75316885cc79e7de3d80cc",
+      "topic_count": 1,
+      "topic_manifest_sha256": "sha256:5957b8e2a868c0fc8db7d379630af868b048fe9a3dd86fd8466c4de664bd2353",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-gsam-formats",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-gsam-formats-2026-09-11",
+      "manifest": "conformance/subsystems/ims/manifests/ims-gsam-formats-topics.json",
+      "manifest_sha256": "sha256:874bd39e8184643b64f05e8b13c9723d35b97ce2a7de52d1d644848a8221c93c",
+      "topic_count": 3,
+      "topic_manifest_sha256": "sha256:3dd6d4c3d4a361dd23a3c5b65a2d873f085363c09715a9aa9539454d202957d8",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-status-explanations",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-status-explanations-2026-09-11",
+      "manifest": "conformance/subsystems/ims/manifests/ims-status-explanations-topics.json",
+      "manifest_sha256": "sha256:23d21ae2d7da3d3d135a739f7c3aac260cbe198622dbde3db1767649b3cdf9b4",
+      "topic_count": 2,
+      "topic_manifest_sha256": "sha256:7d4d6f9d5431bae8a438e9fa40c32f371325cd0956c282df7a4920514ee9c509",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-cobol-dli-boundary",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-cobol-dli-boundary-2026-09-11",
+      "manifest": "conformance/subsystems/ims/manifests/ims-cobol-dli-boundary-topics.json",
+      "manifest_sha256": "sha256:54edd1e17765b48a9377858239aaa1a7186f80a803bd11f59268cee9e3822a25",
+      "topic_count": 5,
+      "topic_manifest_sha256": "sha256:27da1f1a5c46e08776285cc005d8022ad03888349fe8916cdf167d146fda8d7a",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-mixed-ssa-supplement",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-mixed-ssa-supplement-2026-09-11",
+      "manifest": "conformance/subsystems/ims/manifests/ims-mixed-ssa-supplement-topics.json",
+      "manifest_sha256": "sha256:8da23940493b61d442183aaa6663b9d9b11ed02279efb6ce50e4259a627423f4",
+      "topic_count": 4,
+      "topic_manifest_sha256": "sha256:b47a9522b8447bc969730baafc18aa973041112667a710b1bfe337112112bf72",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-ssa-last-position",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-ssa-last-position-2026-09-11",
+      "manifest": "conformance/subsystems/ims/manifests/ims-ssa-last-position-topics.json",
+      "manifest_sha256": "sha256:94e23ea0f6ddd8bc70255344a640dd8cc98e5ad36bf16ad5a29682f2daeffb86",
+      "topic_count": 3,
+      "topic_manifest_sha256": "sha256:804ec48438f467df2e8afc4bac243264ec0a0f9ebee4454e749d6c8e67b79cb6",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-ssa-position-commands",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-ssa-position-commands-2026-09-11",
+      "manifest": "conformance/subsystems/ims/manifests/ims-ssa-position-command-topics.json",
+      "manifest_sha256": "sha256:f2be9bb3fd053843336d01c41777a440b80cce7bef1f8d21e077ea1c864444cc",
+      "topic_count": 4,
+      "topic_manifest_sha256": "sha256:f99728026ed7f14fcc8e104678bc55939581af2defee68385bc3bf35b170e8b9",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-sequential-isrt-position",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-sequential-isrt-position-2026-09-11",
+      "manifest": "conformance/subsystems/ims/manifests/ims-sequential-isrt-position-topics.json",
+      "manifest_sha256": "sha256:d0e139f98513ad265e721a0e3dbeea723b529d94f4da82ae6ce6ec45e454d079",
+      "topic_count": 3,
+      "topic_manifest_sha256": "sha256:f50d0ca77232e353343bfc37bd9b02fef87d20c6bb5926becc5c8e1ef09e55a0",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-tm-prior-commit-backout",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-tm-prior-commit-backout-2026-09-11",
+      "manifest": "conformance/subsystems/ims/manifests/ims-tm-prior-commit-backout-topics.json",
+      "manifest_sha256": "sha256:7228b0429b86e146fee4cc52a64cd70444c3997f57c5922aa9017156879dab06",
+      "topic_count": 1,
+      "topic_manifest_sha256": "sha256:b58649136d3fcb9d8a426eafd588f28ca2a4996974a229dba05b08f4964ed857",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-q-deq-contracts",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-q-deq-contracts-2026-09-11",
+      "manifest": "conformance/subsystems/ims/manifests/ims-q-deq-contract-topics.json",
+      "manifest_sha256": "sha256:eb7648ce87656f41f2bbe04bbc21d74d940fbd78b5d0516787e1f3486d8ee791",
+      "topic_count": 4,
+      "topic_manifest_sha256": "sha256:c9347102caea79a553387ea26b65ecd1a97b03ac0fd8d6874c442df110a0a5f4",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-dedb-subset-pointer-contracts",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-dedb-subset-pointers-2026-09-11",
+      "manifest": "conformance/subsystems/ims/manifests/ims-dedb-subset-pointer-contract-topics.json",
+      "manifest_sha256": "sha256:cda47dd34799fac93db3f041be55a5a3e467059509a562d2787f46900359c71c",
+      "topic_count": 10,
+      "topic_manifest_sha256": "sha256:d49cecc6da4e3d322adf513508950af03330f1d352352a5d5bfeca25b0b3d144",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    }
+  ]
+}

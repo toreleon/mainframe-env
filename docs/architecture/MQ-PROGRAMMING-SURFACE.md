@@ -6,21 +6,58 @@ Owner: `mainframe-env-host-api` contracts and `mainframe-env-mq` provider
 
 Scope: MQI denominator, source provenance, host context and semantic authority
 
-Applies from: mainframe-env 0.15.0
+Applies from: mainframe-env mq.programming
+
+## Finite local-type inquiry contract
+
+`MqMqiSelector::ReviewedQueueType` has a distinct zero-field canonical tag;
+`PendingInteger(20)` and every historical pending tag/byte remain pending and
+unchanged. The one structure/status catalog holds an independent frozen
+`mainframe-env.mq-inquiry-local-type-projection@1`, generated through the existing
+registry tool. Catalog@2 framing and old@1/wire/raw/property/RFH2/status projection
+identities remain exact; the containing catalog file gains the new section and
+therefore a new file hash. Historical catalogs without this section cannot
+generate the new artifact.
+Unknown projection versions, missing facts and changed pins fail closed. There
+is no new persisted DTO/replay schema or automatic historical receipt rewrite.
+Older readers must refuse the additive selector rather than infer admission;
+downgrade requires stopping its use and retaining original canonical identities.
+
+The private-field `MqMqiLocalTypeInquiry` checks ordered reviewed occurrences,
+0..256 selectors, adequate integer slots within the selected product limit and
+zero character bytes. Its complete result check requires exact OK/NONE and one
+observed MQQT_LOCAL per occurrence. Excess caller slots are outside the returned
+prefix and remain untouched. Zero selectors retain the old empty inquiry shape;
+the explicit checked wrapper validates empty results without granting a handle,
+permission or dispatch shortcut. Old pending-only and short-buffer shapes retain
+their broader validators. Mixed profiles and use of the reviewed selector for
+MQSET refuse. No constant answer is produced: actual scalar origin must later
+be an independently held normal-local catalog object opened for INQUIRE.
+
+Reviewed sources are MQ9.4 baseline2026-08-31 row0016/position16 q101840 issue337
+pin, lines19–48 and706–725; programming-supplements baseline2026-09-12 q091590
+451–453 (MQIA_Q_TYPE20/hex14) and q10297025–28; inquiry-attribute-sources
+baseline2026-09-12 q09248011–13 (MQQT_LOCAL1) and q10349019–28. Exact pins and
+fragment hashes live in that single catalog projection. Source review grants
+zero execution credit. Other selectors/kinds, characters, warnings and partial
+output rules remain pending in this profile. Selected/public/native MQINQ, actual
+INQUIRE-open, ten-reference compiled table ABI, original core/SAF/physical audit
+and replay integration remain unsupported follow-ons; full26 acceptance is not
+advanced by contract fixtures. No queue engine or authorization boundary changes.
 
 ## Denominator and provenance
 
-The immutable 0.2 official catalog defines 26 unique IBM MQ 9.4 MQI calls.
+The immutable coverage.foundation official catalog defines 26 unique IBM MQ 9.4 MQI calls.
 The pinned source call list displays 27 rows because it lists `MQMHBUF` twice.
 That duplicate is retained as source provenance and never increments coverage.
 
-`conformance/0.15/mq/source-call-list.json` records the 27 positions, their
+`conformance/subsystems/mq/mq/source-call-list.json` records the 27 positions, their
 normalized official rows, and the exact pinned call-list topic. The generated
 `MqMqiCallIdentityDescriptor` registry joins those positions to the per-call
 topic paths and SHA-256 pins in the immutable MQ topic manifest. The registry
 is identity-only: it neither selects a handler nor advertises execution.
 
-`conformance/0.15/mq/structure-status-catalog.json` adds the ordered,
+`conformance/subsystems/mq/mq/structure-status-catalog.json` adds the ordered,
 source-bound signatures for the same 26 calls. The generated host API exposes
 169 parameter descriptors with structure and version symbols, options,
 selectors, completion and reason families, and handle roles. All 26 pinned
@@ -31,9 +68,189 @@ The MQBUFMH spelling anomaly is recorded in the catalog, while `MQHMSG` is
 the sole published handle identity. The registry supplies identity data only.
 The additive validator now checks source-bound ordered signatures, structure
 identities and versions, option families and documented combinations without
-registering a handler; numeric wire legality and execution remain pending.
+registering a handler. The bounded numeric adapter below admits its reviewed
+point-to-point subset; other numeric forms and execution remain pending.
+
+## Private pointer-free raw layout projection
+
+The same structure/status catalog retains private `@2` framing and adds an
+independent `mainframe-env.mq-raw-layout-projection@1` projection. Its digest is
+separate from the frozen original call/signature identity and the accepted
+wire-options projection; neither historical digest nor canonical bytes changes.
+The existing registry generator emits every field identity, width, offset and
+reviewed initial observation. Initial observations are reference facts, never
+missing-input defaults or scalar legality permits.
+
+`mainframe-env-host-api::mq_raw_layout` captures complete MQOD1 (168 bytes),
+MQMD1 (324), MQMD2 (364), GMO1 (72), PMO1 (128) and MQCNO1 (12) prefixes. Lengths derive from
+the COBOL declarations and joined C byte/character types, not platform-dependent
+CURRENT_LENGTH macros. Version, identifier and complete capacity are checked;
+opaque identifiers and all other input fields remain exact. The embedding must
+explicitly select normal/big or reversed/little integers and ASCII-compatible
+or the existing owned CP037 identifier profile. Other encodings reject.
+Character observations remain raw encoded bytes. CP037 is an owned embedding
+choice, not a claim that MQ mandates CCSID37. MQMD.Encoding describes the body,
+never the structure's encoding. Raw signed 32-bit observations are retained even
+outside COBOL PIC S9(9); scalar use/writeback separately checks that reviewed range.
+
+Writeback preflights a bounded field batch and the exact captured capacity/prefix
+before one copy. Only explicit source-defined output fields may change. Omitted,
+unchanged or undefined fields retain input bytes; suffix bytes stay untouched.
+Actual observations and platform/model/single-queue applicability must come from
+the trusted adapter/service. No status determines output synthesis or mutation
+permission. PMO destination counts cannot be written on z/OS; GMO Signal1 remains
+an opaque slot and SET_SIGNAL pointer behavior is unsupported. Conditional PUT
+correlation/group output updates remain pending in this bounded substrate;
+generic context observations remain GET-only. The bounded context writer below
+is an explicit source-reviewed extension, not a generic policy expansion.
+The API does not generate names, counts, message IDs, descriptor fields or expiry
+clock scaling. Captured numeric Context is an alias observation, never HOBJ
+authority. The eventual registry bridge must supply live handles, including the
+actual retained HCONN for PUT1, independently of names or options.
+
+`MqRawCapture::writeback_full_get_md` maps an actual complete returned MQMD1/2
+value to the same generated output policy and one atomic prefix copy. It requires
+GET applicability, the captured version and exact structure character profile;
+StrucId/Version remain input-only. Every other common/extension output field is
+retained without partial-descriptor narrowing. Numeric byte order comes from
+the original capture, not the returned body Encoding/CCSID. Range, stale-prefix,
+capacity and late-field failures leave every destination byte unchanged; suffix
+bytes remain caller-owned. This helper performs no conversion, defaulting, status
+inference, queue mutation or authority check. Diagnostic signed/opaque-byte
+fixtures prove value preservation, not native semantic validity. Compiled
+OPEN/GET forwarding, trusted catalog/profile binding and multi-argument final
+reply writeback must still compose it with actual selected execution.
+Sources: original MQGETrow0015 and supplemental baseline2026-09-12
+`q097390_204–304`, `q097395_6–30/1498–1508`; source review earns zero credit.
+
+`MqRawCapture::writeback_put_context_md` copies only eight actual returned
+default/no-context MQMD1/2 fields for a z/OS single-queue PUT/PUT1. It proves
+every other field equals captured input before admitting that private writeback
+extension through the same generated widths/kinds/offsets and atomic copier.
+Ignored BackoutCount, supplied IDs, input-only identity/version and MD2 extension
+remain exact, even for diagnostic signed observations. Any other field change,
+foreign character/version/identifier, out-of-range output scalar, stale prefix
+or changed capacity refuses without a write. Suffix bytes remain unowned.
+This helper copies observations; it does not generate blanks, identity, GMT,
+accounting, status, default queue values or execution permission. No pass/set
+context, generated-ID or distribution-list admission follows. Generic raw
+policy and its historical generated digests remain unchanged. Actual selected
+producer and compiled multi-argument forwarding remain separate obligations.
+Sources: supplements baseline2026-09-12 `q098655_194–227` and
+`q097395_1498–1508/1571–1605/1634–1715/1739–1955`, with retained-first SHA/bytes
+and actual offline search/read; source review earns zero execution credit.
+
+Complete MQMD projection into the current typed message descriptor rejects with
+`DescriptorRepresentationPending`: Report, MsgType, Feedback, body encoding/CCSID,
+backout/reply/context/origin and OriginalLength lack lossless typed fields. The
+additive `MqMdValue` and `MqFullMessage` boundary retains those observations with
+explicit FullPut/FullPutOne/FullGet and FullPut/FullGot tags in the existing MQI
+canonical authority. Complete GET binds copied bytes, DataLength, original
+capacity/truncation and reviewed status without losing the returned MD on rejected
+truncation. The existing private result replay codec keeps old storage@1 bytes
+exact and uses strict storage@2 only for these full outputs, composing the owned
+MD value codec and full host result digest. Full requests remain pending and the
+selected provider route explicitly Unsupported until full-MD delivery/checkpoint,
+policy and retained receipt integration. No automatic migration or new executable
+permission follows from exact representation (see ADR0033 full-MD value). Raw structs
+do not create an alternate effect journal or bypass canonical result bounds.
+
+The same delivery kernel now holds tagged partial/complete entries in homogeneous
+queue profiles. Additive cold/live/delivery-row @2 projections share the existing
+checkpoint validator, MD value codec and property vocabulary. A private explicit
+pre-activation quiescent upgrade retains the unchanged rich marker identity and
+composes marker/catalog/metadata CAS in one bounded transaction. Populated partial
+queues retain their profile; full switches require drained queues, no pending
+units/cursors and no selected control/runtime. Previously activated service
+retirement needs an owner-approved seam. Ordinary deltas preserve the loaded
+schema/profile, @1 bytes stay exact, old readers reject @2 and open never rewrites
+state. This is durable storage preparation, not selected full PUT/GET admission,
+operator authorization, context/GMT/ID policy, retention or participant acceptance.
+
+Sources are the MQ9.4 original baseline `ibm-mq-9.4-mqi-2026-08-31`, rows
+0006/0015/0019/0020/0021, the existing programming supplement baseline
+`ibm-mq-9.4-programming-supplements-2026-09-12` (declarations q098100_, q097390_,
+q096710_, q098650_ and their field/constant topics), and the separate
+`ibm-mq-9.4-point-layout-sources-2026-09-12` elementary/COBOL/encoding topics
+q093580_, q093600_, q093630_, q103960_. Exact source pins and fragment locators
+remain in the single catalog. Offline checks validate artifact closure; optional
+cache-backed generation reproduces the selected facts. Reference review provides
+zero execution/licensed credit and no refresh or same-browser capture claim.
+
+MQCNO1 is an additive private raw projection revision in that same catalog. Its
+new frozen digest reconstructs and verifies the exact previous five-layout
+projection; historical call/status/wire-option identities and canonical DTOs
+remain unchanged. The generated prefix contains only StrucId, Version and
+Options. Later offsets/pointers are outside VERSION1 and are never read or zeroed.
+`decode_connx_default` admits numeric MQCNO_NONE (0) or HANDLE_SHARE_NONE (32)
+only with an independently selected ordinary owned nonshared profile. It returns
+the existing checked optional manager name, NonShared and ContractDefault.
+Application options cannot select host topology, connection scope or authority.
+MTS sharing defaults, client/fallback, implicit CICS and binding/security profiles
+remain pending. Other recognized flags are unsupported and unknown bits reject;
+platform-ignored flags are not silently ignored. Zero-valued aliases cannot
+establish binding or reconnect configuration.
+
+StrucId and Version are always input. Options has conditional binding output
+semantics, which this input-only adapter explicitly leaves pending: observed
+updates reject atomically and unchanged/undefined observations retain exact bytes.
+No successful output, status or HCONN is fabricated. The manager still owns the
+trusted producer profile, live alias registry and actual service/COBOL bridge.
+Source context is original row0009 q101770_ and supplemental q091060_ (numeric
+identities), q095410_ (C/COBOL declaration) and q095415_ (field/platform semantics),
+under the baselines above. Exact pins and bounded fragment locators are in the
+catalog. Conflicting CURRENT_VERSION declarations remain unresolved; this adapter
+uses only independently corroborated VERSION1. This decoder earns no MQCONNX
+execution or licensed credit and does not broaden the accepted replay schema.
 
 ## Authority boundary
+
+The compiled machine's ordinary batch adapter now accepts MQCONNX VERSION1
+through `MqMqiProgramFrame::connx_profile`, a read-only interpreter-owned profile
+port that defaults to Unsupported. The embedding must independently select the
+ordinary owned nonshared profile and explicit big-endian/ASCII-compatible
+structure encoding; those are the actual compiled storage rules, not native
+endianness, MQMD.Encoding or decoded Invocation bindings. Other encodings,
+sharing/client/fallback/binding/security profiles and newer versions fail closed.
+The first admitted profile is frozen and compared around lookup callbacks,
+before original effect allocation and again before output writeback. Refusal,
+panic, changed frame/profile and unusable post-dispatch replies preserve Unknown.
+
+All five CONNX operands must be reference storage. The adapter checks MQCHAR48
+manager naming, the real fixed group declaration and direct prefix member types
+(also the one source-defined level01/level10 COPY wrapper),
+offsets/widths against generated Cno1 descriptors, signed fullword outputs and
+all input/output overlaps. CNO capacity is explicitly bounded to 1,024 bytes;
+only its twelve-byte VERSION1 prefix is interpreted. Existing raw capture/decode
+admits exact options0/32. The original ConnectExtended effect keeps existing
+sequence/key/deadline/mutation/context and the separately admitted Invocation.
+All input bytes, including CNO Options and suffix, are retained unchanged.
+Captured layouts, views and bytes are rechecked before a preencoded bounded
+atomic output batch. Only a usable provider-issued opaque token installs an
+existing ABI alias. Failed reviewed status preserves undefined HCONN bytes.
+Both compiled CONN and CONNX also copy the existing source-reviewed
+WARNING/ALREADY_CONNECTED plus Connected shape as exact application CC/RC
+1/2002. Only a nonhistorical provider-issued token can install an ABI alias;
+an already-observed exact token reuses its alias. A child's first observation
+does not allocate a connection or decide a UOW: its trusted provider alone
+attests the prior live handle. Status-only warnings, special/historical handles
+and other warning/failure output forms remain protected Unknown. The original
+reviewed result and canonical identity are retained without OK normalization.
+CONN now captures all four compiled argument layouts, views and bytes, checks
+input/output overlaps, contains profile callbacks and rechecks the entire
+capture before one preencoded atomic write batch. CONNX retains all five ranges,
+the frozen independently selected ABI/profile and its final callback recheck.
+Neither route writes undefined failed HCONN or fabricates conditional Options.
+This warning rule is MQCONN row0008 q101760_ usage271/failed273 and MQCONNX
+row0009 q101770_ return76–78/failed41–42 under the original baseline above.
+No profile/options grant SAF, lifecycle or UOW authority; no conditional Options
+output is fabricated. Sources are original row0009 q101770_ (signature8–18,
+scope26–66), MQCONN row0008 q101760_ (manager14–46), and the supplemental
+q091060_/q095410_/q095415_ pins above. Compiler-generated machine fixtures provide
+no installed selected-provider, SAF or licensed acceptance. Existing
+CONNECT/DISC/CMIT/BACK, canonical and checkpoint bytes stay unchanged; typed
+source schema0/checkpoint refusal remains. The manager owns live session
+forwarding, the actual trusted producer/service route and full26 acceptance.
 
 `mainframe-env-mq` is the one owned semantic authority for queue managers,
 objects, handles, messages, callbacks, properties, delivery and recovery.
@@ -108,10 +325,545 @@ explicit duplicate or unknown states. These are non-executable contracts:
 unsupported forms and pending provider authorities stay explicit, and their
 presence grants no behavioral or licensed coverage.
 
+## Reviewed completion wire identities
+
+The existing completion/reason catalog now uses private source-projection schema
+`mainframe-env.mq-completion-reason-catalog@2`. Its additive wire projection
+reviews `MQCC_OK=0`, `MQCC_WARNING=1` and `MQCC_FAILED=2` from
+`SSFKSJ_9.4.0/refdev/q090560_.html` in the separately pinned
+`ibm-mq-9.4-programming-supplements-2026-09-12` scope. Decimal and eight-digit
+hexadecimal identities agree and fit the API's signed 32-bit MQCC and signed SQL
+integer representation; no SQL storage or general structure layout changes.
+`MQCC_UNKNOWN=-1` is recorded as excluded from ordinary reviewed call returns.
+MQCMIT catalog row `0007` corroborates the MQLONG output role; MQCBC field
+context remains callback input and never creates a return pair for MQCB_FUNCTION.
+
+`MqCompletion::wire_number` and `from_wire_number` map these three identities.
+`MqReviewedStatus::wire_pair` emits their MQCC with the already admitted reason;
+`from_wire_pair` applies the existing call-specific reason admission. Unknown,
+negative or out-of-range completion values, reason aliases needing explicit
+symbols, pending collisions and callback notifications fail closed. All ten
+reason declarations remain pending and all 1,030 pairs retain their source pins.
+
+The generator validates the unchanged original `@1` call-return artifact digest
+by reconstructing its exact JSON representation. `MQ_STATUS_CATALOG_SHA256`
+continues to bind that identity in existing canonical status bytes; the additive
+completion projection has its own source digest. Canonical encoders, outcome
+forms and old golden bytes are unchanged. Offline checks validate artifact
+closure; cache-backed generator/verifier checks independently reproduce the
+selected constants and corroborating fragments before comparison. This maps
+identities only and does not calculate runtime results or register an ABI.
+The archive provenance remains in-progress, without independent browser
+reproduction and predating the MQINQ re-pin; no freshness, same-snapshot,
+behavioral, licensed or execution claim follows from this review.
+
+## Reviewed status with typed output
+
+The additive `MqMqiOutcome::ReviewedOutput { status, output }` binds the existing
+call-specific `MqReviewedStatus` to the existing `MqMqiOutput`. Its distinct
+canonical name preserves every older variant's bytes; `ReviewedStatus` remains
+a status-only observation. This is a bounded output contract, not runtime
+calculation, queue mutation permission, SAF or returned-handle authority.
+
+MQGET catalog row `0015`, `SSFKSJ_9.4.0/refdev/q101830_.html` (SHA-256
+`290b8af3acbe4a87f007ab9e3b67d0a797f835066118c9c6150ff0570e430b62`),
+lines 21–48 requires descriptor, copied buffer and original DataLength even on
+truncation. Its lines 65–125 place both truncation reasons under MQCC_WARNING.
+The separately pinned programming-supplements topic
+`SSFKSJ_9.4.0/refdev/q096715_.html` (SHA-256
+`a1c3fa0544e420f8bc1ce1dfeffb891df435e85a64108c378ac59a48dbd14af3`),
+lines 674–686, distinguishes accepted removal/browse advance from rejected
+retention without browse advance. Both baselines retain their exact pins;
+supplement registration itself grants no semantics or execution credit.
+
+Reviewed GET output admits OK/NONE with a complete message,
+WARNING/TRUNCATED_MSG_ACCEPTED with accepted removed/browsed truncation,
+WARNING/TRUNCATED_MSG_FAILED with rejected retained truncation, and
+FAILED/NO_MSG_AVAILABLE with no-message/wait-expired observation. The constructor
+and provider preflight bind call, supported default options, mode, wait,
+truncation choice, capacity and exact copied length to the original request.
+Required length can exceed capacity within explicit limits. Rejected truncation
+reports no new cursor. The full descriptor, properties, expiry, identifiers and
+copied bytes are encoded; an empty message remains distinct from no message.
+
+Existing OK/NONE output classes remain shape-checked, with reviewed PUT/PUT1
+requiring an actual accepted observation rather than pending/unknown/duplicate.
+Those descriptor input/output roles are retained from rows `0020` and `0021`,
+`q101880_` and `q101890_`. Reviewed distribution output is unsupported because
+this payload lacks per-destination return pairs. The existing syncpoint-only
+FAILED/ENVIRONMENT_ERROR no-output shape remains applicable. Other warning or
+failed payloads, conversion-dependent lengths and absent property size-reporting
+forms fail closed; status-only or explicit pending observations remain available.
+No reason name authorizes mutation, and no numeric alias bypasses reviewed
+symbol admission. All 1,030 declarations and ten pending reasons are unchanged.
+
+## Checked point-to-point numeric intent
+
+The private unreleased structure catalog uses additive schema
+`mainframe-env.mq-structure-status-catalog@2`. Its `wire_options` projection
+contains 102 reviewed numeric identities with exact topic/fragment hashes and
+bounded line locators under `ibm-mq-9.4-programming-supplements-2026-09-12`.
+MQOO `q092100_`, MQCO `q091070_`, MQGMO `q091510_`, MQPMO `q092190_`,
+MQMD `q091870_` and MQOD `q098100_` supply constants and version facts.
+MQGMO `q096715_`, MQPMO `q098655_` and MQOD `q098105_` supply field context.
+Original call rows `0006`, `0015`, `0019`, `0020`, `0021` remain bound to
+`q101740_`, `q101830_`, `q101870_`, `q101880_`, `q101890_` respectively.
+MQOD1 is the only numerically established MQOD version in this selected scope;
+higher version numbers and MQMO constants are not inferred from symbol names.
+
+`mq_wire_options` accepts signed numeric inputs, checks signed 32-bit MQLONG
+range, and produces existing typed OPEN/CLOSE/GET/PUT/PUT1 intents only for
+local queues, MQOD1/GMO1/PMO1 and basic ungrouped MQMD1/2. It preserves the
+three input modes, browse versus removal, finite wait conversion, truncation,
+identifier selection and independently admitted local syncpoint. PUT1 retains
+actual HCONN. NEW_MSG_ID clears only the requested ID to select the existing
+generator intent; NEW_CORREL_ID remains pending. No ID or outcome is generated.
+The returned structures are not wire layouts and do not reconstruct opaque handles.
+
+The additive `MqWireFullGet`/`get_full` adapter retains the complete MQMD1/2
+observation and explicit structure character encoding, while reusing this same
+numeric GMO1 decoder and binding/unit rules. Its first profile is remove/no-wait,
+optional accepted truncation, and explicit or platform-default syncpoint. GMO1
+matches both nonzero binary MsgId and CorrelId; binary-zero fields are wildcards.
+MD2 group/sequence/offset remain exact observations, not additional selectors.
+All signed/fixed-byte fields survive, even diagnostic values that the selected
+service subsequently refuses. There is no partial descriptor conversion, new
+option namespace, outcome generation or handle authority. Native field legality,
+configured queue defaults, actual SAF, original intent and provider admission
+remain separate. Source: original MQGETrow0015 `q101830_21–48`, supplemental
+`q096715_1269–1381` and `q097395_1389–1482` under baseline2026-09-12.
+Compiled OPEN/GET forwarding and complete result writeback remain required;
+this translator alone is not compiled/native full-call acceptance.
+
+The integration-owned `MqWireBindings` port supplies queue-manager platform,
+already admitted unit/cursor, clock conversion and independently checked queue
+defaults. Zero option words require confirmation that cluster/read-ahead,
+property and put response defaults are represented. Missing configuration,
+unit or cursor fails closed. Queue-manager z/OS defaults select local syncpoint;
+distributed defaults select no syncpoint, while browse stays outside syncpoint.
+External coordination remains pending. This port grants no SAF or mutation permit.
+Service/coordinator and live registry checks remain mandatory after conversion.
+
+Unknown/sign/overflow values and supported illegal combinations are rejected.
+Recognized unrepresented context, properties, message handles, async response,
+distribution and higher structure versions stay explicitly pending. Nonempty
+selection under cursor remains pending because the current kernel applies
+selection there, unlike the reviewed source. Nonzero unused wait fields and
+unbounded waits are outside the strict subset. Unsupported defaults cannot
+silently become `ContractDefault`; that value is emitted only after conversion.
+
+The generator reconstructs and verifies the exact historical `@1` catalog hash
+`3dc77d004bd79ad7f6daa99ffb4a3fb958ff1d816cb6c33bc4b6bac794a23448`.
+Existing signature descriptors, status bindings, all 1,030 reason declarations,
+ten pending reasons and canonical request/result bytes retain their identities.
+Only the new projection has a new digest. Older strict catalog readers must
+explicitly support `@2`; no retained effect migration or automatic replay occurs.
+Cache-backed checks reproduce the selected facts through the shared offline
+reader; cache-free checks bind their artifact closure. The supplemental archive
+remains in-progress without independent browser reproduction, predates the MQINQ
+re-pin, and establishes no freshness or same-snapshot claim. The adapter is not
+a public handler or execution/participant/licensed acceptance claim. Remaining
+all-26 structure/option/ABI/service integration stays required.
+
 ## Coverage boundary
 
+### Additive point-layout source scope
+
+`mq-point-layout-sources` separately registers twelve retained MQ 9.4 topics under
+`ibm-mq-9.4-point-layout-sources-2026-09-12`. Its topic-manifest@1 and the shared
+mq.programming registry bind exact bytes, topic-set digest, product and zero-credit scope.
+MQOD and MQMO constants, CCSID, expiry, message type and priority constants,
+elementary data types, COBOL declarations, structure alignment, COBOL COPY
+conventions and binary/machine encoding references supply missing sources for
+subsequent point-to-point layout review.
+The existing 80-topic scope already pins MQOD/MQMD/MQGMO/MQPMO declarations and
+fields, encoding, format, object-type and persistence references; those pins are
+reused without duplication or re-hashing. Both scopes use the existing pinned TOC.
+
+Registration is not numeric or layout admission. Later projections must use the
+one structure/status catalog and explicit review; source presence cannot supply
+defaults, permit unsupported forms or change pending reasons. Original call
+rows `0006`, `0015`, `0019`, `0020`, `0021`, all 27 source positions, frozen
+80-topic bindings and existing semantic/canonical identities remain unchanged.
+No public ABI, handler, machine or service behavior is added. The archive run
+remains in-progress without independent browser reproduction and predates MQINQ
+issue337 re-pin; identity metadata supplies no freshness or same-snapshot claim.
+Source and execution credit remain zero, with all ten reason declarations pending.
+
+### Additive property source scope
+
+The independent `mq-property-sources` scope registers exactly twelve retained
+topics under `ibm-mq-9.4-property-sources-2026-09-12`: property names
+`SSFKSJ_9.4.0/develop/q022940_.html`, restrictions `q022950_.html`, descriptor
+mapping `q022960_.html`, and
+`SSFKSJ_9.4.0/refdev/q091110_.html` copy constants; it also pins MQCHARV and field
+details, MQCMHO/MQDMHO/MQDMPO/MQIMPO/MQPD/MQSMPO option/structure constants needed
+by the five-call property profile. The existing shared reader
+and registry bind exact manifest bytes, topic-set digest and product/version.
+Frozen call, supplemental and point-layout manifests are unchanged. This is
+source registration only: property-name mapping, numeric admission and actual
+selected execution need subsequent source review and tests. Source/coverage
+credit is zero; the archive remains in-progress without independent browser
+reproduction, predates the MQINQ re-pin and establishes no freshness or snapshot
+equivalence. No publication bodies or refreshed sources are retained in Git.
+
+### Additive recovery-policy source scope
+
+The independent `mq-recovery-policy-sources` scope registers exactly
+`SSFKSJ_9.4.0/refdev/q103230_.html` (HardenGetBackout) under
+`ibm-mq-9.4-recovery-policy-sources-2026-09-12`. Its source-owner pin is bound to
+the exact existing archive publication metadata, official MQ 9.4 content
+endpoint, pinned TOC locator and matching raw HTML. The retained topic path was
+checked first; the existing hash-addressed archive supplies the absent retained
+file. The pinned queue-attribute list `q102970_.html`, reached from the pinned
+MQMD BackoutCount topic `q097395_.html`, supplies the exact incoming link.
+Publication `last_modified` comes from verified HTML `lastModifiedDate`, not
+capture time. The shared reader and registry bind the manifest bytes and single
+topic-set digest. Original call, supplemental, layout and property manifests
+and the 26-call/27-position denominator remain unchanged.
+
+This is source registration only. HardenGetBackout defaults, BackoutCount crash
+accuracy, abnormal/final task-end policy and recovery semantics require later
+owned source review and execution proof. Semantic authority and coverage credit
+are zero. The archive remains in-progress without independent browser
+reproduction, predates the MQINQ issue337 re-pin and establishes no freshness or
+snapshot equivalence. No publication bodies or refreshed sources are in Git.
+
+### Additive RFH2 source scope
+
+The independent `mq-rfh2-sources` scope registers fifteen retained topics under
+`ibm-mq-9.4-rfh2-sources-2026-09-12`, product `SSFKSJ_9.4.0`: BMHO/MHBO/RFH
+constants, RFH2 declarations and field details, the mapping overview and eight
+detailed property-mapping topics, and the JMS-header padding/lexical reference.
+The shared topic-manifest
+and registry authorities bind exact hashes, bytes and the existing pinned TOC.
+The retained topic path is checked first; matching archive bytes supply absent
+files. Publication dates come from verified `lastModifiedDate` markup, not fetch
+time. Versioned endpoints, TOC headings and archive metadata establish bounded
+source identity; missing independent HTML product attributes are not invented.
+
+This is source registration only for original MQBUFMH row `0003` and MQMHBUF
+row `0018` (source positions `3`, `18`, `25`). Original 27-topic, supplemental
+80-topic, layout 12-topic, property 12-topic and recovery single-topic manifests,
+26-call denominator, 1030 status declarations and ten pending reasons remain
+unchanged. Numeric/layout/descriptor/option projection and actual RFH2 conversion
+require subsequent explicit review and execution. Semantic authority and coverage
+credit are zero. The archive remains in-progress, predates the MQINQ issue337
+re-pin and has no independent browser reproduction, freshness or same-snapshot
+claim. No publication bodies or refreshed sources are retained in Git.
+
+### Additive message-handle constants source scope
+
+The independent `mq-message-handle-sources` scope binds only
+`SSFKSJ_9.4.0/refdev/q091560_.html` (MQHM message-handle constants), baseline
+`ibm-mq-9.4-message-handle-sources-2026-09-12`, through the shared manifest and
+registry. Its exact bytes, publication date and pinned TOC locator are verified
+offline after checking the retained topic path first. This closes source
+availability for later DLTMH disposition review (original row `0013`, source
+position `13`); it does not add numeric admission or native writeback behavior.
+All existing call/source pins, canonical and numeric projections, 26-call/
+27-position denominator, 1030 status declarations and ten pending reasons remain
+unchanged. Complete IMPO corroboration remains unresolved. Source registration
+has zero semantic authority and zero execution, native, licensed or coverage
+credit. The archive remains in-progress without independent browser reproduction,
+predates MQINQ re-pin and establishes no freshness or snapshot equivalence.
+
+### Historical handle observation
+
+The strict private typed-result storage codec can preserve issued handle outputs
+through the fixed-field `MqHandleObservation` projection. Only observations have
+Serde; opaque executable tokens retain private construction. Decoded tokens have
+an irreversible historical disposition, while exact canonical identity/bytes
+remain unchanged. Every registry access rejects that disposition, including
+lifetime observation. Canonical equality does not mean authority equality.
+Readonly resolution can return an already-existing exact-owner/role/connection/
+epoch entry only after the caller independently proves the retained receipt/core
+occurrence and current admitted frame. It never connects, allocates or resurrects.
+Historical Default/Unassociated connection reconstruction remains unsupported;
+replay cannot acquire a current CICS task's default. Cold exposure still requires
+service-owned persisted epoch advancement. See
+[ADR 0033](../decisions/0033-mq-historical-handle-observation.md); no service,
+SAF, receipt/retention, UOW or public readiness is supplied by this pure boundary.
+
+### Installed admission and explicit frame session
+
+The server's configured installed-batch factory receives the privately
+constructed, nonserializable `InstalledBatchAdmission` after artifact validation
+and the winning existing CALL reservation. It observes actual parent/child
+linkage, catalog/version and validated artifact/compiler/interface provenance,
+the original enclosing ProgramCall and retained parent canonical intent/running
+execution, and the frozen physical store/control/host/artifact-store references.
+Typed admission rejects absent/stale/mismatched original observations and
+rechecks pending CALL/catalog and live monotonic controls around callbacks.
+Legacy routing remains unchanged when no typed factory is configured. A direct
+scheduler entry lacking that original core occurrence stays pending/Unsupported.
+
+The returned `InstalledMqFrameSession` provides the existing machine frame plus
+explicit preparation abort and raw-outcome finish. One server guard disables
+executable use if the session's physical store/control differs from frozen
+setup, even when all copied records or control observations match. It disables
+executable transport before either once-only notification; callback failure or
+panic preserves UnknownOutcome. Drop disables use without MQDISC/commit/backout,
+parent-state mutation or a cleanup queue. Child return, Condition, suspension or
+transfer does not establish task end. Protected CALL/core/replay retention stays
+with its existing protocol. See [ADR 0032](../decisions/0032-mq-program-machine-frame.md).
+
+Admission provenance is not a host-root/lifecycle lease or SAF/public readiness.
+The selected factory must independently bind the SAME service and physical
+store, actual admitted parent/process/task, current incarnation, original effect
+publication and task/UOW disposition. Equal stored rows or binding/owner bytes
+cannot substitute for that authority. The compiler/published-child/coordinator
+fixtures verify server transport with fixture frames/providers; they do not
+prove a real selected service, compiled scheduler producer or participant.
+Actual host producer, all applicable 26-call contexts, durable typed checkpoint,
+SAF/UOW/replay/recovery and participant/CardDemo acceptance remain required.
+
+### Selected message properties
+
+The private selected service admits a finite ordinary nonshared
+z/OS batch/queue-manager profile for MQCRTMH, MQSETMP, MQINQMP, MQDLTMP and
+MQDLTMH. Its checked `Property` request preserves explicit encoding/CCSID,
+version-one default option flags, exact ASCII names, complete MQPD1 and
+null/bytes/UTF-8/signed-integer values. It supports exact `Root.MQMD.Field`
+case for the common MQMD1 fields, excluding StrucId/Version. Each issued HMSG
+owns the associated default descriptor in its existing registry entry; setting
+or resetting a field preserves its full fixed width. Stored descriptor scalars
+are observations, not PUT legality, expiry-clock conversion, context permission
+or a SAF principal. MQMD2/MQMDE extensions remain unsupported in this profile.
+
+An exclusive message candidate holds the actual registry and touched property
+entry through publication under the existing selected mutex. Prospective HMSG
+observations are permanently historical; abort preserves generations/counters,
+and only known adoption returns the issued live token with the committed full
+host-result identity. The original retained core intent, logical current unit,
+physical store, live controls and mandatory MQUOW/CURRENT resource authorizer
+remain independent requirements. Provider rows, the insert-only result receipt
+and typed audit publish in one transaction; no property journal or scheduler is
+introduced. Host publication uses the existing success-audit convention even
+when its exact reviewed MQ result is a defined failure observation. SAF denial
+or authorizer failure publishes an audit-only decision, without property changes.
+
+INQMP observations retain MQPD, type, actual returned Encoding/CCSID, returned
+name prefix/VSLength, copied value prefix and complete DataLength. Short name
+and short value failures retain their exact reviewed FAILED reason pairs;
+simultaneously short buffers remain unsupported because precedence is not
+reviewed. Absent properties retain the call-specific FAILED inquiry or WARNING
+delete result. Undefined nonstring returned CCSID stays absent. New observations
+use the sole replay codec's strict storage@3; existing storage@1/@2 and canonical
+forms keep their bytes. Readers lacking @3 must refuse it, not down-convert it.
+
+Property handles and associated payloads are volatile. Durable receipts preserve
+observations and retained core/UOW dependencies, but cold reopen has no issued
+handle or adopted cache proof and cannot revive properties or aliases. A
+postpublication UnknownOutcome fences the runtime and retains the receipt;
+it grants no redispatch/backout/adoption decision. Legacy KernelV1 conversion
+rejects these reviewed entries rather than discard MQPD/CCSID/descriptor fields.
+Further BUFMH/MHBUF RFH2 profiles, wildcard/cursor/conversion/context/special-connection
+forms, durable payload integration and installed/compiler/participant/CardDemo
+acceptance remain required follow-up work; these private fixtures grant no
+official 26-call or public readiness credit.
+
+The ONE structure/status catalog owns the independent private property source
+projection; historical call/status/wire/raw projection identities remain frozen.
+Sources are original rows0010/0013/0014/0017/0023 in
+`ibm-mq-9.4-mqi-2026-08-31`, the pinned programming supplements, and
+`ibm-mq-9.4-property-sources-2026-09-12` (including q022960 descriptor properties).
+The explicit constants define MQPD_SUPPORT_OPTIONAL=1 and MQCOPY_DEFAULT=22;
+the pinned MQPD structure table's inconsistent zero columns are recorded in
+the projection and are not substituted for those definitions. This review
+changes none of the ten pending reason declarations and earns zero execution
+credit. Archive work remains in progress; no freshness or browser reproduction
+claim follows from these offline pinned reads.
+
+### Private complete producer
+
+`MQ-1503.selected-full-put-producer` adds `PutV1Synchronous` and `NoContext`
+through the existing MQI and numeric wire-option authorities. Their distinct
+named canonical tags and `MqMqiOutput::Produced(MqMqiProduced)` are additive;
+every older request/result tag, domain and partial DTO literal is unchanged.
+The producer output retains complete returned MD, exact resolved MQCHAR48 names,
+three `UndefinedZos` PMO destination counts, and `PreservedIgnoredInput` for
+BackoutCount. That disposition is an owned no-writeback policy: returned MD
+retains every signed ignored input, while newly queued data stores count zero.
+It is not evidence of IBM returned-counter bytes; a native writer must skip it.
+
+The finite private selected profile requires original Running canonical core
+intent, actual ordinary nonshared issued z/OS batch connection, output Hobj for
+PUT or independently resolved predefined normal local queue for PUT1, current
+owned local UOW or explicit NoSyncpoint, mandatory typed SAF Update, and the
+same catalog/control/frame/physical-store fences. MD1/MD2 and structure-character
+profile must match the homogeneous complete queue. PMO1 explicitly selects
+synchronous response and DefaultContext or NoContext. Only FormatNONE opaque
+body, datagram, no reports/feedback/reply/group/segment, empty properties/no HMSG,
+explicit persistence0/1, priority0, unlimited expiry, body CCSID37 or819 and
+caller nonzero MsgId are admitted. Duplicate caller IDs are legal. Unsupported
+forms refuse before context capture or delivery mutation; representable signed
+Encoding is retained without claiming it is a conversion permission.
+
+The same catalog's explicit strict version2 stores actual QM CCSID/character
+profile, QM maximum message length/priority and each normal local queue's
+maximum length/delivery sequence. Version1 encoding is exact and supplies no
+implicit native metadata. Explicit37/819 configuration is not z/OS startup
+default500. Maximum priority has no invented upper bound; the first execution
+profile requires FIFO and priority0. The lesser actual queue/QM body maximum and
+existing host/kernel/prospective row/result quotas all apply, including empty
+body on a zero-maximum queue.
+
+Private unique preactivation Rust setup attaches bounded synchronous physical
+Gregorian GMT/hundredths and trusted batch context ports to the SAME physical
+service/store. Seconds60 is refused without normalization. Actual8-character
+JOB origin is padded to28; absent optional user/accounting differs from errors.
+MQAT_MVS/MQAT_ZOS2, blank identity/origin data, dates and times are source-bound.
+NoContext clears identity/origin fields and samples no time/context. A trusted
+host structure-text adapter must reuse the owned character encoder; body CCSID
+cannot select structure encoding. Matching Invocation text or rows never attests
+provenance. Calls are panic-contained and synchronous service reentry refuses;
+ports must be finite/nonblocking and check exact current frame lifetime.
+The real installed/JES constructor and privileged runtime port composition
+remain explicit host integration obligations, not assertions made by fixtures.
+
+One existing candidate kernel/UOW and insert-only receipt publish through the
+original audited physical transaction. Only known commit adopts. Exact replay
+rechecks live connection/object/current unit/frame/incarnation and SAF without
+resampling context or GMT. Postpersist uncertainty retains/fences and never
+redispatches, refreshes context or decides UOW. Selected receipt/core-retention
+and cold historical-handle refusal keep their existing owners. Tests exercise
+actual selected producer/GET/CMIT/BACK on Memory and exclusively owned SQLite
+with explicitly test-owned provenance ports; they are not JES/RACF/installed
+or participant evidence.
+
+Reviewed sources are original MQPUT/MQPUT1 rows0020/0021 of
+`ibm-mq-9.4-mqi-2026-08-31`, supplements q098655_/q097395_/q097390_/
+q092170_/q092190_, and `mq-producer-attribute-sources` QM/queue maxima, CCSID,
+delivery sequence and MQAT q090310_ declarations. Source registration/read earns
+zero execution or licensed credit and proves neither freshness nor snapshot
+equivalence. Generated IDs/defaults/effective priority/expiry, property/RFH2,
+actual installed/JES provenance, retirement/recovery/full26/participant/CardDemo
+remain required. Only the licensed oracle is human-skipped with zero credit.
+### Selected finite RFH2 conversion
+
+`MqRfh2Profile::ZosBatchUtf8NativeV1` adds actual selected BUFMH/MHBUF
+application-space transformations on the same ordinary ZosBatch connection,
+current unit and issued message registry. It does not enqueue or consume a
+message. An immutable privileged `MqBatchLeDllCodesetSource` is installed on
+the same frozen service/store. It captures the actual batch LE/DLL CODESET once
+during new original CONN/CONNX preparation; only known connection publication
+adopts UTF8/1208. Warning reuse and exact replay retain that original profile
+without calling the source. The port refuses reentry and converts callback panic
+to infrastructure failure. Private fixture implementations do not establish
+installed LE, stub, THLICCSID or queue-manager source acceptance; those actual
+producer constructors remain integration obligations.
+
+The finite input is complete source-valid MQMD1 with ASCII-compatible structure
+characters, native numeric encoding785, CCSID1208, default scalar fields and
+opaque message/correlation IDs. BUFMH admits BMHO1 explicit NONE/retain, an empty
+ordinary property set and zero bytes or one leading RFH2 with a flat custom
+folder/leaf and default full MQPD. Null, bytes, signed integers and printable
+ASCII strings preserve null/empty/blank distinctions and exact opaque body tail.
+The associated complete descriptor is replaced, while the application MD and
+buffer stay untouched. Unsupported merging, deletion, chains and descriptor
+profiles fail before mutation.
+
+MHBUF admits MHBO1 properties-in-RFH2, with optional delete of one exact ordinary
+property after known publication. The owned formatter emits big-endian RFH2
+version2, aligned UTF8 name/value folders and an empty-tail native785/inherited
+CCSID/NONE triple. This deterministic XML spelling is an owned choice, not an IBM
+byte-exact oracle claim. Only the caller MD's Encoding/CCSID/Format become
+785/attested1208/RFH2; every other field stays exact. Required length is counted
+before output allocation. Short capacity publishes exact FAILED/2469 with the
+required DataLength and no MD/buffer write or deletion; missing property publishes
+FAILED/2471 with DataLength0 and no writes. This explicit no-copy short-buffer
+policy is permitted, not claimed source-mandated. Malformed admitted RFH2 input
+publishes FAILED/2334 with undefined DataLength left absent.
+
+Touched-entry candidates hold the sole registry borrow through the original
+intent-fenced provider-row/receipt/audit transaction. Late CAS, clock, quota,
+SAF or control failures abort without adopting descriptor/property changes.
+Postpublication uncertainty fences and retains the receipt, never authorizing
+redispatch or a durable decision. Associated payload and live source profile
+remain volatile: cold historical receipts cannot revive either handle or data.
+
+Distinct `Rfh2` request and `Rfh2Observation` output tags retain the original
+BUFMH/MHBUF call identities. Result preflight binds even directly assembled
+enums to exact capacity, descriptor, length and reviewed call status. The sole
+codec uses strict storage@4 iff this observation is present; old storage@1/@2/@3,
+canonical DTOs and all old projection digests remain byte-exact. Older readers
+must refuse @4. Storage@5 exclusively records the produced-PUT class above;
+the composed codec rejects either class under the other's version.
+The one structure/status catalog owns an independent private RFH2 projection;
+it changes no call denominator, status membership or pending reason.
+
+Source scope is original `ibm-mq-9.4-mqi-2026-08-31` row0003/q101710 and
+row0018/q101860 (positions18/25), the programming/property supplements, and
+`ibm-mq-9.4-rfh2-sources-2026-09-12`. RFH2 q099240/q099245 establish layout and
+folder rules; q104140/q104200 establish lexical/default-PD interpretation;
+q104160 lines9–11 establish the batch LE/DLL capture event. Recorded BMHO
+initializer, MHBO reason, structure-ID spelling and i8-limit conflicts stay
+pending rather than guessed. Source reads earn zero execution credit. Full
+conversion/context/group/MDE profiles, installed forwarding, durable payload,
+recovery/participant/IR/CardDemo and remaining applicable 26-call acceptance
+remain parent work; only the licensed oracle is human-skipped0/26.
+
+### Explicit volatile root ABI scope
+
+An admitted frame may now supply the same `MqMqiAbiScope` allocation to its SAME
+TASK machines. Predispatch bounded connection reservations, non-reused aliases,
+exact argument rechecks and one callback-free caller-byte/alias commit prevent
+late partial adoption. DISC retires aliases across frames; unusable or dropped
+dispatched calls fence the shared scope without provider cleanup or a UOW decision.
+Equal contexts are not sharing proof, and the sole provider registry remains
+executable authority. The default absent port preserves older connection-only
+embeddings; typed scopes cannot be serialized or restored. See
+[ADR0035](../decisions/0035-mq-root-scoped-abi-aliases.md) for source rows,
+finite ABI and compatibility. Installed root forwarding, HOBJ/HMSG families and
+genuine compiled provider verticals remain pending; private adapter fixtures
+grant no installed-host execution credit.
+
+### Coverage identity
+
+The ONE structure/status catalog also owns a distinct private
+`mq-raw-property-projection@1`: `OwnedReconciledNullSlot4AsciiNormalV1`.
+MQIMPO1 is a complete 60-byte prefix with four Reserved1 characters, full
+20-byte MQCHARV with a four-byte null replacement, and eight TypeString bytes.
+Standalone MQCHARV is 20 bytes. This explicitly reconciles q097210's incomplete
+COBOL/PL/I/assembler members and conflicting Reserved1/TypeString declarations
+with q097215 field descriptions and q094690's complete CHARV declarations.
+It is not exact vendor CMQIMPOV, CURRENT_LENGTH or a universal pointer ABI.
+Vendor copybook equivalence remains unresolved. The existing raw, wire, property,
+RFH2, status, canonical and replay projections retain their historical identities.
+
+Non-Serde captures retain the entire fixed containing group, bounded to 64 KiB,
+including prefix, actual capacity and suffix. Trusted embedding selects ASCII
+and normal big-endian storage independently of requested/returned value encoding
+or CCSID. A four-zero-byte replacement cannot be dereferenced. Positive offsets
+resolve from the enclosing IMPO or standalone CHARV start; explicit positive
+buffer capacity, containing-group bounds and protected ranges are checked.
+Options, sentinels and diagnostic signed observations remain raw, not admitted
+operations or live aliases. Compiler group validation belongs to the bridge.
+
+Pure inquiry plans accept only existing reviewed standard-type observations and
+exact call/status pairing. They preencode ReturnedEncoding, defined string-only
+ReturnedCCSID, returned-name VSLength/VSCCSID and the actual name prefix. Separate
+MQPD/Type/Value/DataLength arguments are outside this substrate. Requested,
+reserved, pointer, offset, capacity and all TypeString bytes remain unchanged;
+unknown-type/conversion warnings need broader output representation. Unavailable
+properties have no defined writes. Short-name prefix copying is the owned policy,
+not IBM byte equivalence: q094695 lines21–30 and q097215 lines289–295 differ.
+All captured bytes/encoding/capacity and cross-plan overlaps are checked before
+one bounded callback-free batch; failure writes nothing. No raw capture confers
+handle, source-profile, SAF, core or UOW authority.
+
+Sources are original `ibm-mq-9.4-mqi-2026-08-31` row0017/q101850,
+`ibm-mq-9.4-programming-supplements-2026-09-12` q097210/q097215,
+`ibm-mq-9.4-property-sources-2026-09-12` q094690/q094695/q091730, and
+`ibm-mq-9.4-point-layout-sources-2026-09-12` q093580/q093600.
+q094690 lines81–89 supplies the deliberate null replacement; generic pointer
+alignment is a different ABI. Source review and raw fixtures earn zero native,
+execution, licensed or official-call credit. Native compiled forwarding and all
+remaining parent acceptance remain required.
+
 The MQ-1506 licensed adapter at
-`conformance/0.15/oracles/mq-licensed-differential.json` binds the 26-call
+`conformance/subsystems/mq/oracles/mq-licensed-differential.json` binds the 26-call
 denominator to independent fixture identities and a bounded external receipt.
 Its verifier requires an authorized IBM MQ 9.4 environment, exact service and
 candidate identities, distinct product and oracle runners, normalized
@@ -130,3 +882,288 @@ Behavioral credit requires independently bound Conformance IR obligations and
 verdicts for each applicable recognized, validated, executed, conditioned,
 recovered and differential gate. Missing licensed or source evidence remains
 pending; it is never inferred from registry presence or broad workload success.
+
+## Privileged native point observations
+
+The trusted batch facet supplies an opaque structure profile before raw OD/MD
+decode, then an exact decoded lookup or retained HOBJ point profile. It reads
+the same selected service, physical store snapshot, frozen original frame,
+directory owner, issued nonshared batch connection, incarnation, catalog@2 and
+current retained local unit. It does not allocate, dispatch, sample context/GMT,
+create cursors, authorize SAF, publish audit/receipt or change durable rows.
+
+The initial binding is predefined normal-local OPEN (explicit OUTPUT or
+INPUT_SHARED), complete GET (held INPUT_SHARED, GMO1 removal/no-wait), complete
+PUT/PUT1 (PMO1 explicit synchronous), or CLOSE NONE.
+Actual complete queue version/structure characters and native maxima are observed;
+body Encoding/CCSID never chooses structure ABI. CP037 facts remain truthful but
+the first compiled adapter must refuse them until its character projection is
+implemented. Partial GET/PUT, browse, wait and general zero modifier/default
+policy cannot reuse this finite observation as admission.
+
+Cluster binding applies only to cluster queues (pinned MQOPEN q101870_350–389);
+the selected owning route is predefined normal-local, with no cluster dispatch.
+Read-ahead is ignored for nonclient applications (q101870_718), explicit
+INPUT_SHARED does not use DefInputOpen, and explicit PMO_SYNC_RESPONSE overrides
+default response (q098655_315–320). These operation-specific facts are rechecked
+through the exact wire query tuple; LocalQueue name alone never opens the gate.
+Structured property/MQGET/RFH2 policy remains separately owned and pending.
+
+Output preflight compares stable ABI/catalog/route facts, not historical physical
+row versions that known publication legitimately advances. Current-unit change
+invalidates these finite profiles; unit decisions require a new owning lookup.
+The final physical comparison occurs after the final bounded clock callback and
+fresh core/frame checks. Clock panic is contained without poisoning the selected
+mutex; selected-service reentry is refused while observing the clock. A callback
+that advances a physical catalog/control row cannot return stale usable facts.
+CLOSE encoding preflight preserves the opaque captured queue facts without
+requiring or reviving the retired HOBJ. Equal observations never resolve a raw
+uncertain result or grant historical handle authority.
+
+Privileged Rust-only source setup requires one unique inactive runtime and the
+same physical Arc store, once before activation. The host supplies the sole
+owned character encoder and independently admitted live source. NoContext-only
+adapters leave GMT/context Unsupported; DefaultContext cannot fabricate JES/time.
+Callbacks are bounded/nonblocking, contained and nonreentrant; they perform no
+publication or cleanup and cannot wait for cross-thread service reentry. This
+setup is not application/JSON attestation, installed/JES proof or public readiness.
+Actual compiled forwarding, atomic native writeback, host provenance, root/core
+recovery, SAF, participants, full26 and CardDemo remain required.
+
+The GET binding observes the same complete queue profile and existing owned local
+unit before decoding MD/GMO. The existing full GMO1 adapter admits only removal,
+no wait, finite sync/truncation controls and binary MsgId/CorrelId matching; the
+selected FullGet owner independently refuses stored structured properties,
+conversion/header/group/segment forms before live adoption. It does not infer
+PropertyControl from a local name: q096715_1167–1204 and1515–1520 leave generic
+property/RFH2 behavior outside this finite empty-property profile. The z/OS
+syncpoint default is source-defined (q096715_201–215), but an explicit choice
+remains preferable; either uses the actual owning current unit, never a guessed
+integer. Output-only descriptor fields do not become selectors or permissions.
+
+The legacy FullGet output lacks GMO ResolvedQName (q096715_1260–1268); the
+additive qualified result below carries its defined value. These read-only facts
+neither fabricate that field nor authorize native GET writeback. Native ABI
+composition remains required. GET pre/post comparisons keep the held input object live; only CLOSE
+has the explicit retired-object comparison. Known GET publication advances row
+versions while preserving ABI facts, and CMIT/BACK require a newly captured unit.
+
+### Qualified complete GET observation
+
+The additive QualifiedFullGet request and QualifiedFullGot output preserve the
+old FullGet/FullGot API and bytes. The same selected complete GET owner observes
+the held predefined normal-local INPUT_SHARED queue and catalog@2 structure
+characters, encoding exact ResolvedQName through the privileged existing source.
+Body Encoding/CCSID, OD text or copied rows cannot select or attest that profile.
+No GMT/context/time sample, extra registry, queue engine or receipt journal is added.
+Defined complete MD/prefix/DataLength and current Local/NoSyncpoint controls remain
+owned by the original core/SAF/UOW/candidate/audited-publication path.
+
+GMO q096715_1260–1268 supplies the retrieved local queue name; aliases/models remain
+unsupported by this finite profile. Complete/accepted removal includes exact48
+bytes; rejected truncation/no-message/unknown retains absence and caller GMO bytes
+for the unestablished field while preserving defined MD/prefix/length. The sole
+canonical encoder uses distinct additive tags and the sole replay codec admits
+storage@6 only for the qualified output, refusing class/schema mismatches. Earlier
+versions and source/status/numeric identities remain exact. See ADR0033 for strict
+codec, rollback and definedness boundaries. Native compiler/server forwarding,
+atomic writeback, broader GMO policies, root/recovery/participant/full26/CardDemo
+acceptance remain required; private fixture tests supply none of their credit.
+
+### Compiled OPEN/CLOSE and typed object aliases
+
+The interpreter's finite compiled OPEN/CLOSE bridge requires a deliberate SAME
+TASK root ABI allocation and privileged `native_structure` port, which defaults
+to Unsupported. It captures the opaque selected structure observation before
+OD1 decoding and binds the exact predefined normal-local target through the
+same point observation and existing numeric wire constructors. ASCII structures,
+normal big-endian PIC S9(9) BINARY arguments, explicit OUTPUT or INPUT_SHARED,
+and predefined CLOSE NONE are its initial profile. Generated OD1 fields must
+match a complete fixed compiled group or one checked COPY wrapper. Model,
+remote, alternate-user and general option forms remain unsupported; DynamicQName
+is preserved as source-ignored on this independently verified nonmodel route.
+
+One preallocated volatile table distinguishes connection and object aliases,
+binds each object to its live parent HCONN, and burns nonreused positive aliases
+before dispatch. Known OPEN alone adopts a nonhistorical provider-issued HOBJ.
+Known CLOSE retires only that object while retaining undefined z/OS HOBJ bytes;
+DISC retires its associated object aliases across all sharing frames. Complete
+argument/member snapshots, live profile checks and a final held table guard
+precede one callback-free touched-storage copy/adoption. Unusable replies, stale
+storage/profile, callback panic, cancellation or an abandoned dispatched call
+fence the volatile root without provider cleanup or a UOW/terminal decision.
+No new canonical, replay, durable schema or accepted checkpoint is introduced.
+
+Source applicability is the pinned MQ 9.4 baseline2026-08-31 CLOSE row0006
+`q101740_14–20/274–284` and OPEN row0019 `q101870_881–893`, with supplemental
+baseline2026-09-12 OD1 `q098100_186–198` and DynamicQName `q098105_152–155`.
+Compiled fixture dispatch/writeback and real registry-issued token tests are
+engine evidence, not installed selected Memory/SQLite, real SAF/root-terminal,
+native IBM or official row acceptance. Host wrappers must delegate to the same
+actual selected opaque observations, never copied binding/default facts. The
+complete compiled PUT/PUT1 continuation below consumes actual Produced feedback
+from the configured Foundation descriptor encoder; it cannot use the partial PUT shape.
+Installed forwarding, root recovery, participants, all applicable26 and CardDemo
+remain required parent work.
+
+### Selected full PUT queue defaults
+
+The same explicit native queue catalog can retain reviewed DefPriority,
+DefPersistence and DefaultPutResponse in strict private catalog@3. Historical
+catalog@1/@2 without these fields keeps its exact bytes; no startup default or
+automatic migration is supplied. Install or replace configuration only through
+the existing quiescent owning path. A live catalog change invalidates captured
+physical/profile fences, rather than rebinding an open object to new defaults.
+
+For the finite direct predefined normal-local FIFO route, full PUT/PUT1 accepts
+an explicit priority through the actual QM MaxPriority or the generated MQMD
+default sentinel, and explicit persistence0/1 or its default sentinel. At put
+time the existing selected candidate resolves only the stored descriptor's
+policy. Returned Produced retains the caller's input-only Priority/Persistence;
+the raw MD writer still changes only the existing eight context outputs. A
+nonzero default priority does not reorder FIFO arrival. The existing original
+request, complete result, payload, replay@5/@6 and canonical bytes are unchanged.
+
+The target-aware `put_full_for_target` uses the same retained opaque point's
+existing queue-default query. Explicit synchronous response overrides the queue
+default. Default response is supported only when that actual catalog records
+synchronous response; PUT1 default response under syncpoint stays unsupported
+because the source describes asynchronous behavior without a represented client
+override. Above-max priority also stays unsupported before mutation: its source
+warning and capped placement are not represented by this producer result.
+Asynchronous response, priority ordering, generated IDs, expiry, distribution,
+groups/segments and further profiles remain required follow-ons. Existing
+source-bound NoContext/DefaultContext, actual SAF, live connection/object/unit,
+original core occurrence, audit and single physical CAS publication remain the
+owning authorities; attributes and constructor validation grant no permission.
+
+Source review uses original baseline2026-08-31 PUT row0020 `q101880_` and PUT1
+row0021 `q101890_`, supplemental baseline2026-09-12
+`q097395_1221–1272/1301–1335` (input vs stored policy),
+`q098655_277–341` (response applicability), and producer-attribute baseline
+`ibm-mq-9.4-producer-attribute-sources-2026-09-12`
+`q103190_22–31`, `q103180_22–38`, `q103140_` and `q103300_19–33`.
+Reference review earns zero execution credit. Private selected Memory/owned-file
+SQLite and compiled engine fixtures do not establish installed JES/LE/native,
+root-terminal, participant, official26 or CardDemo acceptance.
+
+### Qualified GMO1 value staging
+
+The raw capture's `stage_qualified_full_get_gmo` prepares GMO1 scratch from an
+actual qualified result using the sole generated ResolvedQName field policy.
+It checks the complete original group snapshot, capacity, trusted structure
+characters, original request and existing result/status/limit validators before
+writing only Some(exact48). None preserves caller QName; StrucId, Version,
+Options, WaitInterval, ignored Signal1/Signal2 and all suffix bytes remain exact.
+Pending/unknown and mismatched observations refuse without writes. Pinned GMO
+q096710_146–184 and q096715_1205–1268 supply declaration and input/output facts;
+this adds no later-version GMO policy, offset inventory or numeric decoder.
+
+This value writer operates in owned scratch and grants no handle, SAF, admission
+or replay authority. Its final prefix copy is allocation/callback/failure-free,
+but it does not join MD, body, DataLength, completion and reason into one commit.
+The genuine installed bridge must preflight all those arguments and perform the
+final full storage comparisons and joined copy without fallible work. Supported
+owned CP037 raw observations do not establish compiler CP037 support. Native
+installed GET forwarding, trusted foundation encoder/JES/GMT, root pending-work,
+recovery/participants/IR/full26/CardDemo acceptance remain independently required.
+
+### Compiled complete PUT/PUT1
+
+The finite compiled bridge forwards eight by-reference arguments into the
+existing `FullPut` or `FullPutOne` original typed host effect. PUT resolves a
+root-shared live object alias under its exact live HCONN; PUT1 retains the actual
+HCONN and independently established predefined normal-local OD1 lookup. The
+privileged structure observation precedes raw OD/MD/PMO decoding. Two additive
+read-only point getters, descriptor version and lesser queue/QM body maximum,
+default to Unsupported and must delegate to the SAME opaque selected point
+observation. Caller Encoding, CCSID, bindings and equal foreign rows cannot
+select or attest that profile.
+
+ASCII-compatible structures and normal big-endian PIC S9(9) BINARY scalars are
+checked against the sole generated complete MD1/2 and PMO1 fields. Fixed groups
+and one COPY wrapper retain complete member/view identities and suffix bytes.
+The body has a separate fixed-storage limit bounded by the actual queue/QM
+maximum and frozen product message limit; only the checked BufferLength prefix
+enters the message. Structure/CNO capture retains its existing 1024-byte limit.
+The initial sealed `put_full` constructor admits explicit synchronous response,
+syncpoint/no-syncpoint and default/no-context, with an independently admitted
+local unit. It requires a supplied nonzero message ID and supplied correlation
+bytes (including binary-zero MQCI_NONE), unlimited
+expiry, positive reviewed body CCSID37/819, Format NONE and no properties,
+header, groups or segments. The queue-default extension above broadens only
+priority, persistence and synchronous response through `put_full_for_target`;
+generated IDs and other modes remain unsupported.
+
+The compiled supplied-correlation extension follows MQ9.4 MD field details
+`q097395_` lines1336–1494 in the supplements baseline
+`ibm-mq-9.4-programming-supplements-2026-09-12`: CorrelId is arbitrary supplied
+24-byte input, including MQCI_NONE, without MQPMO_NEW_CORREL_ID. In contrast,
+binary-zero MsgId requests generation and remains unsupported by this finite
+bridge. PMO field details `q098655_` lines122–142 distinguish both generation
+flags, which remain unsupported. Original PUT/PUT1 rows0020/0021 (`q101880_`,
+`q101890_`, baseline `ibm-mq-9.4-mqi-2026-08-31`) and every canonical/replay
+identity remain unchanged. Exact supplied CorrelId enters the original complete
+request and is preserved by request-bound Produced writeback. Private compiled
+regressions establish engine capture and atomicity only, with zero installed,
+native, source-execution, licensed or official call-coverage credit.
+
+Known success requires the original-request-bound actual `Produced` observation;
+legacy partial PUT/FullPut, status-only success and unsupported warnings cannot
+be substituted. The interpreter does not sample JES/GMT or encode context. The
+existing MD writer copies the eight already encoded actual context fields and
+preserves IDs, ignored BackoutCount, MD2 extension and all other input bytes.
+The sole PMO writer copies actual resolved names while retaining undefined z/OS
+destination counts, ignored Context, reserved Timeout and suffix bytes. A known
+reviewed FAILED status-only reply changes only the exact CC/RC, under an owned
+no-output policy; it makes no assertion about undefined IBM failure fields.
+
+All output bytes are prepared before final physical/profile callbacks, exact
+argument/member comparison and a pure held root parent/object-use guard. The
+joined copy has no callback, allocation, fallible lookup or alias mutation after
+that guard. Late storage/profile changes, malformed output, panic, cancellation,
+uncertainty and abandoned dispatched calls fence the volatile root without
+cleanup, backout or redispatch. No canonical, replay, durable or checkpoint
+schema changes are introduced.
+
+Source baseline2026-08-31 PUT row0020 `q101880_5–98` and PUT1 row0021
+`q101890_5–65` establish the signature and actual connection/object/body inputs.
+Supplement baseline2026-09-12 `q098655_194–227/315–319/382–446` establishes
+context, synchronous response, ignored/reserved fields and z/OS count
+definedness; `q098650_162–188` and `q097390_` provide declarations through the
+unchanged raw projection. `q092190_44–52/77–88` corroborates the existing option
+values. Sources and compiled private frame/reply fixtures provide zero installed
+selected Memory/SQLite, real SAF/JES/LE/core/root-terminal, native IBM, licensed
+or official26 credit. Manager integration must supply actual opaque wrappers,
+independent installed source provenance and original selected publication,
+including pending PUT normal/CEE3ABD and removed-GET root acceptance. Recovery,
+participants, full applicable26 and CardDemo remain required parent work.
+
+### Compiled qualified complete GET
+
+The finite nine-reference MQGET route emits original `QualifiedFullGet`, with
+actual live root HCONN/HOBJ and opaque same-point descriptor/body maxima before
+raw decode. Complete MD1/2 and GMO1, generated members, COPY wrappers, suffixes,
+normal big-endian PIC S9(9), ASCII structure and separate fixed body bounds are
+captured. The existing full GET constructor owns finite unit/truncation decoding;
+actual queue access, SAF and UOW admission remain selected-provider responsibilities.
+This profile is normal local INPUT_SHARED removal without wait, conversion,
+properties, additional ID selectors, groups or segments.
+
+Request-bound results retain OK/0, accepted WARNING/2079, rejected WARNING/2080
+and NoMessage FAILED/2033. Represented MD/prefix/DataLength includes rejected
+truncation; actual Some QName is written only for complete/accepted outcomes.
+NoMessage leaves absent MD/body/DataLength/QName unchanged. Sole MD/GMO writers
+and scalar encodings stage all writes before final callbacks, complete physical
+and pure storage checks, cancellation and a held parent/object-use guard. Joined
+copy has no callback, allocation, fallible lookup or UOW decision afterward.
+Unknown, malformed, late drift, panic, cancellation and Drop fence without retry.
+
+Pinned baseline2026-08-31 GET0015 q101830_5–48/121–125 and supplements2026-09-12
+q096710_115–162, q096715_1225–1268, q097390_/q097395_, q091510_ supply signature,
+warning pairs, complete MD and GMO declarations/definedness. Signal1's generated
+four-byte COBOL BINARY slot remains opaque; SET_SIGNAL and pointer dereference
+are refused. All old canonical/replay/schema/catalog authorities remain unchanged.
+Source and private compiled-frame fixtures earn zero installed/native/SAF/JES/LE/
+pending-work/official/licensed credit. Genuine host forwarding, removed GET and
+pending PUT normal/CEE3ABD, recovery, participants, IR/full26/CardDemo remain required.

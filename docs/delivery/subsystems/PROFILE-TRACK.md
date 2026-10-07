@@ -2,18 +2,18 @@
 
 Status: **Approved 2026-09-27; intake in progress**
 Epic: [#300](https://github.com/toreleon/mainframe-env/issues/300)
-Profile contract: [ADR-0006](../../decisions/0006-carddemo-0.1.1-profile.md)
+Profile contract: [ADR-0006](../../decisions/0006-carddemo-profile.md)
 
 The [subsystem delivery program](README.md) grows the pinned IBM
 programming surface one subsystem at a time. This track grows something
 different: the number of **complete workload profiles** mainframe-env runs.
-It runs beside subsystem implementation and does not change any version's scope or exit
+It runs beside subsystem implementation and does not change any subsystem's scope or exit
 criteria.
 
 ## Why a second track
 
 ADR-0006 defines six cumulative CardDemo profiles, and rule 7 of the shared
-acceptance contract keeps them green. CardDemo is also the only application family, so every
+acceptance contract requires a current passing run for each declared profile. CardDemo is also the only application family, so every
 subsystem phase is regression-checked against a single application's shape. A
 second family with a different shape (GenApp: CICS service layers over Db2 and
 VSAM, TSQ, web-service copybooks) finds gaps that CardDemo cannot.
@@ -74,13 +74,13 @@ equivalence, and nothing on this track is presented as such.
 | PT-1 | This document and the intake rules | all | Documentation checks | — |
 | PT-2 | `profile intake` command ([#301](https://github.com/toreleon/mainframe-env/issues/301)) | `genapp-base` | Fixture-corpus report tests | — |
 | PT-3 | GenApp gap report and issues | `genapp-base` | Reproducible report from the pin | Per gap |
-| PT-4 | `genapp-base` declaration and journeys | `genapp-base` | GenApp journeys | 0.9 web and transforms; Db2 in 0.12–0.13 (expected) |
+| PT-4 | `genapp-base` declaration and journeys | `genapp-base` | GenApp journeys | cics.application-api web and transforms; Db2 in db2.core–db2.programming (expected) |
 | PT-5 | Per-profile performance and scale budgets | `carddemo-base` first | Batch-window budget; first fails on [#186](https://github.com/toreleon/mainframe-env/issues/186) | — |
-| PT-6 | Crash-and-resume journey per profile | `carddemo-base` first | Restart equals a clean run | 0.16 for cross-resource cases |
+| PT-6 | Crash-and-resume journey per profile | `carddemo-base` first | Restart equals a clean run | integration.transactions for cross-resource cases |
 | PT-7 | Customer-shape regression tests | `carddemo-base` | Unit and conformance tests | Per shape |
 
 Candidate later profiles, each needing a sponsor workload before it is
 started: a CardDemo batch cycle under a scheduler
 ([#234](https://github.com/toreleon/mainframe-env/issues/234)), SORT-heavy
 reporting ([#235](https://github.com/toreleon/mainframe-env/issues/235)), and
-an IMS DB/TM profile after 0.14.
+an IMS DB/TM profile after ims.programming.

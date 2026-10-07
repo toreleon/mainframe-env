@@ -1,10 +1,10 @@
 # CardDemo reached compatibility copybooks
 
-Status: **Historical CD-003 contract; ownership migrated in 0.2.0**
+Status: **Historical CD-003 contract; ownership migrated in coverage.foundation**
 
 mainframe-env does not copy IBM product source. The compiler generates nine
-owned source-level definitions from the catalog in the accepted 0.1.1 receipt.
-For 0.2.0 the exact bytes moved without change: CICS owns DFHAID/DFHBMSCA, Db2
+owned source-level definitions from the retained CardDemo compatibility catalog.
+For coverage.foundation the exact bytes moved without change: CICS owns DFHAID/DFHBMSCA, Db2
 owns SQLCA, and MQ owns the six CMQ* members. The compiler consumes their
 explicitly ordered source libraries and owns no compatibility bytes. These
 definitions cover only symbols and layouts reached by the pinned CardDemo

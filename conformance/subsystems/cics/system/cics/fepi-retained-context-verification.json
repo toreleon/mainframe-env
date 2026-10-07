@@ -1,0 +1,945 @@
+{
+  "archive_run": {
+    "id": "20260912T054102Z-0a2bbb55",
+    "path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/work/SSJL4D_6.x-d44905bca77947f4/20260912T054102Z-0a2bbb55/run.json",
+    "product": "SSJL4D_6.x",
+    "semantic_authority": false,
+    "sha256": "356217b899c27472688bc71522343b320b88c64ac6b56a032b2483f260892081",
+    "status": "in-progress",
+    "toc_sha256": "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a"
+  },
+  "coverage_credit": 0,
+  "execution_credit": 0,
+  "existing_reused_pins": [
+    {
+      "bytes": 16116,
+      "scopes": [
+        {
+          "bytes": 16116,
+          "content_url": "https://www.ibm.com/docs/api/v1/content/SSJL4D_6.x%2Freference-diagnostics%2Feib%2Fdfha8me.html?parsebody=true&lang=en",
+          "scopes": [
+            {
+              "baseline": "ibm-cics-ts-6x-application-api-sources-c-2026-09-10",
+              "manifest": "conformance/subsystems/cics/application/manifests/cics-application-api-sources-c-topics.json",
+              "scope_id": "cics-application-api-sources-c",
+              "subsystem": "cics",
+              "target_subsystem": "cics.application-api"
+            }
+          ],
+          "sha256": "99e70c0ed7e31d29401691796df28f5bec2b819214bed1b48c944b08cc138cea"
+        }
+      ],
+      "sha256": "99e70c0ed7e31d29401691796df28f5bec2b819214bed1b48c944b08cc138cea",
+      "topic_path": "SSJL4D_6.x/reference-diagnostics/eib/dfha8me.html"
+    },
+    {
+      "bytes": 265761,
+      "scopes": [
+        {
+          "bytes": 265761,
+          "content_url": "https://www.ibm.com/docs/api/v1/content/SSJL4D_6.x%2Freference-diagnostics%2Feib%2Fdfha8mf.html?parsebody=true&lang=en",
+          "scopes": [
+            {
+              "baseline": "ibm-cics-ts-6x-application-api-sources-a-2026-09-10",
+              "manifest": "conformance/subsystems/cics/application/manifests/cics-application-api-sources-a-topics.json",
+              "scope_id": "cics-application-api-sources-a",
+              "subsystem": "cics",
+              "target_subsystem": "cics.application-api"
+            },
+            {
+              "baseline": "ibm-cics-ts-6x-application-api-sources-c-2026-09-10",
+              "manifest": "conformance/subsystems/cics/application/manifests/cics-application-api-sources-c-topics.json",
+              "scope_id": "cics-application-api-sources-c",
+              "subsystem": "cics",
+              "target_subsystem": "cics.application-api"
+            },
+            {
+              "baseline": "ibm-cics-ts-6x-2026-08-31",
+              "manifest": "conformance/subsystems/coverage/manifests/cics-topics.json",
+              "scope_id": "ibm-cics-ts-6x-2026-08-31",
+              "subsystem": "cics",
+              "target_subsystem": "coverage.foundation"
+            }
+          ],
+          "sha256": "78f90b09987b1a56da7cd9f0a2a36fa43a549966fa7dbeff2ad9608106ef7c25"
+        }
+      ],
+      "sha256": "78f90b09987b1a56da7cd9f0a2a36fa43a549966fa7dbeff2ad9608106ef7c25",
+      "topic_path": "SSJL4D_6.x/reference-diagnostics/eib/dfha8mf.html"
+    },
+    {
+      "bytes": 6895,
+      "scopes": [
+        {
+          "bytes": 6895,
+          "content_url": "https://www.ibm.com/docs/api/v1/content/SSJL4D_6.x%2Fsecurity%2Fresources%2Fsecurity-implement-passtickets.html?parsebody=true&lang=en",
+          "scopes": [
+            {
+              "baseline": "ibm-cics-ts-6x-application-api-sources-b-2026-09-10",
+              "manifest": "conformance/subsystems/cics/application/manifests/cics-application-api-sources-b-topics.json",
+              "scope_id": "cics-application-api-sources-b",
+              "subsystem": "cics",
+              "target_subsystem": "cics.application-api"
+            }
+          ],
+          "sha256": "78c08ca2f65f2858536001a52fad75ca6257638dd1486eafa25d3e0c3d71831a"
+        }
+      ],
+      "sha256": "78c08ca2f65f2858536001a52fad75ca6257638dd1486eafa25d3e0c3d71831a",
+      "topic_path": "SSJL4D_6.x/security/resources/security-implement-passtickets.html"
+    }
+  ],
+  "independently_reproduced_worker_receipt_sha256": "629f93bebb76b73a0356a523f64da78412171d21ea0f124320b78bcb17a282f0",
+  "licensed_credit": 0,
+  "records": [
+    {
+      "archive_body_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/html/sha256/93/9353521527eacefbb685804db34fa6c9c2002622e0ae8b464a213c4f7a9dfd37.html",
+      "archive_bytes_verified": true,
+      "archive_content_type": "text/html; charset=utf-8",
+      "archive_fetched_at": "2026-09-12T06:12:35Z",
+      "archive_http_status": 200,
+      "archive_metadata_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/work/SSJL4D_6.x-d44905bca77947f4/20260912T054102Z-0a2bbb55/topics/ae/aeb23ab29bb2eb494b0c9f2b7c5774ad20e8180310c44b0724bd1eaa818ef99e.json",
+      "archive_metadata_sha256": "bf2766d67cc380554578fc4570011fa85a1c85f1d62b6dba0d5b706f69a315f0",
+      "archive_status": "ok",
+      "bytes": 3613,
+      "committed_pins": [],
+      "content_url": "https://www.ibm.com/docs/api/v1/content/SSJL4D_6.x%2Fapplications%2Fdeveloping%2Ffepi%2Fdfhp73r.html?parsebody=true&lang=en",
+      "direct_affected_official_rows": [
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0022"
+      ],
+      "disposition": "uncommitted-metadata-backed-candidate",
+      "h1": {
+        "id": "dfhp73r__title__1",
+        "label": "Begin-session handler",
+        "tag": "h1"
+      },
+      "host": {
+        "path": "/Users/tore/Library/Application Support/mainframe-env/ibm-docs-html/SSJL4D_6.x/applications/developing/fepi/dfhp73r.html",
+        "status": "missing"
+      },
+      "last_modified": "2026-01-16",
+      "literal_inbound_edges": [
+        {
+          "href_ordinal": 2,
+          "literal_href": "/docs/en/SSJL4D_6.x/applications/developing/fepi/dfhp73r.html",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp73b.html",
+          "target_document_locator": "SSJL4D_6.x/applications/developing/fepi/dfhp73r.html",
+          "target_fragment_status": "not-inspected",
+          "target_group": "out-of-combined-cohort",
+          "target_locator": "SSJL4D_6.x/applications/developing/fepi/dfhp73r.html"
+        }
+      ],
+      "manager_independent_identity_check": true,
+      "outbound_literal_hrefs_not_followed": [
+        {
+          "href_ordinal": 1,
+          "literal_href": "/docs/en/SSJL4D_6.x/security/resources/security-implement-passtickets.html"
+        },
+        {
+          "href_ordinal": 2,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-samples/fepi/dfhp74r.html"
+        },
+        {
+          "href_ordinal": 3,
+          "literal_href": "/docs/en/SSJL4D_6.x/applications/developing/fepi/dfhp7kk.html"
+        }
+      ],
+      "plain_text_line_count": 37,
+      "potential_context_review": {
+        "axis": "Begin-session handler linkage and initialization, inbound-data and sign-on context review",
+        "obligation_applicability": "requires later command-specific review; no rules, expectations or waivers derived",
+        "plain_text_line_span": [
+          3,
+          35
+        ],
+        "semantic_acceptance": false
+      },
+      "product": "SSJL4D_6.x",
+      "sha256": "9353521527eacefbb685804db34fa6c9c2002622e0ae8b464a213c4f7a9dfd37",
+      "structural_headings": [
+        {
+          "id": "dfhp73r__title__1",
+          "label": "Begin-session handler",
+          "tag": "h1"
+        }
+      ],
+      "toc_nodes": [
+        {
+          "json_pointer": "/toc/topics/14/topics/9/topics/3/topics/0/topics/1",
+          "label": "Begin-session handler",
+          "parent": {
+            "json_pointer": "/toc/topics/14/topics/9/topics/3/topics/0",
+            "label": "Programs",
+            "topic_id": "design-programs",
+            "topic_path": "SSJL4D_6.x/applications/developing/fepi/dfhp7kk.html"
+          },
+          "topic_id": "programs-begin-session-handler"
+        }
+      ],
+      "topic_path": "SSJL4D_6.x/applications/developing/fepi/dfhp73r.html",
+      "version_provenance": "CICS TS 6.x documentation family, retained 2026-09-12; no fixed point-release or licensed-environment equivalence asserted",
+      "via_one_new_selected_context_official_rows": [],
+      "via_one_prior_context_official_rows": []
+    },
+    {
+      "archive_body_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/html/sha256/4a/4ab05629fe0d097f7a4dcba0a7b6c951bf30d521413ada3242a9d21aadd3341c.html",
+      "archive_bytes_verified": true,
+      "archive_content_type": "text/html; charset=utf-8",
+      "archive_fetched_at": "2026-09-12T06:41:08Z",
+      "archive_http_status": 200,
+      "archive_metadata_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/work/SSJL4D_6.x-d44905bca77947f4/20260912T054102Z-0a2bbb55/topics/0e/0edff99ace43ab2cac67aaf5da7b1d333b6e7ef1bc2bb25f5bfd650a7c0dbb78.json",
+      "archive_metadata_sha256": "8958f05dc098878fea4f06c9ae720ece27bb0c7f34090679e913127bf3043cf0",
+      "archive_status": "ok",
+      "bytes": 2922,
+      "committed_pins": [],
+      "content_url": "https://www.ibm.com/docs/api/v1/content/SSJL4D_6.x%2Fconfiguring%2Ffepi%2Fdfhp76q.html?parsebody=true&lang=en",
+      "direct_affected_official_rows": [
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0024"
+      ],
+      "disposition": "uncommitted-metadata-backed-candidate",
+      "h1": {
+        "id": "dfhp76q__title__1",
+        "label": "Workload routing in a sysplex",
+        "tag": "h1"
+      },
+      "host": {
+        "path": "/Users/tore/Library/Application Support/mainframe-env/ibm-docs-html/SSJL4D_6.x/configuring/fepi/dfhp76q.html",
+        "status": "missing"
+      },
+      "last_modified": "2026-01-16",
+      "literal_inbound_edges": [
+        {
+          "href_ordinal": 2,
+          "literal_href": "/docs/en/SSJL4D_6.x/configuring/fepi/dfhp76q.html",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp73c.html",
+          "target_document_locator": "SSJL4D_6.x/configuring/fepi/dfhp76q.html",
+          "target_fragment_status": "not-inspected",
+          "target_group": "out-of-combined-cohort",
+          "target_locator": "SSJL4D_6.x/configuring/fepi/dfhp76q.html"
+        }
+      ],
+      "manager_independent_identity_check": true,
+      "outbound_literal_hrefs_not_followed": [
+        {
+          "href_ordinal": 1,
+          "literal_href": "/docs/en/SSJL4D_6.x/configuring/connections/dfht13e.html"
+        },
+        {
+          "href_ordinal": 2,
+          "literal_href": "/docs/en/SSJL4D_6.x/configuring/fepi/dfhp720.html"
+        }
+      ],
+      "plain_text_line_count": 31,
+      "potential_context_review": {
+        "axis": "Target selection and generic-resource/sysplex deployment context review",
+        "obligation_applicability": "requires later command-specific review; no rules, expectations or waivers derived",
+        "plain_text_line_span": [
+          3,
+          29
+        ],
+        "semantic_acceptance": false
+      },
+      "product": "SSJL4D_6.x",
+      "sha256": "4ab05629fe0d097f7a4dcba0a7b6c951bf30d521413ada3242a9d21aadd3341c",
+      "structural_headings": [
+        {
+          "id": "dfhp76q__title__1",
+          "label": "Workload routing in a sysplex",
+          "tag": "h1"
+        }
+      ],
+      "toc_nodes": [
+        {
+          "json_pointer": "/toc/topics/10/topics/25/topics/0/topics/1",
+          "label": "Workload routing in a sysplex",
+          "parent": {
+            "json_pointer": "/toc/topics/10/topics/25/topics/0",
+            "label": "Identifying your configuration requirements",
+            "topic_id": "fepi-identifying-your-configuration-requirements",
+            "topic_path": "SSJL4D_6.x/configuring/fepi/dfhp720.html"
+          },
+          "topic_id": "requirements-workload-routing-in-sysplex"
+        }
+      ],
+      "topic_path": "SSJL4D_6.x/configuring/fepi/dfhp76q.html",
+      "version_provenance": "CICS TS 6.x documentation family, retained 2026-09-12; no fixed point-release or licensed-environment equivalence asserted",
+      "via_one_new_selected_context_official_rows": [],
+      "via_one_prior_context_official_rows": []
+    },
+    {
+      "archive_body_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/html/sha256/5f/5f25bcdf66b2c84ad7c11bc36e5025b04f35907fcd32b014f60175d5b8ead90c.html",
+      "archive_bytes_verified": true,
+      "archive_content_type": "text/html; charset=utf-8",
+      "archive_fetched_at": "2026-09-12T08:25:02Z",
+      "archive_http_status": 200,
+      "archive_metadata_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/work/SSJL4D_6.x-d44905bca77947f4/20260912T054102Z-0a2bbb55/topics/23/230cbd5476a9c417a924badf4cd4d40500ed8f48eae45839b4daacbe750d64ff.json",
+      "archive_metadata_sha256": "31266b4d6ebb9152670a29d58cd344045be9ddc55721e72bcfe3be4a67709769",
+      "archive_status": "ok",
+      "bytes": 11047,
+      "committed_pins": [],
+      "content_url": "https://www.ibm.com/docs/api/v1/content/SSJL4D_6.x%2Freference-applications%2Freference-programming.html?parsebody=true&lang=en",
+      "direct_affected_official_rows": [],
+      "disposition": "uncommitted-metadata-backed-candidate",
+      "h1": {
+        "id": "reference_applications__title__1",
+        "label": "Application development reference",
+        "tag": "h1"
+      },
+      "host": {
+        "path": "/Users/tore/Library/Application Support/mainframe-env/ibm-docs-html/SSJL4D_6.x/reference-applications/reference-programming.html",
+        "status": "missing"
+      },
+      "last_modified": "2026-07-23",
+      "literal_inbound_edges": [
+        {
+          "href_ordinal": 27,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/reference-programming.html",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp73u.html",
+          "target_document_locator": "SSJL4D_6.x/reference-applications/reference-programming.html",
+          "target_fragment_status": "not-inspected",
+          "target_group": "out-of-combined-cohort",
+          "target_locator": "SSJL4D_6.x/reference-applications/reference-programming.html"
+        },
+        {
+          "href_ordinal": 25,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/reference-programming.html",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp743.html",
+          "target_document_locator": "SSJL4D_6.x/reference-applications/reference-programming.html",
+          "target_fragment_status": "not-inspected",
+          "target_group": "out-of-combined-cohort",
+          "target_locator": "SSJL4D_6.x/reference-applications/reference-programming.html"
+        }
+      ],
+      "manager_independent_identity_check": true,
+      "outbound_literal_hrefs_not_followed": [
+        {
+          "href_ordinal": 1,
+          "literal_href": "/docs/en/SSJL4D_6.x/applications/developing/le/dfhp3_langenv_oview.html"
+        },
+        {
+          "href_ordinal": 2,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-api/dfhp4_apiformat.html"
+        },
+        {
+          "href_ordinal": 3,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-api/dfhp4_commandsummary.html"
+        },
+        {
+          "href_ordinal": 4,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-javadocs/jcics-javadoc/index.html"
+        },
+        {
+          "href_ordinal": 5,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-javadocs/jcicsx-javadoc/index.html"
+        },
+        {
+          "href_ordinal": 6,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-javadocs/j2ee-javadoc/index.html"
+        },
+        {
+          "href_ordinal": 7,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-javadocs/ws-assistant-javadoc-6.3/index.html"
+        },
+        {
+          "href_ordinal": 8,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-javadocs/ws-assistant-javadoc-6.2/index.html"
+        },
+        {
+          "href_ordinal": 9,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-javadocs/ws-assistant-javadoc-6.1/index.html"
+        },
+        {
+          "href_ordinal": 10,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/foundation-classes/dfhal0l.html"
+        },
+        {
+          "href_ordinal": 11,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-bts/dfhp9_btsapi.html"
+        },
+        {
+          "href_ordinal": 12,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-bts/dfhp916.html"
+        },
+        {
+          "href_ordinal": 13,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp7kq.html"
+        },
+        {
+          "href_ordinal": 14,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp73u.html"
+        },
+        {
+          "href_ordinal": 15,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp708.html"
+        },
+        {
+          "href_ordinal": 16,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/rexx/rexx.html"
+        },
+        {
+          "href_ordinal": 17,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/foundation-classes/dfhal0l.html"
+        },
+        {
+          "href_ordinal": 18,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/bms/dfhp4_bmsconstants.html"
+        },
+        {
+          "href_ordinal": 19,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/bms/dfhp4_bmsmacros.html"
+        },
+        {
+          "href_ordinal": 20,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/assembler/assembler-macros-reference.html"
+        },
+        {
+          "href_ordinal": 21,
+          "literal_href": "/docs/en/SSJL4D_6.x/upgrading/changes/compiler_changes.html"
+        },
+        {
+          "href_ordinal": 22,
+          "literal_href": "/docs/en/SSJL4D_6.x/applications/developing/compiler/dfhp3_transl_options_intro.html"
+        },
+        {
+          "href_ordinal": 23,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-api/dfhp4_threadsafelist.html"
+        },
+        {
+          "href_ordinal": 24,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-api/cics-api-jcics-mapping.html"
+        },
+        {
+          "href_ordinal": 25,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-api/dfha80c.html"
+        },
+        {
+          "href_ordinal": 26,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-api/dfhp4_nlscodes.html"
+        },
+        {
+          "href_ordinal": 27,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-diagnostics/eib/dfhp4_eibfields.html"
+        },
+        {
+          "href_ordinal": 28,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-diagnostics/eib/dfha8me.html"
+        },
+        {
+          "href_ordinal": 29,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-diagnostics/eib/dfha8mf.html"
+        },
+        {
+          "href_ordinal": 30,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/interfaces/dfhtmfb.html"
+        },
+        {
+          "href_ordinal": 31,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-api/dfhp4b00140.html"
+        },
+        {
+          "href_ordinal": 32,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-api/dfhp4_saaresourcerecovery.html"
+        },
+        {
+          "href_ordinal": 33,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-api/dfhp4_cpicomms.html"
+        },
+        {
+          "href_ordinal": 34,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/event-processing/dfhep_formats.html"
+        },
+        {
+          "href_ordinal": 35,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/interfaces/dfhtmer.html"
+        },
+        {
+          "href_ordinal": 36,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/mq/fr11120_.html"
+        },
+        {
+          "href_ordinal": 37,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/containers/dfhws_PipelineContainers.html"
+        },
+        {
+          "href_ordinal": 38,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/containers/dfhjson_jsoncontainers_json.html"
+        },
+        {
+          "href_ordinal": 39,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/web-services-pipelines/pipeline-config-xml-elements-overview.html"
+        }
+      ],
+      "plain_text_line_count": 62,
+      "potential_context_review": {
+        "axis": "Programming-reference navigation and language/runtime support context review",
+        "obligation_applicability": "requires later command-specific review; no rules, expectations or waivers derived",
+        "plain_text_line_span": [
+          3,
+          17
+        ],
+        "semantic_acceptance": false
+      },
+      "product": "SSJL4D_6.x",
+      "sha256": "5f25bcdf66b2c84ad7c11bc36e5025b04f35907fcd32b014f60175d5b8ead90c",
+      "structural_headings": [
+        {
+          "id": "reference_applications__title__1",
+          "label": "Application development reference",
+          "tag": "h1"
+        }
+      ],
+      "toc_nodes": [
+        {
+          "json_pointer": "/toc/topics/24",
+          "label": "Application development reference",
+          "parent": null,
+          "topic_id": "application-development-reference"
+        }
+      ],
+      "topic_path": "SSJL4D_6.x/reference-applications/reference-programming.html",
+      "version_provenance": "CICS TS 6.x documentation family, retained 2026-09-12; no fixed point-release or licensed-environment equivalence asserted",
+      "via_one_new_selected_context_official_rows": [],
+      "via_one_prior_context_official_rows": [
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0001",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0002",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0003",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0004",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0005",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0006",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0007",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0008",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0009",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0010",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0011",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0012",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0013",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0014",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0015",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0016",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0017",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0018",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0019",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0020",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0021",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0022",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0023",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0024",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0025",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0026",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0027",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0028",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0029",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0030",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0031",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0032",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0033",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0034",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0035",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0036",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0037",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0038",
+        "ibm-cics-ts-6x-2026-08-31:fepi-commands:0039"
+      ]
+    }
+  ],
+  "schema_version": "mainframe-env.retained-source-verification@1",
+  "semantic_authority": false,
+  "source_closure": "three registered document identities only; literal fragment and semantic applicability closure remain pending",
+  "source_context_counts": {
+    "absent_fragments": 6,
+    "committed_selected_topics": 3,
+    "direct_command_edges_to_six": 3,
+    "distinct_preserved_command_bodies": 36,
+    "edges_to_absent_fragments": 23,
+    "matching_archive_topics": 6,
+    "matching_host_topics": 0,
+    "missing_host_topics": 6,
+    "new_candidate_topics": 3,
+    "official_rows": 39,
+    "prior_context_edges_to_six": 10,
+    "prior_literal_edges_to_six": 13,
+    "selected_context_topics": 6
+  },
+  "source_topics": 3,
+  "toc": {
+    "bytes": 4767198,
+    "path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/toc/sha256/f6/f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a.json",
+    "product": "SSJL4D_6.x",
+    "sha256": "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a",
+    "url": "https://www.ibm.com/docs/api/v1/toc/cics-ts/6.x?lang=en"
+  },
+  "unresolved_original_fragments": [
+    {
+      "actual_h1": {
+        "id": "dfhp73i__title__1",
+        "label": "FEPI transient data queue records",
+        "tag": "h1"
+      },
+      "bytes": 12089,
+      "disposition": "exact referenced fragment remains absent; existing H1 is separately observed and is not substituted",
+      "element_ids": [
+        "dfhp73i__entry__1",
+        "dfhp73i__entry__2",
+        "dfhp73i__entry__29",
+        "dfhp73i__entry__30",
+        "dfhp73i__stentry__1",
+        "dfhp73i__stentry__2",
+        "dfhp73i__title__1",
+        "dfhp73i__title__2",
+        "lastModifiedDate"
+      ],
+      "exact_id_present": false,
+      "literal_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp73i.html#dfhp73i",
+      "manager_private_manifest": "/Users/tore/code/.codex-worktrees/mainframe-env/v010-completion-20261002/conformance/subsystems/cics/system/manifests/cics-fepi-context-topics.json",
+      "named_anchor_present": false,
+      "named_anchors": [],
+      "observed_edges": [
+        {
+          "href_ordinal": 4,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp73i.html#dfhp73i",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html",
+          "target_document_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp73i.html",
+          "target_fragment_status": "absent",
+          "target_group": "context-nine",
+          "target_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp73i.html#dfhp73i"
+        }
+      ],
+      "retained_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/html/sha256/84/84bb27ff6cf3b282754001015db6c4d871c872e4687ceab8c456f31af1e5f3b1.html",
+      "sha256": "84bb27ff6cf3b282754001015db6c4d871c872e4687ceab8c456f31af1e5f3b1"
+    },
+    {
+      "actual_h1": {
+        "id": "dfhp73u__title__1",
+        "label": "FEPI system programming reference",
+        "tag": "h1"
+      },
+      "bytes": 7300,
+      "disposition": "exact referenced fragment remains absent; existing H1 is separately observed and is not substituted",
+      "element_ids": [
+        "dfhp73u__title__1",
+        "lastModifiedDate"
+      ],
+      "exact_id_present": false,
+      "literal_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp73u.html#dfhp73u",
+      "manager_private_manifest": "/Users/tore/code/.codex-worktrees/mainframe-env/v010-completion-20261002/conformance/subsystems/cics/system/manifests/cics-fepi-context-topics.json",
+      "named_anchor_present": false,
+      "named_anchors": [],
+      "observed_edges": [
+        {
+          "href_ordinal": 1,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp73u.html#dfhp73u",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp708.html",
+          "target_document_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp73u.html",
+          "target_fragment_status": "absent",
+          "target_group": "context-nine",
+          "target_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp73u.html#dfhp73u"
+        },
+        {
+          "href_ordinal": 1,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp73u.html#dfhp73u",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp743.html",
+          "target_document_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp73u.html",
+          "target_fragment_status": "absent",
+          "target_group": "context-nine",
+          "target_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp73u.html#dfhp73u"
+        }
+      ],
+      "retained_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/html/sha256/84/84ad3c0a95a78d78a8fbcf79be34579f2bf769681213dea364b5e4192a591ef1.html",
+      "sha256": "84ad3c0a95a78d78a8fbcf79be34579f2bf769681213dea364b5e4192a591ef1"
+    },
+    {
+      "actual_h1": {
+        "id": "dfhp743__title__1",
+        "label": "FEPI application programming reference",
+        "tag": "h1"
+      },
+      "bytes": 9610,
+      "disposition": "exact referenced fragment remains absent; existing H1 is separately observed and is not substituted",
+      "element_ids": [
+        "dfhp743__title__1",
+        "lastModifiedDate"
+      ],
+      "exact_id_present": false,
+      "literal_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp743.html#dfhp743",
+      "manager_private_manifest": "/Users/tore/code/.codex-worktrees/mainframe-env/v010-completion-20261002/conformance/subsystems/cics/system/manifests/cics-fepi-context-topics.json",
+      "named_anchor_present": false,
+      "named_anchors": [],
+      "observed_edges": [
+        {
+          "href_ordinal": 2,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp743.html#dfhp743",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp708.html",
+          "target_document_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp743.html",
+          "target_fragment_status": "absent",
+          "target_group": "context-nine",
+          "target_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp743.html#dfhp743"
+        },
+        {
+          "href_ordinal": 1,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp743.html#dfhp743",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp73u.html",
+          "target_document_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp743.html",
+          "target_fragment_status": "absent",
+          "target_group": "context-nine",
+          "target_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp743.html#dfhp743"
+        }
+      ],
+      "retained_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/html/sha256/51/51b12ae091dc0fa5c2a493d7f8cbb2af2c032fc85951305e134f611ca39383d4.html",
+      "sha256": "51b12ae091dc0fa5c2a493d7f8cbb2af2c032fc85951305e134f611ca39383d4"
+    },
+    {
+      "actual_h1": {
+        "id": "dfhp74k__title__1",
+        "label": "FEPI start data",
+        "tag": "h1"
+      },
+      "bytes": 9144,
+      "disposition": "exact referenced fragment remains absent; existing H1 is separately observed and is not substituted",
+      "element_ids": [
+        "dfhp74k__entry__1",
+        "dfhp74k__entry__2",
+        "dfhp74k__stentry__1",
+        "dfhp74k__stentry__2",
+        "dfhp74k__title__1",
+        "dfhp74k__title__2",
+        "lastModifiedDate"
+      ],
+      "exact_id_present": false,
+      "literal_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74k.html#dfhp74k",
+      "manager_private_manifest": "/Users/tore/code/.codex-worktrees/mainframe-env/v010-completion-20261002/conformance/subsystems/cics/system/manifests/cics-fepi-context-topics.json",
+      "named_anchor_present": false,
+      "named_anchors": [],
+      "observed_edges": [
+        {
+          "href_ordinal": 1,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp74k.html#dfhp74k",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74j.html",
+          "target_document_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74k.html",
+          "target_fragment_status": "absent",
+          "target_group": "context-nine",
+          "target_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74k.html#dfhp74k"
+        }
+      ],
+      "retained_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/html/sha256/e6/e6b2c076787514186984f4e70d46a1f894fb02afa74a13230862629c36d115d6.html",
+      "sha256": "e6b2c076787514186984f4e70d46a1f894fb02afa74a13230862629c36d115d6"
+    },
+    {
+      "actual_h1": {
+        "id": "dfhp74l__title__1",
+        "label": "FEPI inbound and outbound data formats",
+        "tag": "h1"
+      },
+      "bytes": 7024,
+      "disposition": "exact referenced fragment remains absent; existing H1 is separately observed and is not substituted",
+      "element_ids": [
+        "dfhp74l__title__1",
+        "dfhp74l__title__2",
+        "dfhp74l__title__3",
+        "lastModifiedDate"
+      ],
+      "exact_id_present": false,
+      "literal_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html#dfhp74l",
+      "manager_private_manifest": "/Users/tore/code/.codex-worktrees/mainframe-env/v010-completion-20261002/conformance/subsystems/cics/system/manifests/cics-fepi-context-topics.json",
+      "named_anchor_present": false,
+      "named_anchors": [],
+      "observed_edges": [
+        {
+          "href_ordinal": 1,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html#dfhp74l",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp748.html",
+          "target_document_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html",
+          "target_fragment_status": "absent",
+          "target_group": "context-nine",
+          "target_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html#dfhp74l"
+        },
+        {
+          "href_ordinal": 1,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html#dfhp74l",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp749.html",
+          "target_document_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html",
+          "target_fragment_status": "absent",
+          "target_group": "context-nine",
+          "target_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html#dfhp74l"
+        },
+        {
+          "href_ordinal": 10,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html#dfhp74l",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp749.html",
+          "target_document_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html",
+          "target_fragment_status": "absent",
+          "target_group": "context-nine",
+          "target_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html#dfhp74l"
+        },
+        {
+          "href_ordinal": 1,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html#dfhp74l",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74f.html",
+          "target_document_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html",
+          "target_fragment_status": "absent",
+          "target_group": "context-nine",
+          "target_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html#dfhp74l"
+        },
+        {
+          "href_ordinal": 1,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html#dfhp74l",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74g.html",
+          "target_document_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html",
+          "target_fragment_status": "absent",
+          "target_group": "context-nine",
+          "target_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html#dfhp74l"
+        },
+        {
+          "href_ordinal": 1,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html#dfhp74l",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74h.html",
+          "target_document_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html",
+          "target_fragment_status": "absent",
+          "target_group": "context-nine",
+          "target_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html#dfhp74l"
+        },
+        {
+          "href_ordinal": 1,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html#dfhp74l",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74i.html",
+          "target_document_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html",
+          "target_fragment_status": "absent",
+          "target_group": "context-nine",
+          "target_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html#dfhp74l"
+        },
+        {
+          "href_ordinal": 3,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html#dfhp74l",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74i.html",
+          "target_document_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html",
+          "target_fragment_status": "absent",
+          "target_group": "context-nine",
+          "target_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html#dfhp74l"
+        },
+        {
+          "href_ordinal": 4,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html#dfhp74l",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74i.html",
+          "target_document_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html",
+          "target_fragment_status": "absent",
+          "target_group": "context-nine",
+          "target_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html#dfhp74l"
+        }
+      ],
+      "retained_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/html/sha256/9f/9f5713726ca1c63f09daa7c54d95bd8ce1debda00ff64af1dc4f06b9f2047fb5.html",
+      "sha256": "9f5713726ca1c63f09daa7c54d95bd8ce1debda00ff64af1dc4f06b9f2047fb5"
+    },
+    {
+      "actual_h1": {
+        "id": "dfhp74m__title__1",
+        "label": "End conditions for FEPI CONVERSE and FEPI RECEIVE",
+        "tag": "h1"
+      },
+      "bytes": 15636,
+      "disposition": "exact referenced fragment remains absent; existing H1 is separately observed and is not substituted",
+      "element_ids": [
+        "dfhp74m__dfhp75o",
+        "dfhp74m__dfhp75o__entry__1",
+        "dfhp74m__dfhp75o__entry__10",
+        "dfhp74m__dfhp75o__entry__11",
+        "dfhp74m__dfhp75o__entry__12",
+        "dfhp74m__dfhp75o__entry__13",
+        "dfhp74m__dfhp75o__entry__14",
+        "dfhp74m__dfhp75o__entry__15",
+        "dfhp74m__dfhp75o__entry__16",
+        "dfhp74m__dfhp75o__entry__17",
+        "dfhp74m__dfhp75o__entry__18",
+        "dfhp74m__dfhp75o__entry__2",
+        "dfhp74m__dfhp75o__entry__3",
+        "dfhp74m__dfhp75o__entry__4",
+        "dfhp74m__dfhp75o__entry__5",
+        "dfhp74m__dfhp75o__entry__6",
+        "dfhp74m__dfhp75o__entry__7",
+        "dfhp74m__dfhp75o__entry__8",
+        "dfhp74m__dfhp75o__entry__9",
+        "dfhp74m__title__1",
+        "lastModifiedDate"
+      ],
+      "exact_id_present": false,
+      "literal_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html#dfhp74m",
+      "manager_private_manifest": "/Users/tore/code/.codex-worktrees/mainframe-env/v010-completion-20261002/conformance/subsystems/cics/system/manifests/cics-fepi-context-topics.json",
+      "named_anchor_present": false,
+      "named_anchors": [],
+      "observed_edges": [
+        {
+          "href_ordinal": 2,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html#dfhp74m",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp748.html",
+          "target_document_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html",
+          "target_fragment_status": "absent",
+          "target_group": "context-nine",
+          "target_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html#dfhp74m"
+        },
+        {
+          "href_ordinal": 9,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html#dfhp74m",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp748.html",
+          "target_document_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html",
+          "target_fragment_status": "absent",
+          "target_group": "context-nine",
+          "target_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html#dfhp74m"
+        },
+        {
+          "href_ordinal": 2,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html#dfhp74m",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp749.html",
+          "target_document_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html",
+          "target_fragment_status": "absent",
+          "target_group": "context-nine",
+          "target_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html#dfhp74m"
+        },
+        {
+          "href_ordinal": 9,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html#dfhp74m",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp749.html",
+          "target_document_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html",
+          "target_fragment_status": "absent",
+          "target_group": "context-nine",
+          "target_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html#dfhp74m"
+        },
+        {
+          "href_ordinal": 2,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html#dfhp74m",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74f.html",
+          "target_document_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html",
+          "target_fragment_status": "absent",
+          "target_group": "context-nine",
+          "target_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html#dfhp74m"
+        },
+        {
+          "href_ordinal": 6,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html#dfhp74m",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74f.html",
+          "target_document_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html",
+          "target_fragment_status": "absent",
+          "target_group": "context-nine",
+          "target_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html#dfhp74m"
+        },
+        {
+          "href_ordinal": 2,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html#dfhp74m",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74g.html",
+          "target_document_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html",
+          "target_fragment_status": "absent",
+          "target_group": "context-nine",
+          "target_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html#dfhp74m"
+        },
+        {
+          "href_ordinal": 6,
+          "literal_href": "/docs/en/SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html#dfhp74m",
+          "source_topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74g.html",
+          "target_document_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html",
+          "target_fragment_status": "absent",
+          "target_group": "context-nine",
+          "target_locator": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html#dfhp74m"
+        }
+      ],
+      "retained_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/html/sha256/2f/2f5c45518008e0f9b5e090fde7030a916ff4374d472d65225790ece0c64a3c60.html",
+      "sha256": "2f5c45518008e0f9b5e090fde7030a916ff4374d472d65225790ece0c64a3c60"
+    }
+  ]
+}

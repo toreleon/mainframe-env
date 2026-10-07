@@ -1,0 +1,27 @@
+{
+  "baseline_id": "ibm-enterprise-cobol-6.5-program-initial-context-2026-09-11",
+  "book_href": "SS6SG3_6.5/pg/tasks/tppgm07.html",
+  "book_label": "Program lifecycle retained context candidates",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "coverage_credit": 0,
+  "product": "SS6SG3_6.5",
+  "retained_in_repository": false,
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "snapshot_date": "2026-09-11",
+  "subsystem": "cobol",
+  "toc_sha256": "c3527d5e084e9749bef54ddf7bfdb1ecbbed94dd686c724417a4a3b669f671ce",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/SS6SG3_6.5?lang=en",
+  "topic_count": 1,
+  "topic_manifest_digest": "45b6228ae82d9aeff0be085a35a54a57f8e94c4526ac13725e89488c450d0307",
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topics": [
+    {
+      "bytes": 3699,
+      "last_modified": "2026-01-30",
+      "sha256": "0c0de3b5aee04c212b7828895af6d0fb6d18890153c86327d2cdbc02a7ee937f",
+      "topic_path": "SS6SG3_6.5/pg/tasks/tppgm07.html"
+    }
+  ],
+  "total_bytes": 3699,
+  "target_subsystem": "cics.application-api"
+}

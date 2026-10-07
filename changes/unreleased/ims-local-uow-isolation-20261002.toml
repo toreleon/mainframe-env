@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Fence generic IMS local database writers through shared provider-row CAS and witnessed undo so rollback cannot erase another run's committed work; retain legacy undo readers with explicit unknown backout and fence load, logical cascades and utility publication."

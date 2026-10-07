@@ -19,8 +19,17 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+mod checked_replay;
+mod original_dispatch;
+pub use checked_replay::{CheckedReplayAuditCapture, CheckedReplayObservations};
+mod root_terminal;
+use root_terminal::NativeProgress;
+pub use root_terminal::{
+    NativeChildEnrollment, NativeRootAdmission, NativeRootConfiguration, NativeRootHooks,
+    NativeRootTermination, WinningRootTerminal,
+};
+
 const LIFECYCLE_OUTBOX_TOPIC: &str = "execution.lifecycle.v1";
-const LIFECYCLE_OUTBOX_DOMAIN: &[u8] = b"mainframe-env.execution-lifecycle@1\0";
 
 mod completion;
 mod handoff;
@@ -61,6 +70,8 @@ pub struct ExecutionCoordinator {
     store: Option<Arc<dyn PlatformStore>>,
     audit_sink: Option<Arc<dyn AuditSink>>,
     limits: CoordinatorLimits,
+    checked_inquiry_replay: bool,
+    checked_replay_pending: std::sync::Mutex<Option<Arc<CheckedReplayAuditCapture>>>,
 }
 
 struct PlatformAuditSink(Arc<dyn PlatformStore>);
@@ -89,6 +100,8 @@ impl ExecutionCoordinator {
             store: None,
             audit_sink: None,
             limits,
+            checked_inquiry_replay: false,
+            checked_replay_pending: std::sync::Mutex::new(None),
         }
     }
 
@@ -103,6 +116,8 @@ impl ExecutionCoordinator {
             store: None,
             audit_sink: Some(audit_sink),
             limits,
+            checked_inquiry_replay: false,
+            checked_replay_pending: std::sync::Mutex::new(None),
         }
     }
 
@@ -129,6 +144,8 @@ impl ExecutionCoordinator {
             store: Some(store),
             audit_sink: None,
             limits,
+            checked_inquiry_replay: false,
+            checked_replay_pending: std::sync::Mutex::new(None),
         }
     }
 
@@ -176,7 +193,7 @@ impl ExecutionCoordinator {
         M: Machine<Effect = EffectRequest, EffectResult = EffectResult>,
         F: FnMut() -> Result<ExecutionControl, ExecutionControlError>,
     {
-        self.execute_inner(machine, invocation, observe, false)
+        self.execute_inner(machine, invocation, observe, false, None, None, None)
     }
 
     /// Resume a durably journaled execution after a process boundary.
@@ -195,7 +212,7 @@ impl ExecutionCoordinator {
         M: Machine<Effect = EffectRequest, EffectResult = EffectResult>,
         F: FnMut() -> Result<ExecutionControl, ExecutionControlError>,
     {
-        self.execute_inner(machine, invocation, observe, true)
+        self.execute_inner(machine, invocation, observe, true, None, None, None)
     }
 
     /// Close a suspended execution after its checkpoint has been durably
@@ -212,7 +229,8 @@ impl ExecutionCoordinator {
         let store = self.store.as_ref().ok_or_else(|| {
             StoreError::Infrastructure("handoff completion requires an execution store".into())
         })?;
-        let (mut journal, state) = JournalCursor::open(Arc::clone(store), invocation, tick, true)?;
+        let (mut journal, state) =
+            JournalCursor::open(Arc::clone(store), invocation, tick, true, None, None)?;
         if state != Some(ExecutionState::Suspended) {
             return Err(StoreError::InvalidTransition);
         }
@@ -235,11 +253,25 @@ impl ExecutionCoordinator {
         invocation: &Invocation,
         mut observe: F,
         resumable: bool,
+        native: Option<&mut NativeProgress<'_>>,
+        prepare_native: Option<&mut dyn FnMut(&mut M) -> Result<(), HostProblem>>,
+        child: Option<&root_terminal::NativeChildEnrollment>,
     ) -> ExecutionOutcome
     where
         M: Machine<Effect = EffectRequest, EffectResult = EffectResult>,
         F: FnMut() -> Result<ExecutionControl, ExecutionControlError>,
     {
+        if self.checked_inquiry_replay
+            && !self
+                .checked_replay_pending
+                .lock()
+                .is_ok_and(|s| s.is_none())
+        {
+            return failed_outcome(problem(
+                FailureCategory::UnknownOutcome,
+                "retained checked replay attempt requires owning reconciliation",
+            ));
+        }
         if resumable && self.store.is_none() {
             return infrastructure_failure("durable resume requires an execution store");
         }
@@ -251,7 +283,14 @@ impl ExecutionCoordinator {
             .store
             .as_ref()
             .map(|store| {
-                JournalCursor::open(Arc::clone(store), invocation, control.now_tick, resumable)
+                JournalCursor::open(
+                    Arc::clone(store),
+                    invocation,
+                    control.now_tick,
+                    resumable,
+                    native,
+                    child,
+                )
             })
             .transpose()
         {
@@ -259,6 +298,26 @@ impl ExecutionCoordinator {
             Ok(None) => (None, None),
             Err(_) => return infrastructure_failure("execution admission persistence failed"),
         };
+        if let Some(prepare) = prepare_native {
+            if !journal.as_ref().is_some_and(|j| j.native.is_some()) || prepare(machine).is_err() {
+                return failed_outcome(problem(
+                    FailureCategory::UnknownOutcome,
+                    "native compiled machine preparation refused",
+                ));
+            }
+        }
+        if journal.as_ref().is_some_and(|j| j.native.is_some()) {
+            control = match observe_checked(
+                &mut observe,
+                control,
+                invocation,
+                invocation.deadline_tick,
+                &mut journal,
+            ) {
+                Ok(control) => control,
+                Err(outcome) => return outcome,
+            };
+        }
         if let Err(outcome) = check_control(
             control,
             None,
@@ -321,269 +380,19 @@ impl ExecutionCoordinator {
             match drive {
                 MachineDrive::Continue => resume = MachineResume::Start,
                 MachineDrive::HostCall(effect) => {
-                    let Some(host) = &self.host else {
-                        let outcome = ExecutionOutcome::ProviderFailure(problem(
-                            FailureCategory::ProviderFailure,
-                            "selected execution profile has no host provider",
-                        ));
-                        let _ = record_step(
-                            &mut journal,
-                            Some(ExecutionState::Failed),
-                            LifecycleEventKind::Failed,
-                            None,
-                            None,
-                        );
-                        return outcome;
-                    };
-                    let request_digest = match canonical_request_digest(&effect.request) {
-                        Ok(digest) => digest,
-                        Err(_) => {
-                            return failed_outcome(problem(
-                                FailureCategory::ResourceExhausted,
-                                "canonical host request exceeds the journal encoding budget",
-                            ));
-                        }
-                    };
-                    let audit_resource = canonical_audit_resource_digest(&effect.request);
-                    let mutating = effect.request.is_mutating();
-                    let capability = effect
-                        .request
-                        .required_capability(InvocationLimits::default());
-                    if resumable && let Some(key) = effect.idempotency_key.as_ref() {
-                        let Some(replay_journal) = journal.as_ref() else {
-                            return infrastructure_failure("durable resume journal is unavailable");
-                        };
-                        let existing = match replay_journal.store.effect(key) {
-                            Ok(existing) => existing,
-                            Err(_) => {
-                                return infrastructure_failure(
-                                    "prior effect lookup failed during durable resume",
-                                );
-                            }
-                        };
-                        if let Some(existing) = existing {
-                            if existing.execution_id != invocation.execution_id
-                                || existing.run_unit_id != invocation.run_unit_id
-                                || existing.sequence != effect.sequence
-                                || existing.digest_format != EffectDigestFormat::CanonicalHostV1
-                                || existing.request_digest != request_digest
-                            {
-                                return failed_outcome(problem(
-                                    FailureCategory::UnknownOutcome,
-                                    "durable effect replay identity does not match",
-                                ));
-                            }
-                            if existing.state != EffectState::Completed {
-                                return failed_outcome(problem(
-                                    FailureCategory::UnknownOutcome,
-                                    "durable effect requires reconciliation before resume",
-                                ));
-                            }
-                            control = match observe_checked(
-                                &mut observe,
-                                control,
-                                invocation,
-                                invocation.deadline_tick.min(effect.deadline_tick),
-                                &mut journal,
-                            ) {
-                                Ok(control) => control,
-                                Err(outcome) => return outcome,
-                            };
-                            let effect_sequence = effect.sequence;
-                            let audited = host.invoke(
-                                invocation,
-                                control.now_tick,
-                                control.cancellation_requested,
-                                effect,
-                            );
-                            let (result, audit) = audited.into_transaction_parts();
-                            let replay_digest = match canonical_result_digest(&result.outcome) {
-                                Ok(digest) => digest,
-                                Err(_) => {
-                                    return failed_outcome(problem(
-                                        FailureCategory::UnknownOutcome,
-                                        "replayed host result cannot be encoded",
-                                    ));
-                                }
-                            };
-                            if existing.result_digest != Some(replay_digest) {
-                                return failed_outcome(problem(
-                                    FailureCategory::UnknownOutcome,
-                                    "replayed host result differs from the reconciled result",
-                                ));
-                            }
-                            if record_audited_step(
-                                &mut journal,
-                                self.audit_sink.as_deref(),
-                                None,
-                                LifecycleEventKind::EffectResult {
-                                    sequence: effect_sequence,
-                                },
-                                None,
-                                None,
-                                audit,
-                            )
-                            .is_err()
-                            {
-                                return infrastructure_failure(
-                                    "replayed host audit persistence failed",
-                                );
-                            }
-                            resume = MachineResume::HostResult(result);
-                            continue;
-                        }
-                    }
-                    let intent_epoch = journal
-                        .as_ref()
-                        .and_then(|journal| journal.sequence.checked_add(1))
-                        .unwrap_or(effect.sequence);
-                    let intent = effect.idempotency_key.as_ref().map(|key| EffectRecord {
-                        execution_id: invocation.execution_id.clone(),
-                        run_unit_id: invocation.run_unit_id.clone(),
-                        sequence: effect.sequence,
-                        key: key.clone(),
-                        digest_format: EffectDigestFormat::CanonicalHostV1,
-                        request_digest,
-                        intent: EffectIntentMetadata {
-                            owner: invocation.execution_id.clone(),
-                            attempt: invocation.attempt,
-                            capability: Some(capability),
-                            audit_resource: Some(audit_resource),
-                            audit_invocation_key: Some(invocation.idempotency_key.clone()),
-                            created_tick: control.now_tick,
-                            recovery_after_tick: invocation.deadline_tick.min(effect.deadline_tick),
-                            epoch: intent_epoch,
-                            recovery_lease: None,
-                        },
-                        state: EffectState::Intent,
-                        result_digest: None,
-                        resolved_tick: None,
-                    });
-                    if record_step(
-                        &mut journal,
-                        None,
-                        LifecycleEventKind::EffectIntent {
-                            sequence: effect.sequence,
-                        },
-                        intent.clone(),
-                        None,
-                    )
-                    .is_err()
-                    {
-                        return infrastructure_failure("effect intent persistence failed");
-                    }
-                    control = match observe_checked(
-                        &mut observe,
-                        control,
+                    let dispatch = original_dispatch::OriginalDispatch {
+                        coordinator: self,
                         invocation,
-                        invocation.deadline_tick.min(effect.deadline_tick),
-                        &mut journal,
-                    ) {
-                        Ok(control) => control,
+                        journal: &mut journal,
+                        control: &mut control,
+                        observe: &mut observe,
+                        resumable,
+                        native_child: child.is_some(),
+                    };
+                    match dispatch.dispatch(effect) {
+                        Ok(result) => resume = MachineResume::HostResult(result),
                         Err(outcome) => return outcome,
-                    };
-                    let dispatch_deadline = invocation.deadline_tick.min(effect.deadline_tick);
-                    let audited = host.invoke(
-                        invocation,
-                        control.now_tick,
-                        control.cancellation_requested,
-                        effect,
-                    );
-                    // Dispatch has already happened. Sample the clock again before recording
-                    // completion so a slow synchronous provider receives its full retention
-                    // lifetime. A failed or regressed observation must not discard the result or
-                    // manufacture an early age; the committed result remains conservatively
-                    // unaged and therefore ineligible for retention until reconciliation.
-                    let post_dispatch_control = observe()
-                        .ok()
-                        .filter(|observed| observed.now_tick >= control.now_tick);
-                    let (result, audit) = audited.into_transaction_parts();
-                    let result_digest = match canonical_result_digest(&result.outcome) {
-                        Ok(digest) => digest,
-                        // Dispatch already happened; leave the durable intent for reconciliation.
-                        Err(_) => {
-                            return failed_outcome(problem(
-                                FailureCategory::UnknownOutcome,
-                                "host result cannot be encoded after dispatch; reconcile the intent",
-                            ));
-                        }
-                    };
-                    let result_record = intent.map(|mut record| {
-                        record.state = match &result.outcome {
-                            Ok(_) => EffectState::Completed,
-                            Err(HostProblem::UnknownOutcome) => EffectState::UnknownOutcome,
-                            Err(_) => EffectState::Failed,
-                        };
-                        record.result_digest = Some(result_digest);
-                        record.resolved_tick =
-                            matches!(record.state, EffectState::Completed | EffectState::Failed)
-                                .then(|| post_dispatch_control.map(|observed| observed.now_tick))
-                                .flatten()
-                                .filter(|tick| *tick != 0);
-                        record
-                    });
-                    if record_audited_step(
-                        &mut journal,
-                        self.audit_sink.as_deref(),
-                        None,
-                        LifecycleEventKind::EffectResult {
-                            sequence: result.sequence,
-                        },
-                        result_record,
-                        None,
-                        audit,
-                    )
-                    .is_err()
-                    {
-                        if mutating || matches!(&result.outcome, Err(HostProblem::UnknownOutcome)) {
-                            return failed_outcome(problem(
-                                FailureCategory::UnknownOutcome,
-                                "host dispatch completed but result persistence failed; reconcile the intent",
-                            ));
-                        }
-                        return infrastructure_failure("effect result persistence failed");
                     }
-                    if matches!(&result.outcome, Err(HostProblem::UnknownOutcome)) {
-                        // Never poll again or resume an ordinary exception handler
-                        // before preserving this already-observed uncertainty.
-                        if !resumable {
-                            let _ = record_step(
-                                &mut journal,
-                                Some(ExecutionState::Failed),
-                                LifecycleEventKind::Failed,
-                                None,
-                                None,
-                            );
-                        }
-                        return failed_outcome(problem(
-                            FailureCategory::UnknownOutcome,
-                            "host outcome unknown",
-                        ));
-                    }
-                    let Some(observed) = post_dispatch_control else {
-                        let _ = record_step(
-                            &mut journal,
-                            Some(ExecutionState::Failed),
-                            LifecycleEventKind::Failed,
-                            None,
-                            None,
-                        );
-                        return infrastructure_failure(
-                            "post-dispatch execution clock unavailable or regressed",
-                        );
-                    };
-                    let previous_control = control;
-                    control = observed;
-                    if let Err(outcome) = check_control(
-                        control,
-                        Some(previous_control),
-                        invocation,
-                        dispatch_deadline,
-                        &mut journal,
-                    ) {
-                        return outcome;
-                    }
-                    resume = MachineResume::HostResult(result);
                 }
                 MachineDrive::Invoke(child) => {
                     if suspend(&mut journal, machine, invocation, None).is_err() {
@@ -611,6 +420,9 @@ impl ExecutionCoordinator {
                     return ExecutionOutcome::Suspended(suspension);
                 }
                 MachineDrive::Completed(completion) => {
+                    if let Some(progress) = journal.as_mut().and_then(|j| j.native.as_deref_mut()) {
+                        progress.completed(&completion);
+                    }
                     if completion::record_completion(
                         &mut journal,
                         machine,
@@ -638,6 +450,9 @@ impl ExecutionCoordinator {
                     return ExecutionOutcome::Condition(condition);
                 }
                 MachineDrive::Abend(abend) => {
+                    if let Some(progress) = journal.as_mut().and_then(|j| j.native.as_deref_mut()) {
+                        progress.abended(&abend);
+                    }
                     if record_step(
                         &mut journal,
                         Some(ExecutionState::Failed),
@@ -758,7 +573,7 @@ fn check_control(
     Ok(())
 }
 
-struct JournalCursor {
+struct JournalCursor<'n, 'h> {
     store: Arc<dyn PlatformStore>,
     execution_id: mainframe_env_execution_api::ExecutionId,
     run_unit_id: mainframe_env_execution_api::RunUnitId,
@@ -766,14 +581,17 @@ struct JournalCursor {
     tick: u64,
     version: u64,
     sequence: u64,
+    native: Option<&'n mut NativeProgress<'h>>,
 }
 
-impl JournalCursor {
+impl<'n, 'h> JournalCursor<'n, 'h> {
     fn open(
         store: Arc<dyn PlatformStore>,
         invocation: &Invocation,
         tick: u64,
         resumable: bool,
+        mut native: Option<&'n mut NativeProgress<'h>>,
+        child: Option<&root_terminal::NativeChildEnrollment>,
     ) -> Result<(Self, Option<ExecutionState>), StoreError> {
         if let Some(execution) = store.get_execution(&invocation.execution_id)? {
             if !resumable
@@ -805,6 +623,7 @@ impl JournalCursor {
                     tick,
                     version: execution.version,
                     sequence: last.sequence,
+                    native,
                 },
                 Some(state),
             ));
@@ -818,23 +637,26 @@ impl JournalCursor {
             kind: LifecycleEventKind::Admitted,
         };
         let notification = notification(&event);
-        store.admit_execution(
-            ExecutionRecord {
-                execution_id: invocation.execution_id.clone(),
-                run_unit_id: invocation.run_unit_id.clone(),
-                selector: invocation.selector.clone(),
-                artifact: invocation.artifact.clone(),
-                principal: invocation.principal.id().clone(),
-                state: ExecutionState::Admitted,
-                attempt: invocation.attempt,
-                version: 1,
-                owner_lease: None,
-                lease_expiry_tick: None,
-                terminal_tick: None,
-            },
-            event,
-            notification,
-        )?;
+        let execution = ExecutionRecord {
+            execution_id: invocation.execution_id.clone(),
+            run_unit_id: invocation.run_unit_id.clone(),
+            selector: invocation.selector.clone(),
+            artifact: invocation.artifact.clone(),
+            principal: invocation.principal.id().clone(),
+            state: ExecutionState::Admitted,
+            attempt: invocation.attempt,
+            version: 1,
+            owner_lease: None,
+            lease_expiry_tick: None,
+            terminal_tick: None,
+        };
+        if let Some(child) = child {
+            child.admit(&store, invocation, execution, event, notification)?;
+        } else if let Some(progress) = native.as_deref_mut() {
+            progress.admit(&store, execution, event, notification)?;
+        } else {
+            store.admit_execution(execution, event, notification)?;
+        }
         Ok((
             Self {
                 store,
@@ -844,6 +666,7 @@ impl JournalCursor {
                 tick,
                 version: 1,
                 sequence: 1,
+                native,
             },
             None,
         ))
@@ -857,6 +680,19 @@ impl JournalCursor {
         checkpoint: Option<CheckpointRecord>,
         audit: Option<AuditRecord>,
     ) -> Result<(), StoreError> {
+        if self.native.is_some()
+            && (checkpoint.is_some()
+                || next_state.is_some_and(|s| {
+                    s.terminal()
+                        || s == ExecutionState::Completing
+                        || s == ExecutionState::Suspended
+                }))
+        {
+            let progress = self.native.take().ok_or(StoreError::InvalidTransition)?;
+            let result = progress.intercept(self, &kind);
+            self.native = Some(progress);
+            return result;
+        }
         self.sequence = self
             .sequence
             .checked_add(1)
@@ -900,37 +736,7 @@ fn notification(event: &LifecycleEvent) -> OutboxRecord {
 }
 
 fn lifecycle_payload(kind: &LifecycleEventKind) -> Vec<u8> {
-    let mut payload = Vec::with_capacity(LIFECYCLE_OUTBOX_DOMAIN.len() + 9);
-    payload.extend_from_slice(LIFECYCLE_OUTBOX_DOMAIN);
-    match kind {
-        LifecycleEventKind::Admitted => payload.push(1),
-        LifecycleEventKind::Queued => payload.push(2),
-        LifecycleEventKind::Claimed => payload.push(3),
-        LifecycleEventKind::Started => payload.push(4),
-        LifecycleEventKind::Completing => payload.push(5),
-        LifecycleEventKind::EffectIntent { sequence } => {
-            payload.push(6);
-            payload.extend_from_slice(&sequence.to_be_bytes());
-        }
-        LifecycleEventKind::EffectResult { sequence } => {
-            payload.push(7);
-            payload.extend_from_slice(&sequence.to_be_bytes());
-        }
-        LifecycleEventKind::Suspended => payload.push(8),
-        LifecycleEventKind::HandoffCompleted => payload.push(17),
-        LifecycleEventKind::Resumed => payload.push(9),
-        LifecycleEventKind::CancellationRequested => payload.push(10),
-        LifecycleEventKind::Cancelled => payload.push(11),
-        LifecycleEventKind::TimedOut => payload.push(12),
-        LifecycleEventKind::Completed { return_code } => {
-            payload.push(13);
-            payload.extend_from_slice(&return_code.to_be_bytes());
-        }
-        LifecycleEventKind::Condition => payload.push(14),
-        LifecycleEventKind::Abend => payload.push(15),
-        LifecycleEventKind::Failed => payload.push(16),
-    }
-    payload
+    mainframe_env_execution_api::lifecycle_notification_payload(kind)
 }
 
 fn record_step(

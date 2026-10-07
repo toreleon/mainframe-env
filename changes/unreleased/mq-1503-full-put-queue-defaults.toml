@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added source-reviewed queue priority, persistence and synchronous-response defaults for finite selected full PUT/PUT1. Strict catalog@3 preserves old catalog bytes. Stored messages receive effective policy; returned MD retains input-only fields. Original effect, SAF, current unit and audited publication remain required. Async response, above-max priority warnings and default-response PUT1 under syncpoint stay unsupported."

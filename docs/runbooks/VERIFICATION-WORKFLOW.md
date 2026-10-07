@@ -2,7 +2,7 @@
 
 Use enough evidence to establish the changed behavior and its affected boundaries.
 Avoid turning each edit into a new full certification campaign. Explicit task,
-release, promotion, and conformance acceptance requirements remain mandatory.
+policy, integration, and conformance acceptance requirements remain mandatory.
 Run project commands directly from the intended checkout with the pinned tools.
 
 ## Agent development loop
@@ -36,7 +36,7 @@ repair or new evidence justifies retrying. Required gates must not be waived.
 
 ## CI ownership
 
-The root `Jenkinsfile` owns candidate-bound CI, full assurance, and release gates.
+The root `Jenkinsfile` owns candidate-bound CI, full assurance gates.
 It refuses dirty or untracked source, records each selected command, and grants no
 licensed credit without the corresponding protected execution evidence. A later
 prose commit cannot hide an intervening failed code change.
@@ -45,8 +45,7 @@ prose commit cannot hide an intervening failed code change.
 
 `ci-checks/plan.json`, per-command JSON/logs, and `summary.json` are archived by
 Jenkins. The summary records actual selected-command time. Failed runs leave later
-gates unrun, and each attempt starts with fresh receipts. Release compilation has
-its own `build-server` timing. The current five-build/two-artifact retention stays
+gates unrun, and each attempt starts with fresh receipts. The current five-build/two-artifact retention stays
 bounded. Download/compiler caches are reusable computation; test receipts are
 evidence and cannot substitute for required candidate checks.
 

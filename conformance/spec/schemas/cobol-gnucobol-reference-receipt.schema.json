@@ -5,7 +5,7 @@
   "additionalProperties": false,
   "required": [
     "schema_version",
-    "target_version",
+    "target_subsystem",
     "status",
     "baseline_id",
     "reference",
@@ -29,7 +29,7 @@
   ],
   "properties": {
     "schema_version": { "const": "mainframe-env.cobol-gnucobol-reference-receipt@1" },
-    "target_version": { "const": "0.4.0" },
+    "target_subsystem": { "const": "cobol.execution" },
     "status": { "const": "pass-with-licensed-differential-pending" },
     "baseline_id": { "const": "ibm-enterprise-cobol-6.5-2026-05-31" },
     "reference": { "const": "gnucobol" },

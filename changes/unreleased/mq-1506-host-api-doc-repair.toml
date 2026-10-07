@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Documented non-MQ host contract bounds, ownership, failure and replay semantics; extracted unchanged request type families behind stable reexports and lowered the host API documentation and request-module ratchets."

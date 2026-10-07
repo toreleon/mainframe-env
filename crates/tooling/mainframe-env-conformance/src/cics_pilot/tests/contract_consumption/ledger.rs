@@ -14,11 +14,14 @@ use mainframe_env_coverage::{
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const PARTICIPANT_CONTRACT: &str =
-    include_str!("../../../../../../../conformance/0.16/contracts/transaction-participant.json");
+const PARTICIPANT_CONTRACT: &str = include_str!(
+    "../../../../../../../conformance/subsystems/integration/contracts/transaction-participant.json"
+);
 
 const SCENARIO: &str = "cics.file-uow.local";
-const SPEC_DIGEST: &str = "sha256:0054f3945d0d5f501d8337e44568c18cf4d660a983f20cc04bf74ecc1856cc79";
+// Frozen current effective runner document includes the 18 upstream MQ selected cases.
+// The CICS scenario, all prior cases and normalized catalog metadata remain unchanged.
+const SPEC_DIGEST: &str = "sha256:4d6d838c9f2a2b848e6b9d6e3a32b3f519c4cf807d0071cae3f394db18950233";
 // Frozen same-builder normalized catalog metadata, not an execution authority.
 const CATALOG_ROWS_DIGEST: &str =
     "sha256:c5d0d72ded0d030bc05c0e89ae70390e90606419fb21e698bac16fe4864145aa";
@@ -102,7 +105,7 @@ fn decode_export(bytes: &[u8], candidate: &str) -> Result<(Export, CompiledSpec)
         || export.spec_digest != SPEC_DIGEST
         || export.catalog_digest
             != digest(
-                &fs::read(root().join("conformance/0.2/catalogs/index.json"))
+                &fs::read(root().join("conformance/subsystems/coverage/catalogs/index.json"))
                     .map_err(|e| e.to_string())?,
             )
     {

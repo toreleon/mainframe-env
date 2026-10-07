@@ -5,39 +5,63 @@ use crate::request::{
 use mainframe_env_execution_api::PrincipalId;
 use serde::{Deserialize, Serialize};
 
+/// Stable owned dataset-definition schema identity.
 pub const DATASET_DEFINITION_CONTRACT: &str = "mainframe-env.dataset-definition@1";
+/// Stable dataset request identity used by host framing.
 pub const DATASET_REQUEST_CONTRACT: &str = "mainframe-env.host.dataset-request@2";
+/// Stable dataset result identity used by host framing.
 pub const DATASET_RESULT_CONTRACT: &str = "mainframe-env.host.dataset-result@2";
+/// Stable provider operand-family capability descriptor identity.
 pub const DATASET_PROVIDER_CAPABILITY_CONTRACT: &str =
     "mainframe-env.dataset-provider-capabilities@1";
+/// Current dataset provider-state schema revision; not a dataset CAS version.
 pub const DATASET_STATE_SCHEMA_VERSION: u16 = 6;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
+/// Declared allocation quantity unit; abstract placement is not a physical device allocation claim.
 pub enum SpaceUnit {
+    /// Quantities expressed as tracks.
     Tracks,
+    /// Quantities expressed as cylinders.
     Cylinders,
+    /// Quantities expressed as blocks.
     Blocks,
+    /// Quantities expressed as kilobytes.
     Kilobytes,
+    /// Quantities expressed as megabytes.
     Megabytes,
+    /// Quantities expressed as record slots.
     Records,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Allocation requests with a positive primary quantity and optional provider-gated extent policies.
 pub struct AllocationSpace {
+    /// Unit in which primary and secondary quantities are expressed.
     pub unit: SpaceUnit,
+    /// Positive initial allocation quantity in the selected unit.
     pub primary: u64,
+    /// Requested additional extent quantity; nonzero requires allocation-extents capability.
     pub secondary: u64,
+    /// Directory block count; nonzero exactly for partitioned organizations.
     pub directory_blocks: u32,
+    /// Request release of unused allocation; requires allocation-extents capability.
     pub release_unused: bool,
+    /// Request contiguous allocation; requires allocation-extents capability.
     pub contiguous: bool,
+    /// Request cylinder rounding; requires allocation-extents capability.
     pub round_to_cylinder: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Record blocking and buffering controls; zero block size leaves selection to the provider.
 pub struct DcbOptions {
+    /// Block byte count; zero leaves selection unspecified, fixed blocks must contain whole logical records.
     pub block_size: u32,
+    /// Positive buffer count; nondefault selection requires buffering capability.
     pub buffer_count: u16,
+    /// Optional positive per-buffer byte capacity, bounded by max_record_bytes.
     pub buffer_size: Option<u32>,
 }
 
@@ -67,17 +91,26 @@ impl Default for AllocationSpace {
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
+/// Placement domain used for explicit provider capability admission.
 pub enum VolumeKind {
+    /// Deterministic abstract placement.
     Abstract,
+    /// Explicit disk placement requiring physical-volumes capability.
     PhysicalDisk,
+    /// Explicit tape placement requiring tape capability.
     Tape,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Nonempty distinct bounded volume labels and device selection; physical/tape operands require capability support.
 pub struct VolumeSelection {
+    /// Abstract, disk or tape selection checked against provider support.
     pub kind: VolumeKind,
+    /// Nonempty distinct bounded labels; they are not native device handles.
     pub volume_ids: Vec<String>,
+    /// Optional bounded device label requiring physical/tape capability.
     pub device_type: Option<String>,
+    /// Positive requested device unit count, without allocating a device here.
     pub unit_count: u16,
 }
 
@@ -93,103 +126,165 @@ impl Default for VolumeSelection {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+/// Optional SMS placement metadata; names preserve requests without implying an installed ACS implementation.
 pub struct SmsClasses {
+    /// Optional bounded data-class label requiring SMS support.
     pub data_class: Option<String>,
+    /// Optional bounded management-class label requiring SMS support.
     pub management_class: Option<String>,
+    /// Optional bounded storage-class label requiring SMS support.
     pub storage_class: Option<String>,
+    /// Optional ACS routine label requiring explicit ACS capability.
     pub acs_routine: Option<String>,
+    /// Guaranteed-space request requiring SMS capability.
     pub guaranteed_space: bool,
+    /// Extended-format request requiring explicit capability.
     pub extended_format: bool,
+    /// Extended-addressing request requiring explicit capability.
     pub extended_addressable: bool,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
+/// Requested compression family; non-None modes require explicit provider capability.
 pub enum CompressionMode {
+    /// No compression requested.
     None,
+    /// Generic compression request requiring capability.
     Generic,
+    /// Tailored compression request requiring capability.
     Tailored,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
+/// Requested VSAM resource-sharing strategy; nondefault buffering is provider-gated.
 pub enum BufferingMode {
+    /// Default provider-selected buffering.
     System,
+    /// Request nonshared buffering resources.
     NonsharedResources,
+    /// Request local shared buffering resources.
     LocalSharedResources,
+    /// Request global shared buffering resources.
     GlobalSharedResources,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
+/// VSAM access mode. RLS and TVS need explicit capabilities; TVS is restricted to key-sequenced definitions.
 pub enum VsamAccessMode {
+    /// Ordinary non-RLS access selection.
     NonRls,
+    /// Record-level sharing selection requiring RLS capability.
     Rls,
+    /// Transactional VSAM selection requiring TVS capability and key-sequenced organization.
     Tvs,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Provider lock compatibility class, distinct from a security access intent.
 pub enum DatasetLockMode {
+    /// Shared read ownership class.
     Shared,
+    /// Update ownership class.
     Update,
+    /// Exclusive ownership class.
     Exclusive,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Dataset-wide or binary record identity scope for a provider-owned lock.
 pub enum DatasetLockTarget {
+    /// Scope the lock to the complete dataset.
     Dataset,
+    /// Scope the lock to one nonempty exact binary record identity.
     Record(Vec<u8>),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Observed lock ownership, expiry and version; possession of this data is not an authorization grant.
 pub struct DatasetLockReceipt {
+    /// Provider-issued lock identity; release still requires ownership validation.
     pub lock_id: String,
+    /// Validated dataset name whose provider state is addressed; the name grants no access.
     pub dataset: DatasetName,
+    /// Dataset-wide or exact binary record lock scope.
     pub target: DatasetLockTarget,
+    /// Claimed principal retained for provider ownership checks; not an authentication credential.
     pub owner: PrincipalId,
+    /// Observed lock compatibility class.
     pub mode: DatasetLockMode,
+    /// Positive absolute logical expiry tick, not a wall-clock timestamp.
     pub expires_at: u64,
+    /// Transaction correlation retained verbatim; naming one does not establish ownership or commit it.
     pub transaction: Option<String>,
+    /// Observed provider revision, distinct from a schema version or execution sequence.
     pub version: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Staged TVS record mutation; staging does not itself publish the dataset change.
 pub enum TvsRecordOperation {
+    /// Stage insertion of complete nonempty record bytes.
     Insert {
+        /// Validated dataset name whose provider state is addressed; the name grants no access.
         dataset: DatasetName,
+        /// Complete owned record bytes; framing and mutation legality belong to the dataset provider.
         record: Vec<u8>,
     },
+    /// Stage replacement by nonempty exact key and record bytes.
     Rewrite {
+        /// Validated dataset name whose provider state is addressed; the name grants no access.
         dataset: DatasetName,
+        /// Exact nonempty key bytes for the staged record operation.
         key: Vec<u8>,
+        /// Complete owned record bytes; framing and mutation legality belong to the dataset provider.
         record: Vec<u8>,
     },
+    /// Stage deletion by a nonempty exact key.
     Delete {
+        /// Validated dataset name whose provider state is addressed; the name grants no access.
         dataset: DatasetName,
+        /// Exact nonempty key bytes for the staged record operation.
         key: Vec<u8>,
     },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Retained TVS outcome, keeping unresolved publication distinct from known commit or rollback.
 pub enum TvsUnitOfWorkState {
+    /// Staging remains open; no finalized decision yet.
     Active,
+    /// Provider retains the known commit outcome.
     Committed,
+    /// Provider retains the known rollback outcome.
     RolledBack,
+    /// The publication outcome is unresolved and requires reconciliation.
     Unknown,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// TVS owner and staged-operation observation at one version, without coordinator completion authority.
 pub struct TvsUnitOfWorkReceipt {
+    /// Transaction correlation retained verbatim; naming one does not establish ownership or commit it.
     pub transaction: String,
+    /// Claimed principal retained for provider ownership checks; not an authentication credential.
     pub owner: PrincipalId,
+    /// Retained active/finalized/unknown outcome; Unknown does not imply rollback.
     pub state: TvsUnitOfWorkState,
+    /// Number of retained staged mutations, not yet-published row count.
     pub staged_operations: u32,
+    /// Observed provider revision, distinct from a schema version or execution sequence.
     pub version: u64,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// VSAM cross-region/system share selections with contract-validated numeric domains.
 pub struct DatasetShareOptions {
+    /// Validated cross-region share option in 1 through 4.
     pub cross_region: u8,
+    /// Validated cross-system share option in 3 through 4.
     pub cross_system: u8,
 }
 
@@ -203,17 +298,29 @@ impl Default for DatasetShareOptions {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// VSAM-only options validated against organization, record framing and advertised provider capabilities.
 pub struct VsamAttributes {
+    /// Optional interval bytes in 512 through 32768, in multiples of 512.
     pub control_interval_size: Option<u32>,
+    /// Optional positive area bytes, at least one interval and a multiple of its size.
     pub control_area_size: Option<u64>,
+    /// Validated sharing policy; nondefault selection requires sharing capability.
     pub share_options: DatasetShareOptions,
+    /// Non-RLS, RLS or TVS admission choice; no ownership is created here.
     pub access_mode: VsamAccessMode,
+    /// Must agree exactly with the selected spanned record format.
     pub spanned: bool,
+    /// Requested reuse policy requiring VSAM-data-options capability.
     pub reuse: bool,
+    /// Requested speed policy requiring VSAM-data-options capability.
     pub speed: bool,
+    /// Requested write checking requiring VSAM-data-options capability.
     pub write_check: bool,
+    /// Requested erase policy requiring VSAM-data-options capability.
     pub erase_on_delete: bool,
+    /// Buffer sharing strategy; nondefault selection requires buffering capability.
     pub buffering: BufferingMode,
+    /// Positive stripe count; values other than one require striping capability.
     pub stripe_count: u16,
 }
 
@@ -236,8 +343,11 @@ impl Default for VsamAttributes {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Requested key-label and compression metadata; it carries no key material or cryptographic execution proof.
 pub struct DataSecurity {
+    /// Optional bounded key locator requiring encryption capability; no key bytes are retained.
     pub encryption_key_label: Option<String>,
+    /// Requested compression family; non-None requires explicit capability.
     pub compression: CompressionMode,
 }
 
@@ -252,49 +362,81 @@ impl Default for DataSecurity {
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
+/// Catalog record classification; existence in this enum does not advertise provider support.
 pub enum CatalogEntryKind {
+    /// Ordinary dataset entry.
     Dataset,
+    /// Alternate index relationship entry.
     AlternateIndex,
+    /// Named alternate-index access path.
     Path,
+    /// Name indirection entry.
     Alias,
+    /// Generation-group definition.
     GenerationDataGroup,
+    /// User catalog entry.
     UserCatalog,
+    /// Master catalog entry.
     MasterCatalog,
+    /// Library catalog classification.
     Library,
+    /// Volume catalog classification.
     Volume,
+    /// Page-space catalog classification.
     PageSpace,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Master or user catalog routing identity.
 pub enum CatalogKind {
+    /// Master catalog routing domain.
     Master,
+    /// User catalog routing domain.
     User,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Requested-to-resolved catalog observation preserving alias traversal and positive version.
 pub struct CatalogResolution {
+    /// Original catalog name before alias resolution.
     pub requested: DatasetName,
+    /// Final resolved dataset/catalog name.
     pub resolved: DatasetName,
+    /// Optional catalog owning the resolution.
     pub catalog: Option<DatasetName>,
+    /// Ordered traversed alias names, bounded by max_records.
     pub alias_chain: Vec<DatasetName>,
+    /// Observed provider revision, distinct from a schema version or execution sequence.
     pub version: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// One versioned catalog listing item and its optional related object.
 pub struct CatalogListEntry {
+    /// Catalog item identity.
     pub name: DatasetName,
+    /// Observed catalog record classification.
     pub kind: CatalogEntryKind,
+    /// Optional related dataset/index/catalog identity.
     pub related: Option<DatasetName>,
+    /// Observed provider revision, distinct from a schema version or execution sequence.
     pub version: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Catalog labels and retention dates; date fields use YYYYDDD and are validated for leap-year boundaries.
 pub struct CatalogMetadata {
+    /// Requested catalog record classification.
     pub entry_kind: CatalogEntryKind,
+    /// Optional explicit catalog routing name.
     pub catalog: Option<DatasetName>,
+    /// Optional bounded catalog owner label, not an authenticated principal.
     pub owner: Option<String>,
+    /// Optional valid YYYYDDD creation date in years 1900 through 9999.
     pub creation_date: Option<u32>,
+    /// Optional valid YYYYDDD date at or after creation; mutually exclusive with retention_days.
     pub expiration_date: Option<u32>,
+    /// Optional retention duration in days; requires creation_date and excludes expiration_date.
     pub retention_days: Option<u16>,
 }
 
@@ -313,20 +455,32 @@ impl Default for CatalogMetadata {
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
+/// Dataset lifecycle observation; pending recall and recovery are not open/usable success states.
 pub enum DatasetLifecycleState {
+    /// Allocation exists before catalog/open use.
     Allocated,
+    /// Cataloged state without an active open observation.
     Cataloged,
+    /// Provider reports an open lifecycle state.
     Open,
+    /// Provider reports closed lifecycle state.
     Closed,
+    /// Content requires migration/recall handling before ordinary use.
     Migrated,
+    /// Recall is requested but not completed.
     RecallPending,
+    /// Recovery is required; ordinary completion must not be fabricated.
     RecoveryRequired,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Retained lifecycle state and migration/backup metadata, not a recovery decision.
 pub struct LifecycleMetadata {
+    /// Retained lifecycle observation, including pending recall/recovery.
     pub state: DatasetLifecycleState,
+    /// Modeled migration level; nonzero requires migration-recall capability.
     pub migration_level: u8,
+    /// Retained backup generation counter, not a machine checkpoint identifier.
     pub backup_generation: u64,
 }
 
@@ -341,31 +495,53 @@ impl Default for LifecycleMetadata {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Operand-family support declaration checked during definition admission, not licensed execution evidence.
 pub struct DatasetProviderCapabilities {
+    /// Capability descriptor schema revision, distinct from provider state schema.
     pub schema_version: u16,
+    /// Declare support for abstract placement; declaration alone is not execution evidence.
     pub abstract_volumes: bool,
+    /// Declare support for secondary allocation, release, contiguity and rounding; declaration alone is not execution evidence.
     pub allocation_extents: bool,
+    /// Declare support for nondefault buffer count/size and resource sharing; declaration alone is not execution evidence.
     pub buffering: bool,
+    /// Declare support for nondefault catalog type, owner and retention; declaration alone is not execution evidence.
     pub catalog_metadata: bool,
+    /// Declare support for explicit catalog routing; declaration alone is not execution evidence.
     pub catalog_routing: bool,
+    /// Declare support for explicit VSAM interval/area sizes; declaration alone is not execution evidence.
     pub control_intervals: bool,
+    /// Declare support for extended format/addressability; declaration alone is not execution evidence.
     pub extended_format: bool,
+    /// Declare support for disk/device placement; declaration alone is not execution evidence.
     pub physical_volumes: bool,
+    /// Declare support for tape placement; declaration alone is not execution evidence.
     pub tape: bool,
+    /// Declare support for ACS routine selection; declaration alone is not execution evidence.
     pub sms_acs: bool,
+    /// Declare support for key-label encryption; declaration alone is not execution evidence.
     pub encryption: bool,
+    /// Declare support for non-None compression; declaration alone is not execution evidence.
     pub compression: bool,
+    /// Declare support for multiple stripes; declaration alone is not execution evidence.
     pub striping: bool,
+    /// Declare support for nondefault migration/lifecycle requests; declaration alone is not execution evidence.
     pub migration_recall: bool,
+    /// Declare support for record-level sharing mode; declaration alone is not execution evidence.
     pub rls: bool,
+    /// Declare support for nondefault share options; declaration alone is not execution evidence.
     pub sharing: bool,
+    /// Declare support for SMS classes and guaranteed space; declaration alone is not execution evidence.
     pub sms_classes: bool,
+    /// Declare support for transactional VSAM mode; declaration alone is not execution evidence.
     pub tvs: bool,
+    /// Declare support for REUSE, SPEED, WRITECHECK and ERASE; declaration alone is not execution evidence.
     pub vsam_data_options: bool,
 }
 
 impl DatasetProviderCapabilities {
     #[must_use]
+    /// Declare the minimal deterministic abstract profile; physical and deferred operand families remain false.
     pub const fn deterministic_abstract() -> Self {
         Self {
             schema_version: 1,
@@ -392,6 +568,7 @@ impl DatasetProviderCapabilities {
     }
 
     #[must_use]
+    /// Enable all represented operand families for structural validation; this does not assert any installed provider implements them.
     pub const fn all_contract_capabilities() -> Self {
         Self {
             schema_version: 1,
@@ -419,20 +596,31 @@ impl DatasetProviderCapabilities {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Owned dataset definition whose structural and capability admission remains separate from installation and permissions.
 pub struct DatasetDefinition {
+    /// Logical record/organization definition validated before installation or mutation.
     pub attributes: DatasetAttributes,
+    /// Record blocking and buffering selection.
     pub dcb: DcbOptions,
+    /// Allocation quantities and extent policy.
     pub allocation: AllocationSpace,
+    /// Requested placement labels/domain.
     pub volumes: VolumeSelection,
+    /// Optional provider-gated SMS selection.
     pub sms: SmsClasses,
+    /// Organization-dependent VSAM options.
     pub vsam: VsamAttributes,
+    /// Key-label and compression requests, without key material.
     pub security: DataSecurity,
+    /// Catalog classification, routing and retention.
     pub catalog: CatalogMetadata,
+    /// Requested initial lifecycle metadata.
     pub lifecycle: LifecycleMetadata,
 }
 
 impl DatasetDefinition {
     #[must_use]
+    /// Wrap attributes in current contract defaults, adding one directory block for partitioned organizations; no dataset is created.
     pub fn compatibility(attributes: DatasetAttributes) -> Self {
         let mut allocation = AllocationSpace::default();
         if matches!(
@@ -454,6 +642,7 @@ impl DatasetDefinition {
         }
     }
 
+    /// Check record/allocation/date/VSAM shape, then reject requested unsupported families with UnsupportedCapability; no state or clock is mutated.
     pub fn validate(
         &self,
         limits: HostLimits,
@@ -728,80 +917,131 @@ impl DatasetDefinition {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Versioned definition, logical allocation and placement observations; byte counters do not imply a physical device.
 pub struct DatasetDescription {
+    /// Complete observed definition.
     pub definition: DatasetDefinition,
+    /// Observed provider revision, distinct from a schema version or execution sequence.
     pub version: u64,
+    /// Total logical allocation in bytes, matching the ordered extent sum.
     pub allocated_bytes: u64,
+    /// Observed logical used byte count.
     pub used_bytes: u64,
+    /// Modeled control-interval count.
     pub control_intervals: u64,
+    /// Modeled control-area count.
     pub control_areas: u64,
+    /// Highest used relative byte address, no greater than max_rba.
     pub high_used_rba: u64,
+    /// Maximum logical relative byte address.
     pub max_rba: u64,
+    /// Nonempty ordered contiguous positive logical extents.
     pub extents: Vec<DatasetExtent>,
+    /// Positive modeled buffering allocation in bytes.
     pub buffer_bytes: u64,
+    /// Nonempty bounded abstract placement identity; not a physical-device claim.
     pub abstract_placement: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Ordered positive logical extent and corresponding provider volume range, both measured in bytes.
 pub struct DatasetExtent {
+    /// Zero-based position in the ordered extent list.
     pub ordinal: u32,
+    /// Logical byte start, contiguous with the preceding extent.
     pub start: u64,
+    /// Corresponding volume-relative byte start.
     pub volume_start: u64,
+    /// Positive extent length in bytes.
     pub length: u64,
+    /// Bounded provider volume label.
     pub volume_id: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// One dataset extent mapped into an owned volume byte range.
 pub struct DatasetVolumeExtent {
+    /// Validated dataset name whose provider state is addressed; the name grants no access.
     pub dataset: DatasetName,
+    /// Dataset extent ordinal mapped into this volume.
     pub dataset_extent_ordinal: u32,
+    /// Dataset-relative logical byte start.
     pub logical_start: u64,
+    /// Volume-relative byte start.
     pub volume_start: u64,
+    /// Positive extent byte length.
     pub length: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Volume allocation observation with ordered contiguous extents and used bytes bounded by allocation.
 pub struct DatasetVolumeDescription {
+    /// Bounded volume label, sorted uniquely in a volume listing.
     pub volume_id: String,
+    /// Volume allocation bytes matching the contiguous extent sum.
     pub allocated_bytes: u64,
+    /// Used bytes, no greater than allocated_bytes.
     pub used_bytes: u64,
+    /// Nonempty contiguous positive volume extents.
     pub extents: Vec<DatasetVolumeExtent>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Owned restore data partitioned by organization; snapshot shape does not grant restore permission.
 pub struct DatasetSnapshot {
+    /// Owned organization/definition restored with this content.
     pub definition: DatasetDefinition,
+    /// Owned record bytes retained in order without text decoding or padding changes.
     pub records: Vec<Vec<u8>>,
+    /// Strictly increasing positive relative-record slots.
     pub relative_records: Vec<DatasetRelativeRecordSnapshot>,
+    /// Strictly ordered unique library members.
     pub members: Vec<DatasetMemberSnapshot>,
+    /// Complete linear byte content; mutually exclusive with record/member forms.
     pub linear_data: Vec<u8>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// One positive relative record number and its exact record bytes.
 pub struct DatasetRelativeRecordSnapshot {
+    /// Positive one-based relative record number.
     pub record_number: u64,
+    /// Complete owned record bytes; framing and mutation legality belong to the dataset provider.
     pub record: Vec<u8>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Member content, PDSE generations or alias target; alias snapshots cannot also carry content.
 pub struct DatasetMemberSnapshot {
+    /// Member identity, sorted uniquely within a snapshot.
     pub name: MemberName,
+    /// Owned record bytes retained in order without text decoding or padding changes.
     pub records: Vec<Vec<u8>>,
+    /// Strictly increasing positive PDSE generations.
     pub generations: Vec<DatasetMemberGenerationSnapshot>,
+    /// Optional distinct nonalias target in the same snapshot; alias content must be empty.
     pub alias_of: Option<MemberName>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Positive ordered member generation preserving program-object classification and record bytes.
 pub struct DatasetMemberGenerationSnapshot {
+    /// Selected/observed generation identity; it is not the current mutable catalog version.
     pub generation: u64,
+    /// Retain program-object classification separately from member record bytes.
     pub program_object: bool,
+    /// Owned record bytes retained in order without text decoding or padding changes.
     pub records: Vec<Vec<u8>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Bounded provider diagnostic text; it is not a standardized machine status or repair receipt.
 pub struct DatasetDiagnostic {
+    /// Nonempty bounded provider diagnostic identifier.
     pub code: String,
+    /// Optional bounded affected-field label.
     pub field: Option<String>,
+    /// Bounded explanatory text, not an automatic repair action.
     pub detail: String,
 }
 

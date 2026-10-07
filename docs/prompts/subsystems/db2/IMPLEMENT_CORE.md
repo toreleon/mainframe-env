@@ -3,7 +3,6 @@
 Subsystem: **db2**
 Phase: **core**
 
-Target version: **0.12.0**
 Completion dependencies: coverage.foundation, cobol.execution, racf.security
 
 Use this prompt from the repository root. The
@@ -15,17 +14,17 @@ requirements alongside the version-specific boundaries below.
 
 ---
 
-You are implementing **mainframe-env 0.12.0: generic Db2 engine and common SQL**.
+You are implementing **mainframe-env db2.core: generic Db2 engine and common SQL**.
 Extend the current generic static-SQL provider into the declared common Db2 core
-so that 0.13 can complete the pinned Db2 13 for z/OS programming surface.
+so that db2.programming can complete the pinned Db2 13 for z/OS programming surface.
 
 ## Read and verify first
 
 Read `docs/prompts/subsystems/README.md`,
 `docs/delivery/subsystems/db2/core-plan.md`, the 158-statement and SQL PL
-catalogs, SQL/host/store/security contracts, and accepted 0.2.0, 0.4.0 and 0.5.0
-evidence. Parser/catalog work may start after 0.2, but host integration requires
-0.4 and public privilege/security integration requires 0.5.
+catalogs, SQL/host/store/security contracts, and accepted coverage.foundation, cobol.execution and racf.security
+evidence. Parser/catalog work may start after coverage.foundation, but host integration requires
+cobol.execution and public privilege/security integration requires racf.security.
 
 ## Implement in this order
 
@@ -56,9 +55,9 @@ prohibited dispatch and a zero-prohibited-dispatch ratchet. Application schemas,
 rows, packages and privileges continue to enter through versioned packages.
 
 Before broad DB2-1203 execution, DB2-1201/DB2-1202 must freeze exact common and
-0.13-deferred row/obligation sets against the pinned 174-row catalog: 158 SQL
+db2.programming-deferred row/obligation sets against the pinned 174-row catalog: 158 SQL
 headings plus 16 SQL PL rows. Preserve every mandatory obligation, source locator
-and owner. Recognition covers the full pinned set; execution credit in 0.12 is
+and owner. Recognition covers the full pinned set; execution credit in db2.core is
 limited to the frozen common subset. A partially implemented row remains partial;
 do not choose the common subset retrospectively from passing tests. Hand every
 remaining obligation to DB2-1301 without reducing the official denominator.
@@ -98,7 +97,7 @@ remaining obligation to DB2-1301 without reducing the official denominator.
 - Enforce exact types, nulls, conversion, SQLCODE/SQLSTATE/SQLCA, authorization,
   constraints, cursor and transaction behavior; missing semantics fail explicitly.
 - Use the common effect/UOW contract; do not create Db2-private cross-resource
-  shortcuts or claim 0.13 advanced rows complete.
+  shortcuts or claim db2.programming advanced rows complete.
 
 ## Completion gate
 
@@ -110,4 +109,4 @@ accepted subset passes licensed Db2 13 differentials.
 
 At handoff, separate recognition from common-subset execution counts, provide
 before/after hardcode scans, AST/catalog/state digests, migration/recovery and
-oracle evidence, deferred 0.13 rows, and full unchanged-candidate validation.
+oracle evidence, deferred db2.programming rows, and full unchanged-candidate validation.

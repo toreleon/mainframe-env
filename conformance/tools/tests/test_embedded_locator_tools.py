@@ -54,7 +54,7 @@ def header_table(table_id: str, cells: list[str]) -> str:
 
 def catalog(name: str) -> dict:
     return json.loads(
-        (REPOSITORY / f"conformance/0.2/catalogs/{name}.json").read_text(encoding="utf-8")
+        (REPOSITORY / f"conformance/subsystems/coverage/catalogs/{name}.json").read_text(encoding="utf-8")
     )
 
 
@@ -283,7 +283,7 @@ class CatalogConventionTests(unittest.TestCase):
 
     def test_every_embedded_body_is_named_by_a_pinned_receipt(self) -> None:
         index = json.loads(
-            (REPOSITORY / "conformance/0.2/catalogs/index.json").read_text(encoding="utf-8")
+            (REPOSITORY / "conformance/subsystems/coverage/catalogs/index.json").read_text(encoding="utf-8")
         )
         for name in ("cics", "ims", "mq", "racf-saf"):
             document = catalog(name)

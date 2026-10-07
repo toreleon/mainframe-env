@@ -10,11 +10,15 @@ pub mod storage64;
 mod value;
 
 pub use coordinator::{
-    CoordinatorLimits, ExecutionControl, ExecutionControlError, ExecutionCoordinator,
+    CheckedReplayAuditCapture, CheckedReplayObservations, CoordinatorLimits, ExecutionControl,
+    ExecutionControlError, ExecutionCoordinator, NativeChildEnrollment, NativeRootAdmission,
+    NativeRootConfiguration, NativeRootHooks, NativeRootTermination, WinningRootTerminal,
 };
+pub use machine::typed_mq::{MqMqiNativePoint, MqMqiNativePointTarget, MqMqiNativeStructure};
 pub use machine::{
     InstalledProgramReturn, InstalledProgramReturnKind, MachineProblem, MachineSnapshot,
-    ReferenceMachine, SUPPORTED_LAYOUT_CATEGORIES, encode_cobol_call_result, supported_operations,
+    MqMqiAbiScope, MqMqiConnxProfile, MqMqiProgramFrame, MqMqiProgramProfile, ReferenceMachine,
+    SUPPORTED_LAYOUT_CATEGORIES, encode_cobol_call_result, supported_operations,
 };
 pub use recovery::{
     EffectRecoveryLimits, EffectRecoveryReport, EffectRecoveryResolution, StaleEffectRecoveryWorker,

@@ -34,8 +34,10 @@ mod coordinator;
 
 use coordinator::{PilotExecution, drive_artifact};
 
-const FIXTURES: &str = include_str!("../../../../conformance/0.9/cics/pilot-fixtures.json");
-const ENVIRONMENT: &str = include_str!("../../../../conformance/0.9/cics/pilot-environment.json");
+const FIXTURES: &str =
+    include_str!("../../../../conformance/subsystems/cics/application/cics/pilot-fixtures.json");
+const ENVIRONMENT: &str =
+    include_str!("../../../../conformance/subsystems/cics/application/cics/pilot-environment.json");
 
 const COMMIT_SOURCE: &str = r#"IDENTIFICATION DIVISION.
 PROGRAM-ID. CICSPILOT.
@@ -1353,7 +1355,7 @@ STOP RUN.
 "#;
 
     const PARTICIPANT_FIXTURES: &str = include_str!(
-        "../../../../conformance/0.16/fixtures/transaction-participant-compatibility.json"
+        "../../../../conformance/subsystems/integration/fixtures/transaction-participant-compatibility.json"
     );
 
     const REMOTE_ROLLBACK_SOURCE: &str = r#"IDENTIFICATION DIVISION.

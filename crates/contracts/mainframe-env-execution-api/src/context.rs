@@ -148,11 +148,13 @@ impl BoundedPayload {
 
     /// Borrow the schema identifier supplied at construction.
     #[must_use]
+    /// Borrow the exact interpretation label without normalization.
     pub fn schema(&self) -> &str {
         &self.schema
     }
     /// Borrow the shared payload bytes without transferring ownership.
     #[must_use]
+    /// Borrow the original bytes; callers still own schema-specific validation and secret handling.
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
@@ -184,16 +186,19 @@ impl Principal {
 
     /// Borrow the principal identity.
     #[must_use]
+    /// Borrow the identity used for effect and audit attribution.
     pub fn id(&self) -> &PrincipalId {
         &self.id
     }
     /// Borrow the exact set of capability grants.
     #[must_use]
+    /// Borrow the exact grants; there is no wildcard or prefix implication.
     pub fn grants(&self) -> &BTreeSet<CapabilityId> {
         &self.grants
     }
     /// Check exact set membership for a capability without wildcard expansion.
     #[must_use]
+    /// Check exact set membership, independently of resource authorization and provider readiness.
     pub fn has_grant(&self, capability: &CapabilityId) -> bool {
         self.grants.contains(capability)
     }
@@ -240,6 +245,7 @@ pub struct CancellationProbe(Arc<AtomicBool>);
 impl CancellationProbe {
     /// Create an independent probe whose cancellation flag is initially false.
     #[must_use]
+    /// Allocate an independent, initially unrequested flag.
     pub fn new() -> Self {
         Self::default()
     }
@@ -251,6 +257,7 @@ impl CancellationProbe {
 
     /// Observe whether this probe or any clone has requested cancellation.
     #[must_use]
+    /// Observe the current shared request with acquire ordering.
     pub fn is_requested(&self) -> bool {
         self.0.load(Ordering::Acquire)
     }
@@ -430,6 +437,7 @@ impl Invocation {
 
     /// Replace the attached cancellation record without revalidating its fields.
     #[must_use]
+    /// Attach a retained request; this marks cancellation regardless of its observation tick.
     pub fn with_cancellation(mut self, cancellation: Cancellation) -> Self {
         self.cancellation = Some(cancellation);
         self
@@ -437,6 +445,7 @@ impl Invocation {
 
     /// Replace the live cancellation probe, retaining its shared signal identity.
     #[must_use]
+    /// Attach the exact shared live probe, without replacing any retained request.
     pub fn with_cancellation_probe(mut self, cancellation_probe: CancellationProbe) -> Self {
         self.cancellation_probe = Some(cancellation_probe);
         self
@@ -446,6 +455,7 @@ impl Invocation {
     ///
     /// This observes control state without stopping work or resolving an outcome.
     #[must_use]
+    /// Observe either retained cancellation or the live flag; deadline checks remain separate.
     pub fn cancellation_requested(&self) -> bool {
         self.cancellation.is_some()
             || self

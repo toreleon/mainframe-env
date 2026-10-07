@@ -9,8 +9,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
-const SCHEMA: &str = "conformance/0.10/schemas/cics-system-family-contract.schema.json";
-const DIRECTORY: &str = "conformance/0.10/cics/families";
+const SCHEMA: &str =
+    "conformance/subsystems/cics/system/schemas/cics-system-family-contract.schema.json";
+const DIRECTORY: &str = "conformance/subsystems/cics/system/cics/families";
 const MAX_ARTIFACT_BYTES: u64 = 4 * 1024 * 1024;
 const FAMILIES: [&str; 18] = [
     "spi-program",
@@ -224,12 +225,12 @@ fn validate(root: &Path, family: &str, artifact: &Value, path: &Path) -> TaskRes
     )?;
     let (interface, expected) = rows(family)?;
     let map_path = root.join(format!(
-        "conformance/0.10/cics/{interface}-command-source-map.json"
+        "conformance/subsystems/cics/system/cics/{interface}-command-source-map.json"
     ));
     let map = json(&map_path)?;
     let mappings = array(&map, "rows", &map_path)?;
     let manifest_path = root.join(format!(
-        "conformance/0.10/manifests/cics-{interface}-command-topics.json"
+        "conformance/subsystems/cics/system/manifests/cics-{interface}-command-topics.json"
     ));
     let manifest = json(&manifest_path)?;
     let baseline = text(&manifest, "baseline_id", &manifest_path)?;
@@ -373,7 +374,9 @@ fn validate(root: &Path, family: &str, artifact: &Value, path: &Path) -> TaskRes
 
 // Read the common application authority; do not introduce a second response table.
 fn condition_codes(root: &Path) -> TaskResult<BTreeMap<String, i64>> {
-    let path = root.join("conformance/0.9/generated/cics-application-command-contracts.json");
+    let path = root.join(
+        "conformance/subsystems/cics/application/generated/cics-application-command-contracts.json",
+    );
     let contracts = json(&path)?;
     validate_condition_codes(root, &contracts["condition_name_authority"], &path)
 }
@@ -390,7 +393,7 @@ fn validate_condition_codes(
         "CICS common condition authority identity/digest differs",
     )?;
     let manifest_path =
-        root.join("conformance/0.9/manifests/cics-application-api-sources-a-topics.json");
+        root.join("conformance/subsystems/cics/application/manifests/cics-application-api-sources-a-topics.json");
     let manifest = json(&manifest_path)?;
     let pin = array(&manifest, "topics", &manifest_path)?
         .iter()
@@ -437,7 +440,8 @@ fn validate_cvda_numeric_encoding(root: &Path, domain: &Value, path: &Path) -> T
     let Some(encoding) = domain.get("numeric_encoding") else {
         return Ok(());
     };
-    let manifest_path = root.join("conformance/0.9/manifests/cics-misc-tail-cvda-topics.json");
+    let manifest_path = root
+        .join("conformance/subsystems/cics/application/manifests/cics-misc-tail-cvda-topics.json");
     let manifest = json(&manifest_path)?;
     let topic = array(&manifest, "topics", &manifest_path)?
         .iter()
@@ -598,11 +602,11 @@ mod tests {
         let root = root();
         let (interface, ids) = rows(family).unwrap();
         let map = json(&root.join(format!(
-            "conformance/0.10/cics/{interface}-command-source-map.json"
+            "conformance/subsystems/cics/system/cics/{interface}-command-source-map.json"
         )))
         .unwrap();
         let manifest = json(&root.join(format!(
-            "conformance/0.10/manifests/cics-{interface}-command-topics.json"
+            "conformance/subsystems/cics/system/manifests/cics-{interface}-command-topics.json"
         )))
         .unwrap();
         let unit = if interface == "spi" {
@@ -620,7 +624,7 @@ mod tests {
                 "authorization":{"intent":"unresolved","resource_class":null,"resource_pattern":null,"audit_obligations":[]},
                 "obligations":[{"id":"synthetic.shape","gates":["validated"],"cases":[{"id":"synthetic.case","input":{"NAME":"A"},"expected":"contract-only shape accepted, no semantic claim","source_lines":[1]}]}],"gaps":["Synthetic fixture has no semantic authority"]})
         }).collect::<Vec<_>>();
-        json!({"schema_version":"mainframe-env.cics-system-family@1","target_version":"0.10.0","family":family,"runtime_binding":"private-unregistered","commands":commands})
+        json!({"schema_version":"mainframe-env.cics-system-family@1","target_subsystem":"cics.system-api","family":family,"runtime_binding":"private-unregistered","commands":commands})
     }
 
     fn valid(family: &str, value: &Value) -> TaskResult<usize> {
@@ -664,7 +668,7 @@ mod tests {
 
     #[test]
     fn common_response_authority_rejects_tampered_records_order_digest_and_pin() {
-        let path = root().join("conformance/0.9/generated/cics-application-command-contracts.json");
+        let path = root().join("conformance/subsystems/cics/application/generated/cics-application-command-contracts.json");
         let authority = json(&path).unwrap()["condition_name_authority"].clone();
         assert_eq!(
             validate_condition_codes(&root(), &authority, &path)
@@ -1035,9 +1039,10 @@ mod tests {
 
     fn numeric_fixture() -> Value {
         let mut value = cvda_fixture();
-        let manifest =
-            json(&root().join("conformance/0.9/manifests/cics-misc-tail-cvda-topics.json"))
-                .unwrap();
+        let manifest = json(&root().join(
+            "conformance/subsystems/cics/application/manifests/cics-misc-tail-cvda-topics.json",
+        ))
+        .unwrap();
         let topic = &manifest["topics"][0];
         value["commands"][0]["grammar"]["cvda_domains"][0]["numeric_encoding"] = json!({
             "source": {"baseline":manifest["baseline_id"], "topic_path":topic["topic_path"],

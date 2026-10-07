@@ -1,9 +1,9 @@
 # COBOL runtime semantic contracts
 
-Status: **Frozen for mainframe-env 0.4.0 implementation**
+Status: **Frozen for mainframe-env cobol.execution implementation**
 Owner: **compiler and interpreter maintainers**
 Scope: **COBOL runtime semantic contracts**
-Applies from: **mainframe-env 0.4.0**
+Applies from: **mainframe-env current subsystem contracts**
 
 The accepted typed COBOL HIR lowers once into the existing Core-MIR operation
 catalog. The deterministic reference machine is the only execution authority;
@@ -29,7 +29,7 @@ contract explicitly permits it.
 ## Values and storage
 
 - Fixed decimal uses a bounded 36-digit `dec::Decimal<12>` primitive behind an
-  owned adapter that admits at most 34 digits. The pinned 0.4 execution/oracle
+  owned adapter that admits at most 34 digits. The pinned cobol.execution execution/oracle
   profile is `ARITH(EXTEND)` and the main arithmetic path uses its 34-digit
   context. The primitive spike also freezes the 18-digit `ARITH(COMPAT)`
   context, but propagating that compiler option into executable artifacts is an

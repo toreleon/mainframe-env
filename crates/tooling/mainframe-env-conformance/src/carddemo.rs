@@ -5,10 +5,22 @@ use source_input::{collect_paths, source_file};
 
 mod corpus_validation;
 use corpus_validation::*;
+mod bounds;
+use bounds::checked_total;
 
+mod authorization_context;
 mod bms;
 mod control_library;
+mod ims_packages;
+mod ims_routes;
+use authorization_context::{authorization_invocation, mq_client_invocation};
 mod online_authorities;
+mod online_definition;
+use online_definition::carddemo_base_online_definition;
+mod screen;
+mod serve;
+use screen::online_screen_fields;
+pub use serve::{serve_carddemo_application, serve_carddemo_from_env};
 mod readacct;
 
 pub use readacct::{capture_carddemo_readacct_from_env, verify_carddemo_readacct_from_env};
@@ -1463,15 +1475,6 @@ pub fn verify_carddemo_control_flow_from_env(
         transfers,
         returns,
         control_sha256: format!("{:x}", control_digest.finalize()),
-    })
-}
-
-fn checked_total(current: usize, increment: usize, name: &str) -> Result<usize, CorpusProblem> {
-    current.checked_add(increment).ok_or_else(|| {
-        CorpusProblem::new(
-            "carddemo.control.resource_exhausted",
-            format!("{name} counter overflow"),
-        )
     })
 }
 
@@ -5829,6 +5832,7 @@ pub fn verify_carddemo_ims_from_env(
     let compiler = CobolCompiler::default();
     let mut programs_compiled = 0usize;
     let mut dli_operations = BTreeMap::new();
+    let mut packaged_programs = Vec::new();
     for (relative, bundle) in explicit_carddemo_bundles(&corpus_dir)?
         .into_iter()
         .filter(|(relative, _)| relative.starts_with("app/app-authorization-ims-db2-mq/cbl/"))
@@ -5879,19 +5883,41 @@ pub fn verify_carddemo_ims_from_env(
                     format!("{relative}: {problem:?}"),
                 )
             })?;
-        if !matches!(result, CompilerResult::Published { .. }) {
+        let CompilerResult::Published { artifact, .. } = result else {
             return Err(CorpusProblem::new(
                 "carddemo.ims.compile_failed",
                 format!("{relative} did not publish"),
             ));
-        }
+        };
+        let name = Path::new(&relative)
+            .file_stem()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| {
+                CorpusProblem::new("carddemo.ims.compile_failed", "program name missing")
+            })?;
+        packaged_programs.push(BatchProgramDefinition::current(name, &artifact));
         programs_compiled += 1;
     }
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|error| CorpusProblem::new("carddemo.ims.runtime", error.to_string()))?;
-    let exercise = runtime.block_on(exercise_ims_routes(&corpus_dir, definition.clone()))?;
+    let exercise = runtime.block_on(exercise_ims_routes(
+        &corpus_dir,
+        StoreProfile::Memory,
+        &packaged_programs,
+    ))?;
+    let sqlite = runtime.block_on(exercise_ims_routes(
+        &corpus_dir,
+        StoreProfile::Sqlite,
+        &packaged_programs,
+    ))?;
+    if exercise != sqlite {
+        return Err(CorpusProblem::new(
+            "carddemo.ims.backend_drift",
+            "Memory/SQLite observables differ",
+        ));
+    }
     let mut shape = Sha256::new();
     digest_field(&mut shape, corpus.commit.as_bytes());
     digest_field(
@@ -6408,8 +6434,7 @@ pub fn verify_carddemo_full_from_env(
         .build()
         .map_err(|error| CorpusProblem::new("carddemo.full.runtime", error.to_string()))?;
     let exercise = runtime.block_on(exercise_full_certification())?;
-    let release_disposition =
-        "product-0.1.1-released-locally; carddemo-conformance-only".to_string();
+    let release_disposition = "source-checkout; carddemo-conformance-only".to_string();
     let owned_commands = vec![
         "cargo xtask carddemo-operator-install --check".into(),
         "cargo xtask carddemo-operator-compile --check".into(),
@@ -6984,7 +7009,7 @@ async fn exercise_mq_authorization_routes(
     ims.install(ims_definition).map_err(terminal_problem)?;
     let base_root = ims_record(100, b"000002", b"EXISTING-SUMMARY")?;
     let base_child = ims_record(200, b"20260801", b"EXISTING-DETAIL")?;
-    let admin = authorization_invocation("mq-auth-admin", true, ServiceClass::Interactive)?;
+    let admin = mq_client_invocation("mq-auth-admin", true, ServiceClass::Interactive)?;
     ims.execute(
         &admin,
         &ims_request(
@@ -7006,7 +7031,7 @@ async fn exercise_mq_authorization_routes(
     )
     .map_err(terminal_problem)?;
 
-    let date = authorization_invocation("mq-date", true, ServiceClass::Interactive)?;
+    let date = mq_client_invocation("mq-date", true, ServiceClass::Interactive)?;
     let date_correlation = vec![b'D'; 24];
     let date_put = mq
         .execute(
@@ -7101,7 +7126,7 @@ async fn exercise_mq_authorization_routes(
         ));
     }
 
-    let account = authorization_invocation("mq-account", true, ServiceClass::Interactive)?;
+    let account = mq_client_invocation("mq-account", true, ServiceClass::Interactive)?;
     let account_correlation = vec![b'A'; 24];
     mq.execute(
         &account,
@@ -7200,7 +7225,7 @@ async fn exercise_mq_authorization_routes(
         )
     })?;
     let mut typed_invocation =
-        authorization_invocation("mq-typed-route", true, ServiceClass::Interactive)?;
+        mq_client_invocation("mq-typed-route", true, ServiceClass::Interactive)?;
     typed_invocation.artifact = ArtifactRef::new(
         typed_artifact.content_id().to_reference(),
         InvocationLimits::default(),
@@ -7243,7 +7268,7 @@ async fn exercise_mq_authorization_routes(
         ));
     }
 
-    let denied = authorization_invocation("mq-denied", false, ServiceClass::Interactive)?;
+    let denied = mq_client_invocation("mq-denied", false, ServiceClass::Interactive)?;
     let denied_request = mq_request(
         MqOperation::PutOne,
         1,
@@ -7841,62 +7866,6 @@ fn require_mq_message(
     }
 }
 
-fn authorization_invocation(
-    run: &str,
-    granted: bool,
-    service_class: ServiceClass,
-) -> Result<Invocation, CorpusProblem> {
-    let limits = InvocationLimits::default();
-    let grants = if granted {
-        [
-            "host.mq.read",
-            "host.mq.write",
-            "host.ims.read",
-            "host.ims.write",
-            "host.db2.read",
-            "host.db2.write",
-            "host.cics.execute",
-            "host.security.authorize",
-        ]
-        .into_iter()
-        .map(|capability| CapabilityId::new(capability, limits))
-        .collect::<Result<BTreeSet<_>, _>>()
-        .map_err(|_| CorpusProblem::new("carddemo.authorization.invocation", "grant invalid"))?
-    } else {
-        BTreeSet::new()
-    };
-    Invocation::new(
-        RequestId::new(format!("carddemo-auth-request-{run}"), limits).map_err(|_| {
-            CorpusProblem::new("carddemo.authorization.invocation", "request invalid")
-        })?,
-        ExecutionId::new(format!("carddemo-auth-execution-{run}"), limits).map_err(|_| {
-            CorpusProblem::new("carddemo.authorization.invocation", "execution invalid")
-        })?,
-        RunUnitId::new(run, limits)
-            .map_err(|_| CorpusProblem::new("carddemo.authorization.invocation", "run invalid"))?,
-        None,
-        Selector::new("program:CARDDEMO-AUTH", limits).expect("static selector"),
-        ArtifactRef::new("carddemo-authorization", limits).expect("static artifact"),
-        Principal::new(
-            PrincipalId::new("IBMUSER", limits).expect("static principal"),
-            grants,
-            limits,
-        )
-        .expect("bounded principal"),
-        service_class,
-        0,
-        1_000_000,
-        TraceId::new(format!("carddemo-auth-trace-{run}"), limits).expect("bounded trace"),
-        IdempotencyKey::new(format!("carddemo-auth-invocation-{run}"), limits)
-            .expect("bounded invocation key"),
-        1,
-        ResourceLimits::default(),
-        BTreeMap::new(),
-        limits,
-    )
-    .map_err(|_| CorpusProblem::new("carddemo.authorization.invocation", "invocation invalid"))
-}
-
 fn cics_syncpoint(
     server: &ProductServer,
     invocation: &Invocation,
@@ -8018,554 +7987,7 @@ fn mq_queue_digests(mq: &MqService) -> Result<BTreeMap<String, String>, CorpusPr
     Ok(output)
 }
 
-struct ImsExercise {
-    databases_installed: usize,
-    psbs_installed: usize,
-    pcbs_installed: usize,
-    roots: usize,
-    children: usize,
-    secondary_index_entries: usize,
-    hierarchy_sha256: String,
-    selected_job_routes: usize,
-    spool_sha256: BTreeMap<String, String>,
-}
-
-async fn exercise_ims_routes(
-    corpus_dir: &Path,
-    definition: ImsApplicationDefinition,
-) -> Result<ImsExercise, CorpusProblem> {
-    let artifact_root =
-        env::temp_dir().join(format!("mainframe-env-carddemo-ims-{}", std::process::id()));
-    let config = ServerConfig {
-        store_profile: StoreProfile::Memory,
-        artifact_root: artifact_root.clone(),
-        tls: TlsConfig {
-            enabled: false,
-            certificate_path: None,
-            private_key_reference: None,
-        },
-        ..ServerConfig::default()
-    };
-    let store = Arc::new(MemoryStore::new(Default::default()));
-    let server = ProductServer::open_with_package_trust(
-        config.clone(),
-        store.clone(),
-        Arc::new(MemorySecretResolver::default()),
-        default_program_router(),
-        carddemo_package_trust()?,
-    )
-    .map_err(terminal_problem)?;
-    install_carddemo_db2_package(&server, &[])?;
-    let ims = server.ims_service();
-    let install = ims.install(definition.clone()).map_err(terminal_problem)?;
-    if !ims
-        .install(definition.clone())
-        .map_err(terminal_problem)?
-        .replayed
-    {
-        return Err(CorpusProblem::new(
-            "carddemo.ims.install_replay",
-            "IMS definition replay was not idempotent",
-        ));
-    }
-    let root_one = ims_record(100, b"000001", b"ROOT-ONE")?;
-    let root_two = ims_record(100, b"000002", b"ROOT-TWO")?;
-    let child_one = ims_record(200, b"99900001", b"CHILD-ONE")?;
-    let child_two = ims_record(200, b"99900002", b"CHILD-TWO")?;
-    let image = ImsLoadImage {
-        database: "DBPAUTP0".into(),
-        roots: vec![
-            ImsLoadRoot {
-                data: root_one.clone(),
-                children: vec![child_one.clone()],
-            },
-            ImsLoadRoot {
-                data: root_two.clone(),
-                children: vec![child_two.clone()],
-            },
-        ],
-    };
-    server
-        .bootstrap_user("IBMUSER", b"TESTPASS")
-        .map_err(terminal_problem)?;
-    let racf = server.racf_service();
-    racf.define_profile("DATASET", "AWS.M2.CARDDEMO.**", "IBMUSER", None)
-        .map_err(terminal_problem)?;
-    racf.permit(
-        "DATASET",
-        "AWS.M2.CARDDEMO.**",
-        "IBMUSER",
-        AccessIntent::Alter,
-    )
-    .map_err(terminal_problem)?;
-    let mut sequence = 70_000u64;
-    utility_seed_dataset(
-        &server,
-        "AWS.M2.CARDDEMO.PAUTDB.ROOT.FILEO",
-        DatasetOrganization::Sequential,
-        RecordFormat::Fixed,
-        100,
-        None,
-        vec![root_one.clone(), root_two.clone()],
-        &mut sequence,
-    )?;
-    let child_records = [
-        (b"000001".as_slice(), &child_one),
-        (b"000002".as_slice(), &child_two),
-    ]
-    .into_iter()
-    .map(|(parent, child)| {
-        let mut record = parent.to_vec();
-        record.extend_from_slice(child);
-        record
-    })
-    .collect();
-    utility_seed_dataset(
-        &server,
-        "AWS.M2.CARDDEMO.PAUTDB.CHILD.FILEO",
-        DatasetOrganization::Sequential,
-        RecordFormat::Fixed,
-        206,
-        None,
-        child_records,
-        &mut sequence,
-    )?;
-    let app = server.router();
-    let load_jcl = String::from_utf8(read_corpus_file(
-        corpus_dir,
-        &corpus_dir.join("app/app-authorization-ims-db2-mq/jcl/LOADPADB.JCL"),
-    )?)
-    .map_err(|_| CorpusProblem::new("carddemo.ims.jcl_invalid", "LOADPADB is not UTF-8"))?;
-    let load_job = submit_job_with_retcode(&server, &app, &load_jcl, "CC 0000").await?;
-    let control = ims_invocation("ims-control", true, None)?;
-    ims.execute(
-        &control,
-        &ims_request(
-            ImsOperation::Schedule,
-            101,
-            Some("PSBPAUTB"),
-            &[],
-            Vec::new(),
-            Vec::new(),
-            None,
-        )?,
-    )
-    .map_err(terminal_problem)?;
-    let root = ims
-        .execute(
-            &control,
-            &ims_request(
-                ImsOperation::GetUnique,
-                2,
-                None,
-                &["PAUTSUM0"],
-                Vec::new(),
-                vec![ims_qualifier("PAUTSUM0", "ACCNTID", b"000001")],
-                None,
-            )?,
-        )
-        .map_err(terminal_problem)?;
-    if root.status != "  "
-        || root
-            .segments
-            .first()
-            .is_none_or(|segment| segment.data != root_one)
-    {
-        return Err(CorpusProblem::new(
-            "carddemo.ims.gu_drift",
-            "GU did not return the qualified root segment",
-        ));
-    }
-    let child = ims
-        .execute(
-            &control,
-            &ims_request(
-                ImsOperation::GetNextParent,
-                4,
-                None,
-                &["PAUTDTL1"],
-                Vec::new(),
-                Vec::new(),
-                None,
-            )?,
-        )
-        .map_err(terminal_problem)?;
-    if child
-        .segments
-        .first()
-        .is_none_or(|segment| segment.data != child_one)
-    {
-        return Err(CorpusProblem::new(
-            "carddemo.ims.gnp_drift",
-            "GNP did not preserve root/child hierarchy",
-        ));
-    }
-    let mut replaced_child = child_one.clone();
-    replaced_child[8..12].copy_from_slice(b"EDIT");
-    ims.execute(
-        &control,
-        &ims_request(
-            ImsOperation::Replace,
-            5,
-            None,
-            &["PAUTDTL1"],
-            replaced_child,
-            Vec::new(),
-            None,
-        )?,
-    )
-    .map_err(terminal_problem)?;
-    let transient_child = ims_record(200, b"99900003", b"TRANSIENT")?;
-    ims.execute(
-        &control,
-        &ims_request(
-            ImsOperation::Insert,
-            6,
-            None,
-            &["PAUTSUM0", "PAUTDTL1"],
-            transient_child,
-            vec![ims_qualifier("PAUTSUM0", "ACCNTID", b"000001")],
-            None,
-        )?,
-    )
-    .map_err(terminal_problem)?;
-    ims.execute(
-        &control,
-        &ims_request(
-            ImsOperation::GetUnique,
-            7,
-            None,
-            &["PAUTSUM0", "PAUTDTL1"],
-            Vec::new(),
-            vec![
-                ims_qualifier("PAUTSUM0", "ACCNTID", b"000001"),
-                ims_qualifier("PAUTDTL1", "PAUT9CTS", b"99900003"),
-            ],
-            None,
-        )?,
-    )
-    .map_err(terminal_problem)?;
-    ims.execute(
-        &control,
-        &ims_request(
-            ImsOperation::Delete,
-            8,
-            None,
-            &["PAUTDTL1"],
-            Vec::new(),
-            Vec::new(),
-            None,
-        )?,
-    )
-    .map_err(terminal_problem)?;
-    let next = ims
-        .execute(
-            &control,
-            &ims_request(
-                ImsOperation::GetNext,
-                9,
-                None,
-                &["PAUTSUM0"],
-                Vec::new(),
-                Vec::new(),
-                None,
-            )?,
-        )
-        .map_err(terminal_problem)?;
-    if next.status != "  " {
-        return Err(CorpusProblem::new(
-            "carddemo.ims.gn_drift",
-            "GN did not return a root",
-        ));
-    }
-    ims.execute(
-        &control,
-        &ims_request(
-            ImsOperation::Checkpoint,
-            10,
-            None,
-            &[],
-            Vec::new(),
-            Vec::new(),
-            Some("CD025001"),
-        )?,
-    )
-    .map_err(terminal_problem)?;
-    ims.execute(
-        &control,
-        &ims_request(
-            ImsOperation::Terminate,
-            11,
-            None,
-            &[],
-            Vec::new(),
-            Vec::new(),
-            None,
-        )?,
-    )
-    .map_err(terminal_problem)?;
-    let unload_jcl = String::from_utf8(read_corpus_file(
-        corpus_dir,
-        &corpus_dir.join("app/app-authorization-ims-db2-mq/jcl/UNLDPADB.JCL"),
-    )?)
-    .map_err(|_| CorpusProblem::new("carddemo.ims.jcl_invalid", "UNLDPADB is not UTF-8"))?;
-    let unload_job = submit_job_with_retcode(&server, &app, &unload_jcl, "CC 0000").await?;
-    let unloaded_roots = utility_records(&server, "AWS.M2.CARDDEMO.PAUTDB.ROOT.FILEO", None)?;
-    let unloaded_children = utility_records(&server, "AWS.M2.CARDDEMO.PAUTDB.CHILD.FILEO", None)?;
-    if unloaded_roots.len() != 2
-        || unloaded_children.len() != 2
-        || unloaded_roots.iter().any(|record| record.len() != 100)
-        || unloaded_children.iter().any(|record| record.len() != 206)
-    {
-        return Err(CorpusProblem::new(
-            "carddemo.ims.unload_drift",
-            "IMS unload job did not write two roots and two qualified children",
-        ));
-    }
-
-    let route_source = "IDENTIFICATION DIVISION. PROGRAM-ID. IMSROUTE. DATA DIVISION. WORKING-STORAGE SECTION. 01 PSB-NAME PIC X(8) VALUE 'PSBPAUTB'. 01 PCB-N PIC S9(4) COMP VALUE 1. 01 ROOT-X PIC X(100). 01 ACCT-X PIC X(6) VALUE '000001'. PROCEDURE DIVISION. EXEC DLI SCHD PSB((PSB-NAME)) END-EXEC. EXEC DLI GU USING PCB(PCB-N) SEGMENT(PAUTSUM0) INTO(ROOT-X) WHERE(ACCNTID = ACCT-X) END-EXEC. DISPLAY ROOT-X. EXEC DLI TERM END-EXEC. STOP RUN.";
-    let artifact = crate::compile(route_source).map_err(|error| {
-        CorpusProblem::new("carddemo.ims.route_compile", format!("IMS route: {error}"))
-    })?;
-    let invocation = ims_artifact_invocation("ims-route", &artifact, true, None)?;
-    let host = Arc::new(ScopedHostService::new(
-        Arc::new(
-            RegistrySnapshot::new(
-                1,
-                ims_providers(ims.clone(), InvocationLimits::default()),
-                InvocationLimits::default(),
-            )
-            .map_err(|_| CorpusProblem::new("carddemo.ims.registry", "registry invalid"))?,
-        ),
-        mainframe_env_host_api::HostLimits::default(),
-    ));
-    let mut machine = mainframe_env_interpreter::ReferenceMachine::from_binary(
-        artifact.payload(),
-        invocation.clone(),
-        mainframe_env_ir::CodecLimits::default(),
-    )
-    .map_err(|problem| CorpusProblem::new("carddemo.ims.route", format!("{problem:?}")))?;
-    let coordinator = mainframe_env_interpreter::ExecutionCoordinator::with_host(
-        host.clone(),
-        Arc::new(MemoryStore::new(Default::default())),
-        mainframe_env_interpreter::CoordinatorLimits::default(),
-    );
-    let outcome = coordinator.execute(
-        &mut machine,
-        &invocation,
-        mainframe_env_interpreter::ExecutionControl::default(),
-    );
-    if !matches!(
-        outcome,
-        mainframe_env_execution_api::ExecutionOutcome::Completed(ref completion)
-            if completion.output.bytes().starts_with(b"000001")
-    ) {
-        return Err(CorpusProblem::new(
-            "carddemo.ims.route_failed",
-            format!("typed DLI application route did not complete: {outcome:?}"),
-        ));
-    }
-
-    let denied_invocation = ims_invocation("ims-denied", false, None)?;
-    let denied_request = ims_request(
-        ImsOperation::Schedule,
-        1,
-        Some("PSBPAUTB"),
-        &[],
-        Vec::new(),
-        Vec::new(),
-        None,
-    )?;
-    let denied_effect = EffectRequest {
-        run_unit: denied_invocation.run_unit_id.clone(),
-        sequence: 1,
-        deadline_tick: denied_invocation.deadline_tick,
-        idempotency_key: denied_request
-            .mutation
-            .as_ref()
-            .map(|mutation| mutation.idempotency_key.clone()),
-        request: mainframe_env_host_api::HostRequest::Ims(denied_request),
-    };
-    if host
-        .invoke(&denied_invocation, 1, false, denied_effect)
-        .persist_with(|audit| {
-            store
-                .record_audit(audit)
-                .map_err(|_| HostProblem::InfrastructureFailure)
-        })
-        .outcome
-        != Err(HostProblem::Unauthorized)
-    {
-        return Err(CorpusProblem::new(
-            "carddemo.ims.authorization_drift",
-            "missing IMS grant did not fail closed",
-        ));
-    }
-    let mismatch = ims_invocation(
-        "ims-generation-mismatch",
-        true,
-        Some(("host.ims.write", "wrong")),
-    )?;
-    let mismatch_request = ims_request(
-        ImsOperation::Schedule,
-        1,
-        Some("PSBPAUTB"),
-        &[],
-        Vec::new(),
-        Vec::new(),
-        None,
-    )?;
-    let mismatch_effect = EffectRequest {
-        run_unit: mismatch.run_unit_id.clone(),
-        sequence: 1,
-        deadline_tick: mismatch.deadline_tick,
-        idempotency_key: mismatch_request
-            .mutation
-            .as_ref()
-            .map(|mutation| mutation.idempotency_key.clone()),
-        request: mainframe_env_host_api::HostRequest::Ims(mismatch_request),
-    };
-    if host
-        .invoke(&mismatch, 1, false, mismatch_effect)
-        .persist_with(|audit| {
-            store
-                .record_audit(audit)
-                .map_err(|_| HostProblem::InfrastructureFailure)
-        })
-        .outcome
-        != Err(HostProblem::ProviderFailure)
-    {
-        return Err(CorpusProblem::new(
-            "carddemo.ims.provider_failure_drift",
-            "provider generation mismatch did not fail closed",
-        ));
-    }
-
-    let malformed = ims_invocation("ims-malformed", true, None)?;
-    ims.execute(
-        &malformed,
-        &ims_request(
-            ImsOperation::Schedule,
-            1,
-            Some("PSBPAUTB"),
-            &[],
-            Vec::new(),
-            Vec::new(),
-            None,
-        )?,
-    )
-    .map_err(terminal_problem)?;
-    let malformed_result = ims.execute(
-        &malformed,
-        &ims_request(
-            ImsOperation::Insert,
-            102,
-            None,
-            &["PAUTSUM0"],
-            vec![0],
-            Vec::new(),
-            None,
-        )?,
-    );
-    if malformed_result != Err(HostProblem::Malformed) {
-        return Err(CorpusProblem::new(
-            "carddemo.ims.malformed_drift",
-            format!("malformed segment length returned {malformed_result:?}"),
-        ));
-    }
-
-    let limited_store = Arc::new(MemoryStore::new(Default::default()));
-    let limited = ImsService::open(
-        limited_store,
-        ImsLimits {
-            max_roots: 1,
-            ..ImsLimits::default()
-        },
-    )
-    .map_err(terminal_problem)?;
-    limited.install(definition).map_err(terminal_problem)?;
-    let limited_result = limited.execute(
-        &ims_invocation("ims-limit", true, None)?,
-        &ims_request(
-            ImsOperation::Load,
-            1,
-            None,
-            &[],
-            serde_json::to_vec(&image)
-                .map_err(|error| CorpusProblem::new("carddemo.ims.load", error.to_string()))?,
-            Vec::new(),
-            None,
-        )?,
-    );
-    if limited_result != Err(HostProblem::ResourceExhausted) {
-        return Err(CorpusProblem::new(
-            "carddemo.ims.resource_drift",
-            "root limit did not fail closed",
-        ));
-    }
-
-    let hierarchy = ims.hierarchy("DBPAUTP0").map_err(terminal_problem)?;
-    let hierarchy_sha256 = ims_hierarchy_digest(&hierarchy);
-    let roots = hierarchy.len();
-    let children = hierarchy.iter().map(|root| root.children.len()).sum();
-    let secondary_index_entries = ims
-        .secondary_index_entries("DBPAUTP0")
-        .map_err(terminal_problem)?;
-    let spool_sha256 = base_batch_spool_digests(
-        &server,
-        &BTreeMap::from([
-            ("LOADPADB".into(), load_job),
-            ("UNLDPADB".into(), unload_job),
-        ]),
-    )?;
-    if !server.graceful_shutdown().await {
-        return Err(CorpusProblem::new(
-            "carddemo.ims.shutdown_failed",
-            "IMS server did not shut down",
-        ));
-    }
-    drop(ims);
-    drop(server);
-    let restarted = ProductServer::open_with_package_trust(
-        config,
-        store,
-        Arc::new(MemorySecretResolver::default()),
-        default_program_router(),
-        carddemo_package_trust()?,
-    )
-    .map_err(terminal_problem)?;
-    if ims_hierarchy_digest(
-        &restarted
-            .ims_service()
-            .hierarchy("DBPAUTP0")
-            .map_err(terminal_problem)?,
-    ) != hierarchy_sha256
-        || restarted
-            .ims_service()
-            .checkpoint_count()
-            .map_err(terminal_problem)?
-            != 1
-    {
-        return Err(CorpusProblem::new(
-            "carddemo.ims.restart_drift",
-            "IMS hierarchy or checkpoint changed across restart",
-        ));
-    }
-    let _ = restarted.graceful_shutdown().await;
-    drop(restarted);
-    let _ = fs::remove_dir_all(&artifact_root);
-    Ok(ImsExercise {
-        databases_installed: install.databases,
-        psbs_installed: install.psbs,
-        pcbs_installed: install.pcbs,
-        roots,
-        children,
-        secondary_index_entries,
-        hierarchy_sha256,
-        selected_job_routes: 2,
-        spool_sha256,
-    })
-}
+use ims_routes::exercise_ims_routes;
 
 fn carddemo_ims_definition(
     corpus_dir: &Path,
@@ -11521,77 +10943,6 @@ fn require_online_mapset(
     }
 }
 
-fn online_screen_fields(
-    terminal: &serde_json::Value,
-) -> Result<BTreeMap<String, Vec<u8>>, CorpusProblem> {
-    let bytes =
-        base64::engine::general_purpose::STANDARD
-            .decode(terminal["screen_base64"].as_str().ok_or_else(|| {
-                CorpusProblem::new("carddemo.online.response", "screen is missing")
-            })?)
-            .map_err(|error| CorpusProblem::new("carddemo.online.response", error.to_string()))?;
-    let mut at = 0usize;
-    let mut fields = BTreeMap::new();
-    while at < bytes.len() {
-        let name_length = u32::from_be_bytes(
-            bytes
-                .get(at..at + 4)
-                .ok_or_else(|| {
-                    CorpusProblem::new("carddemo.online.screen_invalid", "field name is truncated")
-                })?
-                .try_into()
-                .map_err(|_| {
-                    CorpusProblem::new("carddemo.online.screen_invalid", "field name is invalid")
-                })?,
-        ) as usize;
-        at += 4;
-        let name_end = at.checked_add(name_length).ok_or_else(|| {
-            CorpusProblem::new("carddemo.online.screen_invalid", "field name is too large")
-        })?;
-        let name = String::from_utf8(
-            bytes
-                .get(at..name_end)
-                .ok_or_else(|| {
-                    CorpusProblem::new("carddemo.online.screen_invalid", "field name is truncated")
-                })?
-                .to_vec(),
-        )
-        .map_err(|_| {
-            CorpusProblem::new("carddemo.online.screen_invalid", "field name is invalid")
-        })?;
-        at = name_end;
-        let value_length = u32::from_be_bytes(
-            bytes
-                .get(at..at + 4)
-                .ok_or_else(|| {
-                    CorpusProblem::new("carddemo.online.screen_invalid", "field value is truncated")
-                })?
-                .try_into()
-                .map_err(|_| {
-                    CorpusProblem::new("carddemo.online.screen_invalid", "field value is invalid")
-                })?,
-        ) as usize;
-        at += 4;
-        let value_end = at.checked_add(value_length).ok_or_else(|| {
-            CorpusProblem::new("carddemo.online.screen_invalid", "field value is too large")
-        })?;
-        let value = bytes
-            .get(at..value_end)
-            .ok_or_else(|| {
-                CorpusProblem::new("carddemo.online.screen_invalid", "field value is truncated")
-            })?
-            .to_vec();
-        at = value_end;
-        if fields.insert(name, value).is_some() || fields.len() > 512 {
-            return Err(CorpusProblem::new(
-                "carddemo.online.screen_invalid",
-                "screen fields are duplicated or unbounded",
-            ));
-        }
-    }
-    Ok(fields)
-}
-
 fn normal_online_effects(server: &ProductServer, session: &str, operation: CicsOperation) -> usize {
     server.online_trace(session).map_or(0, |trace| {
         trace
@@ -13073,115 +12424,6 @@ fn screen_contains(screen: &[u8], text: &str) -> bool {
             .is_ok_and(|encoded| screen.windows(encoded.len()).any(|value| value == encoded))
 }
 
-fn carddemo_base_online_definition(
-    corpus_dir: &Path,
-) -> Result<OnlineApplicationDefinition, CorpusProblem> {
-    let mut bundles = BTreeMap::new();
-    for (primary, bundle) in explicit_carddemo_bundles(corpus_dir)? {
-        if !primary.starts_with("app/cbl/") {
-            continue;
-        }
-        let name = Path::new(&primary)
-            .file_stem()
-            .and_then(|value| value.to_str())
-            .ok_or_else(|| {
-                CorpusProblem::new("carddemo.online.program_invalid", "program name is invalid")
-            })?
-            .to_ascii_uppercase();
-        if bundles.insert(name.clone(), (primary, bundle)).is_some() {
-            return Err(CorpusProblem::new(
-                "carddemo.online.program_duplicate",
-                format!("{name} is duplicated"),
-            ));
-        }
-    }
-    let csd = String::from_utf8(read_corpus_file(
-        corpus_dir,
-        &corpus_dir.join("app/csd/CARDDEMO.CSD"),
-    )?)
-    .map_err(|_| CorpusProblem::new("carddemo.online.csd_invalid", "base CSD is not UTF-8"))?;
-    let resources = parse_csd(&csd).map_err(package_problem)?;
-    let mut transactions = BTreeMap::new();
-    for resource in resources
-        .into_iter()
-        .filter(|resource| resource.kind == "TRANSACTION")
-    {
-        let program = resource.properties.get("PROGRAM").ok_or_else(|| {
-            CorpusProblem::new(
-                "carddemo.online.csd_invalid",
-                format!("{} program is missing", resource.name),
-            )
-        })?;
-        if bundles.contains_key(program) {
-            transactions.insert(resource.name, program.clone());
-        }
-    }
-    let mut needed = transactions.values().cloned().collect::<BTreeSet<_>>();
-    needed.insert("CSUTLDTC".into());
-    let compiler = CobolCompiler::default();
-    let mut programs = Vec::new();
-    let mut semantic_models = Vec::new();
-    for name in &needed {
-        let (primary, bundle) = bundles.get(name).ok_or_else(|| {
-            CorpusProblem::new(
-                "carddemo.online.program_missing",
-                format!("{name} source closure is missing"),
-            )
-        })?;
-        let analysis = compiler.analyze(bundle);
-        semantic_models.push(analysis.semantic.ok_or_else(|| {
-            CorpusProblem::new(
-                "carddemo.online.compile_failed",
-                format!("{primary}: semantic model is missing"),
-            )
-        })?);
-        let result = compiler
-            .compile(CompilerRequest {
-                source: bundle.clone(),
-                mode: CompilationMode::Executable,
-                target: CompileTarget::new("reference").map_err(|error| {
-                    CorpusProblem::new("carddemo.online.target_invalid", error.to_string())
-                })?,
-                options: CompileOptions::new(BTreeMap::new()).map_err(|error| {
-                    CorpusProblem::new("carddemo.online.options_invalid", error.to_string())
-                })?,
-            })
-            .map_err(|error| {
-                CorpusProblem::new(
-                    "carddemo.online.compile_failed",
-                    format!("{primary}: {error}"),
-                )
-            })?;
-        let artifact = match result {
-            CompilerResult::Published { artifact, .. } => artifact,
-            CompilerResult::Analysis { diagnostics, .. }
-            | CompilerResult::Failed { diagnostics, .. } => {
-                return Err(CorpusProblem::new(
-                    "carddemo.online.compile_failed",
-                    format!(
-                        "{primary}: {}",
-                        diagnostics.first().map_or("no diagnostic", |diagnostic| {
-                            diagnostic.public_message()
-                        })
-                    ),
-                ));
-            }
-        };
-        programs.push(OnlineProgramDefinition::current(name.clone(), &artifact));
-    }
-    if programs.len() != 18 || transactions.len() != 17 {
-        return Err(CorpusProblem::new(
-            "carddemo.online.catalog_drift",
-            "base program or source-backed transaction count differs",
-        ));
-    }
-    Ok(OnlineApplicationDefinition {
-        programs,
-        transactions,
-        maps: carddemo_base_maps(corpus_dir, &semantic_models)?,
-    })
-}
-
 fn carddemo_db2_online_definition(
     corpus_dir: &Path,
 ) -> Result<OnlineApplicationDefinition, CorpusProblem> {
@@ -13563,6 +12805,24 @@ mod tests {
 
     static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 
+    #[test]
+    fn mq_workload_invocations_select_their_actual_syncpoint_owner() {
+        let client = mq_client_invocation("client", true, ServiceClass::Interactive).unwrap();
+        assert_eq!(
+            client.bindings["mq.host-context"].bytes(),
+            b"mqi-client|queue-manager"
+        );
+        assert!(!client.bindings.contains_key("cics.execution-context"));
+        let cics =
+            authorization_invocation("authorization", true, ServiceClass::Interactive).unwrap();
+        assert_eq!(
+            cics.bindings["mq.host-context"].bytes(),
+            b"zos-cics|host-coordinator"
+        );
+        assert_eq!(cics.bindings["cics.execution-context"].bytes(), b"local");
+        assert!(!cics.bindings.contains_key("cics.nested-effect-origin"));
+    }
+
     struct Fixture {
         root: PathBuf,
         inventory: PathBuf,
@@ -13874,7 +13134,7 @@ mod tests {
     #[test]
     fn accepted_cdv1_correction_compiles_and_runs_public_route() {
         let inventory = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../conformance/0.1.1/inventory/carddemo-corpus.json");
+            .join("../../../conformance/profiles/carddemo/inventory/carddemo-corpus.json");
         let receipt =
             verify_cdv1_correction(&inventory, "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e").unwrap();
         assert_eq!(receipt.disposition, "accepted-owned-source");

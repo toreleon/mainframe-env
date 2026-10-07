@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added an explicitly supplied volatile task-root MQI connection alias scope shared across SAME TASK frames, with predispatch bounded reservations, non-reused aliases, atomic caller-byte adoption and uncertainty/drop fencing; old connection-only embeddings and persisted identities remain unchanged."

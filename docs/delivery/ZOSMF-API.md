@@ -1,12 +1,12 @@
-# z/OSMF 0.1 compatibility API
+# z/OSMF compatibility API
 
-Status: **Frozen for mainframe-env 0.1.0**
+Status: **Frozen for mainframe-env platform.runtime-integration**
 Owner: **z/OSMF gateway maintainers**
 Scope: **public z/OSMF-compatible routes, requests, and responses**
-Applies from: **mainframe-env 0.1.0**
+Applies from: **mainframe-env current subsystem contracts**
 
 The authoritative route list is
-`conformance/0.1/inventory/zosmf-routes.json`. Exactly 23 routes cover product
+`conformance/subsystems/platform/inventory/zosmf-routes.json`. Exactly 23 routes cover product
 information, authentication, datasets/members/AMS, jobs/spool, and the bounded
 console subset. Mutating routes require `X-CSRF-ZOSMF-HEADER`. Requests are
 bounded before parsing and authenticated requests accept Basic credentials or

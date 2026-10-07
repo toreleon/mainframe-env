@@ -1,13 +1,13 @@
-# mainframe-env 0.8.0 review — JES2 execution and real utility semantics
+# mainframe-env jes.execution review — JES2 execution and real utility semantics
 
 Reviewed branch: `impl/0.8.0` (JES-801 … JES-806, `71c29be` … `e1777f2`)
 Baseline: `main`
 Review date: 2026-09-04
 Disposition under review: `pass-with-licensed-differential-pending`
 
-## 0.8.1 remediation
+## Runtime integration remediation
 
-All findings below are resolved by the 0.8.1 patch tracked in
+All findings below are resolved by the JES corrective patch tracked in
 [#42](https://github.com/toreleon/mainframe-env/issues/42). The original
 finding text remains intact as the review record; the patch adds focused
 regressions and reruns the complete release gate on one new candidate.
@@ -28,7 +28,7 @@ approved policy. No Hercules, MVS 3.8J, modeled, generated, historical, or
 local product result receives licensed-equivalence credit.
 
 This report reviews the branch against
-[the 0.8.0 plan](execution-plan.md), [the implementation prompt](../../../prompts/subsystems/jes/IMPLEMENT_EXECUTION.md),
+[the jes.execution plan](execution-plan.md), [the implementation prompt](../../../prompts/subsystems/jes/IMPLEMENT_EXECUTION.md),
 and [the implementation status report](execution-status.md). Findings 1–3 were
 reproduced with temporary probe tests against the branch; the probes were
 reverted and are not part of the candidate.
@@ -38,7 +38,7 @@ reverted and are not part of the candidate.
 The declared gates all pass, the licensed-differential machinery is genuinely
 fail-closed, and program-name dispatch is really gone. Three confirmed
 correctness defects sit on the restart and utility paths that JES-805 and
-JES-806 own, and each contradicts a specific 0.8 exit-gate claim.
+JES-806 own, and each contradicts a specific jes.execution exit-gate claim.
 
 | # | Finding | Severity | Status |
 |---|---|---|---|
@@ -58,7 +58,7 @@ Verified directly on the branch, not taken from the status report:
 - **Tests.** `cargo test --workspace` is green and the per-crate counts match
   `jes/execution-status.md` exactly: batch 136, conformance 168 with 2 ignored,
   server 27, dataset 56, interpreter 12, spool 3, store 15.
-- **Gates.** `cargo xtask full-regression --check` passes.
+- **Gates.** `historical full-regression gate (retired)` passes.
   `cargo clippy --workspace --all-targets -- -D warnings` is clean.
 - **Licensed differential is fail-closed.** `cargo xtask jes-oracle --check`
   exits with the pending message and grants no credit.
@@ -176,7 +176,7 @@ buffer.
 inside the first loop, and only acquires locks in a second loop after every DD
 has been processed. The existence probe (`dataset_attributes`) is also
 unlocked. Two concurrent jobs can both observe "absent" and both Define. The
-0.6 lock authority governs the execution window but not the create.
+dataset.data lock authority governs the execution window but not the create.
 
 ### 5. DISP abnormal-termination default does not follow the JCL rule — P1
 
@@ -203,7 +203,7 @@ changing behavior, then extend the JES-802 matrix with the two rows above.
 `0x20` regardless of CCSID. A CP037 dataset should pad with `0x40`.
 `program.rs:628 dataset_space` already implements the correct rule and is used
 by `fit_sortout_records`, so the two paths disagree. Pre-existing (introduced
-in `6b5bc67`), but JES-802 put it on the main DD write path, so 0.8 is where it
+in `6b5bc67`), but JES-802 put it on the main DD write path, so jes.execution is where it
 starts to matter.
 
 ### 7. `dispose_dds` failure masks the original abend — P1
@@ -255,18 +255,9 @@ rest of the job. Same family as finding 1.
   code: an equivalent program using different data names gets no TIOT. The
   de-hardcoding gate does not catch it because its forbidden list only covers
   CardDemo application identities.
-- `VERSION` and `CHANGELOG.md` still read 0.7.0. That matches repository
-  process — both are bumped in the separate `Release mainframe-env X.Y.Z`
-  commit — and is not a branch defect.
 
-## Effect on the frozen campaign candidate
+## Current campaign validation
 
-Adding this file to the index changes the digest reported by
-`cargo xtask jes-oracle-candidate`, because only
-`conformance/0.8/evidence/jes-806-matrix.json` and
-`docs/delivery/subsystems/jes/execution-status.md` are excluded from the
-candidate domain. The frozen candidate
-`sha256:2733803af3a110d6fc752d8ec9695f824ffc23f87554eaa026eb1fd3402bcd4d`
-therefore describes the tree *before* this review was committed. Any licensed
-z/OS 3.2/JES2 campaign must be re-pinned to the candidate that actually ships,
-which the 0.17 CER-1702 gate requires anyway.
+Run licensed comparisons against the current candidate and keep outputs outside
+Git. A historical frozen candidate or execution receipt does not validate a
+changed checkout.

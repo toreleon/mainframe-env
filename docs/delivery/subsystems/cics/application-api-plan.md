@@ -2,16 +2,15 @@
 
 Subsystem: **cics**
 Phase: **application-api**
-Target release: **0.9.0**
 
 Status: **Proposed**
-Start gate: 0.4 COBOL host ABI, 0.5 SAF, and 0.6 data authorities frozen;
+Start gate: cobol.execution COBOL host ABI, racf.security SAF, and dataset.data data authorities frozen;
 R-01–R-28 integrated and post-review entry gate accepted
 Completion dependencies: cobol.execution, racf.security, dataset.data
 Estimate: 18–28 engineer-months
 
 Current readiness: **CIC-901 complete at its non-release implementation
-boundary**. The full 0.9.0 milestone remains **Proposed**: CIC-902 through
+boundary**. The full cics.application-api milestone remains **Proposed**: CIC-902 through
 CIC-906, release work, and licensed differentials are not complete. PR
 [#131](https://github.com/toreleon/mainframe-env/pull/131) merged the hardening
 changes as `8b7459ab9d9c23e3b872314323d3e30020e13f31`. The integrated acceptance
@@ -23,7 +22,7 @@ source, contract, compiler, compatibility, and boundary commits culminating in
 feature candidate `49ae7c9dbb763c8a88f42a041a58e9e99b59d05c`; its source, workspace,
 architecture, documentation, MSRV, dependency-policy, and PostgreSQL parity
 gates pass. Preserve the historical
-[pre-0.9 review](../../../reviews/PRE-0.9.0-DEEP-REVIEW.md), including its P2/P3
+[subsystem review](../../../reviews/SUBSYSTEM-REVIEW.md), including its P2/P3
 baseline requirements. Those historical receipts remain separate from the
 current CIC-901 validation. Track the boundary in
 [CICS application API progress](application-api-status.md) and
@@ -32,7 +31,7 @@ current CIC-901 validation. Track the boundary in
 ## Post-review entry gate
 
 Before broad CIC-901 work, the status document must identify **Ready for
-CIC-901**, the tested hardening SHA/tree, the 0.4/0.5/0.6 dependency receipts,
+CIC-901**, the tested hardening SHA/tree, the cobol.execution/racf.security/dataset.data dependency receipts,
 and references linking all R-01–R-28 findings to their individual fix commits
 and focused regressions. The review's Gates A–D and required entry checks must
 pass together on that unchanged candidate, including the accepted CICS pilot,
@@ -61,7 +60,7 @@ The generated contract is `frozen-with-bounded-ambiguities` with logical digest
 its physical file SHA-256 is
 `55f2379e10a56e1fe271c21820a9cf6a534a97802e16e85d8d9d9693ee521fd3`.
 
-This is a non-release implementation boundary, not 0.9 completion. It grants
+This is a non-release implementation boundary, not cics.application-api completion. It grants
 the 240 unready commands zero execution, coverage, semantic, and differential
 credit. CIC-902 through CIC-906 must supply and integrate their family semantics.
 Release generation, exact-target launch, archive reproduction, deployment, and
@@ -128,7 +127,7 @@ cache-backed A/B/C projection and independent verification, and all 11 native
 PostgreSQL parity selectors. Release and licensed campaigns were not run and
 are not implied by this result.
 
-The [common release contract](../README.md#common-release-contract) and
+The [common release contract](../README.md#shared-validation-contract) and
 [hardened slice acceptance](../../../prompts/subsystems/README.md#hardened-slice-acceptance)
 apply, including early participant-contract and licensed-harness preparation.
 These requirements do not themselves certify implementation or waive an exit gate.
@@ -213,15 +212,15 @@ substitute for this route proof or complete a whole family.
 
 Command families can run in parallel after the generated option, condition,
 resource-key, and effect contracts freeze. File and security semantics merge
-through the 0.6 and 0.5 authorities; host-call changes merge through 0.4.
+through the dataset.data and racf.security authorities; host-call changes merge through cobol.execution.
 
-After the hardening entry gate, 0.9 can run alongside remaining 0.8 work and
-0.12, 0.14, and 0.15. SPI/FEPI parser preparation
+After the hardening entry gate, cics.application-api can run alongside remaining jes.execution work and
+db2.core, ims.programming, and mq.programming. SPI/FEPI parser preparation
 may begin, but its public surface cannot complete before this API is stable.
 
 ## Backend and failure validation
 
-PostgreSQL is an affected 0.9 environment. Select the following tests according
+PostgreSQL is an affected cics.application-api environment. Select the following tests according
 to each slice's changed boundary and run the complete affected matrix on the
 unchanged minor-integration candidate. An ignored or unavailable backend test
 remains pending. Use focused tests in the inner loop; the common validation
@@ -259,7 +258,7 @@ fixtures without granting licensed credit.
 An unavailable licensed runner blocks the final differential gate, not
 independent implementation after the hardening entry gate. Keep
 `differential=pending`, retain the blocker and next external prerequisite, and
-do not report 0.9 complete until the required licensed campaigns pass.
+do not report cics.application-api complete until the required licensed campaigns pass.
 
 ## Exit gate
 
@@ -277,4 +276,4 @@ do not report 0.9 complete until the required licensed campaigns pass.
 
 ## Non-goals
 
-- CICS system programming interface and FEPI completion, which belong to 0.10.
+- CICS system programming interface and FEPI completion, which belong to cics.system-api.

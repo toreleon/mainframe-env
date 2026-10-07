@@ -1,3 +1,5 @@
+//! Existing application batch-controller input projection.
+
 use super::*;
 
 pub(super) fn decode_application_batch_controller(

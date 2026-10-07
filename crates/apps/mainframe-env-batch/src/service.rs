@@ -1,5 +1,24 @@
 mod dd_allocation;
+mod effect_loan;
 mod hex_encoding;
+mod host_dispatch;
+mod ims_controller;
+mod prepared_selection;
+mod problem;
+mod program_dispatch;
+mod run_retirement;
+mod run_selection;
+mod run_stop;
+mod running_step;
+
+pub use effect_loan::BatchEffectOccurrence;
+use prepared_selection::next_job_version;
+use run_stop::RunInput;
+pub use run_stop::{BatchRunControl, BatchRunExit};
+use running_step::ProgramDispatch;
+pub use running_step::{RunningStepAdmission, RunningStepView};
+
+use problem::{abend_code, ams_condition_code, problem_category};
 
 use crate::ams::{
     AmsCommand, AmsRegister, AmsStatement, compare, numeric_operand, operand, pair_operand,
@@ -211,23 +230,6 @@ pub struct BatchService {
 }
 
 impl BatchService {
-    fn invoke_host(
-        &self,
-        invocation: &Invocation,
-        now_tick: u64,
-        cancellation_requested: bool,
-        request: EffectRequest,
-    ) -> EffectResult {
-        ScopedHostService::invoke(
-            &self.host,
-            invocation,
-            now_tick,
-            cancellation_requested,
-            request,
-        )
-        .persist_with(|audit| self.store.record_audit(audit).map_err(store_error))
-    }
-
     pub fn open(
         host: Arc<ScopedHostService>,
         store: Arc<dyn ProviderStateStore>,
@@ -586,12 +588,13 @@ impl BatchService {
 
     fn submit_internal_reader(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         parent_job_id: &str,
         step_name: &str,
         bundle: &JclBundle,
         key: &IdempotencyKey,
     ) -> Result<JobSnapshot, HostProblem> {
+        invocation.check()?;
         self.submit_with_origin(
             invocation,
             bundle,
@@ -608,13 +611,14 @@ impl BatchService {
     #[allow(clippy::too_many_arguments)]
     fn submit_with_origin(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         bundle: &JclBundle,
         key: &IdempotencyKey,
         hold: bool,
         kind: JesJobKind,
         origin: JesSubmissionOrigin,
     ) -> Result<JobSnapshot, HostProblem> {
+        invocation.check()?;
         let plan = parse_jcl(bundle, self.jcl_limits)?;
         let (security_class, resource) = match &origin {
             JesSubmissionOrigin::External => ("JESJOBS", format!("JOB.{}", plan.name)),
@@ -662,7 +666,7 @@ impl BatchService {
         if let Some(id) = state.replay.get(key.as_str()) {
             let job = state.jobs.get(id).ok_or(HostProblem::UnknownOutcome)?;
             return if job.plan == plan
-                && job.owner == invocation.principal.id().as_str()
+                && job.owner == invocation.original().principal.id().as_str()
                 && job.kind == kind
                 && job.origin == origin
             {
@@ -720,7 +724,7 @@ impl BatchService {
             schema_version: JES_DURABLE_JOB_CONTRACT.into(),
             id: id.clone(),
             name: plan.name.clone(),
-            owner: invocation.principal.id().as_str().into(),
+            owner: invocation.original().principal.id().as_str().into(),
             kind,
             origin,
             route,
@@ -763,6 +767,15 @@ impl BatchService {
                 .into(),
             ],
         };
+        // The contained internal reader uses the same reserved job number and
+        // builders, but never holds Batch state across provider/observer calls.
+        // Plain Invocation retains the historical lock and callback order.
+        let retained_state = if invocation.contained() {
+            drop(state);
+            None
+        } else {
+            Some(state)
+        };
         if let Err(problem) = (|| {
             self.append_spool_records(invocation, &mut job, None, None, "JESJCL", jcl_records)?;
             self.append_spool_records(
@@ -782,11 +795,49 @@ impl BatchService {
                 vec![format!("{id} ADMITTED").into_bytes()],
             )
         })() {
+            if invocation.contained() {
+                return Err(invocation.poison(problem));
+            }
             let _ = self.purge_spool_authority(invocation, &mut job);
             return Err(problem);
         }
+        invocation.check()?;
+        let mut state = match retained_state {
+            Some(state) => state,
+            None => self.lock()?,
+        };
+        if invocation.contained() {
+            if state.replay.contains_key(key.as_str()) || state.jobs.contains_key(&id) {
+                return Err(invocation.poison(HostProblem::IdempotencyConflict));
+            }
+            if state.jobs.len() >= self.limits.max_jobs
+                || state
+                    .jobs
+                    .values()
+                    .filter(|job| job.state == JobState::Queued)
+                    .count()
+                    >= self.limits.max_queued
+                || state
+                    .jobs
+                    .values()
+                    .filter(|candidate| {
+                        !candidate.state.terminal()
+                            && candidate.route.execution_node == job.route.execution_node
+                    })
+                    .count()
+                    >= inbound_limit
+            {
+                return Err(invocation.poison(HostProblem::ResourceExhausted));
+            }
+        }
         if let Err(problem) = self.persist_job(&job, None) {
-            return match self.purge_spool_authority(invocation, &mut job) {
+            let cleanup = if invocation.contained() {
+                drop(state);
+                return Err(invocation.poison(problem));
+            } else {
+                self.purge_spool_authority(invocation, &mut job)
+            };
+            return match cleanup {
                 Ok(SpoolResult::Mutated { .. }) => Err(problem),
                 Ok(SpoolResult::PurgePending { .. }) | Err(_) => Err(HostProblem::UnknownOutcome),
                 Ok(_) => Err(HostProblem::ProviderFailure),
@@ -1156,7 +1207,7 @@ impl BatchService {
         initiator: &str,
         cancelled: bool,
     ) -> Result<Option<JobSnapshot>, HostProblem> {
-        self.run_on_member(invocation, member, initiator, cancelled, None)
+        self.run_on_member(invocation, member, initiator, cancelled, None, None)
     }
 
     pub fn run_claimed(
@@ -1181,274 +1232,12 @@ impl BatchService {
         }
         for member in members {
             if let Some(job) =
-                self.run_on_member(invocation, &member, initiator, cancelled, Some(id))?
+                self.run_on_member(invocation, &member, initiator, cancelled, Some(id), None)?
             {
                 return Ok(Some(job));
             }
         }
         Ok(None)
-    }
-
-    fn run_on_member(
-        &self,
-        invocation: &Invocation,
-        member: &str,
-        initiator: &str,
-        cancelled: bool,
-        requested_id: Option<&str>,
-    ) -> Result<Option<JobSnapshot>, HostProblem> {
-        if self.limits.max_active == 0 {
-            return Err(HostProblem::ResourceExhausted);
-        }
-        let member = member.to_ascii_uppercase();
-        let topology = self.topology()?;
-        let member_definition = topology
-            .members
-            .get(&member)
-            .filter(|member| member.enabled && topology.node_available(&member.node))
-            .cloned()
-            .ok_or(HostProblem::UnsupportedCapability {
-                capability: "jes.mas.member".into(),
-                detail: format!("MAS member {member} is unavailable"),
-            })?;
-        let scheduler = self
-            .scheduler
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?
-            .configuration
-            .clone();
-        let id = {
-            let state = self.lock()?;
-            let mut class_active = BTreeMap::<char, usize>::new();
-            let mut initiator_active = 0usize;
-            let mut member_active = 0usize;
-            for job in state
-                .jobs
-                .values()
-                .filter(|job| matches!(job.state, JobState::Selected | JobState::Running))
-            {
-                *class_active.entry(job.class).or_default() += 1;
-                if job.initiator.as_deref() == Some(initiator) {
-                    initiator_active += 1;
-                }
-                if job.route.owner_member.as_deref() == Some(member.as_str()) {
-                    member_active += 1;
-                }
-            }
-            if member_active >= member_definition.max_active {
-                return Ok(None);
-            }
-            let candidates = state
-                .jobs
-                .values()
-                .filter(|job| job.owner == invocation.principal.id().as_str())
-                .filter(|job| requested_id.is_none_or(|id| job.id == id))
-                .filter(|job| {
-                    job.route.execution_node == member_definition.node
-                        && job
-                            .route
-                            .owner_member
-                            .as_deref()
-                            .is_none_or(|owner| owner == member)
-                })
-                .map(|job| JobSelectionCandidate {
-                    id: &job.id,
-                    class: job.class,
-                    priority: job.priority,
-                    state: job.state,
-                });
-            select_job(
-                &scheduler,
-                initiator,
-                initiator_active,
-                &class_active,
-                candidates,
-            )?
-            .map(str::to_string)
-        };
-        let Some(id) = id else {
-            return Ok(None);
-        };
-        self.ensure_spool_migrated(invocation, &id)?;
-        if cancelled || invocation.cancellation_requested() {
-            return self.cancel(invocation, &id).map(Some);
-        }
-        let mut job = {
-            let mut state = self.lock()?;
-            let current = state.jobs.get(&id).cloned().ok_or(HostProblem::NotFound)?;
-            if current.owner != invocation.principal.id().as_str() {
-                return Err(HostProblem::Unauthorized);
-            }
-            self.authorize(
-                invocation,
-                "JESJOBS",
-                &format!("JOB.{}", current.name),
-                AccessIntent::Execute,
-                2,
-            )?;
-            ensure_job_event_capacity(&current, self.limits.max_events, 4)?;
-            let selected_version = next_job_version(current.version)?;
-            let running_version = next_job_version(selected_version)?;
-            let running_attempt = current
-                .attempt
-                .checked_add(1)
-                .filter(|attempt| *attempt <= self.limits.max_attempts)
-                .ok_or(HostProblem::ResourceExhausted)?;
-            let mut selected = current.clone();
-            selected.version = selected_version;
-            selected.state = JobState::Selected;
-            selected.initiator = Some(initiator.into());
-            selected.route.owner_member = Some(member.clone());
-            push_job_event(
-                &mut selected,
-                self.limits.max_events,
-                format!("selected:{initiator}"),
-            )?;
-            self.persist_job(&selected, Some(current.version))?;
-            state.jobs.insert(id.clone(), selected.clone());
-            let mut running = selected.clone();
-            running.version = running_version;
-            running.attempt = running_attempt;
-            running.state = JobState::Running;
-            running.initiator = Some(initiator.into());
-            running.route.owner_member = Some(member);
-            push_job_event(&mut running, self.limits.max_events, "running")?;
-            self.persist_job(&running, Some(selected.version))?;
-            state.jobs.insert(id.clone(), running.clone());
-            running
-        };
-        let outcome = self.execute(invocation, &mut job);
-        if outcome == Err(HostProblem::UnknownOutcome) {
-            return Err(HostProblem::UnknownOutcome);
-        }
-        let cleanup = self.cleanup_job_temporary_datasets(invocation, &mut job);
-        let outcome = match (outcome, cleanup) {
-            (Ok(return_code), Ok(())) => Ok(return_code),
-            (Err(problem), Ok(())) | (_, Err(problem)) => Err(problem),
-        };
-        let mut state = self.lock()?;
-        let current = state.jobs.get(&id).cloned().ok_or(HostProblem::NotFound)?;
-        if current.state == JobState::Cancelled {
-            return Ok(Some(snapshot(&current)));
-        }
-        if current.state != JobState::Running {
-            return Err(HostProblem::UnknownOutcome);
-        }
-        ensure_job_event_capacity(
-            &job,
-            self.limits.max_events,
-            if outcome.is_ok() { 2 } else { 1 },
-        )?;
-        let terminal_version = next_job_version(current.version)?;
-        let completed_version = outcome
-            .is_ok()
-            .then(|| next_job_version(terminal_version))
-            .transpose()?;
-        job.version = terminal_version;
-        let terminal_step = job.active_step.clone();
-        job.active_step = None;
-        match outcome {
-            Ok(return_code) => {
-                job.return_code = Some(return_code);
-                job.state = JobState::Output;
-                push_job_event(&mut job, self.limits.max_events, "output")?;
-                self.append_spool_records(
-                    invocation,
-                    &mut job,
-                    None,
-                    None,
-                    "JESMSGLG",
-                    vec![format!("ENDED RC={return_code:04}").into_bytes()],
-                )?;
-                self.complete_output(invocation, &mut job)?;
-                self.persist_job(&job, Some(current.version))?;
-                state.jobs.insert(id.clone(), job.clone());
-                let output_version = job.version;
-                job.version = completed_version.ok_or(HostProblem::InfrastructureFailure)?;
-                job.state = JobState::Completed;
-                job.initiator = None;
-                push_job_event(&mut job, self.limits.max_events, "completed")?;
-                self.persist_job(&job, Some(output_version))?;
-                let result = snapshot(&job);
-                state.jobs.insert(id, job.clone());
-                self.persist_checkpoint(&job, job.effect_sequence)?;
-                return Ok(Some(result));
-            }
-            Err(problem) => {
-                if let HostProblem::Condition { name, .. } = &problem
-                    && let Some(code) = name.strip_prefix("ABEND:")
-                {
-                    job.abend_code = Some(code.to_string());
-                }
-                let cancelled = problem == HostProblem::Cancelled;
-                job.state = if cancelled {
-                    JobState::Cancelled
-                } else {
-                    JobState::Failed
-                };
-                job.initiator = None;
-                if let Some(cancellation) = job.cancellation.as_mut() {
-                    cancellation.state = CancellationState::Completed;
-                } else if cancelled {
-                    job.cancellation = Some(JesCancellation {
-                        id: format!("{}-CANCEL-{}", job.id, job.version),
-                        requested_by: invocation.principal.id().as_str().into(),
-                        reason: "execution cancellation".into(),
-                        requested_tick: 0,
-                        state: CancellationState::Completed,
-                    });
-                }
-                push_job_event(
-                    &mut job,
-                    self.limits.max_events,
-                    if cancelled {
-                        String::from("cancelled:execution")
-                    } else {
-                        format!("failed:{problem:?}")
-                    },
-                )?;
-                if let Some(step) = terminal_step {
-                    self.append_spool_records(
-                        invocation,
-                        &mut job,
-                        Some(&step),
-                        None,
-                        "JOBLOG",
-                        vec![
-                            format!(
-                                "{step} {} {problem:?}",
-                                if cancelled { "CANCELLED" } else { "FAILED" }
-                            )
-                            .into_bytes(),
-                        ],
-                    )?;
-                }
-                self.append_spool_records(
-                    invocation,
-                    &mut job,
-                    None,
-                    None,
-                    "JESMSGLG",
-                    vec![
-                        format!(
-                            "{} {problem:?}",
-                            if cancelled { "CANCELLED" } else { "FAILED" }
-                        )
-                        .into_bytes(),
-                    ],
-                )?;
-                if cancelled {
-                    self.cancel_output(invocation, &mut job)?;
-                } else {
-                    self.complete_output(invocation, &mut job)?;
-                }
-            }
-        }
-        self.persist_job(&job, Some(current.version))?;
-        let result = snapshot(&job);
-        state.jobs.insert(id, job.clone());
-        self.persist_checkpoint(&job, job.effect_sequence)?;
-        Ok(Some(result))
     }
 
     pub fn drain_queued(&self, invocation: &Invocation) -> Result<Vec<JobSnapshot>, HostProblem> {
@@ -1468,7 +1257,13 @@ impl BatchService {
         }
     }
 
-    fn execute(&self, invocation: &Invocation, job: &mut Job) -> Result<i32, HostProblem> {
+    fn execute(
+        &self,
+        invocation: &(impl RunInput + ?Sized),
+        job: &mut Job,
+        mut dispatch: Option<&mut ProgramDispatch<'_>>,
+    ) -> Result<i32, HostProblem> {
+        invocation.check()?;
         let mut max_rc = 0;
         let mut abended = false;
         let mut first_abend = None::<String>;
@@ -1496,15 +1291,16 @@ impl BatchService {
                 }
                 continue;
             }
-            if let Some(cancellation) = &invocation.cancellation {
+            if let Some(cancellation) = &invocation.original().cancellation {
                 job.cancellation = Some(JesCancellation {
                     id: cancellation.id.as_str().into(),
-                    requested_by: invocation.principal.id().as_str().into(),
+                    requested_by: invocation.original().principal.id().as_str().into(),
                     reason: cancellation.reason.clone(),
                     requested_tick: cancellation.requested_at_tick,
                     state: CancellationState::Observed,
                 });
                 self.mark_step(
+                    invocation,
                     job,
                     step,
                     StepState::Cancelled,
@@ -1526,7 +1322,14 @@ impl BatchService {
                         "JOBLOG",
                         vec![format!("{} BYPASSED RESTART", step.name).into_bytes()],
                     )?;
-                    self.mark_step(job, step, StepState::BypassedRestart, None, effect_sequence)?;
+                    self.mark_step(
+                        invocation,
+                        job,
+                        step,
+                        StepState::BypassedRestart,
+                        None,
+                        effect_sequence,
+                    )?;
                     continue;
                 }
             }
@@ -1540,6 +1343,7 @@ impl BatchService {
                     vec![format!("{} SKIPPED COND", step.name).into_bytes()],
                 )?;
                 self.mark_step(
+                    invocation,
                     job,
                     step,
                     StepState::SkippedCondition,
@@ -1555,7 +1359,14 @@ impl BatchService {
                     .insert(step.name.clone(), effect_sequence);
             }
             job.active_step = Some(step.name.clone());
-            self.mark_step(job, step, StepState::Allocating, None, effect_sequence)?;
+            self.mark_step(
+                invocation,
+                job,
+                step,
+                StepState::Allocating,
+                None,
+                effect_sequence,
+            )?;
             let allocation_plans = plan_dd_allocations(&step.dds)?;
             let mut allocations = Vec::new();
             let mut program_abend_code = None;
@@ -1575,7 +1386,14 @@ impl BatchService {
                     &mut dds,
                     &mut effect_sequence,
                 )?;
-                self.mark_step(job, step, StepState::Running, None, effect_sequence)?;
+                self.mark_step(
+                    invocation,
+                    job,
+                    step,
+                    StepState::Running,
+                    None,
+                    effect_sequence,
+                )?;
                 for dd in &mut dds {
                     if !is_program_library_dd(dd)
                         && let Some(raw_name) = dd.dataset.clone()
@@ -1635,6 +1453,16 @@ impl BatchService {
                         &input,
                         &mut effect_sequence,
                     )?,
+                    RegisteredProgramHandler::ProgramService if dispatch.is_some() => self
+                        .execute_program_controller_admitted(
+                            invocation,
+                            job,
+                            step,
+                            &input,
+                            &mut effect_sequence,
+                            &registration.program,
+                            &mut **dispatch.as_mut().expect("checked callback"),
+                        )?,
                     RegisteredProgramHandler::ProgramService
                     | RegisteredProgramHandler::Utility(_) => self.execute_program_controller(
                         invocation,
@@ -1696,6 +1524,12 @@ impl BatchService {
                 }
                 Ok(output)
             });
+            if let Err(problem) = &step_result {
+                if run_stop::fence_step_error(invocation.contained(), problem) {
+                    return Err(invocation.poison(problem.clone()));
+                }
+            }
+            invocation.check()?;
             let output = match step_result {
                 Ok(output) => output,
                 Err(problem) => {
@@ -1724,6 +1558,7 @@ impl BatchService {
                         first_abend.get_or_insert_with(|| code.clone());
                         job.abend_code = Some(code.clone());
                         self.mark_step(
+                            invocation,
                             job,
                             step,
                             StepState::Abended,
@@ -1741,13 +1576,14 @@ impl BatchService {
                     if state == StepState::Cancelled {
                         job.cancellation = Some(JesCancellation {
                             id: format!("{}-CANCEL-{}", job.id, job.version),
-                            requested_by: invocation.principal.id().as_str().into(),
+                            requested_by: invocation.original().principal.id().as_str().into(),
                             reason: "provider cancellation".into(),
                             requested_tick: 0,
                             state: CancellationState::Observed,
                         });
                     }
                     self.mark_step(
+                        invocation,
                         job,
                         step,
                         state,
@@ -1767,6 +1603,7 @@ impl BatchService {
             };
             if !(0..=4_095).contains(&output.return_code) {
                 self.mark_step(
+                    invocation,
                     job,
                     step,
                     StepState::Failed,
@@ -1802,7 +1639,14 @@ impl BatchService {
                     .into_bytes(),
                 ],
             )?;
-            self.mark_step(job, step, StepState::Disposing, None, effect_sequence)?;
+            self.mark_step(
+                invocation,
+                job,
+                step,
+                StepState::Disposing,
+                None,
+                effect_sequence,
+            )?;
             if let Err(problem) = self.dispose_dds(
                 invocation,
                 job,
@@ -1812,6 +1656,7 @@ impl BatchService {
                 false,
             ) {
                 self.mark_step(
+                    invocation,
                     job,
                     step,
                     StepState::Failed,
@@ -1823,6 +1668,7 @@ impl BatchService {
                 return Err(problem);
             }
             self.mark_step(
+                invocation,
                 job,
                 step,
                 StepState::Completed,
@@ -1845,12 +1691,14 @@ impl BatchService {
 
     fn mark_step(
         &self,
+        invocation: &(impl RunInput + ?Sized),
         job: &mut Job,
         step: &StepPlan,
         next: StepState,
         termination: Option<StepTermination>,
         effect_sequence: u64,
     ) -> Result<(), HostProblem> {
+        invocation.check()?;
         // Keep two durable event slots for the job's output/completed or
         // failed/cancelled terminal projection before publishing a step edge.
         ensure_job_event_capacity(job, self.limits.max_events, 3)?;
@@ -1894,15 +1742,29 @@ impl BatchService {
         }
         self.persist_job(job, Some(expected))?;
         state.jobs.insert(job.id.clone(), job.clone());
+        invocation.published_job(job_record(job)?);
+        if invocation.contained() {
+            // The known Job edge is retained if a late observation stops the run.
+            // Do not call the observer under the state lock or publish its next
+            // checkpoint after a latched stop. Legacy checkpoint order is below.
+            drop(state);
+            invocation.check()?;
+            self.persist_checkpoint(job, effect_sequence)?;
+            invocation.check()?;
+            return Ok(());
+        }
         self.persist_checkpoint(job, effect_sequence)?;
+        drop(state);
+        invocation.check()?;
         Ok(())
     }
 
     fn cleanup_job_temporary_datasets(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &mut Job,
     ) -> Result<(), HostProblem> {
+        invocation.check()?;
         let mut sequence = 0u64;
         for dataset in job.temporary_datasets.clone() {
             self.authorize(
@@ -1920,12 +1782,12 @@ impl BatchService {
             .map_err(|_| HostProblem::ResourceExhausted)?;
             let result = self.invoke_host(
                 invocation,
-                invocation.deadline_tick.saturating_sub(1),
+                invocation.original().deadline_tick.saturating_sub(1),
                 false,
                 EffectRequest {
-                    run_unit: invocation.run_unit_id.clone(),
+                    run_unit: invocation.original().run_unit_id.clone(),
                     sequence: sequence_value,
-                    deadline_tick: invocation.deadline_tick,
+                    deadline_tick: invocation.original().deadline_tick,
                     idempotency_key: Some(key.clone()),
                     request: HostRequest::Dataset(DatasetRequest::Delete {
                         dataset: DatasetName::new(&dataset, 128)
@@ -1956,13 +1818,14 @@ impl BatchService {
 
     fn append_spool_records(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &mut Job,
         step_name: Option<&str>,
         dd: Option<&crate::DdPlan>,
         file: &str,
         records: Vec<Vec<u8>>,
     ) -> Result<(), HostProblem> {
+        invocation.check()?;
         if records.is_empty() {
             return Ok(());
         }
@@ -2011,12 +1874,12 @@ impl BatchService {
         }
         let result = self.invoke_host(
             invocation,
-            invocation.deadline_tick.saturating_sub(1),
+            invocation.original().deadline_tick.saturating_sub(1),
             false,
             EffectRequest {
-                run_unit: invocation.run_unit_id.clone(),
+                run_unit: invocation.original().run_unit_id.clone(),
                 sequence,
-                deadline_tick: invocation.deadline_tick,
+                deadline_tick: invocation.original().deadline_tick,
                 idempotency_key: Some(key.clone()),
                 request: HostRequest::Spool(SpoolRequest::Append {
                     job: JobName::new(&job.id, 128).map_err(|_| HostProblem::Malformed)?,
@@ -2103,20 +1966,31 @@ impl BatchService {
         Ok(())
     }
 
-    fn complete_output(&self, invocation: &Invocation, job: &mut Job) -> Result<(), HostProblem> {
+    fn complete_output(
+        &self,
+        invocation: &(impl RunInput + ?Sized),
+        job: &mut Job,
+    ) -> Result<(), HostProblem> {
+        invocation.check()?;
         self.seal_output(invocation, job, false)
     }
 
-    fn cancel_output(&self, invocation: &Invocation, job: &mut Job) -> Result<(), HostProblem> {
+    fn cancel_output(
+        &self,
+        invocation: &(impl RunInput + ?Sized),
+        job: &mut Job,
+    ) -> Result<(), HostProblem> {
+        invocation.check()?;
         self.seal_output(invocation, job, true)
     }
 
     fn seal_output(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &mut Job,
         cancelled: bool,
     ) -> Result<(), HostProblem> {
+        invocation.check()?;
         let files = job.spool_files.keys().cloned().collect::<Vec<_>>();
         for file in files {
             let resource = spool_resource(job, &file);
@@ -2136,12 +2010,12 @@ impl BatchService {
             .map_err(|_| HostProblem::ResourceExhausted)?;
             let result = self.invoke_host(
                 invocation,
-                invocation.deadline_tick.saturating_sub(1),
+                invocation.original().deadline_tick.saturating_sub(1),
                 false,
                 EffectRequest {
-                    run_unit: invocation.run_unit_id.clone(),
+                    run_unit: invocation.original().run_unit_id.clone(),
                     sequence,
-                    deadline_tick: invocation.deadline_tick,
+                    deadline_tick: invocation.original().deadline_tick,
                     idempotency_key: Some(key.clone()),
                     request: HostRequest::Spool(SpoolRequest::Seal {
                         job: JobName::new(&job.id, 128).map_err(|_| HostProblem::Malformed)?,
@@ -2183,9 +2057,10 @@ impl BatchService {
 
     fn purge_spool_authority(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &mut Job,
     ) -> Result<SpoolResult, HostProblem> {
+        invocation.check()?;
         let resource = format!("JOB.{}", job.name);
         let authorize_sequence = next_spool_sequence(invocation, job)?;
         self.authorize(
@@ -2203,12 +2078,12 @@ impl BatchService {
         .map_err(|_| HostProblem::ResourceExhausted)?;
         let outcome = self.invoke_host(
             invocation,
-            invocation.deadline_tick.saturating_sub(1),
+            invocation.original().deadline_tick.saturating_sub(1),
             false,
             EffectRequest {
-                run_unit: invocation.run_unit_id.clone(),
+                run_unit: invocation.original().run_unit_id.clone(),
                 sequence,
-                deadline_tick: invocation.deadline_tick,
+                deadline_tick: invocation.original().deadline_tick,
                 idempotency_key: Some(key.clone()),
                 request: HostRequest::Spool(SpoolRequest::Purge {
                     job: JobName::new(&job.id, 128).map_err(|_| HostProblem::Malformed)?,
@@ -2229,12 +2104,13 @@ impl BatchService {
 
     fn execute_sdsf(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &Job,
         step: &StepPlan,
         input: &ProgramInput,
         effect_sequence: &mut u64,
     ) -> Result<crate::ProgramOutput, HostProblem> {
+        invocation.check()?;
         let controls = parse_sdsf_file_controls(&input_dd_text(input, "ISFIN")?)
             .map_err(|_| HostProblem::Unsupported)?;
         let arguments = controls
@@ -2256,12 +2132,12 @@ impl BatchService {
         let key = effect_key(job, step, sequence)?;
         let result = self.invoke_host(
             invocation,
-            invocation.deadline_tick.saturating_sub(1),
+            invocation.original().deadline_tick.saturating_sub(1),
             false,
             EffectRequest {
-                run_unit: invocation.run_unit_id.clone(),
+                run_unit: invocation.original().run_unit_id.clone(),
                 sequence,
-                deadline_tick: invocation.deadline_tick,
+                deadline_tick: invocation.original().deadline_tick,
                 idempotency_key: Some(key.clone()),
                 request: HostRequest::Cics(CicsRequest {
                     operation: CicsOperation::SetFileStatus,
@@ -2272,6 +2148,7 @@ impl BatchService {
                         idempotency_key: key,
                         transaction: Some(
                             invocation
+                                .original()
                                 .bindings
                                 .get("cics.transaction")
                                 .and_then(|value| std::str::from_utf8(value.bytes()).ok())
@@ -2309,35 +2186,40 @@ impl BatchService {
 
     fn execute_db2_tso(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &Job,
         step: &StepPlan,
         input: &ProgramInput,
         effect_sequence: &mut u64,
     ) -> Result<crate::ProgramOutput, HostProblem> {
+        invocation.check()?;
         let control = input_dd_text(input, "SYSTSIN")?;
-        let normalized = control.trim().to_ascii_uppercase();
-        if normalized.starts_with("FREE PLAN(") || normalized.starts_with("FREE PACKAGE(") {
-            if !normalized.ends_with(')') || normalized.contains('\n') {
-                return Err(HostProblem::Unsupported);
+        let (program, control) = match crate::db2_tso::parse(&control)? {
+            crate::db2_tso::Action::Free(commands) => {
+                let mut return_code = 0;
+                let mut records = Vec::new();
+                for command in commands {
+                    let result = self.db2_call(
+                        invocation,
+                        job,
+                        step,
+                        effect_sequence,
+                        Db2Operation::FreePlans,
+                        command,
+                        0,
+                    )?;
+                    return_code = return_code.max(i32::from(result.sqlcode != 0) * 8);
+                    records.push(format!("IKJEFT01 SQLCODE={}", result.sqlcode).into_bytes());
+                }
+                return Ok(crate::ProgramOutput {
+                    return_code,
+                    records,
+                    dd_outputs: BTreeMap::new(),
+                    termination: None,
+                });
             }
-            let result = self.db2_call(
-                invocation,
-                job,
-                step,
-                effect_sequence,
-                Db2Operation::FreePlans,
-                control,
-                0,
-            )?;
-            return Ok(crate::ProgramOutput {
-                return_code: i32::from(result.sqlcode != 0) * 8,
-                records: vec![format!("IKJEFT01 SQLCODE={}", result.sqlcode).into_bytes()],
-                dd_outputs: BTreeMap::new(),
-                termination: None,
-            });
-        }
-        let program = tso_run_program(&control)?;
+            crate::db2_tso::Action::Run { program, command } => (program, command),
+        };
         let selector = BatchControllerSelector::tso(&program)?;
         if let Some(controller) = self.resolve_controller(&selector)? {
             return match controller.plan {
@@ -2450,433 +2332,10 @@ impl BatchService {
         Ok(name)
     }
 
-    fn execute_program_controller(
-        &self,
-        invocation: &Invocation,
-        job: &Job,
-        step: &StepPlan,
-        input: &ProgramInput,
-        effect_sequence: &mut u64,
-        program: &str,
-    ) -> Result<crate::ProgramOutput, HostProblem> {
-        let payload = BoundedPayload::new(
-            "mainframe-env.program.input@1",
-            serde_json::to_vec(input).map_err(|_| HostProblem::ProviderFailure)?,
-            InvocationLimits::default(),
-        )
-        .map_err(|_| HostProblem::ResourceExhausted)?;
-        let sequence = next_effect_sequence(invocation, effect_sequence)?;
-        let key = effect_key(job, step, sequence)?;
-        let mut program_invocation = invocation.clone();
-        let limits = InvocationLimits::default();
-        let binding = BoundedPayload::new(
-            "mainframe-env.jes-work@1",
-            format!("jes:{}", job.id).into_bytes(),
-            limits,
-        )
-        .map_err(|_| HostProblem::ResourceExhausted)?;
-        if let Some(existing) = program_invocation.bindings.get("jes.work-id") {
-            if existing != &binding {
-                return Err(HostProblem::Malformed);
-            }
-        } else if program_invocation.bindings.len() >= limits.max_bindings {
-            return Err(HostProblem::ResourceExhausted);
-        }
-        program_invocation
-            .bindings
-            .insert("jes.work-id".into(), binding);
-        let result = self.invoke_host(
-            &program_invocation,
-            invocation.deadline_tick.saturating_sub(1),
-            false,
-            EffectRequest {
-                run_unit: invocation.run_unit_id.clone(),
-                sequence,
-                deadline_tick: invocation.deadline_tick,
-                idempotency_key: Some(key),
-                request: HostRequest::Program(ProgramRequest::Call {
-                    program: ProgramName::new(program, 128).map_err(|_| HostProblem::Malformed)?,
-                    payload,
-                    service: None,
-                }),
-            },
-        );
-        match result.outcome? {
-            HostResult::Program(payload) => decode_program_output(&payload),
-            _ => Err(HostProblem::ProviderFailure),
-        }
-    }
-
-    fn execute_ims_controller(
-        &self,
-        invocation: &Invocation,
-        job: &Job,
-        step: &StepPlan,
-        input: &ProgramInput,
-        effect_sequence: &mut u64,
-    ) -> Result<crate::ProgramOutput, HostProblem> {
-        let selector = ims_controller_selector(input.parameter.as_deref().unwrap_or_default())?;
-        let controller = self
-            .resolve_controller(&selector)?
-            .ok_or(HostProblem::Unsupported)?;
-        let program = controller
-            .program
-            .path
-            .rsplit('/')
-            .next()
-            .ok_or(HostProblem::InfrastructureFailure)?
-            .to_string();
-        let mode = controller.selector.mode().unwrap_or_default().to_string();
-        match controller.plan {
-            BatchControllerPlan::ProgramCall => Err(HostProblem::ProviderFailure),
-            BatchControllerPlan::ImsLoad {
-                database,
-                root_dd,
-                child_dd,
-                root_record_bytes,
-                child_record_bytes,
-                parent_key_bytes,
-            } => {
-                let roots = input_dd_records(input, &root_dd)?;
-                let children = input_dd_records(input, &child_dd)?;
-                let mut hierarchy = roots
-                    .into_iter()
-                    .map(|data| {
-                        if data.len() != root_record_bytes || data.len() < parent_key_bytes {
-                            return Err(HostProblem::Malformed);
-                        }
-                        Ok((
-                            data[..parent_key_bytes].to_vec(),
-                            (data, Vec::<Vec<u8>>::new()),
-                        ))
-                    })
-                    .collect::<Result<BTreeMap<_, _>, _>>()?;
-                for record in children {
-                    if record.len() != child_record_bytes || record.len() < parent_key_bytes {
-                        return Err(HostProblem::Malformed);
-                    }
-                    hierarchy
-                        .get_mut(&record[..parent_key_bytes])
-                        .ok_or(HostProblem::Malformed)?
-                        .1
-                        .push(record[parent_key_bytes..].to_vec());
-                }
-                let image = serde_json::json!({
-                    "database": database,
-                    "roots": hierarchy.into_values().map(|(data, children)| {
-                        serde_json::json!({"data": data, "children": children})
-                    }).collect::<Vec<_>>()
-                });
-                let result = self.ims_call(
-                    invocation,
-                    job,
-                    step,
-                    effect_sequence,
-                    ImsOperation::Load,
-                    Some(database),
-                    serde_json::to_vec(&image).map_err(|_| HostProblem::ProviderFailure)?,
-                    1,
-                )?;
-                Ok(crate::ProgramOutput {
-                    return_code: i32::from(result.status != "  ") * 8,
-                    records: vec![
-                        format!("DFSRRC00 LOAD SEGMENTS={}", result.affected_segments).into_bytes(),
-                    ],
-                    dd_outputs: BTreeMap::new(),
-                    termination: None,
-                })
-            }
-            BatchControllerPlan::ImsUnload {
-                database,
-                root_segment,
-                child_segment,
-                root_output_dd,
-                child_output_dd,
-                combined_output_dd,
-            } => {
-                let result = self.ims_call(
-                    invocation,
-                    job,
-                    step,
-                    effect_sequence,
-                    ImsOperation::Unload,
-                    Some(database),
-                    Vec::new(),
-                    4_096,
-                )?;
-                let mut roots = Vec::new();
-                let mut children = Vec::new();
-                for segment in &result.segments {
-                    if segment.name == root_segment {
-                        roots.push(segment.data.clone());
-                    } else if segment.name == child_segment {
-                        let mut record = segment
-                            .parent_key
-                            .clone()
-                            .ok_or(HostProblem::ProviderFailure)?;
-                        record.extend_from_slice(&segment.data);
-                        children.push(record);
-                    } else {
-                        return Err(HostProblem::ProviderFailure);
-                    }
-                }
-                let dd_outputs = if let Some(combined) = combined_output_dd {
-                    BTreeMap::from([(combined, roots.into_iter().chain(children).collect())])
-                } else {
-                    BTreeMap::from([
-                        (root_output_dd.ok_or(HostProblem::ProviderFailure)?, roots),
-                        (
-                            child_output_dd.ok_or(HostProblem::ProviderFailure)?,
-                            children,
-                        ),
-                    ])
-                };
-                Ok(crate::ProgramOutput {
-                    return_code: i32::from(result.status != "  ") * 8,
-                    records: vec![
-                        format!("DFSRRC00 UNLOAD SEGMENTS={}", result.segments.len()).into_bytes(),
-                    ],
-                    dd_outputs,
-                    termination: None,
-                })
-            }
-            BatchControllerPlan::ImsPurge {
-                psb,
-                root_segment,
-                child_segment,
-                control_dd,
-                required_expiry_days,
-                checkpoint_prefix,
-                summary_field,
-            } => {
-                let control = input_dd_records(input, &control_dd)?;
-                let range = control
-                    .first()
-                    .ok_or(HostProblem::Malformed)
-                    .and_then(|record| {
-                        std::str::from_utf8(record).map_err(|_| HostProblem::Malformed)
-                    })?;
-                let fields = range.split(',').map(str::trim).collect::<Vec<_>>();
-                let expiry_days = fields.first().ok_or(HostProblem::Malformed)?;
-                if fields.len() != 4
-                    || expiry_days.len() != 2
-                    || fields[1].len() != 5
-                    || fields[2].len() != 5
-                    || !fields[..3]
-                        .iter()
-                        .all(|field| field.bytes().all(|byte| byte.is_ascii_digit()))
-                    || !matches!(fields[3], "Y" | "N")
-                {
-                    return Err(HostProblem::Malformed);
-                }
-                if *expiry_days != required_expiry_days {
-                    return Err(HostProblem::Unsupported);
-                }
-                self.ims_dli_call(
-                    invocation,
-                    job,
-                    step,
-                    effect_sequence,
-                    ImsOperation::Schedule,
-                    Some(psb),
-                    Vec::new(),
-                    Vec::new(),
-                    Vec::new(),
-                    None,
-                    1,
-                )?;
-                let mut deleted_roots = 0u64;
-                let mut deleted_children = 0u64;
-                loop {
-                    let root = self.ims_dli_call(
-                        invocation,
-                        job,
-                        step,
-                        effect_sequence,
-                        ImsOperation::GetNext,
-                        None,
-                        vec![root_segment.clone()],
-                        Vec::new(),
-                        Vec::new(),
-                        None,
-                        1,
-                    )?;
-                    if root.status == "GB" {
-                        break;
-                    }
-                    if !root.status.trim().is_empty() {
-                        return Err(HostProblem::ProviderFailure);
-                    }
-                    loop {
-                        let child = self.ims_dli_call(
-                            invocation,
-                            job,
-                            step,
-                            effect_sequence,
-                            ImsOperation::GetNextParent,
-                            None,
-                            vec![child_segment.clone()],
-                            Vec::new(),
-                            Vec::new(),
-                            None,
-                            1,
-                        )?;
-                        if child.status == "GE" {
-                            break;
-                        }
-                        if !child.status.trim().is_empty() {
-                            return Err(HostProblem::ProviderFailure);
-                        }
-                        let deleted = self.ims_dli_call(
-                            invocation,
-                            job,
-                            step,
-                            effect_sequence,
-                            ImsOperation::Delete,
-                            None,
-                            vec![child_segment.clone()],
-                            Vec::new(),
-                            Vec::new(),
-                            None,
-                            1,
-                        )?;
-                        deleted_children =
-                            deleted_children.saturating_add(deleted.affected_segments);
-                    }
-                    let deleted = self.ims_dli_call(
-                        invocation,
-                        job,
-                        step,
-                        effect_sequence,
-                        ImsOperation::Delete,
-                        None,
-                        vec![root_segment.clone()],
-                        Vec::new(),
-                        Vec::new(),
-                        None,
-                        1,
-                    )?;
-                    deleted_roots = deleted_roots.saturating_add(deleted.affected_segments);
-                }
-                let checkpoint = format!(
-                    "{checkpoint_prefix}{:0>3}",
-                    job.id.trim_start_matches("JOB")
-                );
-                self.ims_dli_call(
-                    invocation,
-                    job,
-                    step,
-                    effect_sequence,
-                    ImsOperation::Checkpoint,
-                    None,
-                    Vec::new(),
-                    Vec::new(),
-                    Vec::new(),
-                    Some(checkpoint.clone()),
-                    1,
-                )?;
-                Ok(crate::ProgramOutput {
-                    return_code: 0,
-                    records: vec![format!(
-                        "DFSRRC00 {mode} PROGRAM={program} EXPIRY-DAYS={expiry_days} ROOTS={deleted_roots} CHILDREN={deleted_children} CHECKPOINT={checkpoint} {summary_field}={deleted_roots}"
-                    )
-                    .into_bytes()],
-                    dd_outputs: BTreeMap::new(),
-                    termination: None,
-                })
-            }
-        }
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn ims_call(
-        &self,
-        invocation: &Invocation,
-        job: &Job,
-        step: &StepPlan,
-        effect_sequence: &mut u64,
-        operation: ImsOperation,
-        psb: Option<String>,
-        data: Vec<u8>,
-        max_segments: u32,
-    ) -> Result<mainframe_env_host_api::ImsResult, HostProblem> {
-        self.ims_dli_call(
-            invocation,
-            job,
-            step,
-            effect_sequence,
-            operation,
-            psb,
-            Vec::new(),
-            data,
-            Vec::new(),
-            None,
-            max_segments,
-        )
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn ims_dli_call(
-        &self,
-        invocation: &Invocation,
-        job: &Job,
-        step: &StepPlan,
-        effect_sequence: &mut u64,
-        operation: ImsOperation,
-        psb: Option<String>,
-        segments: Vec<String>,
-        data: Vec<u8>,
-        qualifiers: Vec<ImsQualifier>,
-        checkpoint_id: Option<String>,
-        max_segments: u32,
-    ) -> Result<mainframe_env_host_api::ImsResult, HostProblem> {
-        let sequence = next_effect_sequence(invocation, effect_sequence)?;
-        let mutation = if operation.is_mutating() {
-            let key = effect_key(job, step, sequence)?;
-            Some(Mutation {
-                sequence,
-                idempotency_key: key,
-                transaction: Some(job.id.clone()),
-            })
-        } else {
-            None
-        };
-        let result = self.invoke_host(
-            invocation,
-            invocation.deadline_tick.saturating_sub(1),
-            false,
-            EffectRequest {
-                run_unit: invocation.run_unit_id.clone(),
-                sequence,
-                deadline_tick: invocation.deadline_tick,
-                idempotency_key: mutation
-                    .as_ref()
-                    .map(|mutation| mutation.idempotency_key.clone()),
-                request: HostRequest::Ims(ImsRequest {
-                    operation,
-                    psb,
-                    pcb: 1,
-                    segments,
-                    data,
-                    qualifiers,
-                    checkpoint_id,
-                    max_segments,
-                    mutation,
-                    system: None,
-                    q_class: None,
-                }),
-            },
-        );
-        match result.outcome? {
-            HostResult::Ims(result) => Ok(result),
-            _ => Err(HostProblem::ProviderFailure),
-        }
-    }
-
     #[allow(clippy::too_many_arguments)]
     fn db2_call(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &Job,
         step: &StepPlan,
         effect_sequence: &mut u64,
@@ -2884,6 +2343,7 @@ impl BatchService {
         statement: String,
         max_rows: u32,
     ) -> Result<mainframe_env_host_api::Db2Result, HostProblem> {
+        invocation.check()?;
         let sequence = next_effect_sequence(invocation, effect_sequence)?;
         let mutation = if operation.is_mutating() {
             let key = effect_key(job, step, sequence)?;
@@ -2897,12 +2357,12 @@ impl BatchService {
         };
         let result = self.invoke_host(
             invocation,
-            invocation.deadline_tick.saturating_sub(1),
+            invocation.original().deadline_tick.saturating_sub(1),
             false,
             EffectRequest {
-                run_unit: invocation.run_unit_id.clone(),
+                run_unit: invocation.original().run_unit_id.clone(),
                 sequence,
-                deadline_tick: invocation.deadline_tick,
+                deadline_tick: invocation.original().deadline_tick,
                 idempotency_key: mutation
                     .as_ref()
                     .map(|mutation| mutation.idempotency_key.clone()),
@@ -2925,13 +2385,14 @@ impl BatchService {
 
     fn execute_idcams(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &mut Job,
         step: &StepPlan,
         dataset_resolutions: &BTreeMap<String, String>,
         input: &ProgramInput,
         effect_sequence: &mut u64,
     ) -> Result<i32, HostProblem> {
+        invocation.check()?;
         let control = input_dd_text(input, "SYSIN")?;
         crate::ams::validate_idcams_control(control.as_bytes())?;
         let statements = crate::ams::parse_idcams_control(control.as_bytes())?;
@@ -2956,7 +2417,7 @@ impl BatchService {
     #[allow(clippy::too_many_arguments)]
     fn execute_ams_statement(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &mut Job,
         step: &StepPlan,
         dataset_resolutions: &BTreeMap<String, String>,
@@ -2966,6 +2427,7 @@ impl BatchService {
         max_cc: &mut u8,
         last_cc: &mut u8,
     ) -> Result<(), HostProblem> {
+        invocation.check()?;
         match statement {
             AmsStatement::Set { register, value } => match register {
                 AmsRegister::MaxCc => *max_cc = *value,
@@ -3033,7 +2495,7 @@ impl BatchService {
     #[allow(clippy::too_many_arguments)]
     fn execute_ams_command(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &mut Job,
         step: &StepPlan,
         dataset_resolutions: &BTreeMap<String, String>,
@@ -3041,6 +2503,7 @@ impl BatchService {
         effect_sequence: &mut u64,
         command: &AmsCommand,
     ) -> Result<(), HostProblem> {
+        invocation.check()?;
         self.authorize_ams_command(invocation, command, effect_sequence)?;
         if let Some(capability) = command.capability() {
             return Err(HostProblem::UnsupportedCapability {
@@ -3101,10 +2564,11 @@ impl BatchService {
 
     fn authorize_ams_command(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         command: &AmsCommand,
         effect_sequence: &mut u64,
     ) -> Result<(), HostProblem> {
+        invocation.check()?;
         let source = command.source();
         let mut resources = Vec::<(String, AccessIntent)>::new();
         let mut push = |value: Option<String>, intent| {
@@ -3186,20 +2650,21 @@ impl BatchService {
 
     fn ams_dataset_read(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         effect_sequence: &mut u64,
         request: DatasetRequest,
     ) -> Result<DatasetResult, HostProblem> {
+        invocation.check()?;
         let sequence = next_effect_sequence(invocation, effect_sequence)?;
         match self
             .invoke_host(
                 invocation,
-                invocation.deadline_tick.saturating_sub(1),
+                invocation.original().deadline_tick.saturating_sub(1),
                 false,
                 EffectRequest {
-                    run_unit: invocation.run_unit_id.clone(),
+                    run_unit: invocation.original().run_unit_id.clone(),
                     sequence,
-                    deadline_tick: invocation.deadline_tick,
+                    deadline_tick: invocation.original().deadline_tick,
                     idempotency_key: None,
                     request: HostRequest::Dataset(request),
                 },
@@ -3213,12 +2678,13 @@ impl BatchService {
 
     fn ams_dataset_mutation(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &Job,
         step: &StepPlan,
         effect_sequence: &mut u64,
         build: impl FnOnce(Mutation) -> DatasetRequest,
     ) -> Result<DatasetResult, HostProblem> {
+        invocation.check()?;
         let sequence = next_effect_sequence(invocation, effect_sequence)?;
         let key = effect_key(job, step, sequence)?;
         let request = build(Mutation {
@@ -3229,12 +2695,12 @@ impl BatchService {
         match self
             .invoke_host(
                 invocation,
-                invocation.deadline_tick.saturating_sub(1),
+                invocation.original().deadline_tick.saturating_sub(1),
                 false,
                 EffectRequest {
-                    run_unit: invocation.run_unit_id.clone(),
+                    run_unit: invocation.original().run_unit_id.clone(),
                     sequence,
-                    deadline_tick: invocation.deadline_tick,
+                    deadline_tick: invocation.original().deadline_tick,
                     idempotency_key: Some(key),
                     request: HostRequest::Dataset(request),
                 },
@@ -3248,12 +2714,13 @@ impl BatchService {
 
     fn delete_idcams(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &Job,
         step: &StepPlan,
         effect_sequence: &mut u64,
         statement: &str,
     ) -> Result<(), HostProblem> {
+        invocation.check()?;
         let name = crate::ams::bare_target(statement, "DELETE").ok_or(HostProblem::Malformed)?;
         let dataset = dataset_name(&name)?;
         let purge = statement.contains(" PURGE");
@@ -3275,12 +2742,13 @@ impl BatchService {
 
     fn listcat_idcams(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &mut Job,
         step: &StepPlan,
         effect_sequence: &mut u64,
         statement: &str,
     ) -> Result<(), HostProblem> {
+        invocation.check()?;
         let pattern =
             operand(statement, &["ENTRIES", "ENTRY", "LEVEL"]).unwrap_or_else(|| "**".into());
         let DatasetResult::CatalogEntries { entries, more } = self.ams_dataset_read(
@@ -3327,7 +2795,7 @@ impl BatchService {
     #[allow(clippy::too_many_arguments)]
     fn repro_idcams(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &mut Job,
         step: &StepPlan,
         dataset_resolutions: &BTreeMap<String, String>,
@@ -3335,6 +2803,7 @@ impl BatchService {
         effect_sequence: &mut u64,
         statement: &str,
     ) -> Result<(), HostProblem> {
+        invocation.check()?;
         let records = if let Some(input_name) = operand(statement, &["INFILE", "IFILE"]) {
             input_dd_records(input, &input_name)?
         } else {
@@ -3401,7 +2870,7 @@ impl BatchService {
     #[allow(clippy::too_many_arguments)]
     fn execute_ams_typed_command(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &mut Job,
         step: &StepPlan,
         dataset_resolutions: &BTreeMap<String, String>,
@@ -3409,6 +2878,7 @@ impl BatchService {
         effect_sequence: &mut u64,
         command: &AmsCommand,
     ) -> Result<(), HostProblem> {
+        invocation.check()?;
         let statement = command.source();
         match command.id() {
             "allocate" => {
@@ -3716,7 +3186,7 @@ impl BatchService {
                             effect_sequence,
                             |mutation| DatasetRequest::ReconcileTvs {
                                 transaction,
-                                owner: invocation.principal.id().clone(),
+                                owner: invocation.original().principal.id().clone(),
                                 committed: statement.contains(" COMMIT"),
                                 mutation,
                             },
@@ -3727,7 +3197,7 @@ impl BatchService {
                             effect_sequence,
                             DatasetRequest::TvsStatus {
                                 transaction,
-                                owner: invocation.principal.id().clone(),
+                                owner: invocation.original().principal.id().clone(),
                             },
                         )?
                     }
@@ -3753,12 +3223,13 @@ impl BatchService {
 
     fn alter_idcams(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &Job,
         step: &StepPlan,
         effect_sequence: &mut u64,
         statement: &str,
     ) -> Result<(), HostProblem> {
+        invocation.check()?;
         let from = dataset_name(
             &crate::ams::bare_target(statement, "ALTER").ok_or(HostProblem::Malformed)?,
         )?;
@@ -3857,7 +3328,7 @@ impl BatchService {
     #[allow(clippy::too_many_arguments)]
     fn export_idcams(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &mut Job,
         step: &StepPlan,
         dataset_resolutions: &BTreeMap<String, String>,
@@ -3865,6 +3336,7 @@ impl BatchService {
         statement: &str,
         disconnect: bool,
     ) -> Result<(), HostProblem> {
+        invocation.check()?;
         let target = dataset_name(
             &operand(statement, &["ENTRIES", "INDATASET"]).ok_or(HostProblem::Malformed)?,
         )?;
@@ -3922,13 +3394,14 @@ impl BatchService {
 
     fn import_idcams(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &Job,
         step: &StepPlan,
         input: &ProgramInput,
         effect_sequence: &mut u64,
         statement: &str,
     ) -> Result<(), HostProblem> {
+        invocation.check()?;
         let dd = operand(statement, &["INFILE", "IFILE"]).ok_or(HostProblem::Malformed)?;
         let mut records = input_dd_records(input, &dd)?;
         if records.is_empty() {
@@ -3999,12 +3472,13 @@ impl BatchService {
 
     fn verify_idcams(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &Job,
         step: &StepPlan,
         effect_sequence: &mut u64,
         dataset: DatasetName,
     ) -> Result<(), HostProblem> {
+        invocation.check()?;
         let DatasetResult::Description(description) = self.ams_dataset_read(
             invocation,
             effect_sequence,
@@ -4032,13 +3506,14 @@ impl BatchService {
 
     fn define_idcams(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &Job,
         step: &StepPlan,
         command: &str,
         statement: &str,
         effect_sequence: &mut u64,
     ) -> Result<(), HostProblem> {
+        invocation.check()?;
         let sequence = next_effect_sequence(invocation, effect_sequence)?;
         let key = effect_key(job, step, sequence)?;
         let request = if command == "define-alias" {
@@ -4229,12 +3704,12 @@ impl BatchService {
         };
         let result = self.invoke_host(
             invocation,
-            invocation.deadline_tick.saturating_sub(1),
+            invocation.original().deadline_tick.saturating_sub(1),
             false,
             EffectRequest {
-                run_unit: invocation.run_unit_id.clone(),
+                run_unit: invocation.original().run_unit_id.clone(),
                 sequence,
-                deadline_tick: invocation.deadline_tick,
+                deadline_tick: invocation.original().deadline_tick,
                 idempotency_key: Some(key),
                 request: HostRequest::Dataset(request),
             },
@@ -4247,16 +3722,17 @@ impl BatchService {
 
     fn allocate_dds(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &mut Job,
         step: &StepPlan,
         plans: &[DdAllocationPlan],
         effect_sequence: &mut u64,
     ) -> Result<Vec<DdRuntimeAllocation>, HostProblem> {
+        invocation.check()?;
         if plans.len() != step.dds.len() {
             return Err(HostProblem::InfrastructureFailure);
         }
-        let lock_owner = invocation.principal.id().clone();
+        let lock_owner = invocation.original().principal.id().clone();
         let mut allocations = Vec::new();
         let mut actual_dispositions = Vec::new();
         let mut lock_modes = BTreeMap::<String, DatasetLockMode>::new();
@@ -4328,12 +3804,12 @@ impl BatchService {
                             };
                         let result = self.invoke_host(
                             invocation,
-                            invocation.deadline_tick.saturating_sub(1),
+                            invocation.original().deadline_tick.saturating_sub(1),
                             false,
                             EffectRequest {
-                                run_unit: invocation.run_unit_id.clone(),
+                                run_unit: invocation.original().run_unit_id.clone(),
                                 sequence,
-                                deadline_tick: invocation.deadline_tick,
+                                deadline_tick: invocation.original().deadline_tick,
                                 idempotency_key,
                                 request: HostRequest::Dataset(request),
                             },
@@ -4410,12 +3886,12 @@ impl BatchService {
                 let key = effect_key(job, step, sequence)?;
                 let result = self.invoke_host(
                     invocation,
-                    invocation.deadline_tick.saturating_sub(1),
+                    invocation.original().deadline_tick.saturating_sub(1),
                     false,
                     EffectRequest {
-                        run_unit: invocation.run_unit_id.clone(),
+                        run_unit: invocation.original().run_unit_id.clone(),
                         sequence,
-                        deadline_tick: invocation.deadline_tick,
+                        deadline_tick: invocation.original().deadline_tick,
                         idempotency_key: Some(key.clone()),
                         request: HostRequest::Dataset(DatasetRequest::AcquireLock {
                             dataset: DatasetName::new(&dataset, 128)
@@ -4424,7 +3900,11 @@ impl BatchService {
                             owner: lock_owner.clone(),
                             mode,
                             now_tick: sequence,
-                            lease_ticks: invocation.deadline_tick.saturating_sub(sequence).max(1),
+                            lease_ticks: invocation
+                                .original()
+                                .deadline_tick
+                                .saturating_sub(sequence)
+                                .max(1),
                             transaction: Some(job.id.clone()),
                             mutation: Mutation {
                                 sequence,
@@ -4484,12 +3964,12 @@ impl BatchService {
                     definition.lifecycle.state = DatasetLifecycleState::Allocated;
                     let result = self.invoke_host(
                         invocation,
-                        invocation.deadline_tick.saturating_sub(1),
+                        invocation.original().deadline_tick.saturating_sub(1),
                         false,
                         EffectRequest {
-                            run_unit: invocation.run_unit_id.clone(),
+                            run_unit: invocation.original().run_unit_id.clone(),
                             sequence,
-                            deadline_tick: invocation.deadline_tick,
+                            deadline_tick: invocation.original().deadline_tick,
                             idempotency_key: Some(key.clone()),
                             request: HostRequest::Dataset(DatasetRequest::Define {
                                 dataset: allocation.dataset.clone(),
@@ -4532,19 +4012,20 @@ impl BatchService {
 
     fn read_dataset_records(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         allocation: &DdRuntimeAllocation,
         effect_sequence: &mut u64,
     ) -> Result<Vec<Vec<u8>>, HostProblem> {
+        invocation.check()?;
         let sequence = next_effect_sequence(invocation, effect_sequence)?;
         let result = self.invoke_host(
             invocation,
-            invocation.deadline_tick.saturating_sub(1),
+            invocation.original().deadline_tick.saturating_sub(1),
             false,
             EffectRequest {
-                run_unit: invocation.run_unit_id.clone(),
+                run_unit: invocation.original().run_unit_id.clone(),
                 sequence,
-                deadline_tick: invocation.deadline_tick,
+                deadline_tick: invocation.original().deadline_tick,
                 idempotency_key: None,
                 request: HostRequest::Dataset(DatasetRequest::Read {
                     dataset: allocation.dataset.clone(),
@@ -4563,12 +4044,13 @@ impl BatchService {
 
     fn hydrate_dds(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &Job,
         allocations: &[DdRuntimeAllocation],
         dds: &mut [crate::DdPlan],
         effect_sequence: &mut u64,
     ) -> Result<BTreeMap<String, Vec<Vec<u8>>>, HostProblem> {
+        invocation.check()?;
         let _ = job;
         let mut hydrated = BTreeMap::<String, Vec<Vec<u8>>>::new();
         let mut start = 0usize;
@@ -4610,12 +4092,12 @@ impl BatchService {
                 let sequence = next_effect_sequence(invocation, effect_sequence)?;
                 let result = self.invoke_host(
                     invocation,
-                    invocation.deadline_tick.saturating_sub(1),
+                    invocation.original().deadline_tick.saturating_sub(1),
                     false,
                     EffectRequest {
-                        run_unit: invocation.run_unit_id.clone(),
+                        run_unit: invocation.original().run_unit_id.clone(),
                         sequence,
-                        deadline_tick: invocation.deadline_tick,
+                        deadline_tick: invocation.original().deadline_tick,
                         idempotency_key: None,
                         request: HostRequest::Dataset(DatasetRequest::ReadConcatenation {
                             datasets: group_allocations
@@ -4675,7 +4157,7 @@ impl BatchService {
 
     fn write_dd_outputs(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &mut Job,
         step: &StepPlan,
         dataset_resolutions: &BTreeMap<String, String>,
@@ -4683,6 +4165,7 @@ impl BatchService {
         outputs: &BTreeMap<String, Vec<Vec<u8>>>,
         effect_sequence: &mut u64,
     ) -> Result<(), HostProblem> {
+        invocation.check()?;
         for (name, records) in outputs {
             let (ordinal, dd) = step
                 .dds
@@ -4771,12 +4254,12 @@ impl BatchService {
             let attribute_sequence = next_effect_sequence(invocation, effect_sequence)?;
             let attributes = self.invoke_host(
                 invocation,
-                invocation.deadline_tick.saturating_sub(1),
+                invocation.original().deadline_tick.saturating_sub(1),
                 false,
                 EffectRequest {
-                    run_unit: invocation.run_unit_id.clone(),
+                    run_unit: invocation.original().run_unit_id.clone(),
                     sequence: attribute_sequence,
-                    deadline_tick: invocation.deadline_tick,
+                    deadline_tick: invocation.original().deadline_tick,
                     idempotency_key: None,
                     request: HostRequest::Dataset(DatasetRequest::Attributes {
                         dataset: allocation.dataset.clone(),
@@ -4798,12 +4281,12 @@ impl BatchService {
                     let key = effect_key(job, step, sequence)?;
                     let result = self.invoke_host(
                         invocation,
-                        invocation.deadline_tick.saturating_sub(1),
+                        invocation.original().deadline_tick.saturating_sub(1),
                         false,
                         EffectRequest {
-                            run_unit: invocation.run_unit_id.clone(),
+                            run_unit: invocation.original().run_unit_id.clone(),
                             sequence,
-                            deadline_tick: invocation.deadline_tick,
+                            deadline_tick: invocation.original().deadline_tick,
                             idempotency_key: Some(key.clone()),
                             request: HostRequest::Dataset(DatasetRequest::WriteRelative {
                                 dataset: allocation.dataset.clone(),
@@ -4857,12 +4340,12 @@ impl BatchService {
             };
             let result = self.invoke_host(
                 invocation,
-                invocation.deadline_tick.saturating_sub(1),
+                invocation.original().deadline_tick.saturating_sub(1),
                 false,
                 EffectRequest {
-                    run_unit: invocation.run_unit_id.clone(),
+                    run_unit: invocation.original().run_unit_id.clone(),
                     sequence,
-                    deadline_tick: invocation.deadline_tick,
+                    deadline_tick: invocation.original().deadline_tick,
                     idempotency_key: Some(key.clone()),
                     request: HostRequest::Dataset(request),
                 },
@@ -4879,13 +4362,14 @@ impl BatchService {
 
     fn dispose_dds(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &mut Job,
         step: &StepPlan,
         allocations: &[DdRuntimeAllocation],
         effect_sequence: &mut u64,
         abnormal: bool,
     ) -> Result<(), HostProblem> {
+        invocation.check()?;
         let mut first_problem = None;
         let mut disposed = BTreeMap::<String, ()>::new();
         let mut deleted_datasets = BTreeMap::<String, ()>::new();
@@ -4941,12 +4425,12 @@ impl BatchService {
             };
             let outcome = self.invoke_host(
                 invocation,
-                invocation.deadline_tick.saturating_sub(1),
+                invocation.original().deadline_tick.saturating_sub(1),
                 false,
                 EffectRequest {
-                    run_unit: invocation.run_unit_id.clone(),
+                    run_unit: invocation.original().run_unit_id.clone(),
                     sequence,
-                    deadline_tick: invocation.deadline_tick,
+                    deadline_tick: invocation.original().deadline_tick,
                     idempotency_key: Some(key),
                     request: HostRequest::Dataset(request),
                 },
@@ -4976,12 +4460,12 @@ impl BatchService {
             let key = effect_key(job, step, sequence)?;
             let result = self.invoke_host(
                 invocation,
-                invocation.deadline_tick.saturating_sub(1),
+                invocation.original().deadline_tick.saturating_sub(1),
                 false,
                 EffectRequest {
-                    run_unit: invocation.run_unit_id.clone(),
+                    run_unit: invocation.original().run_unit_id.clone(),
                     sequence,
-                    deadline_tick: invocation.deadline_tick,
+                    deadline_tick: invocation.original().deadline_tick,
                     idempotency_key: Some(key.clone()),
                     request: HostRequest::Dataset(DatasetRequest::ReleaseLock {
                         dataset: allocation.dataset.clone(),
@@ -5396,7 +4880,12 @@ impl BatchService {
         Ok(())
     }
 
-    fn ensure_spool_migrated(&self, invocation: &Invocation, id: &str) -> Result<(), HostProblem> {
+    fn ensure_spool_migrated(
+        &self,
+        invocation: &(impl RunInput + ?Sized),
+        id: &str,
+    ) -> Result<(), HostProblem> {
+        invocation.check()?;
         let mut state = self.lock()?;
         let current = state.jobs.get(id).cloned().ok_or(HostProblem::NotFound)?;
         if current.spool.is_empty() {
@@ -5423,12 +4912,13 @@ impl BatchService {
 
     fn read_spool_files(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         job: &Job,
         files: &[String],
         start: usize,
         max: usize,
     ) -> Result<(Vec<Vec<u8>>, bool), HostProblem> {
+        invocation.check()?;
         let total_records = files.iter().try_fold(0usize, |total, file| {
             let descriptor = job
                 .spool_files
@@ -5467,12 +4957,12 @@ impl BatchService {
             )?;
             let result = self.invoke_host(
                 invocation,
-                invocation.deadline_tick.saturating_sub(1),
+                invocation.original().deadline_tick.saturating_sub(1),
                 false,
                 EffectRequest {
-                    run_unit: invocation.run_unit_id.clone(),
+                    run_unit: invocation.original().run_unit_id.clone(),
                     sequence: sequence.saturating_add(1),
-                    deadline_tick: invocation.deadline_tick,
+                    deadline_tick: invocation.original().deadline_tick,
                     idempotency_key: None,
                     request: HostRequest::Spool(SpoolRequest::Read {
                         job: JobName::new(&job.id, 128).map_err(|_| HostProblem::Malformed)?,
@@ -5499,7 +4989,7 @@ impl BatchService {
     #[allow(clippy::too_many_arguments)]
     fn transition_output(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         id: &str,
         output_id: &str,
         from: &[JesOutputState],
@@ -5507,6 +4997,7 @@ impl BatchService {
         spool_state: JesSpoolState,
         event: &str,
     ) -> Result<JesOutputGroup, HostProblem> {
+        invocation.check()?;
         let mut state = self.lock()?;
         let current = state.jobs.get(id).cloned().ok_or(HostProblem::NotFound)?;
         let current_group = current
@@ -5561,12 +5052,13 @@ impl BatchService {
 
     fn transition(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         id: &str,
         from: JobState,
         to: JobState,
         event: &str,
     ) -> Result<JobSnapshot, HostProblem> {
+        invocation.check()?;
         let mut state = self.lock()?;
         let current = state.jobs.get(id).cloned().ok_or(HostProblem::NotFound)?;
         if current.state != from {
@@ -5592,11 +5084,12 @@ impl BatchService {
 
     fn mutate_queued_job(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         id: &str,
         event: &str,
         mutation: impl FnOnce(&mut Job) -> Result<(), HostProblem>,
     ) -> Result<JobSnapshot, HostProblem> {
+        invocation.check()?;
         let mut state = self.lock()?;
         let current = state.jobs.get(id).cloned().ok_or(HostProblem::NotFound)?;
         if !matches!(current.state, JobState::Queued | JobState::Held) {
@@ -5625,10 +5118,11 @@ impl BatchService {
 
     fn set_initiator(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         initiator: &str,
         enabled: bool,
     ) -> Result<(), HostProblem> {
+        invocation.check()?;
         validate_jes_name(initiator)?;
         let initiator = initiator.to_ascii_uppercase();
         self.authorize(
@@ -5692,24 +5186,25 @@ impl BatchService {
 
     fn authorize(
         &self,
-        invocation: &Invocation,
+        invocation: &(impl RunInput + ?Sized),
         class: &str,
         resource: &str,
         intent: AccessIntent,
         sequence: u64,
     ) -> Result<(), HostProblem> {
+        invocation.check()?;
         let result = self.invoke_host(
             invocation,
-            invocation.deadline_tick.saturating_sub(1),
+            invocation.original().deadline_tick.saturating_sub(1),
             false,
             EffectRequest {
-                run_unit: invocation.run_unit_id.clone(),
+                run_unit: invocation.original().run_unit_id.clone(),
                 sequence,
-                deadline_tick: invocation.deadline_tick,
+                deadline_tick: invocation.original().deadline_tick,
                 idempotency_key: None,
                 request: HostRequest::Security(SecurityRequest::Authorize {
                     principal: PrincipalId::new(
-                        invocation.principal.id().as_str(),
+                        invocation.original().principal.id().as_str(),
                         InvocationLimits::default(),
                     )
                     .map_err(|_| HostProblem::InfrastructureFailure)?,
@@ -5948,35 +5443,8 @@ fn input_dd_text(input: &ProgramInput, name: &str) -> Result<String, HostProblem
     .map_err(|_| HostProblem::Malformed)
 }
 
-fn tso_run_program(control: &str) -> Result<String, HostProblem> {
-    let upper = control.to_ascii_uppercase();
-    let normalized = upper.trim();
-    let program = normalized
-        .strip_prefix("RUN PROGRAM(")
-        .and_then(|tail| tail.strip_suffix(')'))
-        .ok_or(HostProblem::Unsupported)?;
-    if program.is_empty()
-        || program.len() > 128
-        || !program.bytes().all(|byte| byte.is_ascii_alphanumeric())
-    {
-        Err(HostProblem::Malformed)
-    } else {
-        Ok(program.into())
-    }
-}
-
 fn ims_controller_selector(parameter: &str) -> Result<BatchControllerSelector, HostProblem> {
-    let normalized = parameter
-        .trim()
-        .trim_matches(|character| matches!(character, '\'' | '"' | '(' | ')'));
-    let fields = normalized.split(',').map(str::trim).collect::<Vec<_>>();
-    if fields.len() < 2 || fields.len() > 3 {
-        return Err(HostProblem::Unsupported);
-    }
-    let mode = fields.first().copied().ok_or(HostProblem::Malformed)?;
-    let program = fields.get(1).copied().ok_or(HostProblem::Malformed)?;
-    let qualifier = fields.get(2).copied().filter(|value| !value.is_empty());
-    BatchControllerSelector::ims(mode, program, qualifier)
+    crate::ims_launcher::selector(parameter)
 }
 
 struct SdsfFileControl {
@@ -6031,53 +5499,6 @@ fn parse_sdsf_file_controls(control: &str) -> Result<Vec<SdsfFileControl>, HostP
         Err(HostProblem::Malformed)
     } else {
         Ok(controls)
-    }
-}
-
-fn ams_condition_code(problem: &HostProblem) -> u8 {
-    match problem {
-        HostProblem::NotFound => 8,
-        HostProblem::Condition { response, .. } if *response <= 4 => 4,
-        HostProblem::Condition { response, .. } if *response <= 8 => 8,
-        HostProblem::Condition { response, .. } if *response <= 12 => 12,
-        HostProblem::Unsupported
-        | HostProblem::UnsupportedCapability { .. }
-        | HostProblem::Malformed
-        | HostProblem::Unauthorized
-        | HostProblem::IdempotencyConflict => 12,
-        _ => 16,
-    }
-}
-
-fn abend_code(problem: &HostProblem) -> Option<String> {
-    match problem {
-        HostProblem::Condition { name, .. } => name.strip_prefix("ABEND:").and_then(|code| {
-            (!code.is_empty()
-                && code.len() <= 16
-                && code
-                    .bytes()
-                    .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit()))
-            .then(|| code.to_string())
-        }),
-        _ => None,
-    }
-}
-
-fn problem_category(problem: &HostProblem) -> &'static str {
-    match problem {
-        HostProblem::Malformed => "malformed",
-        HostProblem::Unsupported | HostProblem::UnsupportedCapability { .. } => "unsupported",
-        HostProblem::NotFound => "not-found",
-        HostProblem::Condition { .. } => "condition",
-        HostProblem::Unauthorized => "unauthorized",
-        HostProblem::Cancelled => "cancelled",
-        HostProblem::TimedOut => "timed-out",
-        HostProblem::ResourceExhausted => "resource-exhausted",
-        HostProblem::ProviderFailure => "provider-failure",
-        HostProblem::InfrastructureFailure => "infrastructure-failure",
-        HostProblem::MissingIdempotency => "missing-idempotency",
-        HostProblem::IdempotencyConflict => "idempotency-conflict",
-        HostProblem::UnknownOutcome => "unknown-outcome",
     }
 }
 
@@ -6894,11 +6315,15 @@ fn dataset_resolution_key(dd: &crate::DdPlan, raw: &str) -> String {
     )
 }
 
-fn next_effect_sequence(invocation: &Invocation, sequence: &mut u64) -> Result<u64, HostProblem> {
+fn next_effect_sequence(
+    invocation: &(impl RunInput + ?Sized),
+    sequence: &mut u64,
+) -> Result<u64, HostProblem> {
+    invocation.check()?;
     *sequence = sequence
         .checked_add(1)
         .ok_or(HostProblem::ResourceExhausted)?;
-    if *sequence > invocation.limits.max_effects {
+    if *sequence > invocation.original().limits.max_effects {
         return Err(HostProblem::ResourceExhausted);
     }
     Ok(*sequence)
@@ -6912,12 +6337,16 @@ fn effect_key(job: &Job, step: &StepPlan, sequence: u64) -> Result<IdempotencyKe
     .map_err(|_| HostProblem::ResourceExhausted)
 }
 
-fn next_spool_sequence(invocation: &Invocation, job: &mut Job) -> Result<u64, HostProblem> {
+fn next_spool_sequence(
+    invocation: &(impl RunInput + ?Sized),
+    job: &mut Job,
+) -> Result<u64, HostProblem> {
+    invocation.check()?;
     job.spool_sequence = job
         .spool_sequence
         .checked_add(1)
         .ok_or(HostProblem::ResourceExhausted)?;
-    if job.spool_sequence > invocation.limits.max_effects {
+    if job.spool_sequence > invocation.original().limits.max_effects {
         return Err(HostProblem::ResourceExhausted);
     }
     Ok(job.spool_sequence)
@@ -7174,10 +6603,6 @@ fn ensure_job_event_capacity(
     }
 }
 
-fn next_job_version(version: u64) -> Result<u64, HostProblem> {
-    version.checked_add(1).ok_or(HostProblem::ResourceExhausted)
-}
-
 fn push_job_event(
     job: &mut Job,
     max_events: usize,
@@ -7402,6 +6827,9 @@ fn dcollect_catalog_names(
 
 #[cfg(test)]
 mod tests {
+    mod ims_completion;
+    mod run_stop;
+    mod running_step;
     use super::*;
     use crate::{Program, ProgramOutput, ProgramRouter};
     use mainframe_env_dataset::{DatasetLimits, DatasetService, dataset_providers};
@@ -8008,7 +7436,7 @@ mod tests {
         ))
     }
 
-    fn invocation() -> Invocation {
+    pub(super) fn invocation() -> Invocation {
         let limits = InvocationLimits::default();
         let grants = [
             "host.security.authorize",
@@ -11456,7 +10884,7 @@ mod tests {
         assert!(migrated["spool_files"].get("LEGACY").is_some());
         assert!(migrated["program_registrations"].get("STEP1").is_some());
         let schema: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../conformance/0.8/schemas/jes-durable-job.schema.json"
+            "../../../../conformance/subsystems/jes/schemas/jes-durable-job.schema.json"
         ))
         .unwrap();
         jsonschema::draft202012::options()

@@ -14,3 +14,7 @@ Verify with `cargo test -p mainframe-env-store-api`.
 authority proves readable and writable access and reports every object-count or
 aggregate-byte quota it enforces; readiness requires headroom in each reported
 dimension.
+
+## Documentation
+
+[Documentation portal](../../../docs/README.md) · [Current package map](../../../docs/architecture/PACKAGE-MAP.md) · [Embedding guide](../../../docs/guides/EMBEDDING.md) · [Contribution and verification](../../../CONTRIBUTING.md)

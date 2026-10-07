@@ -3,13 +3,13 @@
 Status: **Proposed**
 Owner: **repository owner**
 Scope: **licensed IBM oracles, customer captures, and IBM-derived material**
-Applies from: **mainframe-env 0.17 licensed-evidence planning, subject to acceptance**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Context
 
 Issue [#260](https://github.com/toreleon/mainframe-env/issues/260) identifies
 licensed differential evidence as a release dependency, including CER-1701 and
-the 0.10–0.17 campaigns. A reproducible harness does not itself establish that
+the cics.system-api–certification.licensed campaigns. A reproducible harness does not itself establish that
 an environment may be used for this project or that its output may be published.
 [ADR-0024](0024-per-assertion-oracle-provenance.md)
 defines per-assertion oracle source classes and credit rules; this decision
@@ -119,6 +119,6 @@ not a legal conclusion. Counsel must resolve:
 
 This proposal adds no oracle credit or approval. Schema changes, provenance
 backfill, source procurement, a dated campaign sourcing decision, CER-1701 and
-release-gate implementation, and updates to 0.10–0.17 exit criteria require
+release-gate implementation, and updates to cics.system-api–certification.licensed exit criteria require
 separate work. It does not resolve #157's federated-runtime licence matrix,
 change language or subsystem semantics, or decide freedom to operate.

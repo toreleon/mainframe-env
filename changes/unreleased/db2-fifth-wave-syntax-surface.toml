@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Expose owned bounded DROP TABLE/VIEW/INDEX/ALIAS and RENAME TABLE/INDEX syntax APIs with public identifier, qualification, location, rejection and resource-bound regressions; binding and execution remain pending."

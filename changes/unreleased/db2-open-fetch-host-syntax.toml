@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add bounded owned Db2 OPEN/static-host and single-row FETCH syntax with optional host lists or SQLDA descriptors, explicit/default orientation and FROM spelling, decoded cursor names, indicators and original-source spans. Binding, cursor state, SQLCA and execution remain pending; partial SQL 0100/0078 syntax grants no official coverage credit."

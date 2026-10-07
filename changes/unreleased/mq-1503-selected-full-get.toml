@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a bounded private original selected full-descriptor MQGET removal profile and source-reviewed live z/OS local BACK counter policy using existing delivery, handles/current unit, resource authorization and atomic audited occurrence publication. Exact descriptors/truncation observations and replay are retained; structured properties, full PUT/context policy, native option admission and installed/public acceptance remain pending."

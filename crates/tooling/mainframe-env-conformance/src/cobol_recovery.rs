@@ -9,14 +9,15 @@ use mainframe_env_ir::CodecLimits;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
-const FIXTURE_BYTES: &[u8] =
-    include_bytes!("../../../../conformance/0.4/cobol/recovery-fixtures.json");
+const FIXTURE_BYTES: &[u8] = include_bytes!(
+    "../../../../conformance/subsystems/cobol/execution/cobol/recovery-fixtures.json"
+);
 const FIXTURE_PREFIX: &str = "cobol.recovery.";
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Catalog {
     schema_version: String,
-    target_version: String,
+    target_subsystem: String,
     fixtures: Vec<Fixture>,
 }
 #[derive(Debug, Deserialize)]
@@ -55,7 +56,7 @@ static RECOVERED: Recovered = Recovered;
 pub fn verify_cobol_recovery_fixtures() -> Result<(), String> {
     let catalog = catalog()?;
     if catalog.schema_version != "mainframe-env.cobol-recovery-fixtures@1"
-        || catalog.target_version != "0.4.0"
+        || catalog.target_subsystem != "cobol.execution"
         || !(5..=512).contains(&catalog.fixtures.len())
     {
         return Err("COBOL recovery fixture denominator drifted".into());

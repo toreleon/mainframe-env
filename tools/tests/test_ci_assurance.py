@@ -20,7 +20,7 @@ class SelectionTests(unittest.TestCase):
             'crates/stores/mainframe-env-store/src/durable.rs': {'store','runtime'},
             'Jenkinsfile': ci.ALL,
             'tools/jenkins/disk_guard.py': ci.ALL,
-            'conformance/0.8/evidence/receipt.json': ci.ALL,
+            'conformance/subsystems/jes/evidence/receipt.json': ci.ALL,
             'docs/contracts/effect-canonical-v1.md': {ci.DOCS},
             'docs/architecture/RUNTIME.md': {ci.DOCS},
         }.items():
@@ -30,12 +30,12 @@ class SelectionTests(unittest.TestCase):
             self.assertEqual(set(ci.obligations([path])), ci.ALL)
     def test_cics_pilot_manifest_review_fixture_observation_and_provider_paths_are_selected(self):
         for path, required in {
-            'conformance/0.9/manifests/cics-file-uow-topics.json': ci.ALL,
-            'conformance/0.9/cics/pilot-rule-review.json': ci.ALL,
-            'conformance/0.9/cics/pilot-fixtures.json': ci.ALL,
-            'conformance/0.9/cobol/move-rule-review.json': ci.ALL,
-            'conformance/0.9/cobol/move-fixture.json': ci.ALL,
-            'conformance/0.9/oracles/cics-licensed-differential.json': ci.ALL,
+            'conformance/subsystems/cics/application/manifests/cics-file-uow-topics.json': ci.ALL,
+            'conformance/subsystems/cics/application/cics/pilot-rule-review.json': ci.ALL,
+            'conformance/subsystems/cics/application/cics/pilot-fixtures.json': ci.ALL,
+            'conformance/subsystems/cics/application/cobol/move-rule-review.json': ci.ALL,
+            'conformance/subsystems/cics/application/cobol/move-fixture.json': ci.ALL,
+            'conformance/subsystems/cics/application/oracles/cics-licensed-differential.json': ci.ALL,
             'crates/tooling/mainframe-env-conformance/src/cics_pilot.rs': {'architecture','evidence','runtime'},
             'crates/tooling/mainframe-env-conformance/src/cobol_move_pilot.rs': {'architecture','evidence','runtime'},
             'crates/tooling/mainframe-env-conformance/src/cics_licensed.rs': {'architecture','evidence','runtime'},
@@ -61,7 +61,7 @@ class SelectionTests(unittest.TestCase):
             with self.assertRaises(ValueError): ci.obligations([path])
     @patch.object(ci,'identity',return_value={'candidate':'a'*40,'tree':'b'*40})
     def test_full_tiers_select_every_obligation(self,_):
-        for event,ref in [('schedule','refs/heads/main'),('manual','refs/heads/main'),('tag','refs/tags/mainframe-env-v0.8.2')]:
+        for event,ref in [('schedule','refs/heads/main'),('manual','refs/heads/main'),('tag','refs/tags/sandbox-checkpoint')]:
             p=ci.make_plan(Path('.'),{},event,ref)
             self.assertTrue(p['full']);self.assertTrue(p['msrv']);self.assertTrue(p['store'])
             self.assertTrue(set(ci.FULL)<=set(p['primary_gates']))
@@ -79,29 +79,16 @@ class SelectionTests(unittest.TestCase):
         self.assertFalse(plan['build'])
         self.assertEqual(plan['primary_gates'],['supply-chain','cargo-deny','license-notices','docs'])
 
-    def test_jenkins_and_offline_release_bundle_enforce_license_distribution(self):
-        jenkins=(ROOT/'Jenkinsfile').read_text()
-        self.assertIn('--gate cargo-deny -- cargo deny check',jenkins)
-        self.assertIn('--gate license-notices -- cargo xtask license-notices --check',jenkins)
-        self.assertIn('--gate supply-chain',jenkins)
-        self.assertIn('--gate msrv',jenkins)
-        self.assertIn('cargo +1.95.0 check --workspace --all-targets --all-features --locked',jenkins)
-        self.assertIn("command -v cargo-deny",jenkins)
-        self.assertIn("mainframe-env-release-ed25519-pkcs8",jenkins)
-        self.assertIn('MAINFRAME_ENV_RELEASE_INVOCATION_ID="${BUILD_URL:',jenkins)
-        for required in [
-            'config/release-attestation-policy.json',
-            'conformance/standards/cyclonedx/1.6/bom-1.6.schema.json.gz.b64',
-            'docs/architecture/RELEASE-BUILDER.md',
-            'docs/contracts/RELEASE-BUILD-V1.md',
-        ]:
-            self.assertIn(required,jenkins)
-        bundle=(ROOT/'tools/package_offline_cargo_bundle.sh').read_text()
-        for required in ['LICENSE','NOTICE','LICENSES/ICU.txt']:
-            self.assertIn(f'"$root/{required}"',bundle)
-        policy=(ROOT/'deny.toml').read_text()
-        self.assertIn('crate = "decnumber-sys@=0.1.6"',policy)
-        self.assertIn('allow = ["ICU"]',policy)
+    def test_jenkins_enforces_dependency_policy_and_current_subsystem_checks(self):
+        jenkins = (ROOT / 'Jenkinsfile').read_text()
+        self.assertIn('--gate cargo-deny -- cargo deny check', jenkins)
+        self.assertIn('--gate license-notices -- cargo xtask license-notices --check', jenkins)
+        self.assertIn('--gate supply-chain', jenkins)
+        self.assertIn('cargo +1.95.0 check --workspace --all-targets --all-features --locked', jenkins)
+        self.assertNotIn('RELEASE_TAG', jenkins)
+        self.assertNotIn('publish_release_assets.py', jenkins)
+        self.assertIn('--gate conformance', jenkins)
+
 
     def test_jenkins_records_discovered_tooling_and_all_postgres_gates(self):
         root = Path(__file__).resolve().parents[2]
@@ -159,10 +146,11 @@ class SelectionTests(unittest.TestCase):
     def test_jenkins_tag_and_timer_select_full_contexts(self):
         tag=ci.jenkins_context(Path('.'),{
             'JENKINS_HOME':'/capped/jenkins-home',
-            'BRANCH_NAME':'mainframe-env-v0.8.2',
+            'BRANCH_NAME':'sandbox-checkpoint',
+            'TAG_NAME':'sandbox-checkpoint',
         })
         self.assertEqual((tag['event'],tag['ref'],tag['provider']),
-                         ('tag','refs/tags/mainframe-env-v0.8.2','jenkins'))
+                         ('tag','refs/tags/sandbox-checkpoint','jenkins'))
         timer=ci.jenkins_context(Path('.'),{
             'JENKINS_URL':'http://127.0.0.1:8080/',
             'BUILD_CAUSE':'TIMERTRIGGER',

@@ -3,7 +3,7 @@
 Status: **Proposed; private codec prerequisite; runtime writers disabled**
 Owner: **Selected execution and CICS task maintainers**
 Scope: **language storage identity, before atomic instance admission and close**
-Applies from: **mainframe-env 0.9.0 development**
+Applies from: **mainframe-env development**
 
 ## Context and decision
 

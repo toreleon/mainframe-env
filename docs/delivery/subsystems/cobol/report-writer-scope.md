@@ -1,13 +1,13 @@
-# COBOL 0.4.0 Report Writer scope decision
+# COBOL cobol.execution Report Writer scope decision
 
 Decision: Report Writer source-language items are outside the frozen Enterprise
-COBOL 6.5 language-row denominator for 0.4.0. They require a separately
+COBOL 6.5 language-row denominator for cobol.execution. They require a separately
 installed Report Writer Precompiler and therefore are not missing native
 Enterprise COBOL statement or data-clause implementations.
 
 ## Authorities
 
-- The pinned 0.3 language inventory is derived from Enterprise COBOL 6.5
+- The pinned cobol.structure language inventory is derived from Enterprise COBOL 6.5
   Language Reference publication `SC27-8713-04`, digest
   `sha256:8b86cbd2d838d8f460dcbe8d1e74d2266799ce1534f4cfdbc08469c36748e85e`.
   It contains no Report Writer `INITIATE`, `GENERATE`, or `TERMINATE` row,
@@ -23,10 +23,10 @@ Enterprise COBOL statement or data-clause implementations.
 
 ## Compatibility boundary
 
-The 0.4 runtime can execute standard Enterprise COBOL emitted or converted by
+The cobol.execution runtime can execute standard Enterprise COBOL emitted or converted by
 an external Report Writer precompiler when that output stays within the pinned
 language rows. Implementing, bundling, or claiming compatibility for the
-precompiler itself is outside 0.4.0 and would require a separately pinned
+precompiler itself is outside cobol.execution and would require a separately pinned
 product receipt, catalog, obligations, and licensed differential campaign.
 
 This decision does not exclude Enterprise COBOL declaratives. The pinned `USE`
@@ -46,7 +46,7 @@ still states that. The original text is left standing as the dated record.
   under "Authorities" was the SC27-8713-04 PDF, pinned at
   `https://www.ibm.com/docs/en/SS6SG3_6.5/pdf/lrmvs.pdf`. That pin is retired.
   The COBOL baseline now pins 622 IBM Documentation topics listed in
-  `conformance/0.2/manifests/cobol-topics.json`, digest
+  `conformance/subsystems/coverage/manifests/cobol-topics.json`, digest
   `sha256:9b0291045414ca38d0e8138c7cc78d7321887a3fad6c27a433efd9e9ca7fd1ad`.
   The inventory it yields is unchanged, and it still contains no Report Writer
   `INITIATE`, `GENERATE` or `TERMINATE` row, `REPORT SECTION`, or

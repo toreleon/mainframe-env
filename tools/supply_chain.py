@@ -33,7 +33,7 @@ MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
 MAX_TREE_FILES = 200_000
 MAX_TREE_BYTES = 4 * 1024 * 1024 * 1024
 CI_PATH_PREFIXES = (".github/workflows/", "tools/")
-CI_PATHS = {"Jenkinsfile", "tools/package_offline_cargo_bundle.sh"}
+CI_PATHS = {"Jenkinsfile"}
 INSTALL_COMMAND = re.compile(
     r"^\s*(?:sudo\s+)?(?:apt(?:-get)?\s+install|apk\s+add|brew\s+install|"
     r"dnf\s+install|yum\s+install|pip(?:3)?\s+install|npm\s+install\s+-g)\b"
@@ -87,7 +87,6 @@ def validate_ci_lock(root: Path) -> dict:
             "rust",
             "tools",
             "tracked_remote_inputs",
-            "offline_bundle",
             "unsupported_local_inputs",
         },
         "CI input lock",
@@ -153,15 +152,6 @@ def validate_ci_lock(root: Path) -> dict:
     require(all(IMAGE.fullmatch(value) is not None for value in remote["container_images"]), "container lock contains a mutable coordinate")
     require(not remote["package_install_commands"], "tracked CI package installation is forbidden")
 
-    offline = lock["offline_bundle"]
-    exact_keys(offline, {"generator", "inputs"}, "offline input lock")
-    safe_relative(offline["generator"], "offline generator")
-    require(isinstance(offline["inputs"], list) and offline["inputs"] == sorted(set(offline["inputs"])), "offline inputs must be sorted and unique")
-    require(offline["generator"] in offline["inputs"], "offline generator is not bound as an input")
-    for relative in offline["inputs"]:
-        safe_relative(relative, "offline input")
-        require((root / relative).is_file(), f"offline input is missing: {relative}")
-
     unsupported = lock["unsupported_local_inputs"]
     require(isinstance(unsupported, list) and unsupported == sorted(set(unsupported)), "unsupported local inputs must be sorted and unique")
     for relative in unsupported:
@@ -221,8 +211,18 @@ def scan_external_inputs(root: Path, tracked: list[str]) -> dict[str, list[str]]
             raise SupplyChainError(f"tracked CI file is missing or too large: {relative}")
         text = path.read_text(encoding="utf-8")
         is_workflow = relative.startswith(".github/workflows/") and relative.endswith((".yml", ".yaml"))
+        stages: set[str] = set()
         for number, line in enumerate(text.splitlines(), 1):
             stripped = line.strip()
+            if path.name.startswith("Dockerfile"):
+                base = re.match(r"FROM\s+(?:--platform=\S+\s+)?(\S+)(?:\s+AS\s+(\S+))?", stripped, re.IGNORECASE)
+                if base:
+                    coordinate = base.group(1)
+                    if coordinate != "scratch" and coordinate.lower() not in stages:
+                        require(IMAGE.fullmatch(coordinate) is not None, f"mutable Docker base at {relative}:{number}: {coordinate}")
+                        images.add(coordinate)
+                    if base.group(2):
+                        stages.add(base.group(2).lower())
             if is_workflow:
                 use = re.match(r"-?\s*uses:\s*['\"]?([^'\"#\s]+)", stripped)
                 if use:
@@ -286,8 +286,6 @@ def check_repository(root: Path = ROOT) -> tuple[dict, dict]:
     launcher = (root / "tools/jenkins/run-local.sh").read_text(encoding="utf-8")
     require("controller/jenkins.war" in launcher and "exec \"$MAINFRAME_ENV_JAVA\" -jar" in launcher, "Jenkins launcher does not use the locked controller")
     require("jenkins-lts" not in launcher, "Jenkins launcher still uses a floating package")
-    bundle = (root / "tools/package_offline_cargo_bundle.sh").read_text(encoding="utf-8")
-    require("record-offline" in bundle and "verify-offline" in bundle, "offline bundle input identity is not recorded and verified")
     return ci_lock, jenkins_lock
 
 
@@ -542,34 +540,6 @@ def executable_identity(name: str, arguments: list[str], executable: str | None 
     return {"version": output.splitlines()[0], "sha256": sha256_file(resolved)}
 
 
-def offline_record(root: Path, vendor: Path) -> dict:
-    ci_lock, jenkins_lock = check_repository(root)
-    inputs = {}
-    for relative in ci_lock["offline_bundle"]["inputs"]:
-        inputs[relative] = sha256_file(root / relative)
-    revision = command_output(["git", "rev-parse", "HEAD"])
-    require(re.fullmatch(r"[0-9a-f]{40}", revision) is not None, "offline source revision is invalid")
-    tools = {
-        "cargo": executable_identity("cargo", ["cargo", "-Vv"]),
-        "git": executable_identity("git", ["git", "--version"]),
-        "python": executable_identity("python", [sys.executable, "--version"], sys.executable),
-        "rustc": executable_identity("rustc", ["rustc", "-Vv"]),
-    }
-    return {
-        "schema_version": "mainframe-env.offline-build-inputs@2",
-        "source_revision": revision,
-        "locked_files": inputs,
-        "vendor": tree_identity(vendor),
-        "tools": tools,
-        "archive_environment": {
-            "implementation": "python-standard-library",
-            "format": "ustar",
-            "compression": "gzip",
-        },
-        "jenkins_controller_version": jenkins_lock["controller"]["version"],
-    }
-
-
 def atomic_json(path: Path, value: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     data = (json.dumps(value, indent=2, sort_keys=True) + "\n").encode("utf-8")
@@ -594,12 +564,6 @@ def parser() -> argparse.ArgumentParser:
     install.add_argument("--home", required=True, type=Path)
     verify = subcommands.add_parser("verify-jenkins")
     verify.add_argument("--home", required=True, type=Path)
-    record = subcommands.add_parser("record-offline")
-    record.add_argument("--vendor", required=True, type=Path)
-    record.add_argument("--output", required=True, type=Path)
-    verify_record = subcommands.add_parser("verify-offline")
-    verify_record.add_argument("--vendor", required=True, type=Path)
-    verify_record.add_argument("--record", required=True, type=Path)
     return value
 
 
@@ -621,15 +585,6 @@ def main(arguments: list[str] | None = None) -> int:
             jenkins_lock = validate_jenkins_lock(ROOT)
             verify_jenkins_home(jenkins_lock, args.home.resolve())
             print(f"jenkins-inputs: pass plugins={len(jenkins_lock['plugins'])}")
-        elif args.command == "record-offline":
-            record = offline_record(ROOT, args.vendor.resolve())
-            atomic_json(args.output.resolve(), record)
-            print(f"offline-inputs: recorded files={record['vendor']['files']} bytes={record['vendor']['bytes']}")
-        elif args.command == "verify-offline":
-            expected = offline_record(ROOT, args.vendor.resolve())
-            actual = load_json(args.record.resolve())
-            require(actual == expected, "offline build input record is stale or incomplete")
-            print(f"offline-inputs: pass files={expected['vendor']['files']} bytes={expected['vendor']['bytes']}")
     except (OSError, KeyError, TypeError, SupplyChainError) as error:
         print(f"supply-chain: {error}", file=sys.stderr)
         return 1

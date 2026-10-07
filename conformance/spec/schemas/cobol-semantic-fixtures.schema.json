@@ -4,10 +4,10 @@
   "title": "mainframe-env COBOL semantic clause conformance fixtures",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "target_version", "fixtures"],
+  "required": ["schema_version", "target_subsystem", "fixtures"],
   "properties": {
     "schema_version": {"const": "mainframe-env.cobol-semantic-fixtures@1"},
-    "target_version": {"const": "0.3.0"},
+    "target_subsystem": {"const": "cobol.structure"},
     "fixtures": {"type": "array", "minItems": 27, "maxItems": 27, "items": {"$ref": "#/$defs/fixture"}}
   },
   "$defs": {

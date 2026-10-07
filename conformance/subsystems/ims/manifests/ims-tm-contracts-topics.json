@@ -1,0 +1,81 @@
+{
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "target_subsystem": "ims.programming",
+  "baseline_id": "ibm-ims-15.6-tm-contracts-2026-09-11",
+  "subsystem": "ims",
+  "product": "SSEPH2_15.6.0",
+  "book_label": "IMS 15.6 TM contracts for mainframe-env 0.14",
+  "book_href": "SSEPH2_15.6.0/com.ibm.ims156.doc.ccg/ims_tm_plan_terminals_msgsched.htm",
+  "snapshot_date": "2026-09-11",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/ims/15.6.0?lang=en",
+  "toc_sha256": "aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "topic_count": 10,
+  "total_bytes": 155700,
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topic_manifest_digest": "dac590371f5b7be6747c7280598ae9db075ea0f7c59473a2fcd8b9c9d8c0cd36",
+  "coverage_credit": 0,
+  "retained_in_repository": false,
+  "topics": [
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gucall.htm",
+      "sha256": "cbd8bd8a4e59418d990c40a3e46458019c504daf529ca45dae036fce51e16edb",
+      "bytes": 14900,
+      "last_modified": "2026-02-09"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gncall.htm",
+      "sha256": "57a3bca4ea20a4e38d3b33e056a154be734e21b06b045785f94510787e83f153",
+      "bytes": 12418,
+      "last_modified": "2026-02-09"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_isrtcalltm.htm",
+      "sha256": "9b0bd68473b41b3614641637776047ba148e2f28d9d5133ec0d78cf931560a31",
+      "bytes": 25001,
+      "last_modified": "2026-02-09"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_purgcall.htm",
+      "sha256": "3b6414156c4c76da888278ff17a1a3d8ed9cedfee1068373f11c46588719e0a6",
+      "bytes": 21798,
+      "last_modified": "2026-02-09"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_chngcall.htm",
+      "sha256": "ec4c7891b7d19dde573319846411c7af40170e90842c3663e59ab85df0999acc",
+      "bytes": 50952,
+      "last_modified": "2026-02-09"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_resultsofmessageiopcb.htm",
+      "sha256": "76fb85f8fb2741324ea42681a80bc2c3b3687341c7f4f32db25d2a227c323d69",
+      "bytes": 3418,
+      "last_modified": "2026-03-24"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.ccg/ims_tm_plan_terminals_msgsched.htm",
+      "sha256": "38a382955cc478134c1345691d29fd1943511032c08418e4f3ca215aafff5a56",
+      "bytes": 16100,
+      "last_modified": "2026-03-17"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_codingconversations.htm",
+      "sha256": "9d429a6ed6e73e1f747b1059c93264761e14bf72cc3ee3aa567d53e1853c84c2",
+      "bytes": 1997,
+      "last_modified": "2026-03-24"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_conversationstate.htm",
+      "sha256": "999cb001b8c66c2623668b3143cf1dd16b7287cbb8655555d776190a26f4fb64",
+      "bytes": 2251,
+      "last_modified": "2026-03-24"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_conversationrecovery.htm",
+      "sha256": "5afd0e6ec7fd527047ff0ecbb30be819cfb11fc9efa894adae232299c9fbc6c3",
+      "bytes": 6865,
+      "last_modified": "2026-03-24"
+    }
+  ]
+}

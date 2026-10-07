@@ -1,9 +1,9 @@
 # ADR-0013: Bounded CICS web-service-control authority
 
-Status: **Proposed for v0.9 development; acceptance gate pending**
+Status: **Proposed for cics.application-api development; acceptance gate pending**
 Owner: **CICS and execution maintainers**
 Scope: **Eight typed web-service-control rows, local service transport, and durable channel state**
-Applies from: **mainframe-env 0.9.0 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 The eight CICS application rows 0107, 0197–0199, and 0259–0262 use owned typed
 MCEP v2 operation and operand identities. New operation tags are 140–147,
@@ -29,4 +29,4 @@ is outside this bounded local service route; the implementation does not claim
 remote transport or licensed IBM equivalence.
 
 The eight exact IBM topic paths and SHA-256 identities are recorded in the
-[0.9.0 status](../delivery/subsystems/cics/application-api-status.md).
+[cics.application-api status](../delivery/subsystems/cics/application-api-status.md).

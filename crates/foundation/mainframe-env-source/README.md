@@ -19,3 +19,7 @@ or unassigned members fail before compiler publication. The legacy
 compatibility source. It validates version, Apache-2.0 license, non-vendor
 origin, exact member bytes, bounds, uniqueness, and ordered materialization;
 it does not supply ABI content itself.
+
+## Documentation
+
+[Documentation portal](../../../docs/README.md) · [Current package map](../../../docs/architecture/PACKAGE-MAP.md) · [Embedding guide](../../../docs/guides/EMBEDDING.md) · [Contribution and verification](../../../CONTRIBUTING.md)

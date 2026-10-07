@@ -1,0 +1,33 @@
+{
+  "schema_version": "mainframe-env.application-package-migration@1",
+  "id": "application-package-v1-to-v2",
+  "target_subsystem": "coverage.foundation",
+  "from_contract": "mainframe-env.application-package@1",
+  "to_contract": "mainframe-env.application-package@2",
+  "strategy": "additive signed envelope with typed subsystem sections",
+  "destructive": false,
+  "old_reader_retained": true,
+  "provider_state_changed": true,
+  "atomicity": {
+    "validate_all_references_before_stage": true,
+    "staged_generation_selectable": false,
+    "ready_and_selection_same_critical_section": true,
+    "same_identity_retry_idempotent": true,
+    "production_trust_authority_injected": true,
+    "production_trust_material_resolved_from_secret_refs": true,
+    "selected_handle_required_for_publication": true,
+    "retained_packages_persisted_and_reverified_on_open": true,
+    "publication_identity_bound_to_expected_generation": true,
+    "publication_sections_recover_from_explicit_durable_states": true,
+    "partial_publication_never_marks_generation_selected": true,
+    "text_bounded_before_normalization_or_owned_allocation": true,
+    "aggregate_and_retained_bytes_bounded_before_clone": true,
+    "aggregate_and_retained_cardinality_bounded_before_clone": true,
+    "conservative_nested_structural_bytes_accounted": true
+  },
+  "rollback": {
+    "supported": true,
+    "method": "recover or select a retained signature-reverified ready generation, replay explicit provider rollback states, or continue reading the accepted v1 package",
+    "partial_generation_selected": false
+  }
+}

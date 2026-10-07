@@ -1,4 +1,4 @@
-use mainframe_env_compiler::{core_mir_catalog, core_mir_profile};
+use mainframe_env_compiler::{COBOL_COMPILER_GENERATION, core_mir_catalog, core_mir_profile};
 use mainframe_env_compiler_api::{
     ARTIFACT_CONTRACT, ArtifactLimits, ArtifactManifest, ArtifactManifestV2, CompileOptions,
     CompileTarget, LEGACY_ARTIFACT_CONTRACT, PublishedArtifact, ValidatedArtifact,
@@ -16,7 +16,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use super::CobolProgram;
 
 pub(crate) const COBOL_REFERENCE_COMPATIBILITY_PROFILE: &str = "mainframe-env.cobol.reference@1";
-const COBOL_COMPILER_GENERATION: &str = concat!("mainframe-env-cobol-", env!("CARGO_PKG_VERSION"));
 
 fn supported_host_interfaces() -> BTreeSet<String> {
     ["mainframe-env.host@1", "mainframe-env.cics@1"]
@@ -180,6 +179,13 @@ pub(super) struct AdmittedProgram {
     pub(super) artifact: ArtifactRef,
     pub(super) executable: ValidatedArtifact,
     pub(super) name: String,
+    pub(super) provenance: AdmittedProgramProvenance,
+    pub(super) metadata: ExecutableArtifactMetadata,
+}
+
+pub(super) enum AdmittedProgramProvenance {
+    Catalog(mainframe_env_store_api::ProviderStateRecord),
+    Selected(mainframe_env_host_api::ProgramLinkSelection),
 }
 
 impl CobolProgram {
@@ -201,6 +207,8 @@ impl CobolProgram {
             artifact: selection.artifact.clone(),
             executable,
             name: program.to_ascii_uppercase(),
+            provenance: AdmittedProgramProvenance::Selected(selection.clone()),
+            metadata: record.executable.ok_or(HostProblem::ProviderFailure)?,
         })
     }
 
@@ -231,7 +239,9 @@ impl CobolProgram {
                 })?,
         };
         let artifact = ArtifactRef::new(
-            String::from_utf8(catalog.payload).map_err(|_| HostProblem::InfrastructureFailure)?,
+            std::str::from_utf8(&catalog.payload)
+                .map_err(|_| HostProblem::InfrastructureFailure)?
+                .to_owned(),
             InvocationLimits::default(),
         )
         .map_err(|_| HostProblem::InfrastructureFailure)?;
@@ -254,6 +264,8 @@ impl CobolProgram {
             artifact,
             executable,
             name,
+            provenance: AdmittedProgramProvenance::Catalog(catalog),
+            metadata: record.executable.ok_or(HostProblem::ProviderFailure)?,
         })
     }
 }

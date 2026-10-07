@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added source-reviewed selected ordinary same-task MQCONN/MQCONNX reuse of the exact prior live connection with WARNING/ALREADY_CONNECTED, preserving logical UOW and queue work through original-intent SAF/audit/CAS/receipt publication and fenced replay; installed public and participant acceptance remain separate."

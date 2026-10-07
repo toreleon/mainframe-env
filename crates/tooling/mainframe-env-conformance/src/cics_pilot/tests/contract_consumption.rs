@@ -28,10 +28,10 @@ use mainframe_env_store_api::{
 
 const ROW: &str = "ibm-cics-ts-6x-2026-08-31:api-commands:0218";
 const COMMAND_CONTRACTS: &str = include_str!(
-    "../../../../../../conformance/0.9/generated/cics-application-command-contracts.json"
+    "../../../../../../conformance/subsystems/cics/application/generated/cics-application-command-contracts.json"
 );
 const PARTICIPANT_FIXTURES: &str = include_str!(
-    "../../../../../../conformance/0.16/fixtures/transaction-participant-compatibility.json"
+    "../../../../../../conformance/subsystems/integration/fixtures/transaction-participant-compatibility.json"
 );
 
 fn row_contract() -> Value {

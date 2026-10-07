@@ -30,7 +30,7 @@ members = [
 resolver = "3"
 
 [workspace.package]
-version = "0.8.3"
+version = "0.1.0"
 edition = "2024"
 rust-version = "1.95"
 license = "Apache-2.0"
@@ -96,3 +96,8 @@ codegen-units = 1
 debug = 0
 incremental = false
 strip = "symbols"
+
+# The published attestation crate ships generated bindings but omits the
+# ../protos inputs used by its release-only generator. Use its shipped bindings.
+[profile.release.package.in_toto_attestation]
+debug-assertions = true

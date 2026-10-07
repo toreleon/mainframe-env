@@ -69,6 +69,7 @@ impl ExecutionCoordinator {
             tick,
             version: exact_suspended_version,
             sequence: last.sequence,
+            native: None,
         };
         journal.record(
             Some(ExecutionState::Completed),

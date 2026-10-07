@@ -58,24 +58,36 @@ const GENERATED_TRANSACTION_PARTICIPANT_V1: TransactionParticipantContract =
         protect_live_checkpoint_audit_replay: true,
         deadline_is_retention_lower_bound: true
     }),
+        preparation_scope: None,
+        preparation_contract_test: None,
+        blocked_obligations: &[],
     },
     TransactionParticipantDescriptor {
         provider_id: "db2",
         status: ParticipantStatus::Pending,
         dependency: "v0.13-owned-participant-binding",
         capabilities: None,
+        preparation_scope: None,
+        preparation_contract_test: None,
+        blocked_obligations: &[],
     },
     TransactionParticipantDescriptor {
         provider_id: "ims",
         status: ParticipantStatus::Pending,
         dependency: "v0.14-owned-participant-binding",
         capabilities: None,
+        preparation_scope: Some("ims-local-database-provider-route"),
+        preparation_contract_test: Some("crates/providers/mainframe-env-ims/tests/participant_contract.rs"),
+        blocked_obligations: &["INT-1601.owner", "INT-1601.modes", "INT-1601.ordering", "INT-1601.fencing", "INT-1601.deadline-cancellation", "INT-1601.security-audit", "INT-1601.retention", "INT-1601.compatibility"],
     },
     TransactionParticipantDescriptor {
         provider_id: "mq",
         status: ParticipantStatus::Pending,
         dependency: "v0.15-owned-participant-binding",
         capabilities: None,
+        preparation_scope: None,
+        preparation_contract_test: None,
+        blocked_obligations: &[],
     }
         ],
     };
