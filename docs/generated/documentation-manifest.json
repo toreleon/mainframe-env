@@ -1606,7 +1606,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cics/system-api-status.md",
       "relative_links": 0,
-      "sha256": "sha256:bbdf3884a27d8aeaa0b508f491a627675589231fa99111e38b5e4cad67482927",
+      "sha256": "sha256:0b6e6de8a823924457fc4a3ca70d783bf026eb77440f4f20078dbb9815b98035",
       "title": "CICS — SPI and FEPI progress",
       "xtask_commands": 0
     },
@@ -2213,8 +2213,8 @@
     {
       "normative": false,
       "path": "docs/runbooks/IBM-DOCS-CACHE.md",
-      "relative_links": 3,
-      "sha256": "sha256:2fead1c836f5ff4460ebae2ccde95d81858efd4a4be820f8f5f7968930907c57",
+      "relative_links": 4,
+      "sha256": "sha256:253a676b0f958348f41739198b3f8051a0f7c7016f50846e27588e522ab35900",
       "title": "IBM documentation cache",
       "xtask_commands": 0
     },

@@ -1,0 +1,38 @@
+{
+  "schema_version": "mainframe-env.ibm-docs-cache-snapshots@1",
+  "repository": "https://github.com/toreleon/mainframe-env-ibm-docs-cache.git",
+  "revision": "d08efcb9849188abd2916aa9e7054eeefc159002",
+  "snapshots": [
+    {
+      "archive": "snapshots/cics-retained-20261007.tar.gz",
+      "bytes": 4631987,
+      "coverage_credit": 0,
+      "id": "cics-retained-20261007",
+      "pins_sha256": "c258efc7adffceadec0f78c044f2f0912b5e372f5884a7a9d132c0e5680a0d67",
+      "scopes": [
+        "cics-application-api-sources-a",
+        "cics-application-api-sources-b",
+        "cics-application-api-sources-c",
+        "cics-bms-map-origin",
+        "cics-cobol-calling-context",
+        "cics-fepi-command-bodies",
+        "cics-fepi-context-candidates",
+        "cics-fepi-retained-context-additions",
+        "cics-file-uow-pilot",
+        "cics-handle-aid",
+        "cics-misc-tail-bridge",
+        "cics-misc-tail-cvda",
+        "cics-program-storage-context",
+        "cics-spi-command-bodies",
+        "cics-task-association",
+        "cics-task-enqueue",
+        "cics-task-scheduling",
+        "ibm-cics-ts-6x-2026-08-31"
+      ],
+      "semantic_authority": false,
+      "sha256": "3e3aab6a966aefbecc0420655b2e5efdc5a95b29b2434c7c9a8d385e1799eb7b",
+      "tocs": 1,
+      "topics": 848
+    }
+  ]
+}

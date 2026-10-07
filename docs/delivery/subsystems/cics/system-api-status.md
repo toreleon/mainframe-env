@@ -91,3 +91,36 @@ checks. Different CLI review checks the final integration resolution. Preserve
 unrelated worktrees and required receipts externally; clean intended Cargo
 targets after build/test/generator sequences. Only a passing synchronized
 candidate is pushed to update draft PR389; no GitHub merge/release/deployment.
+
+
+## Declared cache provisioning ownership
+
+SPI-1001.cache-provisioning adds external snapshot transport for existing pinned
+source bytes; it grants no grammar, runtime, conformance or licensed credit.
+The CLI author owns `conformance/tools/ibm_docs_snapshot.py` and its focused
+Python tests in an isolated worktree from 8c3e91b7400240b45889786ad528f89bbe2f777a.
+Manager owns the bounded snapshot locator, cache runbook, changelog fragment,
+public LFS metadata repository and serial integration. A separate CLI reviewer
+checks the integrated candidate. No IBM refresh, semantic changes, extra
+workers, upstream merge, release or deployment is authorized for this slice.
+Acceptance requires focused corruption/bounds/path/conflict regressions,
+synthetic LFS transport, fresh local snapshot import and shared cache verification, plus applicable
+policy/docs/changelog/format gates. Publication bodies stay outside this code
+repository. Unavailable scopes remain unavailable.
+
+The cache repository is public for metadata and a synthetic transport fixture.
+Redistribution authorization for IBM publication bodies is unavailable; no IBM
+archive is uploaded. The real retained snapshot is tested locally with zero
+execution credit. Developers provision bytes they are authorized to use.
+
+The snapshot importer passed 20 focused synthetic regressions and imported
+849 entries into a fresh external cache; the shared reader verified all 848
+topics and one TOC across 18 registered CICS scopes. Public Git LFS transfer
+was reproduced with a project-created 173-byte archive. These are transport
+checks, with semantic_authority=false and coverage_credit=0. The public
+metadata revision is d08efcb9849188abd2916aa9e7054eeefc159002; the corresponding
+CICS archive remains local-only. Required CICS behavior gates stay pending.
+
+Application review supplements pinned outside the shared registered scopes are
+not included in this snapshot. Existing verified supplement cache entries remain
+required for the architecture/source-review gates.
