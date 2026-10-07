@@ -193,7 +193,14 @@ release records or certification receipts.
 
 The image builds its Rust binaries on the same Debian generation as its runtime,
 pins both base images by digest and Git's source archive by SHA-256, and includes
-Git's corresponding source and the application dependency notices.
+Git's corresponding source and the application dependency notices. The runtime
+uses the pinned Python slim image; Git's shared-library closure comes from the
+pinned Rust builder, with Debian package/source versions in
+`git/RUNTIME-PACKAGES.tsv` and copyright texts in `git/runtime-licenses/`.
+The Git wrapper scopes those libraries to Git processes, preserving HTTPS support
+without replacing Python's runtime libraries. CardDemo's ZIP metadata reader uses
+the builder's `unzip` and bundled libbz2 through a similarly scoped wrapper; their
+copyright notices live in `archive-tools/licenses/`.
 
 ```bash
 docker build -f tools/sandbox/Dockerfile -t mainframe-sandbox:local .
@@ -224,6 +231,56 @@ The frontend's network listener is intended for a private container or VM networ
 with protected ingress. The default native listener remains loopback. Controller
 operations require a secret stored in the instance's mode-0600 connection file;
 browser application routes retain their existing mainframe authentication.
+
+## Size and turnaround
+
+The Docker build mounts only Rust/build inputs into the compiler stage. Controller
+changes reuse the compiled binaries, and Git/reference preparation has its own
+cached stage. An isolated controller-only comment edit rebuilt the image in
+4.32 seconds on the review daemon, with both Rust and Git stages cached; cold
+builds and other daemon/storage configurations will differ. Cargo artifacts are
+cleared after copying binaries and legal notices.
+Git builds without debug symbols, and setup fetches only the pinned CardDemo commit
+without tags; the commit, tree and clean checkout checks remain mandatory.
+
+```mermaid
+flowchart LR
+    rust["Rust sources and locked dependencies"] --> build["Compile once per Rust input change"]
+    build --> binaries["Runtime binaries and notices"]
+    git["Pinned Git source and CardDemo commit"] --> reference["Git, libraries and reference"]
+    python["Python controller changes"] --> image["Slim runtime image"]
+    binaries --> image
+    reference --> image
+    image --> instance["Independent application instance"]
+```
+
+Small compiler operations wait for process completion instead of imposing a fixed
+50 ms sleep. The 30-second deadline, two invocation slots and 2 MiB combined
+stdout/stderr limit still apply, including output written just before exit.
+CardDemo continues to verify its reference and compile the selected programs on
+startup and restart. Persisted compilation caching needs a separate artifact/source
+identity and recovery design; these packaging changes do not bypass those checks.
+
+Measured on Linux x86-64 with the pinned release binaries:
+
+| Measurement | Before | Optimized |
+| --- | ---: | ---: |
+| Local image size (`docker image inspect .Size`, uncompressed) | 1,195,833,565 bytes | 230,273,897 bytes |
+| Small COBOL invocation, median | 50.96 ms | 4.08 ms |
+| Small COBOL invocation, p95 | 51.31 ms | 8.19 ms |
+
+The image is 80.7% smaller. The invocation comparison alternated the previous and
+current controllers around the same release executable and `HELLO.cbl`, with
+three warmups and 30 samples per controller inside a container limited to two
+CPUs and 2 GiB RAM. This measures compiler invocation latency; CardDemo startup
+and Cube VM resume times need separate measurements. Both candidates retained
+the same execution limits.
+
+The optimized image passed all 11 real CardDemo application checks with UID
+10001, a read-only root, no capabilities and 256 PIDs. All 19 MCP tools were
+available through the official client, with real sign-on and populated account
+lookup. The build retains integrity checks, corresponding Git source and legal
+notices.
 
 ## CubeSandbox templates
 

@@ -25,6 +25,27 @@ def install_file(source: Path, destination: Path):
         Path(temporary).unlink(missing_ok=True)
 
 
+def prepare_reference(reference: Path, corpus: Path | None, identity: dict):
+    """Fetch only the pinned commit, then validate reused or newly prepared checkouts."""
+    if not reference.exists():
+        reference.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix=".carddemo-", dir=reference.parent) as temporary:
+            staged = Path(temporary) / "checkout"
+            subprocess.run(["git", "init", "--quiet", str(staged)], check=True)
+            command = ["git", "-C", str(staged)]
+            subprocess.run(command + ["remote", "add", "origin", str(corpus.resolve()) if corpus else identity["repository"]], check=True)
+            subprocess.run(command + ["fetch", "--quiet", "--depth=1", "--no-tags", "origin", identity["commit"]], check=True)
+            subprocess.run(command + ["checkout", "--quiet", "--detach", identity["commit"]], check=True)
+            subprocess.run(command + ["remote", "set-url", "origin", identity["repository"]], check=True)
+            os.replace(staged, reference)
+    command = ["git", "-C", str(reference)]
+    for revision, expected in (("HEAD", identity["commit"]), ("HEAD^{tree}", identity["tree"])):
+        if subprocess.check_output(command + ["rev-parse", revision], text=True).strip() != expected:
+            raise ValueError("reference commit or tree differs from the pinned input")
+    if subprocess.check_output(command + ["status", "--porcelain"], text=True).strip():
+        raise ValueError("reference checkout is dirty")
+
+
 def setup(destination: Path, corpus: Path | None, no_build: bool):
     if destination.is_symlink():
         raise ValueError("bundle destination cannot be a symlink")
@@ -67,11 +88,7 @@ def setup(destination: Path, corpus: Path | None, no_build: bool):
     shutil.copytree(ROOT / "LICENSES", destination / "LICENSES", dirs_exist_ok=True)
     identity = read_json(ROOT / INVENTORY)
     reference = destination / "reference/carddemo"
-    if not reference.exists():
-        reference.parent.mkdir(exist_ok=True)
-        subprocess.run(["git", "clone", "--no-hardlinks", "--no-checkout", str(corpus) if corpus else identity["repository"], str(reference)], check=True)
-        subprocess.run(["git", "-C", str(reference), "remote", "set-url", "origin", identity["repository"]], check=True)
-        subprocess.run(["git", "-C", str(reference), "checkout", "--detach", identity["commit"]], check=True)
+    prepare_reference(reference, corpus, identity)
     subprocess.run([str(bins / "mainframe-sandbox-runtime"), "--help"], check=True, stdout=subprocess.DEVNULL)
     write_json(manifest, {"schema_version": "mainframe-sandbox.bundle@1", "ready": True,
                          "reference_commit": identity["commit"], "binaries": {

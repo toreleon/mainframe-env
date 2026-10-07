@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Reduced sandbox container size with a pinned slim Python base, stripped Git and pinned runtime-library notices and explicit ZIP verification tools; separated Rust build inputs from controller edits, fetched only the pinned CardDemo commit, and removed compiler polling latency while retaining timeout and output limits."

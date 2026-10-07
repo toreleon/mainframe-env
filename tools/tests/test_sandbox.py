@@ -20,6 +20,69 @@ from tools.sandbox.instance import Instance, copy_tree, write_json
 from tools.sandbox.operations import decode_fields, validate, TOOLS
 from tools.sandbox.server import Server
 from tools.sandbox.runtime import Runtime
+from tools.sandbox.setup import prepare_reference
+
+
+class ReferenceSetupTests(unittest.TestCase):
+    def test_fetch_is_shallow_pinned_and_rejects_reused_dirty_or_wrong_checkout(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            corpus = root / "corpus"
+            subprocess.run(["git", "init", "--quiet", str(corpus)], check=True)
+            command = ["git", "-C", str(corpus)]
+            def commit(text):
+                (corpus / "source").write_text(text)
+                subprocess.run(command + ["add", "source"], check=True)
+                subprocess.run(command + ["-c", "user.name=Sandbox test", "-c", "user.email=sandbox@example.invalid",
+                                         "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", text], check=True)
+            commit("pinned")
+            identity = {"repository": "https://example.invalid/reference.git",
+                        "commit": subprocess.check_output(command + ["rev-parse", "HEAD"], text=True).strip(),
+                        "tree": subprocess.check_output(command + ["rev-parse", "HEAD^{tree}"], text=True).strip()}
+            commit("newer upstream")
+            reference = root / "bundle/reference"
+            prepare_reference(reference, corpus, identity)
+            self.assertEqual((reference / "source").read_text(), "pinned")
+            self.assertEqual(subprocess.check_output(["git", "-C", str(reference), "rev-parse", "--is-shallow-repository"], text=True).strip(), "true")
+            prepare_reference(reference, None, identity)
+            (reference / "source").write_text("dirty")
+            with self.assertRaisesRegex(ValueError, "dirty"):
+                prepare_reference(reference, None, identity)
+            subprocess.run(["git", "-C", str(reference), "checkout", "--", "source"], check=True)
+            with self.assertRaisesRegex(ValueError, "commit or tree"):
+                prepare_reference(reference, None, {**identity, "tree": "0" * 40})
+
+
+class CompilerProcessTests(unittest.TestCase):
+    def runtime(self, root, script):
+        instance = Instance(root / "instance", "cobol", None)
+        compiler = root / "compiler"
+        compiler.write_text("#!" + sys.executable + "\n" + script)
+        compiler.chmod(0o700)
+        return Runtime(instance, compiler, root / "runner", None, root / "inventory")
+
+    def test_completed_compiler_stderr_still_counts_toward_output_limit(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            runtime = self.runtime(Path(temporary), 'import sys\nsys.stderr.write("x" * 8192)\nprint(\'{"ok":true}\')\n')
+            with patch("tools.sandbox.runtime.MAX_OUTPUT", 4096):
+                with self.assertRaisesRegex(ValueError, "output limit"):
+                    runtime.compile("run", {"path": "HELLO.cbl"})
+            self.assertEqual(runtime.compilers, set())
+
+    def test_hung_compiler_is_reaped_at_deadline(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            runtime = self.runtime(Path(temporary), "import time\ntime.sleep(10)\n")
+            with patch("tools.sandbox.runtime.COMPILER_TIMEOUT", 0.03):
+                with self.assertRaisesRegex(ValueError, "wall time"):
+                    runtime.compile("run", {"path": "HELLO.cbl"})
+            self.assertEqual(runtime.compilers, set())
+
+    def test_fast_compiler_returns_structured_result_without_polling_sleep(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            runtime = self.runtime(Path(temporary), 'print(\'{"ok":true,"output":"HELLO"}\')\n')
+            result = runtime.compile("run", {"path": "HELLO.cbl"})
+            self.assertEqual(result, {"ok": True, "output": "HELLO"})
+            self.assertEqual(runtime.compilers, set())
 
 
 class WorkspaceBoundaryTests(unittest.TestCase):

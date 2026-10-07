@@ -15,6 +15,7 @@ import time
 from .instance import Instance
 
 MAX_OUTPUT = 2 * 1024 * 1024
+COMPILER_TIMEOUT = 30
 
 
 def stop_process(process: subprocess.Popen) -> None:
@@ -178,13 +179,18 @@ class Runtime:
                                            stdout=output, stderr=errors, start_new_session=True)
                 self.compilers.add(process)
             try:
-                deadline = time.monotonic() + 30
+                deadline = time.monotonic() + COMPILER_TIMEOUT
                 while process.poll() is None:
                     if time.monotonic() >= deadline:
-                        raise ValueError("compiler/execution wall time exceeded 30 seconds")
+                        raise ValueError(f"compiler/execution wall time exceeded {COMPILER_TIMEOUT:g} seconds")
                     if os.fstat(output.fileno()).st_size + os.fstat(errors.fileno()).st_size > MAX_OUTPUT:
                         raise ValueError("compiler/execution output limit exceeded")
-                    time.sleep(0.05)
+                    try:
+                        process.wait(timeout=min(0.05, max(0, deadline - time.monotonic())))
+                    except subprocess.TimeoutExpired:
+                        pass
+                if os.fstat(output.fileno()).st_size + os.fstat(errors.fileno()).st_size > MAX_OUTPUT:
+                    raise ValueError("compiler/execution output limit exceeded")
                 output.seek(0)
                 payload = output.read(MAX_OUTPUT + 1)
                 if len(payload) > MAX_OUTPUT:
