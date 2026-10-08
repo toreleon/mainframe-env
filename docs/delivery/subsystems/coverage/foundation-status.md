@@ -698,3 +698,12 @@ module, formatting, frozen dependency policy and diff checks pass. Tooling-owner
 strict lint passes; retained MQ/dependency-inclusive lint failures are separately
 pending. Missing supplemental cache remains skipped/unavailable with zero credit.
 Broader public and Foundation exit checks remain pending.
+
+### CV-209.journey-closure acceptance
+
+Status: **Complete (bounded closure authority and actual observation transport only)**. The actual corpus loader requires exact committed manifest/matrix bytes, bounded reads and exact distinct requirement closure. Comparison-produced transient observations feed the existing receipt; missing, duplicate, substituted or unobserved requirements refuse. All 51 focused tests pass on the integrated @3 candidate. The reviewed same-function extraction lowers the exact legacy carddemo.rs ratchet from 12,796 to 12,077; new modules stay below 1,200 production lines. Sixteen potential journey tokens exist, while all 105 selected issue acceptances remain unbound. Full CardDemo intentionally refuses incomplete closure; no 20/20, 26/26 or real-workload acceptance is claimed.
+Joint native schemas, application-package metadata, spec, coverage, program registry,
+module, formatting, frozen dependency policy and diff checks pass. Tooling-owner
+strict lint passes; retained MQ/dependency-inclusive lint failures are separately
+pending. Missing supplemental cache remains skipped/unavailable with zero credit.
+Broader public and Foundation exit checks remain pending.
