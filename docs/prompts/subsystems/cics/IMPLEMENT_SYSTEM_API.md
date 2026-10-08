@@ -25,6 +25,31 @@ catalogs, resource lifecycle/topology/condition contracts, and accepted cics.app
 evidence. Verify the cics.application-api command registry, CICS state, SAF, resource, condition,
 effect, and recovery contracts before integration.
 
+## Current preparation and dependency boundary
+
+Read `docs/delivery/subsystems/cics/system-api-status.md` and the current
+application progress before selecting a slice. The integrated private grammar
+covers 266 SPI and 39 FEPI identities; the official denominator remains 269 SPI
+and 39 FEPI. SPI0201 PERFORM SECURITY, SPI0203 PERFORM SSL and SPI0204 PERFORM
+STATISTICS still need reviewed row/body joins. Neither private projections nor
+component tests admit public SPI/FEPI routes; accepted runtime credit remains
+0/269 SPI and 0/39 FEPI.
+
+The application dependency has 260 typed registrations and three unready rows,
+and its frame/storage/lifecycle and affected-backend acceptance remains
+incomplete. Preparation may continue within its declared private boundary;
+public integration requires the actual consumed dependency contracts and
+selected-route gates to pass. A licensed-pending disposition does not waive
+these local requirements.
+
+Use existing matching local cache bytes through offline pinned search/read.
+Missing bodies or TOCs are unavailable, including supplements outside a
+snapshot's registered scopes. Do not refresh sources or change pins without an
+explicit refresh request. The configured private cache storage provides the
+retained TAR at its pinned revision; import and verify its bytes through the
+shared cache runbook. Metadata and a synthetic transport fixture alone cannot
+supply publication bodies. Keep those bodies and execution receipts outside Git.
+
 ## Implement in this order
 
 1. Freeze **SPI-1001** generated SPI/FEPI grammar, options, resource schemas,

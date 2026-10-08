@@ -90,18 +90,17 @@ path and conflict tests cover the tool. Provisioning grants no grammar, runtime,
 conformance or licensed credit. Publication bodies remain outside this repository;
 unavailable scopes remain unavailable.
 
-The cache repository is public for metadata and a synthetic transport fixture.
-Redistribution authorization for IBM publication bodies is unavailable; no IBM
-archive is uploaded. The real retained snapshot is tested locally with zero
-execution credit. Developers provision bytes they are authorized to use.
+The cache repository is now private owner storage at revision
+`058ee688e8d7b6702dd5088d5cfdcb5651d64608`. It provides the canonical
+`cics-retained-20261007.tar.gz` and equivalent inspection ZIP. Both contain the
+same 849 entries; the TAR matches the unchanged committed archive pin. An
+actual LFS download and offline import verify 848 topics and one TOC in the
+current workspace. Cache availability grants no runtime or licensed credit.
+Developers without access provision their own authorized matching bytes.
 
-The original cache producer imported 849 entries and verified 848 topics and
-one TOC across 18 registered CICS scopes. The integration review passed all 20
-focused synthetic snapshot regressions. Public Git LFS transfer was previously
-reproduced with a project-created 173-byte archive. These are scoped transport
-checks, with semantic_authority=false and coverage_credit=0. The public
-metadata revision is d08efcb9849188abd2916aa9e7054eeefc159002; the corresponding
-CICS archive remains local-only. Required CICS behavior gates stay pending.
+The earlier metadata-only revision and synthetic transport checks retain their
+original scope; they no longer describe current storage availability. Source
+provisioning and runtime acceptance remain distinct.
 
 Application review supplements pinned outside the shared registered scopes are
 not included in this snapshot. Existing verified supplement cache entries remain
@@ -112,3 +111,20 @@ The current workspace lacks the application-review body
 unavailable here. Supply authorized matching cache bytes through the
 [cache runbook](../../../runbooks/IBM-DOCS-CACHE.md) before claiming that gate
 passed. No ordinary review refresh or source waiver is implied.
+
+## SPI-1001.cache-storage-binding
+
+Status: **Complete (provisioning metadata only)**. This non-semantic slice updates
+the existing external snapshot storage revision and provisioning instructions after the owner uploads
+the canonical TAR and equivalent inspection ZIP to private Git LFS storage.
+The archive SHA-256, bytes, 18 scope IDs, source pins and zero-credit fields remain
+unchanged. Acceptance is an exact archive/hash/content comparison, shared offline
+import, focused snapshot regression tests, existing source-scope verification,
+documentation/changelog and dependency-policy checks. No publication bytes enter
+this repository and no public runtime or licensed acceptance is claimed.
+
+The archive comparison and offline import pass, with 849 identical TAR/ZIP
+entries and 848 verified topics plus one TOC. All 20 focused snapshot regressions,
+registered SPI/FEPI scope checks, formatting, documentation/subsystem/changelog
+checks, dependency policy and diff review pass. The unchanged source pins retain
+their original identity; no runtime parent is complete from these checks.

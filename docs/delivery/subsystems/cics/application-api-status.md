@@ -20,6 +20,43 @@ historical registry counts below refer to their producing inputs, rather than
 the current registry. Use the [routing authority](../../../architecture/CICS-COMMAND-ROUTING.md)
 and [system API progress](system-api-status.md) for current admission boundaries.
 
+## CIC-901.prompt-current-authority
+
+Parent: CIC-901. Status: **Complete (documentation only)**. This non-semantic
+slice owns the CICS application and system API implementation prompts and the
+routing document's
+current versus historical admission wording. It changes no catalog row,
+mandatory obligation, runtime route, source pin, public ABI or durable schema.
+The consumed base is `e3830278efc8de147f14b0e98da3d759250be782`; existing
+registries, routing contracts and progress records remain authoritative.
+Acceptance is a review of current versus historical instructions, local link
+validation, formatting, documentation/subsystem and changelog checks, dependency
+policy and `git diff --check`. Generated documentation uses its existing owner.
+The scoped review, all 33 local Markdown links and required documentation,
+subsystem, changelog, format, dependency-policy and diff checks pass. The existing
+documentation-manifest merge regressions pass. No runtime or source inputs
+changed; no behavioral, whole-phase or licensed completion is claimed.
+
+The initial CLI worker wave stopped before execution because its account token
+could not be refreshed; its isolated checkouts made no changes. At that point,
+the metadata-only cache revision did not provide the retained CICS archive. The
+manager completed this documentation slice only; those observations retain their
+original candidate and execution scope.
+
+The subsequent continuation restored CLI execution and imported the authorized
+retained TAR from private cache storage at revision
+`058ee688e8d7b6702dd5088d5cfdcb5651d64608`. Its archive bytes match the existing
+snapshot pin; offline verification finds 848 topics and one TOC. This resolves
+the earlier account and CICS snapshot availability failures, not every separately
+pinned review supplement or runtime acceptance requirement. No source refresh
+occurred and no prior receipt is relabeled.
+
+Current implementation proceeds from coverage.foundation in dependency order.
+Licensed and private-only work, and the three unready application rows, are
+outside the user's implementation scope. Their identities and pending gates
+remain unchanged. The previously declared CICS reviews are paused and same-level
+admission remains pending until its prerequisites are verified.
+
 ## Authorized prerequisite completion, 2026-10-02
 
 The SPI/FEPI goal now includes finishing the CICS application API prerequisite
