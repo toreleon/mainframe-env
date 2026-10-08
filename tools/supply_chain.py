@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import base64
 import binascii
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from concurrent.futures import ThreadPoolExecutor
 import errno
 import gzip
@@ -306,10 +306,15 @@ def stream_hash(source, maximum: int) -> tuple[str, bytes, int]:
 
 def verify_profile_file(path: Path, pin: dict) -> dict:
     with checked_input(path, pin) as (source, metadata):
-        digest, integrity, size = stream_hash(source, pin["bytes"])
-        require(digest == pin["sha256"] and size == pin["bytes"], f"profile input digest differs: {path}")
-        if "integrity" in pin:
-            require(integrity == sri_digest(pin["integrity"]), "Zowe archive SRI differs")
+        identity = _verify_profile_source(path, source, metadata, pin)
+    return identity
+
+
+def _verify_profile_source(path: Path, source, metadata: os.stat_result, pin: dict) -> dict:
+    digest, integrity, size = stream_hash(source, pin["bytes"])
+    require(digest == pin["sha256"] and size == pin["bytes"], f"profile input digest differs: {path}")
+    if "integrity" in pin:
+        require(integrity == sri_digest(pin["integrity"]), "Zowe archive SRI differs")
     return {"bytes": size, "sha256": digest, "mode": stat.S_IMODE(metadata.st_mode)}
 
 
@@ -513,6 +518,10 @@ def profile_bindings(values: list[str]) -> dict[str, Path]:
 
 
 def validate_development_inputs(lock: dict, profile_name: str, files: dict[str, Path], tree: Path) -> dict:
+    return _development_input_parts(lock, profile_name, files, tree)[0]
+
+
+def _development_input_parts(lock: dict, profile_name: str, files: dict[str, Path], tree: Path) -> tuple:
     require(profile_name == DEVELOPMENT_PROFILE, "unknown development profile")
     exact_keys(lock.get("development_profiles"), {DEVELOPMENT_PROFILE}, "development profiles")
     profile = lock["development_profiles"][profile_name]
@@ -527,7 +536,90 @@ def validate_development_inputs(lock: dict, profile_name: str, files: dict[str, 
         identities["tree"] = validate_zowe_tree(tree, rows, profile["zowe"])
     except OSError as error:
         raise SupplyChainError(f"development input unavailable: {error}") from error
-    return {"files": dict(files), "tree": tree, "identities": identities}
+    return {"files": dict(files), "tree": tree, "identities": identities}, rows
+
+
+@contextmanager
+def _development_input_command(lock: dict, profile_name: str, files: dict[str, Path],
+                               tree: Path, *, lock_bytes: bytes):
+    """Privately retain one accepted PRE parse for this command's sole POST.
+
+    No proof or row argument is accepted. Fresh bytes authorize POST; retained
+    rows replace only repeated decompression. Descriptors are opened after the
+    child wait and fence both archives through every remaining POST check.
+    """
+    require(type(lock_bytes) is bytes and 0 < len(lock_bytes) <= MAX_JSON_BYTES,
+            "command input proof requires bounded lock bytes")
+    try:
+        decoded = json.loads(lock_bytes, object_pairs_hook=unique_json_object)
+        lock_identity = json.dumps(lock, sort_keys=True, separators=(",", ":"))
+        require(json.dumps(decoded, sort_keys=True, separators=(",", ":")) == lock_identity,
+                "command input proof lock bytes differ")
+    except (UnicodeError, ValueError, TypeError) as error:
+        raise SupplyChainError("invalid command input proof lock") from error
+    bindings = tuple(sorted(files.items()))
+    validated, rows = _development_input_parts(lock, profile_name, files, tree)
+    require(json.dumps(lock, sort_keys=True, separators=(",", ":")) == lock_identity
+            and tuple(sorted(files.items())) == bindings,
+            "command input PRE identities changed before proof mint")
+    # Only immutable scalars survive PRE. None of these rows escapes in the
+    # ordinary validated result, nor can a caller supply replacements at POST.
+    frozen_rows = tuple((name, row["path"], row["bytes"], row["sha256"], row["mode"])
+                        for name, row in rows.items())
+    accepted_tree = tree
+    accepted_profile = profile_name
+    accepted_archive_identities = {role: tuple(sorted(validated["identities"][role].items()))
+                                   for role in ("node-archive", "zowe-archive")}
+    alive = True
+    used = False
+
+    def post(current_lock, current_profile, current_files, current_tree, *, lock_bytes):
+        nonlocal used
+        require(alive and not used, "command input proof expired or consumed")
+        used = True
+        try:
+            def bound():
+                require(current_profile == accepted_profile and current_tree == accepted_tree
+                        and isinstance(current_files, dict) and tuple(sorted(current_files.items())) == bindings,
+                        "command input proof bindings differ")
+                require(type(lock_bytes) is bytes and lock_bytes == raw_lock
+                        and json.dumps(current_lock, sort_keys=True, separators=(",", ":")) == lock_identity,
+                        "command input proof lock differs")
+            bound()
+            profile = json.loads(lock_identity)["development_profiles"][accepted_profile]
+            validate_development_profile(profile)
+            require(sys.platform == "linux" and platform.machine() == "x86_64",
+                    "selected development profile requires Linux x86_64")
+            pins = {"node-archive": profile["node"]["archive"], "node": profile["node"]["binary"],
+                    "zowe-archive": profile["zowe"]["archive"], "bubblewrap": profile["bubblewrap"],
+                    **profile["libraries"]}
+            identities = {}
+            with ExitStack() as fences:
+                # Open both before other roles/tree checks. A later mutation,
+                # capability/mode change or same-byte replacement must fail at
+                # checked_input's final descriptor/path metadata comparison.
+                for role in ("node-archive", "zowe-archive"):
+                    path = current_files[role]
+                    source, metadata = fences.enter_context(checked_input(path, pins[role]))
+                    identities[role] = _verify_profile_source(path, source, metadata, pins[role])
+                    require(tuple(sorted(identities[role].items())) == accepted_archive_identities[role],
+                            "command input proof archive identity differs")
+                for role in sorted(CLIENT_ROLES - {"node-archive", "zowe-archive"}):
+                    identities[role] = verify_profile_file(current_files[role], pins[role])
+                current_rows = {name: {"path": path, "bytes": size, "sha256": digest, "mode": mode}
+                                for name, path, size, digest, mode in frozen_rows}
+                identities["tree"] = validate_zowe_tree(current_tree, current_rows, profile["zowe"])
+                bound()
+            return {"files": dict(current_files), "tree": current_tree, "identities": identities}
+        except OSError as error:
+            raise SupplyChainError(f"development input unavailable: {error}") from error
+
+    raw_lock = lock_bytes
+    try:
+        yield validated, post
+    finally:
+        alive = False
+        frozen_rows = ()
 
 
 def validate_jenkins_lock(root: Path) -> dict:

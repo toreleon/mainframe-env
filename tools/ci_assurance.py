@@ -878,21 +878,35 @@ def public_client_command(root: Path, *, profile_files, profile_tree, run_dir,
     files = supply.profile_bindings(profile_files)
     tree = _public_client_path(profile_tree)
     run = _public_client_run_path(run_dir, source_root, files, tree)
+    proof_context = None
+    postcheck = None
 
     def inputs():
+        nonlocal proof_context, postcheck
         before = _public_client_lock_bytes(source_root)
         lock = supply.validate_ci_lock(source_root)
         if lock['schema_version'] != 'mainframe-env.ci-input-lock@2':
             raise ValueError('public client requires the accepted optional @2 profile')
-        validated = supply.validate_development_inputs(lock, PUBLIC_CLIENT_PROFILE, files, tree)
+        if postcheck is None:
+            context = supply._development_input_command(lock, PUBLIC_CLIENT_PROFILE, files, tree,
+                                                         lock_bytes=before)
+            validated, postcheck = context.__enter__()
+            proof_context = context
+        else:
+            validated = postcheck(lock, PUBLIC_CLIENT_PROFILE, files, tree, lock_bytes=before)
         after = _public_client_lock_bytes(source_root)
         if before != after:
             raise ValueError('public client lock changed during input validation')
         return hashlib.sha256(before).hexdigest(), validated
 
-    lock_hash, validated = inputs()
-    # mkdir is the exclusive allocation boundary; never reuse or delete a leaf.
-    run.mkdir(mode=0o700)
+    try:
+        lock_hash, validated = inputs()
+        # mkdir is the exclusive allocation boundary; never reuse or delete a leaf.
+        run.mkdir(mode=0o700)
+    except BaseException:
+        if proof_context is not None:
+            proof_context.__exit__(None, None, None)
+        raise
     handles = {}
     failures = []
     reaped = False
@@ -941,6 +955,9 @@ def public_client_command(root: Path, *, profile_files, profile_tree, run_dir,
                 raise ValueError('public client lock/input identities changed')
         except BaseException as problem:
             failures.append('public client input postcheck failed: ' + (str(problem) or type(problem).__name__))
+        finally:
+            if proof_context is not None:
+                proof_context.__exit__(None, None, None)
         try:
             _public_client_check_state(run, lock_hash)
         except BaseException as problem:

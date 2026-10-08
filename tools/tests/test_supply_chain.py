@@ -526,5 +526,168 @@ class DevelopmentInputTests(unittest.TestCase):
         self.assertEqual(self.check()["identities"]["tree"]["sha256"], "7e14367156ac13e5f1812bf663fb76b7a6c7e466c1b98293b16e82e92acb8035")
 
 
+class CommandInputValidationTests(unittest.TestCase):
+    def setUp(self):
+        self.fixture = DevelopmentInputTests()
+        self.fixture.setUp()
+        self.addCleanup(self.fixture.doCleanups)
+        self.files = self.fixture.files
+        self.tree = self.fixture.tree
+        self.lock = self.fixture.lock
+        self.raw = json.dumps(self.lock).encode()
+        self.addCleanup(mock.patch.stopall)
+        mock.patch.object(supply_chain.subprocess, 'check_output', side_effect=AssertionError('no execution')).start()
+        mock.patch.object(supply_chain.urllib.request, 'urlopen', side_effect=AssertionError('no network')).start()
+
+    def session(self):
+        return supply_chain._development_input_command(self.lock, PROFILE, self.files, self.tree, lock_bytes=self.raw)
+
+    def post(self, post, **changes):
+        return post(changes.get('lock', self.lock), changes.get('profile', PROFILE),
+                    changes.get('files', self.files), changes.get('tree', self.tree),
+                    lock_bytes=changes.get('raw', self.raw))
+
+    def test_default_still_parses_every_validation_and_session_only_pre(self):
+        with mock.patch.object(supply_chain.tarfile, 'open', wraps=supply_chain.tarfile.open) as opened:
+            self.fixture.check(); self.fixture.check()
+            self.assertEqual(opened.call_count, 4)
+            opened.reset_mock()
+            with self.session() as (before, post):
+                after = self.post(post)
+            self.assertEqual(opened.call_count, 2)
+        self.assertEqual(before, after)
+        self.assertEqual(after['identities']['tree'], {'sha256': TREE_GOLDEN, 'files': 3, 'bytes': 52})
+
+    def test_post_is_single_use_and_context_bound(self):
+        with self.session() as (_, post):
+            self.post(post)
+            with self.assertRaises(supply_chain.SupplyChainError): self.post(post)
+        with self.session() as (_, expired): pass
+        with self.assertRaises(supply_chain.SupplyChainError): self.post(expired)
+        with self.session() as (_, fresh): self.post(fresh)
+
+    def test_pre_lock_and_bindings_cannot_change_before_proof_mint(self):
+        for kind in ('lock', 'binding'):
+            with self.subTest(kind=kind):
+                validator = supply_chain.validate_zowe_tree
+                old = self.files['node']
+                def changed(*args):
+                    result = validator(*args)
+                    if kind == 'lock':
+                        self.lock['unexpected'] = True
+                    else:
+                        path = self.fixture.root / 'new-node'
+                        path.write_bytes(old.read_bytes()); path.chmod(0o755)
+                        self.files['node'] = path
+                    return result
+                try:
+                    with mock.patch.object(supply_chain, 'validate_zowe_tree', side_effect=changed), \
+                            self.assertRaisesRegex(supply_chain.SupplyChainError, 'PRE'):
+                        with self.session(): self.fail('changed PRE minted a proof')
+                finally:
+                    self.lock.pop('unexpected', None)
+                    self.files['node'] = old
+
+    def test_returned_identity_cannot_supply_rows_or_forge_post(self):
+        with self.session() as (before, post):
+            before['identities']['tree'] = {'sha256': '0' * 64, 'files': 1, 'bytes': 0}
+            after = self.post(post)
+            self.assertEqual(after['identities']['tree']['sha256'], TREE_GOLDEN)
+        with self.session() as (_, post):
+            (self.tree / 'package/lib/main.js').write_bytes(b'changed-only\n')
+            with self.assertRaises(supply_chain.SupplyChainError): self.post(post)
+
+    def test_binding_profile_lock_and_raw_lock_rejections(self):
+        for change in ('role', 'tree', 'profile', 'lock', 'raw'):
+            with self.subTest(change=change), self.session() as (_, post):
+                arguments = {}
+                if change == 'role':
+                    path = self.fixture.root / 'other-node'
+                    path.write_bytes(self.files['node'].read_bytes()); path.chmod(0o755)
+                    arguments['files'] = {**self.files, 'node': path}
+                elif change == 'tree': arguments['tree'] = self.fixture.root
+                elif change == 'profile': arguments['profile'] = 'other'
+                elif change == 'raw': arguments['raw'] = self.raw + b' '
+                else:
+                    arguments['lock'] = copy.deepcopy(self.lock)
+                    arguments['lock']['development_profiles'][PROFILE]['node']['version'] = '24.19.1'
+                with self.assertRaises(supply_chain.SupplyChainError): self.post(post, **arguments)
+
+    def test_current_archive_bytes_and_sri_are_read_again(self):
+        for role in ('node-archive', 'zowe-archive'):
+            path = self.files[role]; original = path.read_bytes()
+            with self.subTest(role=role), self.session() as (_, post):
+                path.write_bytes(original[:-1] + bytes([original[-1] ^ 1]))
+                with self.assertRaises(supply_chain.SupplyChainError): self.post(post)
+            path.write_bytes(original)
+        # A wrong digest oracle must remain an independent SRI refusal after
+        # successful PRE; unchanged bytes/sha256 cannot stand in for SHA-512.
+        with self.session() as (_, post):
+            original = supply_chain.stream_hash
+            def wrong_sri(source, maximum):
+                value = original(source, maximum)
+                if os.fstat(source.fileno()).st_ino == self.files['zowe-archive'].stat().st_ino:
+                    return value[0], b'x' * 64, value[2]
+                return value
+            with mock.patch.object(supply_chain, 'stream_hash', side_effect=wrong_sri), \
+                    self.assertRaisesRegex(supply_chain.SupplyChainError, 'SRI'):
+                self.post(post)
+
+    def test_post_tree_membership_manifest_and_role_bytes_are_fresh(self):
+        for kind in ('role', 'extra-directory', 'manifest'):
+            with self.subTest(kind=kind), self.session() as (_, post):
+                if kind == 'role':
+                    path = self.files['libm']; original = path.read_bytes(); path.write_bytes(b'other\n')
+                elif kind == 'manifest':
+                    path = self.tree / 'package/package.json'; original = path.read_bytes(); path.write_bytes(b'{}')
+                else:
+                    path = self.tree / 'extra'; path.mkdir(); original = None
+                with self.assertRaises(supply_chain.SupplyChainError): self.post(post)
+                if original is None: path.rmdir()
+                else: path.write_bytes(original)
+
+    def test_both_archive_fences_survive_post_tree_and_close(self):
+        for role in ('node-archive', 'zowe-archive'):
+            for kind in ('bytes', 'replacement', 'mode'):
+                path = self.files[role]; original = path.read_bytes(); mode = path.stat().st_mode & 0o7777
+                with self.subTest(role=role, kind=kind), self.session() as (_, post):
+                    validator = supply_chain.validate_zowe_tree
+                    def mutate(*args):
+                        result = validator(*args)
+                        if kind == 'bytes': path.write_bytes(original[:-1] + bytes([original[-1] ^ 1]))
+                        elif kind == 'replacement':
+                            replacement = path.with_suffix('.replacement')
+                            replacement.write_bytes(original); replacement.chmod(mode); replacement.replace(path)
+                        else: path.chmod(0o600)
+                        return result
+                    with mock.patch.object(supply_chain, 'validate_zowe_tree', side_effect=mutate), \
+                            self.assertRaisesRegex(supply_chain.SupplyChainError, 'changed during read'):
+                        self.post(post)
+                path.write_bytes(original); path.chmod(mode)
+
+    def test_post_archive_mode_capabilities_and_read_refusal(self):
+        for kind in ('mode', 'caps', 'owner', 'read'):
+            path = self.files['node-archive']; mode = path.stat().st_mode & 0o7777
+            with self.subTest(kind=kind), self.session() as (_, post):
+                if kind == 'mode':
+                    path.chmod(0o777)
+                    with self.assertRaises(supply_chain.SupplyChainError): self.post(post)
+                    path.chmod(mode)
+                elif kind == 'caps':
+                    with mock.patch.object(supply_chain.os, 'getxattr', return_value=b'capability'), \
+                            self.assertRaises(supply_chain.SupplyChainError): self.post(post)
+                elif kind == 'owner':
+                    from types import SimpleNamespace
+                    original = supply_chain.safe_input_mode
+                    def foreign(metadata, context):
+                        original(SimpleNamespace(st_uid=1234567, st_mode=metadata.st_mode), context)
+                    with mock.patch.object(supply_chain, 'safe_input_mode', side_effect=foreign), \
+                            self.assertRaisesRegex(supply_chain.SupplyChainError, 'untrusted'):
+                        self.post(post)
+                else:
+                    with mock.patch.object(supply_chain.os, 'open', side_effect=PermissionError('read refused')), \
+                            self.assertRaises(supply_chain.SupplyChainError): self.post(post)
+
+
 if __name__ == "__main__":
     unittest.main()

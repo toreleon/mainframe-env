@@ -179,6 +179,14 @@ message or nonzero child exit as an authentication/job pass. Raw streams have
 65536-byte individual and 131072-byte combined ceilings; infrastructure
 diagnostics are separately bounded printable ASCII. Rust owns eventual cleanup.
 
+Each action performs full input admission before launch and fresh byte/state
+admission after the actual wait. Its private single-use context reuses only the
+first archive parse's semantic conclusions: POST fully rehashes current archives,
+checks SRI and all role/tree/manifest bytes, and holds both archive state fences
+through completion. Changed inputs refuse. No proof is accepted from CLI or a
+file, and no admission cache survives across commands. Standalone input validation
+still performs the complete archive parses.
+
 Admission requires Linux x86_64, uid/gid 1000, the reviewed supplementary groups
 and zero effective/permitted/ambient capabilities. The launcher mounts accepted
 inputs readonly and owns only its finite writable state. Loopback uses inherited

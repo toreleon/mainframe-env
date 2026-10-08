@@ -1126,6 +1126,15 @@ class PublicClientCommandTests(unittest.TestCase):
         stack.enter_context(patch.object(supply, 'validate_node_archive'))
         stack.enter_context(patch.object(supply, 'zowe_archive_rows', return_value={}))
         stack.enter_context(patch.object(supply, 'validate_zowe_tree', return_value={'sha256': 'b'*64, 'files': 1, 'bytes': 6}))
+        # POST keeps real checked-input contexts open; these existing inert
+        # controls mock only their byte readers, not command/session admission.
+        from contextlib import contextmanager
+        @contextmanager
+        def inert_input(path, pin):
+            yield io.BytesIO(b'inert\n'), Mock(st_mode=0o600)
+        stack.enter_context(patch.object(supply, 'checked_input', side_effect=inert_input))
+        stack.enter_context(patch.object(supply, '_verify_profile_source',
+            side_effect=lambda path, source, metadata, pin: supply.verify_profile_file(path, pin)))
         stack.enter_context(patch.object(ci, '_public_client_identity'))
         def complete(command, root, output, **kwargs):
             self.assertEqual(root, self.run / 'cwd')
@@ -1610,6 +1619,50 @@ class PublicClientAdmissionTests(unittest.TestCase):
     def test_bounded_parent_diagnostic_escapes_controls_and_credentials(self):
         data = ci._public_client_diagnostic('TESTPASS WRONGPASS OTHERPASS\x00\x1b\n\u2603')
         self.assertEqual(data, b'[redacted] [redacted] [redacted]\\x00\\x1b\\n\\u2603\n')
+
+
+class PublicClientValidationCostTests(unittest.TestCase):
+    def setUp(self):
+        source = ROOT / 'tools/tests/test_supply_chain.py'
+        fixture_spec = importlib.util.spec_from_file_location('cost_input_fixtures', source)
+        module = importlib.util.module_from_spec(fixture_spec)
+        fixture_spec.loader.exec_module(module)
+        self.fixture = module.DevelopmentInputTests()
+        self.fixture.setUp()
+        self.addCleanup(self.fixture.doCleanups)
+        self.supply = ci._public_client_supply_chain()
+        self.lock = json.loads((ROOT / self.supply.CI_LOCK_PATH).read_text())
+        self.lock['development_profiles']['public-client-linux-x86_64'] = self.fixture.profile
+        self.lock_bytes = json.dumps(self.lock).encode()
+
+    def command(self, run, launch=None):
+        def complete(command, root, output, **kwargs):
+            kwargs['on_reaped'](0)
+            return 0, None
+        with patch.object(self.supply, 'validate_ci_lock', return_value=self.lock), \
+                patch.object(ci, '_public_client_lock_bytes', return_value=self.lock_bytes), \
+                patch.object(ci, '_public_client_identity'), \
+                patch.object(ci, '_run_owned', side_effect=launch or complete), \
+                patch.object(ci.subprocess, 'Popen', side_effect=AssertionError('no child')):
+            return ci.public_client_command(ROOT,
+                profile_files=[f'{role}={path}' for role, path in self.fixture.files.items()],
+                profile_tree=self.fixture.tree, run_dir=run, action='submit', port='1234', timeout_seconds=1)
+
+    def test_only_pre_streaming_archive_parsers_and_every_action_starts_fresh(self):
+        with patch.object(self.supply.tarfile, 'open', wraps=self.supply.tarfile.open) as opened:
+            for name in ('one', 'two'):
+                self.assertEqual(self.command(self.fixture.root / name), 0)
+        modes = [call.kwargs.get('mode') for call in opened.call_args_list]
+        self.assertEqual(modes, ['r|', 'r|', 'r|', 'r|'])
+
+    def test_real_post_role_bytes_are_not_cached(self):
+        def changed(command, root, output, **kwargs):
+            self.fixture.files['node'].write_bytes(b'other node\n')
+            kwargs['on_reaped'](0)
+            return 0, None
+        run = self.fixture.root / 'changed'
+        self.assertEqual(self.command(run, changed), 1)
+        self.assertIn(b'input postcheck failed', (run / 'supervision-error.txt').read_bytes())
 
 
 class PublicClientSupervisorKeywordTests(unittest.TestCase):

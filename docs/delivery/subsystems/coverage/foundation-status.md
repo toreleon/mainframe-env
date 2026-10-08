@@ -439,38 +439,25 @@ No actual client/server workload or live route/containment/official credit is
 established. Validation-cost and finite fixture gates remain separate pending
 dependencies, with original failed live observations retained.
 
-### CV-209.public-client-validation-cost declaration
+### CV-209.public-client-validation-cost acceptance
 
-The existing native fixture retains an inclusive ten-second allowance failure.
-One separately granted read-only full input validation measures about 6.27
-seconds for the accepted 10,216-file tree; nested stage timings overlap and are
-not a child-only breakdown or a performance acceptance result. Full archive
-decompression/parsing repeats within each action's pre/post admission.
+Status: **Complete (command-local input validation optimization only)**. Full PRE
+admission privately retains immutable archive semantic conclusions for exactly
+one POST. POST still reads and hashes every current archive/role/tree byte,
+requires SRI and exact lock/profile/path identities, and keeps both archive
+descriptor/path fences through all remaining checks. Only redundant POST
+decompression is omitted. Proof mint follows PRE identity rechecks; reuse expires
+with the command. Default validation, input pins, SHA policy and ten/120-second
+allowances are unchanged. There is no persistent or metadata-only admission cache.
 
-Manager grants only `tools/supply_chain.py`, its existing test module,
-`tools/ci_assurance.py`, its existing test module and one isolated fragment.
-Reuse archive semantic conclusions only within the same command's POST, after
-the existing full PRE archive/tree admission has succeeded. A private in-memory
-proof must bind the selected profile, canonical paths, exact lock and parsed
-rows; it cannot come from CLI, a file, an arbitrary row dictionary or another
-command. POST still fully reads and hashes current archives, checks required
-SRI, and revalidates every role, file state, capability, mode, ownership, path,
-tree membership/file bytes and manifest. Changed or unavailable inputs fail.
-Hold both POST archive checked-input descriptors and state fences through all
-POST role/tree/manifest checks; final descriptor/path state must still match.
-No child inherits these proof descriptors or receives admission authority.
-Only redundant POST archive decompression may be omitted. No persistent/global
-cache, metadata-only admission, input/lock/schema change, SHA policy relaxation,
-Rust oracle edit or longer ten/120-second allowance.
-
-Retain the actual cost/allowance failure and independently freeze proof lifecycle,
-rebind/mutation and byte/postcheck refusal controls before production. Do not
-invent an initial failure from a missing helper. Validate the affected supply
-chain and mocked command controls, then one full actual PRE/POST byte-validation
-diagnostic on the changed candidate without a client/server workload. Report
-measured scope honestly; runtime client acceptance still requires its own changed
-input continuation. Manager owns integration, documentation, shared gates and
-sealing after the action-layout dependency. No Cargo, version or source refresh.
+The duplicate-parser observer has a genuine retained failure. Ninety-six affected
+controls pass; the integrated layout/cost candidate passes all 106 combined
+controls. The intermediate PRE-lock mint failure is genuine, while its following
+binding subcase was contaminated and is disqualified as an independent RED.
+One actual byte-only diagnostic measures PRE 5.873 seconds and POST 2.677 seconds,
+with parser opens 2/0 and identical accepted tree/role identities. This is neither
+a workload benchmark nor proof a full client action meets its allowance. Original
+failed live receipts remain unchanged; finite application acceptance is pending.
 
 ### CV-209.cics-bms-input-storage declaration
 
