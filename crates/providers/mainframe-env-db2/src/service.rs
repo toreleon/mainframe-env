@@ -1,3 +1,4 @@
+mod catalog_publication;
 mod cursor;
 
 use cursor::open_cursor;
@@ -332,114 +333,48 @@ impl Db2Service {
         }))
     }
 
+    /// Validate a prospective install using the same current-state checks, without persistence.
+    pub fn validate_catalog_install(
+        &self,
+        catalog: &Db2CatalogGeneration,
+    ) -> Result<(), HostProblem> {
+        catalog.validate(self.limits)?;
+        let durable = self.lock()?;
+        self.prospective_catalog_install(&durable.state, catalog.clone())?;
+        Ok(())
+    }
+
     pub fn install_catalog(&self, catalog: Db2CatalogGeneration) -> Result<(), HostProblem> {
         catalog.validate(self.limits)?;
         let mut durable = self.lock()?;
-        if !durable.state.pending.is_empty() || !durable.state.cursors.is_empty() {
-            return Err(HostProblem::Condition {
-                name: "DB2-CATALOG-BUSY".into(),
-                response: -904,
-                response2: 0,
-            });
+        match self.prospective_catalog_install(&durable.state, catalog)? {
+            Some(next) => self.persist(&mut durable, next),
+            None => Ok(()),
         }
-        let application = catalog.application.to_ascii_uppercase();
-        let generations = durable.state.catalog_generations.get(&application);
-        let retained = generations.and_then(|generations| generations.get(&catalog.generation));
-        let selected = durable.state.installations.get(&application);
-        if retained.is_some_and(|retained| retained.identity != catalog.identity)
-            || selected.is_some_and(|selected| {
-                selected.generation > catalog.generation
-                    || selected.generation == catalog.generation
-                        && selected.identity != catalog.identity
-            })
+    }
+
+    /// Validate retained rollback selection without applying forward-generation rules.
+    pub fn validate_catalog_rollback(
+        &self,
+        application: &str,
+        generation: u64,
+        identity: &str,
+    ) -> Result<(), HostProblem> {
+        let durable = self.lock()?;
+        let next = self.prospective_catalog_rollback(&durable.state, application, generation)?;
+        if next
+            .installations
+            .get(&application.to_ascii_uppercase())
+            .is_none_or(|installed| installed.identity != identity)
         {
             return Err(HostProblem::IdempotencyConflict);
         }
-        if selected.is_some_and(|selected| selected.generation == catalog.generation) {
-            return Ok(());
-        }
-        let mut next = durable.state.scoped_snapshot();
-        apply_catalog_generation(&mut next, catalog, self.limits)?;
-        validate_state(&next, self.limits)?;
-        self.persist(&mut durable, next)
+        Ok(())
     }
 
     pub fn rollback_catalog(&self, application: &str, generation: u64) -> Result<(), HostProblem> {
         let mut durable = self.lock()?;
-        if !durable.state.pending.is_empty() || !durable.state.cursors.is_empty() {
-            return Err(HostProblem::Condition {
-                name: "DB2-CATALOG-BUSY".into(),
-                response: -904,
-                response2: 0,
-            });
-        }
-        let application = application.to_ascii_uppercase();
-        let target = durable
-            .state
-            .catalog_generations
-            .get(&application)
-            .and_then(|generations| generations.get(&generation))
-            .cloned()
-            .ok_or(HostProblem::NotFound)?;
-        let mut next = durable.state.scoped_snapshot();
-        snapshot_selected_catalog(&mut next, &application)?;
-        let current_tables = next
-            .installations
-            .get(&application)
-            .map(|installation| installation.tables.clone())
-            .unwrap_or_default();
-        let target_tables = target.schemas.keys().cloned().collect::<BTreeSet<_>>();
-        for name in current_tables.difference(&target_tables) {
-            match next.table_provenance.get(name).cloned() {
-                Some(TableProvenance::Legacy) => {
-                    let legacy = next
-                        .legacy_snapshots
-                        .get(name)
-                        .cloned()
-                        .ok_or(HostProblem::InfrastructureFailure)?;
-                    next.schemas.insert(name.clone(), legacy.schema.clone());
-                    next.tables.insert(name.clone(), legacy.table.clone());
-                }
-                Some(TableProvenance::Application { owner, .. }) if owner == application => {
-                    next.schemas.remove(name);
-                    next.tables.remove(name);
-                    next.table_provenance.remove(name);
-                    next.legacy_snapshots.remove(name);
-                }
-                _ => return Err(HostProblem::InfrastructureFailure),
-            }
-        }
-        for (name, schema) in &target.schemas {
-            next.schemas.insert(name.clone(), schema.clone());
-            if !next.table_provenance.contains_key(name) {
-                let provenance = if next.legacy_snapshots.contains_key(name) {
-                    TableProvenance::Legacy
-                } else {
-                    TableProvenance::Application {
-                        owner: application.clone(),
-                        generation: target.generation,
-                    }
-                };
-                next.table_provenance.insert(name.clone(), provenance);
-            }
-        }
-        for (name, table) in &target.tables {
-            next.tables.insert(name.clone(), table.clone());
-        }
-        next.installations.insert(
-            application,
-            CatalogInstallation {
-                generation: target.generation,
-                identity: target.identity.clone(),
-                tables: target.schemas.keys().cloned().collect(),
-            },
-        );
-        next.catalog_version = next
-            .catalog_version
-            .checked_add(1)
-            .ok_or(HostProblem::ResourceExhausted)?;
-        validate_foreign_keys(&next)?;
-        validate_state(&next, self.limits)?;
+        let next = self.prospective_catalog_rollback(&durable.state, application, generation)?;
         self.persist(&mut durable, next)
     }
 

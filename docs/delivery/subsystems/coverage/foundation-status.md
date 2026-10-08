@@ -1079,3 +1079,107 @@ all-target application/server/conformance/tooling owner lint passes. Module,
 formatting, frozen dependency, metadata and documentation checks pass. No new
 route, backend, replay, marker, official-row or licensed credit is claimed;
 MQ dependency-inclusive lint and Foundation completion remain pending.
+
+### Publication fencing joint-candidate SQLite execution
+
+Manager integrates the reviewed publication fencing slice with the sixteen
+sealed scopes, including current COSE trust, durable-state schema tests and
+server/conformance lint repairs. Three facade budgets ratchet down to measured
+combined counts; no budget increases or exemptions. The original 21 Memory
+controls and 48 exact hooks remain bound to their earlier producing inputs.
+
+Manager grants the publication worker one checkout-local Cargo sequence to
+compile all affected targets, execute the 22 independent fresh-process SQLite
+install/rollback cuts with their original phase/exit/state expectations, and
+run the four IMS applicability families, relocated DTO and borrowed-writer
+controls on this joint candidate. Strict application/batch/server/Db2/IMS owner
+lint, formatting, frozen dependency and diff gates are in scope. Preserve each
+actual child output, exact cut count, source/input hashes and fresh binary
+before cleanup. Refuse setup errors as setup errors; no expected-result or
+private-gate weakening. No repeat unchanged twelve-minute Memory suite, full
+workspace/CardDemo/PostgreSQL, source refresh or licensed campaign. The worker
+may repair owned integration compilation only and must report semantic defects
+for manager review. Manager owns shared metadata/docs/integration/sealing.
+
+### CardDemo transaction comparison binding
+
+Manager accepts the actual fourteen-test initial result: twelve route controls
+pass, and two missing-observation assertions fail only after all corresponding
+real comparisons complete. No source/runtime/provider repair is needed.
+
+Manager grants the same `CV-209.carddemo-transactions` slice comparison-coupled
+production binding of date validation and duplicate condition through the
+existing online receipt owner. Promote only the reviewed selected source/map/
+authority/fixture helpers; retain the full builders and original fourteen
+independent tests, literals, bytes and manifest requirements. Emit each token
+only from the aggregate actual comparison result, never an expected-token loop
+or unconditional success. Ensure every owned production fixture stops/waits
+its server before artifact cleanup, including route/comparison errors. An
+optional external debug export may retain actual screens/traces/raw tuples
+from these synthetic controls; no new product ledger/schema or expected golden.
+Existing authorities and unavailable-source/private gates remain unchanged.
+
+One checkout-local Cargo slot may run the fourteen controls, meaningful
+negative comparison/teardown controls, strict conformance owner lint and
+formatting/frozen dependency/diff checks. Preserve the initial red unchanged,
+record every new source/input hash, actual result and output before exact
+cleanup. This grants no full CardDemo pass, issue closure, durable restart,
+source refresh or semantic runtime/compiler/provider changes. Manager owns
+ratchets, shared status, integration and sealing.
+
+### MQ bounded mechanical layout preparation
+
+Manager declares `CV-209.mq-mechanical-layout` as the bounded public mechanical
+part of the reviewed MQ disposition. Preserve all genuine historical/import/
+initialization/fencing/upgrade/admission responsibilities in production; their
+private or future composition remains pending. Full `CV-209.mq-contract-lint`
+is not complete and must not be sealed as passed. No fake reads, public
+exposure, suppression, behavior activation or test hiding is permitted.
+
+Prepare the reviewed private layout/context, equivalent delegate removal and
+fixture-only convenience patch under the new scoped fragment. Keep original
+byte/ownership/order expectations and every original diagnostic disposition.
+No Cargo is granted while the two active execution slots are occupied. Report
+the precise surviving diagnostic families and actual proposed test selectors;
+manager owns the later build grant, integration, status and seal.
+
+### PostgreSQL retained-artifact parity selection
+
+Manager declares `CV-209.postgres-parity-selection` for the existing parity
+owner's omitted artifact-reader version compatibility control. Add only its
+existing exact ignored test selector alongside the eleven retained controls,
+and require an actual successful minimum of one test per command through the
+current CI recorder. Preserve the disposable PostgreSQL lifecycle, database
+reset, expectations and summary owner. Wiring/syntax acceptance grants no
+PostgreSQL execution pass; all twelve real controls remain required before
+backend acceptance. No new lifecycle manager, storage behavior or schema.
+
+### CV-204.publication-fencing acceptance
+
+Status: **Complete (one-publisher process admission and file-SQLite recovery)**.
+The shared process lock excludes publication while selected synchronous batch
+and IMS dispatch retain their actual read guard. Actual retained selection
+joins the complete publication tuple and applicable signed sections; full
+controller/SQL/IMS plans validate before Prepared or provider writes. The
+borrowed writer is service-created under its real guard, with private fields.
+Existing publication bytes/defaults and trusted absent-IMS compatibility remain
+unchanged. Completed retry and recovery reject contradictory signed IMS states.
+
+The joint sixteen-seal candidate passes twenty-one named unit controls and one
+borrowed-writer compile-fail doc control, plus all twenty-two fresh-process SQLite
+cuts (eleven install, eleven rollback). Process traces show 108 child executions,
+22 actual crash exits, 20 failed-recovery phases, 44 recovery phases and 110
+authenticated JES/spool receipts. The original two final-complete failed-recovery
+skips remain unchanged. Final publication/installer tuples, target table width
+and admitted/refused programs match independent retained expectations. Thirteen
+native durable-state schema controls pass using the exact fresh joint server
+binary; all 399 producing source inputs match root.
+
+Strict all-target application/batch/server/Db2/IMS owner lint, compilation,
+formatting, frozen dependency and diff checks pass. Three facade budgets lower
+to measured combined counts. Package/schema/coverage/module and current docs
+gates pass after correcting three shifted research source locators. Earlier
+21-case Memory/48-hook results and independent failures remain bound to their
+original producers, without replay or relabeling. This does not establish
+cross-process shared-store exclusion, distributed atomicity, snapshot
+authentication, full Foundation, licensed equivalence or private completion.

@@ -3,7 +3,8 @@
 use super::*;
 
 impl ImsService {
-    pub(crate) fn validate_secondary_metadata(
+    /// Check the existing secondary metadata support predicate without I/O or mutation.
+    pub fn validate_secondary_metadata(
         &self,
         metadata: &ImsMetadataCatalog,
     ) -> Result<(), HostProblem> {

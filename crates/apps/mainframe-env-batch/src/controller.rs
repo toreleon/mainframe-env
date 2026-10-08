@@ -237,6 +237,9 @@ pub struct BatchControllerInstallReceipt {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ResolvedBatchController {
+    pub application: String,
+    pub generation: u64,
+    pub identity: String,
     pub name: String,
     pub selector: BatchControllerSelector,
     pub program: BatchControllerProgram,
@@ -392,6 +395,9 @@ impl BatchControllerRegistry {
                     .insert(
                         selector.clone(),
                         ResolvedBatchController {
+                            application: application.clone(),
+                            generation: generation_number,
+                            identity: generation_identity.clone(),
                             name: name.clone(),
                             selector: selector.clone(),
                             program: program.clone(),

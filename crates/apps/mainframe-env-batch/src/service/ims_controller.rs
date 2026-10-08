@@ -12,9 +12,8 @@ impl BatchService {
     ) -> Result<crate::ProgramOutput, HostProblem> {
         invocation.check()?;
         let selector = ims_controller_selector(input.parameter.as_deref().unwrap_or_default())?;
-        let controller = self
-            .resolve_controller(&selector)?
-            .ok_or(HostProblem::Unsupported)?;
+        let (_publication, controller) = self.admit_controller(&selector)?;
+        let controller = controller.ok_or(HostProblem::Unsupported)?;
         if crate::program::control_source_has_data(input, "SYSIN")
             && !matches!(&controller.plan, BatchControllerPlan::ImsPurge { control_dd, .. } if control_dd == "SYSIN")
         {

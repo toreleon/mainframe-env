@@ -6,7 +6,6 @@ use dataset_helpers::{
     dataset_attributes, dataset_mutation, join_records, member_name, records_for_write,
 };
 mod batch_controller;
-use batch_controller::decode_application_batch_controller;
 mod system_providers;
 use system_providers::*;
 mod dataset_input;
@@ -29,15 +28,17 @@ use crate::{ArtifactProfile, DefaultProgramRouter, ServerConfig, default_program
 use axum::http::StatusCode;
 use base64::Engine;
 use mainframe_env_application::{
+    APPLICATION_PUBLICATION_CONTRACT, APPLICATION_PUBLICATION_NAMESPACE,
     ApplicationGenerationRecord, ApplicationInstaller, ApplicationInstallerV2,
-    ApplicationPackageV2, BatchController as ApplicationBatchController, BatchControllerKind,
-    EntryKind, InstallProblem, InstallState, PackageLimits, PackageSignatureVerifier,
-    SelectedApplicationGeneration,
+    ApplicationPackageV2, ApplicationPublicationState,
+    BatchController as ApplicationBatchController, BatchControllerKind, EntryKind, InstallProblem,
+    InstallState, MAX_APPLICATION_PUBLICATION_BYTES, PackageLimits, PackageSignatureVerifier,
+    PublicationAction, PublicationSectionState, SelectedApplicationGeneration,
 };
 use mainframe_env_batch::{
     BATCH_CONTROLLER_REGISTRY_CONTRACT, BatchControllerDefinition, BatchControllerGeneration,
-    BatchControllerInstallReceipt, BatchControllerPlan, BatchControllerProgram,
-    BatchControllerSelector, BatchLimits, BatchService, JclBundle,
+    BatchControllerPlan, BatchControllerProgram, BatchControllerSelector, BatchLimits,
+    BatchPublicationWrite, BatchService, JclBundle,
 };
 use mainframe_env_cics::{
     BmsMapDefinition, CicsReplayClock, CicsService, CicsTerminalExecution, CicsTerminalSnapshot,
@@ -96,7 +97,7 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex, RwLock, RwLockWriteGuard, TryLockError, Weak};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio_rustls::TlsAcceptor;
 use zeroize::Zeroizing;
@@ -203,41 +204,6 @@ pub struct ApplicationPublicationReceipt {
     pub db2_catalog: bool,
     pub ims_metadata: bool,
     pub replayed: bool,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "kebab-case")]
-enum PublicationSectionState {
-    NotApplicable,
-    Pending,
-    Applying,
-    Applied,
-    Failed,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "kebab-case")]
-enum PublicationAction {
-    Install,
-    Rollback,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-struct ApplicationPublicationState {
-    schema_version: String,
-    package: String,
-    generation: u64,
-    identity: String,
-    action: PublicationAction,
-    controllers: PublicationSectionState,
-    db2: PublicationSectionState,
-    #[serde(default = "publication_not_applicable")]
-    ims: PublicationSectionState,
-    complete: bool,
-}
-
-const fn publication_not_applicable() -> PublicationSectionState {
-    PublicationSectionState::NotApplicable
 }
 
 struct DurableApplicationPublication {
@@ -392,6 +358,9 @@ impl SpoolRetentionClock for EnterpriseReplayClock {
     }
 }
 
+/// Composes one publishing server per store. The shared exclusion fences local
+/// selected-controller dispatch; raw writers and cross-process concurrency remain
+/// the trusted embedding's responsibility.
 pub struct ProductServer {
     config: ServerConfig,
     pub(crate) store: Arc<dyn PlatformStore>,
@@ -410,7 +379,7 @@ pub struct ProductServer {
     program: Arc<DefaultProgramRouter>,
     applications: ApplicationInstaller,
     applications_v2: Mutex<DurableApplicationsV2>,
-    application_publication: Mutex<()>,
+    application_publication: Arc<RwLock<()>>,
     job_submission: Mutex<()>,
     online_programs: Mutex<BTreeMap<String, ArtifactRef>>,
     online_transactions: Mutex<BTreeMap<String, String>>,
@@ -478,8 +447,6 @@ impl ArtifactStore for ProductArtifactStore {
 
 const APPLICATION_V2_STATE_NAMESPACE: &str = "application-package-v2";
 const APPLICATION_V2_STATE_KEY: &str = "registry";
-const APPLICATION_PUBLICATION_NAMESPACE: &str = "application-publication-v2";
-const APPLICATION_PUBLICATION_CONTRACT: &str = "mainframe-env.application-publication@1";
 const AUTH_SESSION_NAMESPACE: &str = "auth-session-v2";
 const AUTH_SESSION_INDEX_NAMESPACE: &str = "auth-session-index-v2";
 const AUTH_SESSION_INDEX_KEY: &str = "global";
@@ -731,7 +698,8 @@ impl ProductServer {
         let program_artifacts: Arc<dyn ArtifactStore> = artifacts.clone();
         program.bind_product_runtime(host.clone(), store.clone(), program_artifacts, &cics)?;
         let checkpoint_store: Arc<dyn CheckpointStore> = store.clone();
-        let batch = BatchService::open_with_checkpoint_store(
+        let application_publication = Arc::new(RwLock::new(()));
+        let batch = BatchService::open_with_checkpoint_store_and_publication_exclusion(
             host.clone(),
             provider_store,
             checkpoint_store,
@@ -740,6 +708,7 @@ impl ProductServer {
                 max_active: JES_WORKER_COUNT,
                 ..BatchLimits::default()
             },
+            application_publication.clone(),
         )?;
         let (application_store_version, applications_v2) = match store
             .get_provider_state(APPLICATION_V2_STATE_NAMESPACE, APPLICATION_V2_STATE_KEY)
@@ -856,7 +825,7 @@ impl ProductServer {
                 store_version: application_store_version,
                 verifier: package_trust,
             }),
-            application_publication: Mutex::new(()),
+            application_publication,
             job_submission: Mutex::new(()),
             online_programs: Mutex::new(online_programs),
             online_transactions: Mutex::new(online_transactions),
@@ -1016,6 +985,7 @@ impl ProductServer {
         &self,
         definitions: Vec<BatchProgramDefinition>,
     ) -> Result<BatchInstallReceipt, HostProblem> {
+        let _publication = self.publication_write()?;
         if definitions.is_empty() || definitions.len() > 4096 {
             return Err(HostProblem::Malformed);
         }
@@ -1091,10 +1061,7 @@ impl ProductServer {
         &self,
         package: &ApplicationPackageV2,
     ) -> Result<ApplicationGenerationRecord, HostProblem> {
-        let _publication = self
-            .application_publication
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let _publication = self.publication_write()?;
         let mut durable = self
             .applications_v2
             .lock()
@@ -1125,27 +1092,49 @@ impl ProductServer {
         &self,
         expected: &ApplicationGenerationRecord,
     ) -> Result<ApplicationPublicationReceipt, HostProblem> {
-        let _publication = self
-            .application_publication
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        self.batch.with_publication_write(|writer| {
+            self.publish_application_generation_locked(expected, writer)
+        })
+    }
+
+    fn publish_application_generation_locked(
+        &self,
+        expected: &ApplicationGenerationRecord,
+        writer: &BatchPublicationWrite<'_>,
+    ) -> Result<ApplicationPublicationReceipt, HostProblem> {
         let selected = self.application_generation_v2(expected)?;
+        // A Ready commit retry preserves selection; only explicit retained rollback
+        // can reselect another Ready generation. Refuse before provider publication.
+        if selected.record().state == InstallState::Ready {
+            self.selected_application_v2(expected)?;
+        }
         let package = selected.package().clone();
         let key = package.base.manifest.name.to_ascii_uppercase();
-        let db2_applicable = package
-            .base
-            .manifest
-            .entries
-            .iter()
-            .any(|entry| entry.kind == EntryKind::Data && entry.path == "data/db2/catalog");
         let existing = self
             .store
             .get_provider_state(APPLICATION_PUBLICATION_NAMESPACE, &key)
             .map_err(store_error)?;
+        let completed = existing
+            .as_ref()
+            .map(|row| self.decode_application_publication(row))
+            .transpose()?
+            .is_some_and(|state| {
+                state.action == PublicationAction::Install
+                    && state.matches_complete(
+                        &expected.package,
+                        expected.generation,
+                        &expected.identity,
+                    )
+            });
+        let plan = self.prevalidate_application_publication(
+            &selected,
+            PublicationAction::Install,
+            completed,
+        )?;
+        let db2_applicable = plan.db2.is_some();
         let mut durable = match existing {
             Some(record) => {
-                let state: ApplicationPublicationState = serde_json::from_slice(&record.payload)
-                    .map_err(|_| HostProblem::InfrastructureFailure)?;
+                let state = self.decode_application_publication(&record)?;
                 if state.schema_version != APPLICATION_PUBLICATION_CONTRACT
                     || state.package.to_ascii_uppercase() != key
                 {
@@ -1180,6 +1169,18 @@ impl ProductServer {
             }
         };
         if durable.state.complete {
+            if !durable.state.matches_complete(
+                &expected.package,
+                expected.generation,
+                &expected.identity,
+            ) || db2_applicable && durable.state.db2 != PublicationSectionState::Applied
+                || !package.sections.batch_controllers.is_empty()
+                    && durable.state.controllers != PublicationSectionState::Applied
+                || (package.sections.ims_metadata.is_some() || package.sections.ims_tm.is_some())
+                    && durable.state.ims != PublicationSectionState::Applied
+            {
+                return Err(HostProblem::InfrastructureFailure);
+            }
             self.selected_application_v2(expected)?;
             return Ok(ApplicationPublicationReceipt {
                 package: package.base.manifest.name,
@@ -1197,7 +1198,7 @@ impl ProductServer {
         } else {
             durable.state.controllers = PublicationSectionState::Applying;
             self.persist_application_publication(&mut durable)?;
-            match self.apply_application_batch_controllers(&selected) {
+            match writer.install_controllers(plan.controllers) {
                 Ok(receipt) => {
                     durable.state.controllers = PublicationSectionState::Applied;
                     self.persist_application_publication(&mut durable)?;
@@ -1214,7 +1215,10 @@ impl ProductServer {
         if db2_applicable && durable.state.db2 != PublicationSectionState::Applied {
             durable.state.db2 = PublicationSectionState::Applying;
             self.persist_application_publication(&mut durable)?;
-            if let Err(problem) = self.apply_application_db2_catalog(&selected) {
+            if let Err(problem) = self
+                .db2
+                .install_catalog(plan.db2.ok_or(HostProblem::InfrastructureFailure)?)
+            {
                 durable.state.db2 = PublicationSectionState::Failed;
                 self.persist_application_publication(&mut durable)?;
                 return Err(problem);
@@ -1253,10 +1257,16 @@ impl ProductServer {
         &self,
         expected: &ApplicationGenerationRecord,
     ) -> Result<ApplicationPublicationReceipt, HostProblem> {
-        let _publication = self
-            .application_publication
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        self.batch.with_publication_write(|writer| {
+            self.rollback_application_generation_locked(expected, writer)
+        })
+    }
+
+    fn rollback_application_generation_locked(
+        &self,
+        expected: &ApplicationGenerationRecord,
+        writer: &BatchPublicationWrite<'_>,
+    ) -> Result<ApplicationPublicationReceipt, HostProblem> {
         let selected = self
             .applications_v2
             .lock()
@@ -1270,19 +1280,30 @@ impl ProductServer {
         }
         let package = selected.package().clone();
         let key = package.base.manifest.name.to_ascii_uppercase();
-        let db2_applicable = package
-            .base
-            .manifest
-            .entries
-            .iter()
-            .any(|entry| entry.kind == EntryKind::Data && entry.path == "data/db2/catalog");
         let existing = self
             .store
             .get_provider_state(APPLICATION_PUBLICATION_NAMESPACE, &key)
             .map_err(store_error)?;
+        let completed = existing
+            .as_ref()
+            .map(|row| self.decode_application_publication(row))
+            .transpose()?
+            .is_some_and(|state| {
+                state.action == PublicationAction::Rollback
+                    && state.matches_complete(
+                        &expected.package,
+                        expected.generation,
+                        &expected.identity,
+                    )
+            });
+        let plan = self.prevalidate_application_publication(
+            &selected,
+            PublicationAction::Rollback,
+            completed,
+        )?;
+        let db2_applicable = plan.db2.is_some();
         let mut durable = if let Some(record) = existing {
-            let state: ApplicationPublicationState = serde_json::from_slice(&record.payload)
-                .map_err(|_| HostProblem::InfrastructureFailure)?;
+            let state = self.decode_application_publication(&record)?;
             if state.action == PublicationAction::Rollback
                 && state.generation == expected.generation
                 && state.identity == expected.identity
@@ -1304,6 +1325,18 @@ impl ProductServer {
             }
         };
         if durable.state.complete {
+            if !durable.state.matches_complete(
+                &expected.package,
+                expected.generation,
+                &expected.identity,
+            ) || db2_applicable && durable.state.db2 != PublicationSectionState::Applied
+                || !package.sections.batch_controllers.is_empty()
+                    && durable.state.controllers != PublicationSectionState::Applied
+                || (package.sections.ims_metadata.is_some() || package.sections.ims_tm.is_some())
+                    && durable.state.ims != PublicationSectionState::Applied
+            {
+                return Err(HostProblem::InfrastructureFailure);
+            }
             self.selected_application_v2(expected)?;
             return Ok(ApplicationPublicationReceipt {
                 package: package.base.manifest.name,
@@ -1320,9 +1353,8 @@ impl ProductServer {
         if durable.state.controllers != PublicationSectionState::Applied {
             durable.state.controllers = PublicationSectionState::Applying;
             self.persist_application_publication(&mut durable)?;
-            if let Err(problem) = self
-                .batch
-                .rollback_controllers(&package.base.manifest.name, package.generation)
+            if let Err(problem) =
+                writer.rollback_controllers(&package.base.manifest.name, package.generation)
             {
                 durable.state.controllers = PublicationSectionState::Failed;
                 self.persist_application_publication(&mut durable)?;
@@ -1367,107 +1399,6 @@ impl ProductServer {
             db2_catalog: db2_applicable,
             ims_metadata: package.sections.ims_metadata.is_some(),
             replayed: false,
-        })
-    }
-
-    fn apply_application_batch_controllers(
-        &self,
-        selected: &SelectedApplicationGeneration,
-    ) -> Result<BatchControllerInstallReceipt, HostProblem> {
-        let package = selected.package();
-        let controllers = package
-            .sections
-            .batch_controllers
-            .iter()
-            .map(|controller| decode_application_batch_controller(package, controller))
-            .collect::<Result<Vec<_>, _>>()?;
-        self.batch.install_controllers(BatchControllerGeneration {
-            schema_version: BATCH_CONTROLLER_REGISTRY_CONTRACT.into(),
-            application: package.base.manifest.name.clone(),
-            generation: package.generation,
-            identity: selected.record().identity.clone(),
-            controllers,
-        })
-    }
-
-    fn apply_application_db2_catalog(
-        &self,
-        selected: &SelectedApplicationGeneration,
-    ) -> Result<(), HostProblem> {
-        let package = selected.package();
-        let catalog_entry = package
-            .base
-            .manifest
-            .entries
-            .iter()
-            .find(|entry| entry.kind == EntryKind::Data && entry.path == "data/db2/catalog")
-            .ok_or(HostProblem::Malformed)?;
-        let catalog_blob = package
-            .base
-            .blobs
-            .get(&catalog_entry.sha256)
-            .ok_or(HostProblem::Malformed)?;
-        let tables = decode_table_definitions_bounded(catalog_blob, Db2Limits::default())?;
-        let declared = package
-            .sections
-            .sql_tables
-            .iter()
-            .map(|table| {
-                (
-                    table.name.to_ascii_uppercase(),
-                    table
-                        .columns
-                        .iter()
-                        .map(|column| (column.name.to_ascii_uppercase(), column.nullable))
-                        .collect::<Vec<_>>(),
-                    table
-                        .primary_key
-                        .iter()
-                        .map(|column| column.to_ascii_uppercase())
-                        .collect::<Vec<_>>(),
-                )
-            })
-            .collect::<BTreeSet<_>>();
-        let signed = tables
-            .iter()
-            .map(|table| {
-                (
-                    table.name.to_ascii_uppercase(),
-                    table
-                        .columns
-                        .iter()
-                        .map(|column| (column.name.to_ascii_uppercase(), column.nullable))
-                        .collect::<Vec<_>>(),
-                    table
-                        .primary_key
-                        .iter()
-                        .map(|column| column.to_ascii_uppercase())
-                        .collect::<Vec<_>>(),
-                )
-            })
-            .collect::<BTreeSet<_>>();
-        if declared != signed {
-            return Err(HostProblem::Malformed);
-        }
-        let rows = package
-            .sections
-            .sql_rows
-            .iter()
-            .map(|row| Db2SeedRow {
-                table: row.table.clone(),
-                values: row
-                    .values
-                    .iter()
-                    .map(|(name, value)| (name.clone(), value.as_bytes().to_vec()))
-                    .collect(),
-            })
-            .collect();
-        self.db2.install_catalog(Db2CatalogGeneration {
-            application: package.base.manifest.name.clone(),
-            generation: package.generation,
-            identity: selected.record().identity.clone(),
-            tables,
-            rows,
         })
     }
 
@@ -1585,7 +1516,7 @@ impl ProductServer {
     ) -> Result<(), HostProblem> {
         let payload =
             serde_json::to_vec(&durable.state).map_err(|_| HostProblem::InfrastructureFailure)?;
-        if payload.len() > 64 * 1024 {
+        if payload.len() > MAX_APPLICATION_PUBLICATION_BYTES {
             return Err(HostProblem::ResourceExhausted);
         }
         let version = durable
@@ -1608,16 +1539,23 @@ impl ProductServer {
     }
 
     fn recover_application_publications(&self) -> Result<(), HostProblem> {
+        self.batch
+            .with_publication_write(|writer| self.recover_application_publications_locked(writer))
+    }
+
+    fn recover_application_publications_locked(
+        &self,
+        writer: &BatchPublicationWrite<'_>,
+    ) -> Result<(), HostProblem> {
         for record in self
             .store
             .list_provider_state(APPLICATION_PUBLICATION_NAMESPACE, 1_024)
             .map_err(store_error)?
         {
-            if record.payload.len() > 64 * 1024 {
+            if record.payload.len() > MAX_APPLICATION_PUBLICATION_BYTES {
                 return Err(HostProblem::ResourceExhausted);
             }
-            let state: ApplicationPublicationState = serde_json::from_slice(&record.payload)
-                .map_err(|_| HostProblem::InfrastructureFailure)?;
+            let state = self.decode_application_publication(&record)?;
             if state.schema_version != APPLICATION_PUBLICATION_CONTRACT
                 || state.package.to_ascii_uppercase() != record.key
             {
@@ -1636,14 +1574,32 @@ impl ProductServer {
             if !state.complete {
                 match state.action {
                     PublicationAction::Install => {
-                        self.publish_application_generation(&expected)?;
+                        self.publish_application_generation_locked(&expected, writer)?;
                     }
                     PublicationAction::Rollback => {
-                        self.rollback_application_generation(&expected)?;
+                        self.rollback_application_generation_locked(&expected, writer)?;
                     }
                 }
             } else {
+                if !state.matches_complete(
+                    &expected.package,
+                    expected.generation,
+                    &expected.identity,
+                ) {
+                    return Err(HostProblem::InfrastructureFailure);
+                }
                 let selected = self.selected_application_v2(&expected)?;
+                let plan =
+                    self.prevalidate_application_publication(&selected, state.action, true)?;
+                if plan.db2.is_some() && state.db2 != PublicationSectionState::Applied
+                    || !plan.controllers.controllers.is_empty()
+                        && state.controllers != PublicationSectionState::Applied
+                    || (selected.package().sections.ims_metadata.is_some()
+                        || selected.package().sections.ims_tm.is_some())
+                        && state.ims != PublicationSectionState::Applied
+                {
+                    return Err(HostProblem::InfrastructureFailure);
+                }
                 self.apply_application_ims_metadata(&selected)?;
             }
         }
@@ -5590,6 +5546,8 @@ mod tests {
     use super::*;
     #[path = "ims_package_tests.rs"]
     mod ims_package_tests;
+    #[path = "publication_fencing_tests.rs"]
+    mod publication_fencing_tests;
     #[path = "sequential_layout_admission_tests.rs"]
     mod sequential_layout_admission_tests;
     #[path = "shisam_fixed_admission_tests.rs"]
@@ -10426,8 +10384,12 @@ mod tests {
             .install_application_package_v2(&first_package)
             .unwrap();
         let retained = server.application_generation_v2(&first).unwrap();
+        let plan = server
+            .prevalidate_application_publication(&retained, PublicationAction::Install, false)
+            .unwrap();
         server
-            .apply_application_batch_controllers(&retained)
+            .batch
+            .with_publication_write(|writer| writer.install_controllers(plan.controllers))
             .unwrap();
         store
             .put_provider_state(

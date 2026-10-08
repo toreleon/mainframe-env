@@ -1,5 +1,43 @@
 use super::*;
+use mainframe_env_application::{
+    APPLICATION_PUBLICATION_CONTRACT, APPLICATION_PUBLICATION_NAMESPACE,
+    ApplicationPublicationState, PublicationAction, PublicationSectionState,
+};
 use mainframe_env_host_api::ImsResult;
+
+// This trusted composition fixture publishes no SQL or optional IMS metadata/TM sections.
+// The existing participant owns its generic utility operations; the exact validated
+// controller receipt is explicitly joined to a complete publication record.
+fn install_complete_controller(service: &BatchService, generation: BatchControllerGeneration) {
+    let receipt = service.install_controllers(generation).unwrap();
+    let state = ApplicationPublicationState {
+        schema_version: APPLICATION_PUBLICATION_CONTRACT.into(),
+        package: receipt.application.clone(),
+        generation: receipt.generation,
+        identity: receipt.identity,
+        action: PublicationAction::Install,
+        controllers: PublicationSectionState::Applied,
+        db2: PublicationSectionState::NotApplicable,
+        ims: PublicationSectionState::NotApplicable,
+        complete: true,
+    };
+    let before = service
+        .store
+        .get_provider_state(APPLICATION_PUBLICATION_NAMESPACE, &receipt.application)
+        .unwrap();
+    service
+        .store
+        .put_provider_state(
+            ProviderStateRecord {
+                namespace: APPLICATION_PUBLICATION_NAMESPACE.into(),
+                key: receipt.application,
+                version: before.as_ref().map_or(1, |row| row.version + 1),
+                payload: serde_json::to_vec(&state).unwrap(),
+            },
+            before.as_ref().map(|row| row.version),
+        )
+        .unwrap();
+}
 
 struct Participant {
     descriptor: CapabilityDescriptor,
@@ -102,7 +140,7 @@ fn fixture(
         child_record_bytes: 4,
         parent_key_bytes: 2,
     };
-    service.install_controllers(generation).unwrap();
+    install_complete_controller(&service, generation);
     let input = ProgramInput {
         parameter: Some("BMP,LOADER,PSB".into()),
         dds: Vec::new(),
@@ -264,7 +302,7 @@ fn cv206_loader_preserves_distinct_roots_children_and_key_width_boundary() {
         child_record_bytes: 4,
         parent_key_bytes: 2,
     };
-    service.install_controllers(generation).unwrap();
+    install_complete_controller(&service, generation);
     input
         .dd_records
         .insert("ROOTS".into(), vec![b"02".to_vec(), b"01".to_vec()]);
@@ -324,7 +362,7 @@ fn purge_rejects_extra_or_unimplemented_controls_before_scheduling() {
         checkpoint_prefix: "DEMO".into(),
         summary_field: "SUMMARY".into(),
     };
-    service.install_controllers(generation).unwrap();
+    install_complete_controller(&service, generation);
     input.parameter = Some("BMP,PURGE,PSB".into());
     for (records, expected) in [
         (
@@ -342,4 +380,57 @@ fn purge_rejects_extra_or_unimplemented_controls_before_scheduling() {
         );
     }
     assert!(participant.calls.lock().unwrap().is_empty());
+}
+
+#[test]
+fn selected_ims_controller_without_complete_publication_never_calls_participant() {
+    let (service, participant, invocation, job, input) = fixture("  ", false);
+    let row = service
+        .store
+        .get_provider_state(APPLICATION_PUBLICATION_NAMESPACE, "RESTART-FIXTURE")
+        .unwrap()
+        .unwrap();
+    service
+        .store
+        .delete_provider_state(APPLICATION_PUBLICATION_NAMESPACE, &row.key, row.version)
+        .unwrap();
+    assert_eq!(
+        service.execute_ims_controller(&invocation, &job, &job.plan.steps[0], &input, &mut 0),
+        Err(HostProblem::NotFound)
+    );
+    assert!(participant.calls.lock().unwrap().is_empty());
+}
+
+#[test]
+fn mismatched_and_partial_ims_publications_never_call_participant() {
+    let (service, participant, invocation, job, input) = fixture("  ", false);
+    let original = service
+        .store
+        .get_provider_state(APPLICATION_PUBLICATION_NAMESPACE, "RESTART-FIXTURE")
+        .unwrap()
+        .unwrap();
+    let valid: ApplicationPublicationState = serde_json::from_slice(&original.payload).unwrap();
+    let mut current = original;
+    for field in [0, 1, 2, 3, 4] {
+        let mut state = valid.clone();
+        match field {
+            0 => state.generation = 2,
+            1 => state.identity = format!("sha256:{:064x}", 999),
+            2 => state.complete = false,
+            3 => state.db2 = PublicationSectionState::Applying,
+            _ => state.controllers = PublicationSectionState::NotApplicable,
+        }
+        let previous = current.version;
+        current.version += 1;
+        current.payload = serde_json::to_vec(&state).unwrap();
+        service
+            .store
+            .put_provider_state(current.clone(), Some(previous))
+            .unwrap();
+        assert_eq!(
+            service.execute_ims_controller(&invocation, &job, &job.plan.steps[0], &input, &mut 0),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        assert!(participant.calls.lock().unwrap().is_empty());
+    }
 }

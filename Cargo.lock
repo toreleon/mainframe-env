@@ -1292,6 +1292,7 @@ dependencies = [
 name = "mainframe-env-batch"
 version = "0.1.0"
 dependencies = [
+ "mainframe-env-application",
  "jsonschema",
  "mainframe-env-dataset",
  "mainframe-env-diagnostics",

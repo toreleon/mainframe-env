@@ -6,6 +6,8 @@ mod ims_controller;
 mod prepared_selection;
 mod problem;
 mod program_dispatch;
+mod publication;
+pub use publication::BatchPublicationWrite;
 mod run_retirement;
 mod run_selection;
 mod run_stop;
@@ -63,7 +65,7 @@ use mainframe_env_store_api::{
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
 const CONTROLLER_STATE_NAMESPACE: &str = "batch-controller-state";
 const CONTROLLER_STATE_KEY: &str = "registry";
@@ -218,6 +220,7 @@ struct DurableTopology {
 }
 
 pub struct BatchService {
+    publication_exclusion: Arc<RwLock<()>>,
     host: Arc<ScopedHostService>,
     store: Arc<dyn ProviderStateStore>,
     checkpoint_store: Option<Arc<dyn CheckpointStore>>,
@@ -252,7 +255,15 @@ impl BatchService {
         limits: BatchLimits,
         scheduler: JesSchedulerConfiguration,
     ) -> Result<Arc<Self>, HostProblem> {
-        Self::open_configured(host, store, None, jcl_limits, limits, scheduler)
+        Self::open_configured(
+            host,
+            store,
+            None,
+            jcl_limits,
+            limits,
+            scheduler,
+            Arc::new(RwLock::new(())),
+        )
     }
 
     pub fn open_with_checkpoint_store(
@@ -269,6 +280,28 @@ impl BatchService {
             jcl_limits,
             limits,
             JesSchedulerConfiguration::single_node(limits.max_active),
+            Arc::new(RwLock::new(())),
+        )
+    }
+
+    /// Inject the composition owner's local publication exclusion before admission.
+    /// Selected controllers require durable complete state even for standalone services.
+    pub fn open_with_checkpoint_store_and_publication_exclusion(
+        host: Arc<ScopedHostService>,
+        store: Arc<dyn ProviderStateStore>,
+        checkpoint_store: Arc<dyn CheckpointStore>,
+        jcl_limits: JclLimits,
+        limits: BatchLimits,
+        publication_exclusion: Arc<RwLock<()>>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_configured(
+            host,
+            store,
+            Some(checkpoint_store),
+            jcl_limits,
+            limits,
+            JesSchedulerConfiguration::single_node(limits.max_active),
+            publication_exclusion,
         )
     }
 
@@ -279,6 +312,7 @@ impl BatchService {
         jcl_limits: JclLimits,
         limits: BatchLimits,
         scheduler: JesSchedulerConfiguration,
+        publication_exclusion: Arc<RwLock<()>>,
     ) -> Result<Arc<Self>, HostProblem> {
         scheduler.validate()?;
         if limits.max_nje_nodes == 0
@@ -489,6 +523,7 @@ impl BatchService {
             }
         }
         Ok(Arc::new(Self {
+            publication_exclusion,
             host,
             store,
             checkpoint_store,
@@ -512,36 +547,6 @@ impl BatchService {
                 next_id,
             }),
         }))
-    }
-
-    pub fn install_controllers(
-        &self,
-        generation: BatchControllerGeneration,
-    ) -> Result<BatchControllerInstallReceipt, HostProblem> {
-        let mut durable = self
-            .controllers
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        durable.registry.preflight_install(&generation)?;
-        let mut replacement = durable.registry.clone();
-        let receipt = replacement.install(generation)?;
-        self.persist_controllers(&mut durable, replacement)?;
-        Ok(receipt)
-    }
-
-    pub fn rollback_controllers(
-        &self,
-        application: &str,
-        generation: u64,
-    ) -> Result<BatchControllerInstallReceipt, HostProblem> {
-        let mut durable = self
-            .controllers
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let mut replacement = durable.registry.clone();
-        let receipt = replacement.select(application, generation)?;
-        self.persist_controllers(&mut durable, replacement)?;
-        Ok(receipt)
     }
 
     /// Parse and validate the immutable JCL plan used for admission decisions.
@@ -2221,7 +2226,8 @@ impl BatchService {
             crate::db2_tso::Action::Run { program, command } => (program, command),
         };
         let selector = BatchControllerSelector::tso(&program)?;
-        if let Some(controller) = self.resolve_controller(&selector)? {
+        let (publication, controller) = self.admit_controller(&selector)?;
+        if let Some(controller) = controller {
             return match controller.plan {
                 BatchControllerPlan::ProgramCall => {
                     let program = self.verify_controller_program(&controller.program)?;
@@ -2237,6 +2243,7 @@ impl BatchService {
                 _ => Err(HostProblem::ProviderFailure),
             };
         }
+        drop(publication);
         validate_tso_action_controls(&program, &control)?;
         let statement = input_dd_text(input, "SYSIN")?;
         let operation = match tso_program_execution(&program).ok_or(HostProblem::Unsupported)? {
@@ -2299,37 +2306,6 @@ impl BatchService {
             dd_outputs,
             termination: None,
         })
-    }
-
-    fn resolve_controller(
-        &self,
-        selector: &BatchControllerSelector,
-    ) -> Result<Option<ResolvedBatchController>, HostProblem> {
-        self.controllers
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)
-            .map(|durable| durable.registry.resolve(selector))
-    }
-
-    fn verify_controller_program(
-        &self,
-        program: &crate::BatchControllerProgram,
-    ) -> Result<String, HostProblem> {
-        let name = program
-            .path
-            .rsplit('/')
-            .next()
-            .ok_or(HostProblem::InfrastructureFailure)?
-            .to_ascii_uppercase();
-        let record = self
-            .store
-            .get_provider_state("batch-program", &name)
-            .map_err(store_error)?
-            .ok_or(HostProblem::NotFound)?;
-        if record.payload != program.identity.as_bytes() {
-            return Err(HostProblem::IdempotencyConflict);
-        }
-        Ok(name)
     }
 
     #[allow(clippy::too_many_arguments)]

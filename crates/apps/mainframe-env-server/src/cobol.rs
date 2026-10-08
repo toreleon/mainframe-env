@@ -88,6 +88,12 @@ pub struct DefaultProgramRouter {
 }
 
 impl DefaultProgramRouter {
+    pub(crate) fn has_registered_program(&self, program: &str) -> bool {
+        self.router
+            .supported_programs()
+            .any(|name| name.eq_ignore_ascii_case(program))
+    }
+
     /// Bind at setup, before dispatch. Rebinding cannot change an active clock domain.
     pub fn bind_execution_control(
         &self,
@@ -1342,5 +1348,14 @@ mod tests {
         );
         assert_eq!(store.events(&execution, 1, 16).unwrap().len(), 5);
         assert_eq!(store.pending_notifications(16).unwrap().len(), 5);
+    }
+
+    #[test]
+    fn publication_queries_the_actual_router_without_a_duplicate_registry() {
+        let router = default_program_router();
+        assert!(router.has_registered_program("IEFBR14"));
+        assert!(router.has_registered_program("iefbr14"));
+        assert!(router.has_registered_program("COBOL"));
+        assert!(!router.has_registered_program("FENCEONE"));
     }
 }

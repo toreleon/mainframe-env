@@ -351,9 +351,9 @@
       "normative": true,
       "owner": "application-package maintainers",
       "path": "docs/architecture/APPLICATION-PACKAGES.md",
-      "relative_links": 2,
+      "relative_links": 3,
       "scope": "application package generation and installation contract",
-      "sha256": "sha256:12b3065bab436b194e61f9e98610e6be8c40e4fa6d95f81f6dd8ac3b3a017840",
+      "sha256": "sha256:ce26a82908ee259576c71b27042705977825124a7feca83e202d9b9c9e63ed18",
       "status": "Frozen for mainframe-env coverage.foundation",
       "title": "Application package generation contract",
       "xtask_commands": 0
@@ -1758,7 +1758,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/coverage/foundation-status.md",
       "relative_links": 5,
-      "sha256": "sha256:3b81cc110daaf08a126f5537e57bc2bf0572dcf21a9e16ce1045ea56b37a1601",
+      "sha256": "sha256:1788579dfd3b41d564e32703262d36eeee5e57a68f5d8534b82a9c182ea4fd9d",
       "title": "Coverage and conformance — Coverage authority progress",
       "xtask_commands": 6
     },
@@ -2214,7 +2214,7 @@
       "normative": false,
       "path": "docs/research/publication-source-probe.md",
       "relative_links": 0,
-      "sha256": "sha256:1072431b2e885c84a5a683fd4c4ac55698ad7830f88ca5352595563c9c528112",
+      "sha256": "sha256:95af43cc39bca9678db3d9af17ea173aa4338b65f92b277362f83c0e4679c44b",
       "title": "Publication source probe",
       "xtask_commands": 0
     },

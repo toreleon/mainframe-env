@@ -79,6 +79,36 @@ idempotent provider operations from explicit partial state. Selection becomes
 complete only after all applicable sections are durable. This is recovery over
 separate provider transactions, not a cross-provider exactly-once claim.
 
+Selected batch controllers and IMS routes join the actual retained selection
+with a complete publication row: namespace, key, positive row version, package,
+generation and identity must match, and applicable signed sections must be
+`applied`. An absent publication row cannot authorize a standalone controller.
+Controller and SQL catalog plans are validated before the prepared record or
+provider effects; completed replay still validates signed shape and closure.
+
+The server and its batch service share one process-local publication lock
+([ADR 0053](../decisions/0053-selected-controller-publication-fence.md)). Selected
+dispatch retains a read guard through the synchronous participant call.
+Publication, rollback, recovery and executable installation use a write guard;
+contention refuses immediately. The service creates its borrowed writer under
+that actual guard, so callers cannot construct or serialize an admission permit.
+There is no lock upgrade or guard held across an await. Raw store writers remain
+a trusted embedding responsibility; this lock provides no cross-process or
+distributed exclusion.
+
+```mermaid
+flowchart LR
+    Package[Verified retained package] --> Plan[Validate complete prospective plan]
+    Plan --> Prepared[Persist prepared publication]
+    Prepared --> Providers[Apply applicable provider sections]
+    Providers --> Complete[Persist complete publication]
+    Selection[Actual selected generation] --> Join[Join exact publication tuple]
+    Complete --> Join
+    Join --> Dispatch[Selected synchronous dispatch]
+    Lock[Shared process publication lock] -. Write guard .-> Prepared
+    Lock -. Read guard through participant .-> Dispatch
+```
+
 IMS metadata publication uses the shared `mainframe-env.ims-metadata@1` DTO and
 validator. The provider atomically retains the package-bound generation and
 advances its selected-generation row through `ProviderStateStore`; rollback

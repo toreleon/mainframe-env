@@ -5,6 +5,12 @@
 mod package_authentication;
 mod package_v1;
 mod package_v2;
+mod publication;
+pub use publication::{
+    APPLICATION_PUBLICATION_CONTRACT, APPLICATION_PUBLICATION_NAMESPACE,
+    ApplicationPublicationState, MAX_APPLICATION_PUBLICATION_BYTES, PublicationAction,
+    PublicationSectionState,
+};
 
 pub use package_authentication::{
     LEGACY_PACKAGE_AUTHENTICATION_ALGORITHM, PACKAGE_AUTHENTICATION_ALGORITHM,
