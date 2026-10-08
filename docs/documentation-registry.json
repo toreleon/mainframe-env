@@ -100,6 +100,7 @@
     "docs/decisions/0048-carddemo-interactive-application.md",
     "docs/decisions/0049-executable-agent-sandbox.md",
     "docs/decisions/0050-host-effect-envelope-layout.md",
+    "docs/decisions/0051-package-identity-framing.md",
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
     "docs/delivery/IMPLEMENTATION-ROADMAP.md",
     "docs/delivery/VERIFICATION-STRATEGY.md",
@@ -545,6 +546,10 @@
         {
           "label": "ADR-0050: Boxed shared host-effect payloads",
           "path": "docs/decisions/0050-host-effect-envelope-layout.md"
+        },
+        {
+          "label": "ADR-0051: Framed package identity and retained compatibility",
+          "path": "docs/decisions/0051-package-identity-framing.md"
         }
       ],
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."

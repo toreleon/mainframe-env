@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 237,
+    "markdown_documents": 238,
     "navigation_groups": 8,
-    "normative_documents": 98,
+    "normative_documents": 99,
     "xtask_commands": 163
   },
   "documents": [
@@ -341,8 +341,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 179,
-      "sha256": "sha256:310973c140115d2e72f0a1b32e26fd7f0f538c994e8636c72b53538c15b13a0e",
+      "relative_links": 180,
+      "sha256": "sha256:a57c8428a3e928e882096227387821601785f311c8b710e6f3b72015d923c335",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -1447,10 +1447,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env current public package hardening",
+      "normative": true,
+      "owner": "Application-package and shared trust maintainers",
+      "path": "docs/decisions/0051-package-identity-framing.md",
+      "relative_links": 0,
+      "scope": "Package identity, fresh admission and trusted retained-state compatibility",
+      "sha256": "sha256:4e71c5d1648eea37c1b54ac9155e04ad4ff1e342d762aeb5ef21ded184b31c1d",
+      "status": "Accepted design; implementation pending",
+      "title": "ADR-0051: Frame current package identities and retain explicit legacy readers",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 53,
-      "sha256": "sha256:43f9927331159d83f380ef579a56c577b54c4fcdc6aae56121dc8a9ebb8b086b",
+      "relative_links": 54,
+      "sha256": "sha256:3c2b086dc70a8f9f86731835cb07818ba2e88f79391b82f11dd3bc0fe60a5317",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1697,8 +1709,8 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/coverage/foundation-status.md",
-      "relative_links": 2,
-      "sha256": "sha256:9723a1f5e7b96b0a90c29194f66c9faa8b29117b4d85dc1a7afa165b82957258",
+      "relative_links": 3,
+      "sha256": "sha256:b25dd65c763a2a8b03f3dabf556a7f31db5b318682c83fd66c45947fcecf2aa0",
       "title": "Coverage and conformance — Coverage authority progress",
       "xtask_commands": 6
     },
@@ -2738,6 +2750,10 @@
         {
           "label": "ADR-0050: Boxed shared host-effect payloads",
           "path": "docs/decisions/0050-host-effect-envelope-layout.md"
+        },
+        {
+          "label": "ADR-0051: Framed package identity and retained compatibility",
+          "path": "docs/decisions/0051-package-identity-framing.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -2960,7 +2976,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:95ac25532cbc184708b38511837822158295432cd22aa8f47003e7df3aeeeb6a",
+  "registry_sha256": "sha256:9356731b3349cfb748c008217b6b5267ad67f1365a1c8bf566dc61b15e34f91f",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

@@ -355,3 +355,11 @@ awaits, errors, ownership, retirement/step fencing and durable bytes; no lint
 suppression, private behavior or expanded admission is allowed. Focused existing
 regressions, strict package Clippy and required gates precede its separate seal.
 The root-validation slice remains pending until this prerequisite passes.
+
+The manager selects the explicit framing/admission compatibility design in
+[ADR-0051](../../../decisions/0051-package-identity-framing.md). The independent
+legacy ambiguity run reproduces four failures with one valid control. Worker
+implementation must preserve the declared finite writer/reader, trusted recovery
+and exact legacy-retry boundary. The unchanged installer-state shape is retained;
+no silent legacy hash/signature migration or new snapshot-authentication guarantee
+is claimed. Standards-envelope adoption remains a separate pending slice.
