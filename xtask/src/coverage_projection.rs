@@ -9,25 +9,52 @@ use mainframe_env_coverage::{
 
 const EVIDENCE_SCHEMA_ID: &str = "https://mainframe-env.invalid/schemas/coverage-evidence@1";
 const LEDGER_SCHEMA_ID: &str = "https://mainframe-env.invalid/schemas/coverage-ledger@1";
+const PACKAGE_SCHEMA_ID: &str = "https://mainframe-env.invalid/schemas/application-package@2";
+const IMS_SCHEMA_ID: &str = "https://mainframe-env.invalid/schemas/ims-metadata@1";
+
+struct RefuseSchemaRetrieval;
+
+impl jsonschema::Retrieve for RefuseSchemaRetrieval {
+    fn retrieve(
+        &self,
+        uri: &jsonschema::Uri<String>,
+    ) -> Result<Value, Box<dyn std::error::Error + Send + Sync>> {
+        Err(format!("external schema retrieval is forbidden: {uri}").into())
+    }
+}
 
 pub(super) fn compile_schema(schema: &Value, path: &Path) -> TaskResult<jsonschema::Validator> {
     jsonschema::draft202012::meta::validate(schema)
         .map_err(|error| format!("{} is not valid Draft 2020-12: {error}", path.display()))?;
     let options = jsonschema::draft202012::options().offline();
-    if schema["$id"].as_str() == Some(LEDGER_SCHEMA_ID) {
-        // Resolve the sole external coverage reference from its current local owner.
-        // Keep the evidence shape authoritative in one schema; never fetch its URI.
+    let resources: &[(&str, &str)] = match schema["$id"].as_str() {
+        Some(LEDGER_SCHEMA_ID) => &[(
+            EVIDENCE_SCHEMA_ID,
+            "conformance/subsystems/coverage/schemas/coverage-evidence.schema.json",
+        )],
+        Some(PACKAGE_SCHEMA_ID) => &[(
+            IMS_SCHEMA_ID,
+            "conformance/subsystems/ims/schemas/ims-metadata.schema.json",
+        )],
+        _ => &[],
+    };
+    if !resources.is_empty() {
+        // Resolve only these owned references locally, with no network retriever.
         let root = repository_root()?;
-        let evidence = json(
-            &root.join("conformance/subsystems/coverage/schemas/coverage-evidence.schema.json"),
-        )?;
-        jsonschema::draft202012::meta::validate(&evidence)
-            .map_err(|error| format!("coverage evidence schema is invalid: {error}"))?;
-        let registry = jsonschema::Registry::new()
-            .add(EVIDENCE_SCHEMA_ID, evidence)
-            .map_err(|error| error.to_string())?
-            .prepare()
-            .map_err(|error| error.to_string())?;
+        let mut registry = jsonschema::Registry::new().retriever(RefuseSchemaRetrieval);
+        for (id, relative) in resources {
+            let resource = json(&root.join(relative))?;
+            require(
+                resource["$id"].as_str() == Some(id),
+                "local schema identity differs",
+            )?;
+            jsonschema::draft202012::meta::validate(&resource)
+                .map_err(|error| format!("{relative} is invalid: {error}"))?;
+            registry = registry
+                .add(*id, resource)
+                .map_err(|error| error.to_string())?;
+        }
+        let registry = registry.prepare().map_err(|error| error.to_string())?;
         return options
             .with_registry(&registry)
             .build(schema)

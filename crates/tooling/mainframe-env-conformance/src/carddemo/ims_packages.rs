@@ -322,7 +322,7 @@ pub(super) fn package(
         },
         generation,
         sections: ApplicationSections {
-            schema_version: APPLICATION_PACKAGE_V2_CONTRACT.into(),
+            schema_version: APPLICATION_PACKAGE_V3_CONTRACT.into(),
             host_abi_libraries: Vec::new(),
             sql_tables: Vec::new(),
             sql_rows: Vec::new(),
@@ -340,7 +340,8 @@ pub(super) fn package(
             value: "pending".into(),
         },
     };
-    package.signature.value =
-        sign_carddemo_package_identity(&package_v2_identity(&package).map_err(package_problem)?);
+    package.signature.value = sign_carddemo_package_identity(
+        &package_generation_identity(&package).map_err(package_problem)?,
+    );
     Ok(package)
 }

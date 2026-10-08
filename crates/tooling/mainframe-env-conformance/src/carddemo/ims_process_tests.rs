@@ -102,7 +102,7 @@ fn corpus_sqlite_process_child() {
             assert_eq!(metadata.generation, 1);
             assert_eq!(
                 metadata.package_identity,
-                package_v2_identity(&package).unwrap()
+                package_generation_identity(&package).unwrap()
             );
             assert_eq!(
                 Some(&metadata.catalog),

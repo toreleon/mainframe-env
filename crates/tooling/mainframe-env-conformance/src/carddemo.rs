@@ -33,12 +33,12 @@ use axum::body::{Body, to_bytes};
 use axum::http::{Method, Request, StatusCode};
 use base64::Engine;
 use mainframe_env_application::{
-    APPLICATION_PACKAGE_V2_CONTRACT, ApplicationInstaller, ApplicationManifest, ApplicationPackage,
+    APPLICATION_PACKAGE_V3_CONTRACT, ApplicationInstaller, ApplicationManifest, ApplicationPackage,
     ApplicationPackageV2, ApplicationSections, BatchController, BatchControllerKind,
     DatasetCatalog, DatasetCatalogEntry, DatasetDefinition, EntryKind, GenerationGroupDefinition,
     InstallProblem, InstallState, PackageEntry, PackageSignature, ProgramArtifact, ProgramCatalog,
-    ProgramFrame, ProgramFrames, SqlColumn, SqlTable, package_identity, package_v2_identity,
-    parse_bms, parse_csd,
+    ProgramFrame, ProgramFrames, SqlColumn, SqlTable, package_generation_identity,
+    package_identity, parse_bms, parse_csd,
 };
 use mainframe_env_batch::{
     JclBundle, JclConversionLimits, JclLimits, JclRecordKind, JclStatementId, JobPlan, JobState,
@@ -5044,7 +5044,7 @@ fn install_carddemo_db2_package(
         },
         generation: 1,
         sections: ApplicationSections {
-            schema_version: APPLICATION_PACKAGE_V2_CONTRACT.into(),
+            schema_version: APPLICATION_PACKAGE_V3_CONTRACT.into(),
             host_abi_libraries: Vec::new(),
             sql_tables,
             sql_rows: Vec::new(),
@@ -5062,7 +5062,7 @@ fn install_carddemo_db2_package(
             value: "pending".into(),
         },
     };
-    let identity = package_v2_identity(&package).map_err(package_problem)?;
+    let identity = package_generation_identity(&package).map_err(package_problem)?;
     package.signature.value = sign_carddemo_package_identity(&identity);
     let installed = server
         .install_application_package_v2(&package)

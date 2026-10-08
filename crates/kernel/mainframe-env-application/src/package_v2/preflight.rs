@@ -1,7 +1,37 @@
-//! Unchanged package footprint and preflight bounds.
+//! Package resource preflight and existing optional semantic validation.
 use super::*;
 
 pub(super) fn validate_aggregate_bounds(
+    package: &ApplicationPackageV2,
+    limits: PackageLimits,
+) -> Result<PackageFootprint, InstallProblem> {
+    let footprint = validate_identity_bounds(package, limits)?;
+    let sections = &package.sections;
+    if let Some(metadata) = &sections.ims_metadata {
+        validate_ims_metadata(metadata, ImsMetadataLimits::default()).map_err(|problem| {
+            if problem == ImsMetadataProblem::LimitExceeded {
+                InstallProblem::LimitExceeded
+            } else {
+                InstallProblem::MissingReference
+            }
+        })?;
+    }
+    if let Some(definitions) = &sections.ims_tm {
+        definitions
+            .validate(TmLimits::default())
+            .map_err(|problem| {
+                if problem == mainframe_env_host_api::HostProblem::ResourceExhausted {
+                    InstallProblem::LimitExceeded
+                } else {
+                    InstallProblem::MissingReference
+                }
+            })?;
+    }
+    Ok(footprint)
+}
+
+/// Resource preflight for identity producers; graph validity remains admission-owned.
+pub(super) fn validate_identity_bounds(
     package: &ApplicationPackageV2,
     limits: PackageLimits,
 ) -> Result<PackageFootprint, InstallProblem> {
@@ -166,26 +196,6 @@ pub(super) fn validate_aggregate_bounds(
         if *count > limits.max_rows_per_ims_definition {
             return Err(InstallProblem::LimitExceeded);
         }
-    }
-    if let Some(metadata) = &sections.ims_metadata {
-        validate_ims_metadata(metadata, ImsMetadataLimits::default()).map_err(|problem| {
-            if problem == ImsMetadataProblem::LimitExceeded {
-                InstallProblem::LimitExceeded
-            } else {
-                InstallProblem::MissingReference
-            }
-        })?;
-    }
-    if let Some(definitions) = &sections.ims_tm {
-        definitions
-            .validate(TmLimits::default())
-            .map_err(|problem| {
-                if problem == mainframe_env_host_api::HostProblem::ResourceExhausted {
-                    InstallProblem::LimitExceeded
-                } else {
-                    InstallProblem::MissingReference
-                }
-            })?;
     }
     Ok(PackageFootprint {
         bytes,

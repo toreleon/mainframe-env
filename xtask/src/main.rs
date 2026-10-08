@@ -25,6 +25,8 @@ mod jcl_catalog;
 mod jcl_conformance;
 mod mq_conformance;
 mod mq_status_catalog;
+#[cfg(test)]
+mod package_schema_tests;
 mod production_scanner;
 mod profile_intake;
 mod racf_catalog;
@@ -9022,6 +9024,24 @@ fn check_application_packages(root: &Path) -> TaskResult {
             &format!("application package contract artifact is missing: {path}"),
         )?;
     }
+    let package_schema = json(
+        &root.join("conformance/subsystems/coverage/schemas/application-package-v2.schema.json"),
+    )?;
+    require(
+        package_schema["required"]
+            == serde_json::json!(["base", "generation", "sections", "signature"])
+            && package_schema["properties"].get("schema_version").is_none()
+            && package_schema["properties"]
+                .get("base_manifest_identity")
+                .is_none()
+            && package_schema["properties"]["base"]["$ref"] == "#/$defs/base"
+            && package_schema["properties"]["sections"]["properties"]["schema_version"]["enum"]
+                == serde_json::json!([
+                    "mainframe-env.application-package@2",
+                    "mainframe-env.application-package@3"
+                ]),
+        "application package schema must describe the owned DTO with finite @2/@3 sections",
+    )?;
     let implementation =
         read(&root.join("crates/kernel/mainframe-env-application/src/package_v2.rs"))?;
     for required in [
@@ -9041,10 +9061,26 @@ fn check_application_packages(root: &Path) -> TaskResult {
         "max_total_retained_package_bytes",
         "validate_aggregate_bounds",
         "pub fn selected_generation",
+        "APPLICATION_PACKAGE_V3_CONTRACT",
+        "pub fn package_v2_identity",
+        "pub fn package_generation_identity",
+        "pub fn package_generation_identity_with_limits",
     ] {
         require(
             implementation.contains(required),
             &format!("application package implementation omits {required}"),
+        )?;
+    }
+    for path in [
+        "crates/tooling/mainframe-env-conformance/src/carddemo.rs",
+        "crates/tooling/mainframe-env-conformance/src/carddemo/ims_packages.rs",
+        "crates/tooling/mainframe-env-conformance/src/carddemo/ims_process_tests.rs",
+    ] {
+        let producer = read(&root.join(path))?;
+        require(
+            producer.contains("package_generation_identity")
+                && !producer.contains("package_v2_identity"),
+            &format!("current application package producer lacks finite identity dispatch: {path}"),
         )?;
     }
     let production_product = production_scanner::read_source(

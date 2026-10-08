@@ -10188,7 +10188,7 @@ mod tests {
         _trust: &HmacSha256PackageTrust,
     ) -> mainframe_env_application::ApplicationPackageV2 {
         use mainframe_env_application::{
-            APPLICATION_PACKAGE_V2_CONTRACT, ApplicationManifest, ApplicationPackage,
+            APPLICATION_PACKAGE_V3_CONTRACT, ApplicationManifest, ApplicationPackage,
             ApplicationSections, BatchController, EntryKind, PackageEntry, PackageSignature,
         };
         let definitions = [
@@ -10228,7 +10228,7 @@ mod tests {
             },
             generation: 1,
             sections: ApplicationSections {
-                schema_version: APPLICATION_PACKAGE_V2_CONTRACT.into(),
+                schema_version: APPLICATION_PACKAGE_V3_CONTRACT.into(),
                 host_abi_libraries: Vec::new(),
                 sql_tables: Vec::new(),
                 sql_rows: Vec::new(),
@@ -10255,7 +10255,7 @@ mod tests {
                 value: "invalid".into(),
             },
         };
-        let identity = mainframe_env_application::package_v2_identity(&package).unwrap();
+        let identity = mainframe_env_application::package_generation_identity(&package).unwrap();
         package.signature.value = sign_test_package_identity(&identity);
         package
     }
@@ -10264,7 +10264,7 @@ mod tests {
         package: &mut mainframe_env_application::ApplicationPackageV2,
         _trust: &HmacSha256PackageTrust,
     ) {
-        let identity = mainframe_env_application::package_v2_identity(package).unwrap();
+        let identity = mainframe_env_application::package_generation_identity(package).unwrap();
         package.signature.value = sign_test_package_identity(&identity);
     }
 
@@ -10367,7 +10367,7 @@ mod tests {
         entry.sha256 = sha256.clone();
         entry.bytes = bytes.len();
         package.base.blobs.insert(sha256, bytes);
-        let identity = mainframe_env_application::package_v2_identity(&package).unwrap();
+        let identity = mainframe_env_application::package_generation_identity(&package).unwrap();
         package.signature.value = sign_test_package_identity(&identity);
         (package, definitions)
     }

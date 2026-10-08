@@ -680,3 +680,12 @@ legacy production ratchet from 12,796 to 12,077 as part of
 `CV-209.journey-closure`. No ceiling is raised, no exemption is added, and all
 new production modules remain below 1,200 lines. The initial joint module
 failure is preserved; the corrected lower ratchet must pass before sealing.
+
+### CV-204.identity-framing acceptance
+
+Status: **Complete (bounded identity and native DTO schema only)**. Current writers emit framed @3 identities with finite neutral dispatch; trusted retained @2 identities/signatures remain exact, fresh @2 admission refuses, and retry requires full retained equality and current trust. The producing owner candidate passed 55 application tests, strict application lint, affected caller compilation and two selected server trust tests. Native integration reproduced all six valid DTO schema refusals, then passed two test families covering six valid controls and nine malformed refusals, plus 30 unchanged coverage schema controls. Explicit-budget identity and recovery remain bounded by configured PackageLimits. This does not authenticate arbitrary external snapshots, adopt a standard signature envelope, repair publication or complete Foundation.
+Joint native schemas, application-package metadata, spec, coverage, program registry,
+module, formatting, frozen dependency policy and diff checks pass. Tooling-owner
+strict lint passes; retained MQ/dependency-inclusive lint failures are separately
+pending. Missing supplemental cache remains skipped/unavailable with zero credit.
+Broader public and Foundation exit checks remain pending.
