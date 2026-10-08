@@ -14475,11 +14475,13 @@ mod tests {
                 .mutate_process(
                     "TYPE",
                     "ORDER",
-                    uow,
-                    execution,
-                    "IBMUSER",
-                    "activate",
-                    [1; 32],
+                    mainframe_env_cics::bts_lifecycle::BtsReplayContext {
+                        run_unit: uow,
+                        owner_execution: execution,
+                        owner_principal: "IBMUSER",
+                        replay_key: "activate",
+                        request_digest: [1; 32],
+                    },
                     |process| {
                         process.start(&root_id, None, true)?;
                         process.checkpoint(&root_id, 1, 7, "selected-checkpoint")?;
@@ -14499,11 +14501,13 @@ mod tests {
                         transid: "BT01".into(),
                         userid: "IBMUSER".into(),
                     },
-                    uow,
-                    execution,
-                    "IBMUSER",
-                    "child",
-                    [2; 32],
+                    mainframe_env_cics::bts_lifecycle::BtsReplayContext {
+                        run_unit: uow,
+                        owner_execution: execution,
+                        owner_principal: "IBMUSER",
+                        replay_key: "child",
+                        request_digest: [2; 32],
+                    },
                 )
                 .unwrap();
             server
@@ -25989,10 +25993,12 @@ mod tests {
                 &session,
                 &principal,
                 "partition-receive-selected-csrf",
-                0x7d,
-                "P",
-                b"lower",
-                17,
+                mainframe_env_cics::CicsPartitionInput {
+                    aid: 0x7d,
+                    partition: "P",
+                    data: b"lower",
+                    cursor: 17,
+                },
                 3,
             )
             .unwrap();

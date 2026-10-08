@@ -133,13 +133,15 @@ fn parse_rfc3339(text: &str) -> Result<ClockInstant, i32> {
         Some(_) => return Err(8),
     };
     checked_instant(
-        year,
-        month,
-        day,
-        hour,
-        minute,
-        second,
-        millisecond,
+        ClockInstant {
+            year,
+            month,
+            day,
+            hour,
+            minute,
+            second,
+            millisecond,
+        },
         offset,
         None,
     )
@@ -161,13 +163,15 @@ fn parse_rfc1123(text: &str) -> Result<ClockInstant, i32> {
         offset(zone, false)?
     };
     checked_instant(
-        year,
-        month,
-        day,
-        hour,
-        minute,
-        second,
-        0,
+        ClockInstant {
+            year,
+            month,
+            day,
+            hour,
+            minute,
+            second,
+            millisecond: 0,
+        },
         offset,
         Some(weekday),
     )
@@ -195,7 +199,19 @@ fn parse_rfc850(text: &str) -> Result<ClockInstant, i32> {
         1900 + i64::from(short_year)
     };
     let (hour, minute, second) = hms(time)?;
-    checked_instant(year, month, day, hour, minute, second, 0, 0, Some(weekday))
+    checked_instant(
+        ClockInstant {
+            year,
+            month,
+            day,
+            hour,
+            minute,
+            second,
+            millisecond: 0,
+        },
+        0,
+        Some(weekday),
+    )
 }
 
 fn parse_asctime(text: &str) -> Result<ClockInstant, i32> {
@@ -210,7 +226,19 @@ fn parse_asctime(text: &str) -> Result<ClockInstant, i32> {
     let month = month_name(month)?;
     let day = day_number(day)?;
     let (hour, minute, second) = hms(time)?;
-    checked_instant(year, month, day, hour, minute, second, 0, 0, Some(weekday))
+    checked_instant(
+        ClockInstant {
+            year,
+            month,
+            day,
+            hour,
+            minute,
+            second,
+            millisecond: 0,
+        },
+        0,
+        Some(weekday),
+    )
 }
 
 fn fixed_number(text: &str, width: usize) -> Option<u32> {
@@ -300,16 +328,13 @@ fn offset(text: &str, colon: bool) -> Result<i32, i32> {
 }
 
 fn checked_instant(
-    year: i64,
-    month: u32,
-    day: u32,
-    hour: u32,
-    minute: u32,
-    second: u32,
-    millisecond: u32,
+    instant: ClockInstant,
     offset_minutes: i32,
     weekday: Option<&str>,
 ) -> Result<ClockInstant, i32> {
+    let ClockInstant {
+        year, month, day, ..
+    } = instant;
     let days = days_from_civil(year, month, day).ok_or(6)?;
     if civil_from_days(days) != (year, month, day) {
         return Err(6);
@@ -330,15 +355,6 @@ fn checked_instant(
             return Err(5);
         }
     }
-    let instant = ClockInstant {
-        year,
-        month,
-        day,
-        hour,
-        minute,
-        second,
-        millisecond,
-    };
     let absolute = absolute_milliseconds(instant).map_err(|_| 4)?;
     let normalized = absolute
         .checked_sub(i64::from(offset_minutes) * 60_000)

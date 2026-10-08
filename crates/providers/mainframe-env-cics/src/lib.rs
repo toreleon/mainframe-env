@@ -31,7 +31,10 @@ pub use service::{
     MAX_PIP_BYTES, MAX_PROCESS_BYTES, MAX_RECORDED_OUTBOUND_FRAMES, SignalFacilityRecord,
     SignalLuType, load_conversation_replay, prune_conversation_replays,
 };
-pub use service::{CicsLocalLinkCallAttestation, CicsLocalLinkEntryAttestation, IssuePassTransfer};
+pub use service::{
+    CicsLocalLinkCallAttestation, CicsLocalLinkEntryAttestation, IssuePassTransfer,
+    prune_issue_device_receipts,
+};
 
 pub use retention::{
     CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
@@ -49,15 +52,16 @@ pub use service::{
     CicsEnqueueModelDefinition, CicsFileDefinition, CicsFileStatus, CicsIntervalError,
     CicsIntervalMode, CicsIntervalTime, CicsJavaStatus, CicsLimits, CicsMonitorAction,
     CicsMonitorPointDefinition, CicsOutboardDestinationDefinition, CicsOutboardKind,
-    CicsOutboardRecord, CicsOutboardSnapshot, CicsPartitionDefinition, CicsPartitionSetDefinition,
-    CicsProgramDefinition, CicsReplayClock, CicsService, CicsSignalCaptureSpec, CicsSignalEmission,
-    CicsSpoolReportSnapshot, CicsStartTask, CicsStartTerminal, CicsTerminalExecution,
-    CicsTerminalSnapshot, CicsTraceConfiguration, CicsTraceEntry, CicsTransformContainerMode,
-    CicsTransformDefinition, CicsTransformFieldDefinition, CicsTransformFieldKind,
-    CicsTransformFormat, CicsTransientDataQueueDefinition, CicsTransientDataQueueKind,
-    CicsTransientDataQueueOpen, CicsWebEndpoint, CicsWebInboundRequest, CicsWebRequest,
-    CicsWebResponse, CicsWebServerResponse, CicsWebServiceDefinition, CicsWebTransport,
-    CicsWebUriMapDefinition, CicsWebVersion, CicsXmlTransformMetadata, cics_provider,
+    CicsOutboardRecord, CicsOutboardSnapshot, CicsPartitionDefinition, CicsPartitionInput,
+    CicsPartitionSetDefinition, CicsProgramDefinition, CicsReplayClock, CicsService,
+    CicsSignalCaptureSpec, CicsSignalEmission, CicsSpoolReportSnapshot, CicsStartTask,
+    CicsStartTerminal, CicsTerminalExecution, CicsTerminalSnapshot, CicsTraceConfiguration,
+    CicsTraceEntry, CicsTransformContainerMode, CicsTransformDefinition,
+    CicsTransformFieldDefinition, CicsTransformFieldKind, CicsTransformFormat,
+    CicsTransientDataQueueDefinition, CicsTransientDataQueueKind, CicsTransientDataQueueOpen,
+    CicsWebEndpoint, CicsWebInboundRequest, CicsWebRequest, CicsWebResponse, CicsWebServerResponse,
+    CicsWebServiceDefinition, CicsWebTransport, CicsWebUriMapDefinition, CicsWebVersion,
+    CicsXmlTransformMetadata, cics_provider,
 };
 pub use service::{
     BrxaBindFrame, BrxaBindReply, BrxaEndFrame, BrxaInitFrame, BrxaInitReply,

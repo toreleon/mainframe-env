@@ -689,3 +689,12 @@ module, formatting, frozen dependency policy and diff checks pass. Tooling-owner
 strict lint passes; retained MQ/dependency-inclusive lint failures are separately
 pending. Missing supplemental cache remains skipped/unavailable with zero credit.
 Broader public and Foundation exit checks remain pending.
+
+### CV-209.cics-contract-lint acceptance
+
+Status: **Complete (mechanical CICS and approved public API migration only)**. ADR-0052 borrowed contexts migrate all 79 inventoried caller expressions in original order; four public Rust signatures change before release. Existing receipt prune is exposed as manual trusted raw-store maintenance with authority/age/archive/protected-reference/coordination obligations and individual conditional deletions. Strict dependency-inclusive CICS Clippy passed; 114 focused tests passed, with unchanged earlier mechanical controls retained separately. Joint server all-targets compilation passes. Durable encodings and excluded commands are unchanged; full retention policy, private composition and official CICS completeness remain pending.
+Joint native schemas, application-package metadata, spec, coverage, program registry,
+module, formatting, frozen dependency policy and diff checks pass. Tooling-owner
+strict lint passes; retained MQ/dependency-inclusive lint failures are separately
+pending. Missing supplemental cache remains skipped/unavailable with zero credit.
+Broader public and Foundation exit checks remain pending.

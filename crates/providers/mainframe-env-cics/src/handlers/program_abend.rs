@@ -123,7 +123,7 @@ fn validate_pending(pending: &PendingProgramAbend) -> Result<(), HostProblem> {
 pub(super) fn validate_replay(response: &CicsResponse) -> Result<bool, HostProblem> {
     if response.outputs.contains_key("ABEND.DEFAULT") {
         validate_default_pop(response)?;
-        if response.outputs.get("ABEND.CODE").is_none() {
+        if !response.outputs.contains_key("ABEND.CODE") {
             return Err(HostProblem::ProviderFailure);
         }
         return Ok(true);

@@ -399,11 +399,13 @@ pub(super) fn invoke(
     let intent = authority.mutate_process(
         &target.process_type,
         &target.process_name,
-        &owner_run,
-        &owner_execution,
-        &owner_principal,
-        &intent_key,
-        digest,
+        crate::service::handlers::bts_lifecycle::BtsReplayContext {
+            run_unit: &owner_run,
+            owner_execution: &owner_execution,
+            owner_principal: &owner_principal,
+            replay_key: &intent_key,
+            request_digest: digest,
+        },
         |process| {
             let activity = process
                 .activities
@@ -464,11 +466,13 @@ pub(super) fn invoke(
         .mutate_process(
             &target.process_type,
             &target.process_name,
-            &owner_run,
-            &owner_execution,
-            &owner_principal,
-            &done_key,
-            digest,
+            crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                run_unit: &owner_run,
+                owner_execution: &owner_execution,
+                owner_principal: &owner_principal,
+                replay_key: &done_key,
+                request_digest: digest,
+            },
             |process| {
                 let activity = process
                     .activities

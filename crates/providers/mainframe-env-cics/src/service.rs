@@ -3380,11 +3380,13 @@ mod tests {
             .mutate_process(
                 "TYPE",
                 "SCOPE",
-                uow,
-                execution,
-                principal,
-                "start",
-                [1; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: uow,
+                    owner_execution: execution,
+                    owner_principal: principal,
+                    replay_key: "start",
+                    request_digest: [1; 32],
+                },
                 |process| {
                     process.start(&root, None, true)?;
                     process.checkpoint(&root, 1, 7, "scope-checkpoint")?;
@@ -8442,7 +8444,7 @@ mod tests {
                 response2: 19,
             })
         );
-        assert!(cics.lock().unwrap().program_loads.get("TOOBIG").is_none());
+        assert!(!cics.lock().unwrap().program_loads.contains_key("TOOBIG"));
 
         let denied_store = Arc::new(MemoryStore::new(Default::default()));
         let (host, seen) = command_authorities(true);
@@ -9483,7 +9485,7 @@ mod tests {
         let state = service.lock().unwrap();
         let terminal = &state.sessions[session.as_str()];
         assert_eq!(terminal.field_values["OPEN"], [0; 4]);
-        assert_eq!(terminal.field_modified["OPEN"], false);
+        assert!(!terminal.field_modified["OPEN"]);
         drop(state);
         assert!(
             service
@@ -14320,8 +14322,8 @@ mod tests {
         let committed_version = terminal.version;
         assert_eq!(terminal.field_values["OPEN"], [0; 4]);
         assert_eq!(terminal.field_values["LOCK"], b"KEEP");
-        assert_eq!(terminal.field_modified["OPEN"], false);
-        assert_eq!(terminal.field_modified["LOCK"], true);
+        assert!(!terminal.field_modified["OPEN"]);
+        assert!(terminal.field_modified["LOCK"]);
         drop(state);
         let controls = service.terminal_control_snapshot(&session).unwrap();
         assert_eq!(controls.cursor, 0);
@@ -14673,7 +14675,7 @@ mod tests {
         let target = &state.sessions[target_session.as_str()];
         assert_eq!(target.screen, b"RAW\0\0-3270-DATA");
         assert_eq!(target.field_values["FIELD"], b"DATA");
-        assert_eq!(target.field_protection["FIELD"], true);
+        assert!(target.field_protection["FIELD"]);
         drop(state);
         let checks = seen.lock().unwrap();
         assert!(checks.iter().any(|(class, resource, intent)| {
@@ -18331,7 +18333,9 @@ mod tests {
             pooled: true,
             certificate: None,
         };
-        service.register_web_urimaps(&[definition.clone()]).unwrap();
+        service
+            .register_web_urimaps(std::slice::from_ref(&definition))
+            .unwrap();
         service.register_web_urimaps(&[definition]).unwrap();
         let invocation = invocation_for("web-open-sqlite", BTreeMap::new());
         let session = SessionId::new("web-open-sqlite", 64).unwrap();
@@ -21377,9 +21381,9 @@ mod tests {
                 .exit,
             "BRXIT"
         );
-        cics.register_bridge_exit_defaults(&[selected.clone()])
+        cics.register_bridge_exit_defaults(std::slice::from_ref(&selected))
             .unwrap();
-        cics.register_bridge_exit_defaults(&[selected.clone()])
+        cics.register_bridge_exit_defaults(std::slice::from_ref(&selected))
             .unwrap();
         assert_eq!(
             cics.resolve_bridge_exit("NX00", None).unwrap().exit,
@@ -28280,7 +28284,10 @@ mod tests {
             let service = service(store);
             service.configure_diagnostic_trace(configuration).unwrap();
             service
-                .register_diagnostic_resources(&[dump_code.clone()], &[monitor_point.clone()])
+                .register_diagnostic_resources(
+                    std::slice::from_ref(&dump_code),
+                    std::slice::from_ref(&monitor_point),
+                )
                 .unwrap();
             assert_eq!(service.diagnostic_snapshot().unwrap().version, 2);
         }
@@ -28294,7 +28301,10 @@ mod tests {
             assert!(snapshot.traces.is_empty() && snapshot.dumps.is_empty());
             service.configure_diagnostic_trace(configuration).unwrap();
             service
-                .register_diagnostic_resources(&[dump_code.clone()], &[monitor_point.clone()])
+                .register_diagnostic_resources(
+                    std::slice::from_ref(&dump_code),
+                    std::slice::from_ref(&monitor_point),
+                )
                 .unwrap();
             assert_eq!(service.diagnostic_snapshot().unwrap().version, 2);
         }
@@ -28820,8 +28830,10 @@ mod tests {
 
     #[test]
     fn dump_transaction_rejects_malformed_segments_and_space_exhaustion() {
-        let mut limits = CicsLimits::default();
-        limits.max_diagnostic_payload_bytes = 64;
+        let limits = CicsLimits {
+            max_diagnostic_payload_bytes: 64,
+            ..CicsLimits::default()
+        };
         let service = CicsService::open(
             authorities(),
             Arc::new(MemoryStore::new(Default::default())),
@@ -29874,7 +29886,7 @@ mod tests {
             let service = service(store);
             let report = service.spool_report_snapshot(&token).unwrap();
             assert_eq!(report.state, "open-output");
-            assert_eq!(report.owner_run_unit.is_some(), true);
+            assert!(report.owner_run_unit.is_some());
             assert_eq!(report.record_length, 80);
         }
         std::fs::remove_dir_all(root).unwrap();
@@ -40696,9 +40708,7 @@ mod tests {
                 .bytes()
                 .starts_with(b"urn:example:booking")
         );
-        let endpoint = format!(
-            "<wsa:EndpointReference xmlns:wsa=\"http://www.w3.org/2005/08/addressing\"><wsa:Address>http://example.invalid/?a=1&amp;b=2</wsa:Address><wsa:Metadata><Schema>v1</Schema></wsa:Metadata></wsa:EndpointReference>"
-        );
+        let endpoint = "<wsa:EndpointReference xmlns:wsa=\"http://www.w3.org/2005/08/addressing\"><wsa:Address>http://example.invalid/?a=1&amp;b=2</wsa:Address><wsa:Metadata><Schema>v1</Schema></wsa:Metadata></wsa:EndpointReference>".to_string();
         let build_epr = request(
             CicsOperation::WsaContextBuild,
             BTreeMap::from([
@@ -42297,11 +42307,13 @@ mod tests {
             .mutate_process(
                 "TYPE",
                 "ORDER",
-                run_unit,
-                execution,
-                "IBMUSER",
-                "suspend",
-                [1; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit,
+                    owner_execution: execution,
+                    owner_principal: "IBMUSER",
+                    replay_key: "suspend",
+                    request_digest: [1; 32],
+                },
                 |process| {
                     process.set_suspended(&root, true)?;
                     Ok(handlers::bts_lifecycle::BtsReply::normal())
@@ -42428,11 +42440,13 @@ mod tests {
             .mutate_process(
                 "TYPE",
                 "EVENTS",
-                run_unit,
-                execution,
-                "IBMUSER",
-                "activate",
-                [1; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit,
+                    owner_execution: execution,
+                    owner_principal: "IBMUSER",
+                    replay_key: "activate",
+                    request_digest: [1; 32],
+                },
                 |process| {
                     process.start(&root, None, true)?;
                     process.checkpoint(&root, 1, 1, "checkpoint")?;
@@ -42454,11 +42468,13 @@ mod tests {
             .mutate_process(
                 "TYPE",
                 "EVENTS",
-                run_unit,
-                execution,
-                "IBMUSER",
-                "dormant",
-                [2; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit,
+                    owner_execution: execution,
+                    owner_principal: "IBMUSER",
+                    replay_key: "dormant",
+                    request_digest: [2; 32],
+                },
                 |process| {
                     process.finish(
                         &root,
@@ -43271,11 +43287,13 @@ mod tests {
                     transid: "BTS1".into(),
                     userid: "USER".into(),
                 },
-                "UOW2",
-                "EXEC2",
-                "USER",
-                "define-child",
-                [2; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "define-child",
+                    request_digest: [2; 32],
+                },
             )
             .unwrap();
         authority.finish_uow("UOW2", "EXEC2", "USER", true).unwrap();
@@ -43368,11 +43386,13 @@ mod tests {
                     transid: "BTS1".into(),
                     userid: "USER".into(),
                 },
-                "UOW2",
-                "EXEC2",
-                "USER",
-                "define-child",
-                [2; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "define-child",
+                    request_digest: [2; 32],
+                },
             )
             .unwrap();
         authority.finish_uow("UOW2", "EXEC2", "USER", true).unwrap();
@@ -43730,11 +43750,13 @@ mod tests {
             .mutate_process(
                 "TYPE",
                 "ORDER",
-                run_unit,
-                execution,
-                "IBMUSER",
-                "start",
-                [1; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit,
+                    owner_execution: execution,
+                    owner_principal: "IBMUSER",
+                    replay_key: "start",
+                    request_digest: [1; 32],
+                },
                 |process| {
                     process.start(&root, None, true)?;
                     process.checkpoint(&root, 1, 1, "checkpoint")?;
@@ -44183,11 +44205,13 @@ mod tests {
             .mutate_process(
                 "TYPE",
                 "ORDER",
-                "BUILDER",
-                "BUILD-EXEC",
-                "IBMUSER",
-                "start",
-                [1; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: "BUILDER",
+                    owner_execution: "BUILD-EXEC",
+                    owner_principal: "IBMUSER",
+                    replay_key: "start",
+                    request_digest: [1; 32],
+                },
                 |process| {
                     process.start(&root, None, true)?;
                     Ok(BtsReply::normal())
@@ -44212,11 +44236,13 @@ mod tests {
                             transid: "BTS1".into(),
                             userid: "IBMUSER".into(),
                         },
-                        "BUILDER",
-                        "BUILD-EXEC",
-                        "IBMUSER",
-                        key,
-                        digest,
+                        crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                            run_unit: "BUILDER",
+                            owner_execution: "BUILD-EXEC",
+                            owner_principal: "IBMUSER",
+                            replay_key: key,
+                            request_digest: digest,
+                        },
                     )
                     .unwrap(),
             );
@@ -44553,11 +44579,13 @@ mod tests {
             .mutate_process(
                 "TYPE",
                 "ORDER",
-                run_unit,
-                execution,
-                "IBMUSER",
-                "start",
-                [1; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit,
+                    owner_execution: execution,
+                    owner_principal: "IBMUSER",
+                    replay_key: "start",
+                    request_digest: [1; 32],
+                },
                 |process| {
                     process.start(&root, None, true)?;
                     process.checkpoint(&root, 1, 1, "checkpoint")?;
@@ -45955,8 +45983,10 @@ mod tests {
                 },
             ],
         };
-        cics.register_partition_sets(&[definition.clone()]).unwrap();
-        cics.register_partition_sets(&[definition.clone()]).unwrap();
+        cics.register_partition_sets(std::slice::from_ref(&definition))
+            .unwrap();
+        cics.register_partition_sets(std::slice::from_ref(&definition))
+            .unwrap();
         assert_eq!(
             cics.register_partition_sets(&[CicsPartitionSetDefinition {
                 partitions: vec![definition.partitions[0].clone()],
@@ -46184,10 +46214,12 @@ mod tests {
                 &session,
                 invocation.principal.id(),
                 "partition-receive-csrf",
-                0x7d,
-                "P",
-                b"mixed",
-                17,
+                crate::CicsPartitionInput {
+                    aid: 0x7d,
+                    partition: "P",
+                    data: b"mixed",
+                    cursor: 17
+                },
                 2,
             )
             .unwrap()
@@ -46252,10 +46284,12 @@ mod tests {
                 &session,
                 invocation.principal.id(),
                 "partition-receive-csrf",
-                0x7d,
-                "UNKNOWN",
-                b"abc",
-                0,
+                crate::CicsPartitionInput {
+                    aid: 0x7d,
+                    partition: "UNKNOWN",
+                    data: b"abc",
+                    cursor: 0
+                },
                 3,
             ),
             Err(HostProblem::Malformed)
@@ -46264,10 +46298,12 @@ mod tests {
             &session,
             invocation.principal.id(),
             "partition-receive-csrf",
-            0x7d,
-            "P",
-            b"lower",
-            0,
+            crate::CicsPartitionInput {
+                aid: 0x7d,
+                partition: "P",
+                data: b"lower",
+                cursor: 0,
+            },
             3,
         )
         .unwrap();
@@ -46291,10 +46327,12 @@ mod tests {
             &session,
             invocation.principal.id(),
             "partition-receive-csrf",
-            0x7d,
-            "P",
-            b"data",
-            0,
+            crate::CicsPartitionInput {
+                aid: 0x7d,
+                partition: "P",
+                data: b"data",
+                cursor: 0,
+            },
             4,
         )
         .unwrap();
@@ -46380,10 +46418,12 @@ mod tests {
                 &session,
                 invocation.principal.id(),
                 "receive-partn-sqlite-csrf",
-                0x7d,
-                "P",
-                b"lower",
-                12,
+                crate::CicsPartitionInput {
+                    aid: 0x7d,
+                    partition: "P",
+                    data: b"lower",
+                    cursor: 12,
+                },
                 2,
             )
             .unwrap();
@@ -46860,7 +46900,7 @@ mod tests {
         )
         .unwrap();
         denied
-            .register_outboard_destinations(&[definition.clone()])
+            .register_outboard_destinations(std::slice::from_ref(&definition))
             .unwrap();
         let (invocation, _) = registered(&denied);
         let add = request(
@@ -46901,7 +46941,7 @@ mod tests {
         let first = {
             let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
             let cics = service(store);
-            cics.register_outboard_destinations(&[definition.clone()])
+            cics.register_outboard_destinations(std::slice::from_ref(&definition))
                 .unwrap();
             let (invocation, _) = registered(&cics);
             let response = cics
@@ -54256,11 +54296,13 @@ mod tests {
             .mutate_process(
                 "TYPE",
                 "ACTIVITY",
-                uow,
-                execution,
-                principal,
-                "start",
-                [1; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: uow,
+                    owner_execution: execution,
+                    owner_principal: principal,
+                    replay_key: "start",
+                    request_digest: [1; 32],
+                },
                 |process| {
                     process.start(&root, None, true)?;
                     process.checkpoint(&root, 1, 7, "checkpoint")?;
@@ -54280,11 +54322,13 @@ mod tests {
                     transid: "BTS1".into(),
                     userid: principal.into(),
                 },
-                uow,
-                execution,
-                principal,
-                "child",
-                [2; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: uow,
+                    owner_execution: execution,
+                    owner_principal: principal,
+                    replay_key: "child",
+                    request_digest: [2; 32],
+                },
             )
             .unwrap();
         cics.bind_bts_activity_context(&invocation.run_unit_id, "TYPE", "ACTIVITY", &root, 1, 7)
@@ -54486,11 +54530,13 @@ mod tests {
             .mutate_process(
                 "TYPE",
                 "DESCEND",
-                root_owner.run_unit_id.as_str(),
-                root_owner.execution_id.as_str(),
-                root_owner.principal.id().as_str(),
-                "start",
-                [1; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: root_owner.run_unit_id.as_str(),
+                    owner_execution: root_owner.execution_id.as_str(),
+                    owner_principal: root_owner.principal.id().as_str(),
+                    replay_key: "start",
+                    request_digest: [1; 32],
+                },
                 |process| {
                     process.start(&root, None, true)?;
                     Ok(BtsReply::normal())
@@ -54509,11 +54555,13 @@ mod tests {
                     transid: "BTS1".into(),
                     userid: root_owner.principal.id().as_str().into(),
                 },
-                root_owner.run_unit_id.as_str(),
-                root_owner.execution_id.as_str(),
-                root_owner.principal.id().as_str(),
-                "child",
-                [2; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: root_owner.run_unit_id.as_str(),
+                    owner_execution: root_owner.execution_id.as_str(),
+                    owner_principal: root_owner.principal.id().as_str(),
+                    replay_key: "child",
+                    request_digest: [2; 32],
+                },
             )
             .unwrap();
         authority

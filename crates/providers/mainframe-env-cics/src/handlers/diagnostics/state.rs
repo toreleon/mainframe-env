@@ -9,24 +9,13 @@ const KEY: &str = "state";
 const MAGIC: &[u8; 8] = b"MECDIA01";
 
 /// Local trace destinations and the main user-trace flag.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CicsTraceConfiguration {
     pub user_trace: bool,
     pub internal: bool,
     pub auxiliary: bool,
     pub system: bool,
-}
-
-impl Default for CicsTraceConfiguration {
-    fn default() -> Self {
-        Self {
-            user_trace: false,
-            internal: false,
-            auxiliary: false,
-            system: false,
-        }
-    }
 }
 
 /// One retained trace entry, with the captured bytes and issuing identity.
@@ -394,9 +383,11 @@ mod tests {
     #[test]
     fn diagnostic_state_codec_rejects_corruption_and_capacity_excess() {
         let limits = CicsLimits::default();
-        let mut state = DiagnosticState::default();
-        state.version = 1;
-        state.next_sequence = 2;
+        let mut state = DiagnosticState {
+            version: 1,
+            next_sequence: 2,
+            ..DiagnosticState::default()
+        };
         state.traces.push(CicsDiagnosticTraceRecord {
             sequence: 1,
             kind: "TRACENUM".into(),

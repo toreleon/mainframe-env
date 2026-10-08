@@ -33,11 +33,11 @@ pub(in crate::service) use host_boundary::{
 mod interval;
 mod interval_control;
 mod issue_device;
-pub use issue_device::IssuePassTransfer;
 #[cfg(test)]
 pub(in crate::service) use issue_device::{
     IssueDeviceDefinition, IssueDeviceKind, IssueDeviceRecord, invoke as invoke_issue_device,
 };
+pub use issue_device::{IssuePassTransfer, prune_issue_device_receipts};
 mod journal_control;
 mod limits;
 mod network_context;
@@ -359,7 +359,8 @@ pub use task_enqueue::CicsEnqueueModelDefinition;
 pub(super) use task_enqueue::{load_enqueue_models, release_uow as release_uow_enqueues};
 pub use terminal_control::{
     CicsBmsControlSnapshot, CicsOutboardDestinationDefinition, CicsOutboardKind,
-    CicsOutboardRecord, CicsOutboardSnapshot, CicsPartitionDefinition, CicsPartitionSetDefinition,
+    CicsOutboardRecord, CicsOutboardSnapshot, CicsPartitionDefinition, CicsPartitionInput,
+    CicsPartitionSetDefinition,
 };
 pub(super) use terminal_control::{
     TerminalInput, invoke as invoke_terminal_control, release_bms_message_for_task,

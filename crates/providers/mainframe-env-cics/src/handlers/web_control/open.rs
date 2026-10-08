@@ -290,9 +290,9 @@ fn token(run: &Run, request: &CicsRequest) -> Result<[u8; 8], HostProblem> {
     digest.update(run.invocation.run_unit_id.as_str().as_bytes());
     digest.update(b"\0");
     digest.update(mutation.idempotency_key.as_str().as_bytes());
-    Ok(digest.finalize()[..8]
+    digest.finalize()[..8]
         .try_into()
-        .map_err(|_| HostProblem::InfrastructureFailure)?)
+        .map_err(|_| HostProblem::InfrastructureFailure)
 }
 
 pub(super) fn replay_write(

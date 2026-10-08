@@ -44,22 +44,26 @@ pub(super) fn invoke(
         authority.remove_subtree(
             &process.process_type,
             &process.name,
-            run_unit,
-            owner_execution,
-            owner_principal,
-            replay_key,
-            digest,
+            crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                run_unit,
+                owner_execution,
+                owner_principal,
+                replay_key,
+                request_digest: digest,
+            },
             &BtsRemoval::Reset { activity_id },
         )?;
     } else if request.operation == CicsOperation::DeleteActivity {
         authority.remove_subtree(
             &process.process_type,
             &process.name,
-            run_unit,
-            owner_execution,
-            owner_principal,
-            replay_key,
-            digest,
+            crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                run_unit,
+                owner_execution,
+                owner_principal,
+                replay_key,
+                request_digest: digest,
+            },
             &BtsRemoval::Delete {
                 parent_id: parent_id.ok_or(HostProblem::InfrastructureFailure)?,
                 child_name: argument_name(request, "ACTIVITY", 16)?,
@@ -76,11 +80,13 @@ pub(super) fn invoke(
             authority.mutate_process(
                 &process.process_type,
                 &process.name,
-                run_unit,
-                owner_execution,
-                owner_principal,
-                replay_key,
-                digest,
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit,
+                    owner_execution,
+                    owner_principal,
+                    replay_key,
+                    request_digest: digest,
+                },
                 |process| {
                     process.set_suspended(&activity_id, true)?;
                     Ok(BtsReply::normal())

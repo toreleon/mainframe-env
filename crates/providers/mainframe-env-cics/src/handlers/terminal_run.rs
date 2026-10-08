@@ -239,7 +239,7 @@ impl CicsService {
         let run = state.runs.get(&run_id).cloned();
         drop(state);
         if let Some(run) = &run {
-            handlers::release_task_state(self, &run)?;
+            handlers::release_task_state(self, run)?;
         }
         let mut state = self.lock()?;
         if state.runs.get(&run_id).is_some_and(|current| {

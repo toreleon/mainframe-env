@@ -135,7 +135,7 @@ fn build(
                     },
                 ));
             }
-            data.into()
+            data
         };
         if field != "ALL" {
             state
@@ -222,7 +222,7 @@ fn get(
     authorize_channel(service, run, &channel, AccessIntent::Read)?;
     let target_page = target_encoding(request)?;
     let index = number(request, "RELATESINDEX")?.unwrap_or(1);
-    if index < 1 || index > 32 {
+    if !(1..=32).contains(&index) {
         return Err(condition("INVREQ", 16, 11));
     }
     let mut response = normal(service, run)?;

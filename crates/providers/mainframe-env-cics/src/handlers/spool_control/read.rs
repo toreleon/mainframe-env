@@ -50,7 +50,7 @@ pub(super) fn invoke(
             response2: 12,
         });
     }
-    if maxflength < 0 || maxflength > 32_760 || into_capacity < 0 {
+    if !(0..=32_760).contains(&maxflength) || into_capacity < 0 {
         return Err(HostProblem::Condition {
             name: "LENGERR".into(),
             response: 22,

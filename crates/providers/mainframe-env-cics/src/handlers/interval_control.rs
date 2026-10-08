@@ -1250,21 +1250,22 @@ mod tests {
             Ok(records["ATTACHED"].clone())
         );
 
-        let mut reader = RecordReader::new(&encoded);
-        reader.take(MAGIC.len()).unwrap();
-        reader.text(8).unwrap();
-        reader.text(4).unwrap();
-        reader.text(256).unwrap();
-        reader.text(256).unwrap();
-        reader.u64().unwrap();
-        reader.optional_text(4).unwrap();
-        reader.field(limits.max_queue_bytes).unwrap();
-        reader.optional_text(4).unwrap();
-        reader.optional_text(4).unwrap();
-        reader.optional_text(8).unwrap();
-        reader.boolean().unwrap();
-        let state_at = reader.at;
-        drop(reader);
+        let state_at = {
+            let mut reader = RecordReader::new(&encoded);
+            reader.take(MAGIC.len()).unwrap();
+            reader.text(8).unwrap();
+            reader.text(4).unwrap();
+            reader.text(256).unwrap();
+            reader.text(256).unwrap();
+            reader.u64().unwrap();
+            reader.optional_text(4).unwrap();
+            reader.field(limits.max_queue_bytes).unwrap();
+            reader.optional_text(4).unwrap();
+            reader.optional_text(4).unwrap();
+            reader.optional_text(8).unwrap();
+            reader.boolean().unwrap();
+            reader.at
+        };
         let mut unknown = encoded;
         unknown[state_at] = 8;
         assert_eq!(
