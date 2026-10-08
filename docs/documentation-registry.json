@@ -109,7 +109,8 @@
     "docs/delivery/subsystems/mq/inquiry-source-boundary.md",
     "docs/guides/MAINFRAME-SANDBOX.md",
     "docs/decisions/0053-selected-controller-publication-fence.md",
-    "docs/decisions/0054-focused-conformance-output.md"
+    "docs/decisions/0054-focused-conformance-output.md",
+    "docs/decisions/0055-standard-package-mac-envelope.md"
   ],
   "navigation": [
     {
@@ -565,6 +566,10 @@
         {
           "label": "ADR-0054: Canonical focused conformance output",
           "path": "docs/decisions/0054-focused-conformance-output.md"
+        },
+        {
+          "label": "ADR-0055: Standard package MAC envelope",
+          "path": "docs/decisions/0055-standard-package-mac-envelope.md"
         }
       ],
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."

@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 241,
+    "markdown_documents": 242,
     "navigation_groups": 8,
-    "normative_documents": 102,
+    "normative_documents": 103,
     "xtask_commands": 163
   },
   "documents": [
@@ -341,8 +341,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 183,
-      "sha256": "sha256:20342bba15729db0a8f723bc71e4cea8544c10a7a29782849795ddcfb0e20fb0",
+      "relative_links": 184,
+      "sha256": "sha256:c4f291e4dd879fa32df252b04b09551acca0dd4e1e1af419644c4243dc1dff0d",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -1495,10 +1495,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env current public package hardening",
+      "normative": true,
+      "owner": "application trust and embedding maintainers",
+      "path": "docs/decisions/0055-standard-package-mac-envelope.md",
+      "relative_links": 0,
+      "scope": "current package MAC envelope and finite retained verification",
+      "sha256": "sha256:b5ecfed7933a04d9bf84577280257b4a3472d908a6ace260708d25dab830b781",
+      "status": "Accepted design; dependency and implementation acceptance pending",
+      "title": "ADR-0055: Use a bounded COSE_Mac0 profile for current package authentication",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 57,
-      "sha256": "sha256:34a958bbb77b2f28dea97520d7c143307ba9b44e1c177c808d453e4e01c6f89b",
+      "relative_links": 58,
+      "sha256": "sha256:54e3b783a1e8d275761ae6547ed582190fb27718c5ed574d67df0e2342c0cc2f",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1746,7 +1758,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/coverage/foundation-status.md",
       "relative_links": 5,
-      "sha256": "sha256:70776a8155aab10ffc1dfd494caf0d97aa6fe1d0224b7cb92d1047e3cdb000d0",
+      "sha256": "sha256:66d13233637073f9d29b7d1fd0a71c4ca0242ede1a0f7cb9a2c643dd38feac81",
       "title": "Coverage and conformance — Coverage authority progress",
       "xtask_commands": 6
     },
@@ -2802,6 +2814,10 @@
         {
           "label": "ADR-0054: Canonical focused conformance output",
           "path": "docs/decisions/0054-focused-conformance-output.md"
+        },
+        {
+          "label": "ADR-0055: Standard package MAC envelope",
+          "path": "docs/decisions/0055-standard-package-mac-envelope.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -3024,7 +3040,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:1e6220a725d51aec71f6184f31de97b7db1be049ec8349b028a00079affe79c5",
+  "registry_sha256": "sha256:96cfd1b2f138876808c0b1adb7ca4dd2717109b5e8e28caf9b1d1160d533cc81",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

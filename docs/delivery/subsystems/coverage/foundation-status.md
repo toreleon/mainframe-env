@@ -707,3 +707,48 @@ module, formatting, frozen dependency policy and diff checks pass. Tooling-owner
 strict lint passes; retained MQ/dependency-inclusive lint failures are separately
 pending. Missing supplemental cache remains skipped/unavailable with zero credit.
 Broader public and Foundation exit checks remain pending.
+
+### Package-state schema implementation grant
+
+`CV-202.package-state-schema` consumes identity seal 8124e3a6 and current
+be9c9e70. Manager approves one server dev edge to the existing workspace
+jsonschema 0.52.1 with defaults disabled, its direct lock edge, the reviewed
+private native binder/test module and the two prepared state-schema repairs.
+The package schema remains unchanged. One focused Cargo sequence is granted:
+first execute real DTO tests against unchanged state schemas and preserve actual
+assertion failures; then apply only the reviewed schema repair and rerun the
+same expectations, affected compilation/lint and policy checks. A compilation
+or package-reference prerequisite failure must be resolved and cannot count
+as state-schema red. Missing-IMS history and null selection remain valid;
+selected/topology/trust remain with existing typed readers. Strict outside-owner
+failures remain pending, not suppressed. Fixture receipts stay external and
+earn no coverage. Manager owns shared local INSTALLER reference registration,
+final native schema/metadata integration, generated docs and sealing.
+
+### Standard envelope implementation decision
+
+Manager accepts ADR-0055 for `CV-204.standard-envelope`. Prepare the private
+application owned codec, pure source-compatible verifier fresh-policy query,
+production server trust adapter and current conformance/server producers in a
+new isolated checkout consuming framing seal 8124e3a6. Existing ring remains
+the crypto provider; coset 0.4.2/defaults-off plus existing workspace base64 are
+the only proposed codec edges. The reviewed external dependency closure is not
+a locked acceptance receipt. No Cargo/resolution is granted yet: provide exact
+manifest/lock/feature proposal and independent regression source before a slot
+and dependency acceptance sequence. No unrelated lock upgrade, private key
+rotation, legacy relabeling, new signature/wire DTO or source semantics.
+Preserve key lengths 32..4096, canonical-only COSE, original protected MAC bytes
+and full-owned equality for any legacy-profile retry. All dependency and final
+execution acceptance remains pending; no conformance/coverage credit.
+
+### Nonpublishing public-check preparation
+
+Manager authorizes `CV-209.public-check` preparation only in its isolated
+checkout. Reuse the completed acceptance audit and existing CI assurance,
+Jenkins command owners and public dependency/exit policy. Design the smallest
+finite aggregate for current-candidate public checks, preserving their actual
+failures, skips and required floor/backend/workload/client gates. Do not restore
+GitHub releases, tags, crate version management, signed release artifacts or
+committed evidence receipts. No Cargo, command campaign or repository mutation
+is authorized during preparation. Manager must review candidate/dirty-input
+binding, exact command scope and fail-closed status before implementation.
