@@ -383,6 +383,22 @@ file-SQLite recovery; backend parity remains pending until executed. No Cargo or
 production repair is granted during preparation. The manager must review the
 exact regression/adapter scope before granting its red/implementation sequence.
 
+### Identity producer and schema binding scope
+
+Extend `CV-204.identity-framing` to the current signed package producers in
+`mainframe-env-conformance/src/carddemo.rs`, `carddemo/ims_packages.rs` and
+`carddemo/ims_process_tests.rs`; the ProductServer test producer/resigner helpers
+in `product.rs`; the existing `application-package-v2.schema.json`; and only
+affected application-package guard bindings in `xtask/src/main.rs`.
+Align that existing schema with the actual `base`, `generation`, `sections` and
+`signature` DTO, with exact finite @2/@3 discrimination in `sections`; it must
+not retain an invented top-level projection or add a second discriminator.
+Preserve legacy-only migration fixtures and independent frozen identity vectors.
+Current producers use @3 and finite identity dispatch. Production HMAC/key policy
+is unchanged. Publication behavior, installer/publication schema repairs and
+standards-envelope adoption remain separate slices. Shared contract inventories,
+architecture docs and generated metadata remain manager-owned.
+
 ### CV-204.package-bounds acceptance
 
 Status: **Complete (bounded package admission and codec only)**. The independently reproduced allocation/codec refusals are repaired. All 33 focused package tests and dependency-inclusive strict Clippy pass in the producing checkout; integrated application-package/spec/coverage, module, formatting and frozen dependency gates pass. Streaming preflight checks counts, text and checked footprint before typed decoding; capped export borrows retained packages and stops before full encoding. Duplicate JSON members refuse. Serde scratch and bounded metadata sets still allocate; this is not a process-wide heap quota. Identity framing and publication fencing remain pending.
