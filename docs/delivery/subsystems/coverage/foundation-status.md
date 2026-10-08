@@ -377,3 +377,10 @@ Status: **Complete (mechanical batch lint only)**. The 21 existing package-local
 Documentation/changelog/subsystem and diff checks pass for this reviewed scope.
 Missing supplemental source checks are `skipped/unavailable` by user direction,
 with zero credit. Foundation acceptance and other public exit gates remain pending.
+
+### CV-206.controller-root-validation acceptance
+
+Status: **Complete (controller admission and root validation only)**. Integrated controller tests (11) and IMS completion tests (8) pass, with strict batch Clippy after the separate lint prerequisite. Duplicate root keys, including identical duplicates, refuse before participant effects. Impossible root-key widths refuse admission and leave selection intact. Valid retained forms remain unchanged; historical impossible-width retained generations also refuse reconstruction through the existing install path. Same-process reopen supplies no process-crash or backend-parity credit.
+Documentation/changelog/subsystem and diff checks pass for this reviewed scope.
+Missing supplemental source checks are `skipped/unavailable` by user direction,
+with zero credit. Foundation acceptance and other public exit gates remain pending.

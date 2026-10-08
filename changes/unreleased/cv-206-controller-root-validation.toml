@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Reject duplicate IMS loader root keys before participant calls and reject controller root-key widths larger than root records without changing selected generations."
