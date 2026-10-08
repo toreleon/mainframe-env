@@ -124,3 +124,12 @@ controller root validation and executable journey/client/exit-gate closure.
 They remain pending bounded assignments and compatibility decisions; static
 findings are not reproduced defects or completion receipts. Retained signatures
 and identity domains must not be silently rehashed.
+
+### CV-203.generated-binding acceptance
+
+Status: **Complete (generated binding only)**. The failing owner check reproduced
+a stale catalog binding. Normal regeneration updates only the catalog input
+digest; the generated identity-set digest and all 1,506 descriptors are unchanged.
+The owner check, deterministic second generation, current spec/coverage checks,
+formatting, dependency policy, documentation/changelog/subsystem and diff checks
+pass. No handler or runtime gate receives credit from this repair.
