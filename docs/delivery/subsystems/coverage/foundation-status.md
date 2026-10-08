@@ -573,3 +573,12 @@ diff checks pass. Strict tooling-owner lint passes with `--no-deps`; the unchang
 dependency-inclusive MQ/CICS lint failures remain separately pending and are not
 waived or described as passed. Foundation/public exit acceptance remains pending.
 Missing supplemental cache checks remain `skipped/unavailable`, zero credit.
+
+### CV-208.production-scanner acceptance
+
+Status: **Complete (production scanner boundary only)**. Actual Rust test items are excluded by the shared lexical scanner without hiding later production behind comment/string/test markers. Four real Rust-owner tests and the 26 Python scanner/boundary tests pass. Existing application/dehardcoding guards use one batched source transport and fail closed on malformed input or transport failure. Lexical cfg handling is conservative, not full compiler/macro evaluation.
+Joint schemas/coverage/spec, module, formatting, frozen dependency, metadata and
+diff checks pass. Strict tooling-owner lint passes with `--no-deps`; the unchanged
+dependency-inclusive MQ/CICS lint failures remain separately pending and are not
+waived or described as passed. Foundation/public exit acceptance remains pending.
+Missing supplemental cache checks remain `skipped/unavailable`, zero credit.

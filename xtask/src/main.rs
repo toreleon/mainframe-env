@@ -25,6 +25,7 @@ mod jcl_catalog;
 mod jcl_conformance;
 mod mq_conformance;
 mod mq_status_catalog;
+mod production_scanner;
 mod profile_intake;
 mod racf_catalog;
 #[cfg(test)]
@@ -9046,8 +9047,10 @@ fn check_application_packages(root: &Path) -> TaskResult {
             &format!("application package implementation omits {required}"),
         )?;
     }
-    let product = read(&root.join("crates/apps/mainframe-env-server/src/product.rs"))?;
-    let production_product = product.split("#[cfg(test)]").next().unwrap_or(&product);
+    let production_product = production_scanner::read_source(
+        root,
+        &root.join("crates/apps/mainframe-env-server/src/product.rs"),
+    )?;
     for required in [
         "applications_v2: Mutex<DurableApplicationsV2>",
         "pub fn open_with_package_trust",
@@ -9068,8 +9071,7 @@ fn check_application_packages(root: &Path) -> TaskResult {
 
 fn check_db2_catalog(root: &Path) -> TaskResult {
     let service_path = root.join("crates/providers/mainframe-env-db2/src/service.rs");
-    let service = read(&service_path)?;
-    let production = service.split("#[cfg(test)]").next().unwrap_or(&service);
+    let production = production_scanner::read_source(root, &service_path)?;
     let upper = production.to_ascii_uppercase();
     for forbidden in [
         "CARDDEMO",
@@ -9146,13 +9148,8 @@ fn check_db2_catalog(root: &Path) -> TaskResult {
 fn check_batch_controllers(root: &Path) -> TaskResult {
     let service_path = root.join("crates/apps/mainframe-env-batch/src/service.rs");
     let controller_path = root.join("crates/apps/mainframe-env-batch/src/controller.rs");
-    let service = read(&service_path)?;
-    let controller = read(&controller_path)?;
-    let production_service = service.split("#[cfg(test)]").next().unwrap_or(&service);
-    let production_controller = controller
-        .split("#[cfg(test)]")
-        .next()
-        .unwrap_or(&controller);
+    let production_service = production_scanner::read_source(root, &service_path)?;
+    let production_controller = production_scanner::read_source(root, &controller_path)?;
     let production = format!("{production_service}\n{production_controller}").to_ascii_uppercase();
     for forbidden in [
         "COBTUPDT",
@@ -9202,8 +9199,10 @@ fn check_batch_controllers(root: &Path) -> TaskResult {
             &format!("batch controller service integration omits {required}"),
         )?;
     }
-    let product = read(&root.join("crates/apps/mainframe-env-server/src/product.rs"))?;
-    let production_product = product.split("#[cfg(test)]").next().unwrap_or(&product);
+    let production_product = production_scanner::read_source(
+        root,
+        &root.join("crates/apps/mainframe-env-server/src/product.rs"),
+    )?;
     require(
         production_product.contains("pub fn publish_application_generation")
             && production_product.contains("selected_application_v2")
@@ -9884,54 +9883,26 @@ fn check_dehardcoding(root: &Path) -> TaskResult {
     collect_extension(&root.join("crates"), OsStr::new("rs"), &mut rust_files)?;
     rust_files.sort();
     let conformance = root.join("crates/tooling/mainframe-env-conformance");
-    let forbidden_application_identities = [
-        "CARDDEMO",
-        "COBTUPDT",
-        "CBPAUP0C",
-        "PAUDBLOD",
-        "PAUDBUNL",
-        "DBPAUTP0",
-        "PSBPAUTB",
-        "PAUTSUM0",
-        "PAUTDTL1",
-        "AUTHFRDS",
-        "TRANSACTION_TYPE",
-        "TRANSACTION_TYPE_CATEGORY",
-    ];
-    let mut hits = Vec::new();
-    for rust_file in rust_files {
-        if rust_file.starts_with(&conformance)
+    rust_files.retain(|rust_file| {
+        !(rust_file.starts_with(&conformance)
             || rust_file.file_name() == Some(OsStr::new("tests.rs"))
             || rust_file
                 .components()
-                .any(|part| part.as_os_str() == OsStr::new("tests"))
-        {
-            continue;
-        }
-        let source = read(&rust_file)?;
-        let production_end = ["#[cfg(test)]", "#![cfg(test)]"]
-            .iter()
-            .filter_map(|marker| source.find(marker))
-            .min()
-            .unwrap_or(source.len());
-        let production = &source[..production_end];
-        let upper = production.to_ascii_uppercase();
-        for identity in forbidden_application_identities {
-            if upper.contains(identity) {
-                hits.push(format!(
-                    "{}:{identity}",
-                    rust_file.strip_prefix(root).unwrap_or(&rust_file).display()
-                ));
-            }
-        }
-    }
-    require(
-        hits.is_empty(),
-        &format!("production application hardcode scan found {hits:?}"),
+                .any(|part| part.as_os_str() == OsStr::new("tests")))
+    });
+    production_scanner::check_application_hardcodes(root, &rust_files)?;
+    let program = production_scanner::read_source(
+        root,
+        &root.join("crates/apps/mainframe-env-batch/src/program.rs"),
     )?;
-    let program = read(&root.join("crates/apps/mainframe-env-batch/src/program.rs"))?;
-    let batch = read(&root.join("crates/apps/mainframe-env-batch/src/service.rs"))?;
-    let server = read(&root.join("crates/apps/mainframe-env-server/src/cobol.rs"))?;
+    let batch = production_scanner::read_source(
+        root,
+        &root.join("crates/apps/mainframe-env-batch/src/service.rs"),
+    )?;
+    let server = production_scanner::read_source(
+        root,
+        &root.join("crates/apps/mainframe-env-server/src/cobol.rs"),
+    )?;
     for (scope, source, forbidden) in [
         (
             "common program registry",
@@ -9944,7 +9915,7 @@ fn check_dehardcoding(root: &Path) -> TaskResult {
         ),
         (
             "batch execution",
-            batch.split("#[cfg(test)]").next().unwrap_or(&batch),
+            batch.as_str(),
             vec![
                 "match program.as_str()",
                 "step.program.eq_ignore_ascii_case(\"",
@@ -9952,7 +9923,7 @@ fn check_dehardcoding(root: &Path) -> TaskResult {
         ),
         (
             "installed system services",
-            server.split("#[cfg(test)]").next().unwrap_or(&server),
+            server.as_str(),
             vec!["program.eq_ignore_ascii_case(\""],
         ),
     ] {
