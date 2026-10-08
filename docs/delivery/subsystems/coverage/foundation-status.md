@@ -133,3 +133,12 @@ digest; the generated identity-set digest and all 1,506 descriptors are unchange
 The owner check, deterministic second generation, current spec/coverage checks,
 formatting, dependency policy, documentation/changelog/subsystem and diff checks
 pass. No handler or runtime gate receives credit from this repair.
+
+### CV-207.generated-binding acceptance
+
+Status: **Complete (generated inventory only)**. The failing inventory check
+reproduced stale DFHAID byte length/hash and the resulting CICS library digest.
+Normal owner regeneration updates those three fields to the unchanged provider
+source bytes. The owner check and deterministic second generation, formatting,
+dependency policy, module/documentation/changelog/subsystem and diff checks pass.
+This repair grants no ABI-equivalence, runtime or licensed credit.

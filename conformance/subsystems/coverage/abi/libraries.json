@@ -5,15 +5,15 @@
   "libraries": [
     {
       "id": "mainframe-env.cics-cobol-abi@1",
-      "identity": "sha256:9f8cc6f0a771f5fbe5ba08a04d3e98d63475ed954776a6a0d83b568c3ef24bb0",
+      "identity": "sha256:98e3e1b793a2459d84ef04226f01848ef29dd31838a6e28986244437c28e21b8",
       "library_name": "cics-cobol-abi-v1",
       "license": "Apache-2.0",
       "members": [
         {
-          "bytes": 1136,
+          "bytes": 1374,
           "name": "DFHAID",
           "path": "compatibility/DFHAID.cpy",
-          "sha256": "sha256:3dc63be975ea05eb9e3f7dd8d9d31971be742cdab4ea9fd479a3a22463b2c1f4"
+          "sha256": "sha256:5b34b524b428fbaaa75f6f4a037a45e756f262e31f6919fe4bc0ec8b2dfe2c3d"
         },
         {
           "bytes": 557,
