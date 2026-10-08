@@ -313,3 +313,12 @@ it. Each completed sequence saves output externally and cleans its own target.
 The manager reviews compatibility, integrates exact owned diffs, runs affected
 gates, seals each slice separately and opens a scoped PR. Parent acceptance and
 all unavailable source/backend/client gates remain pending.
+
+### Supplemental cache disposition
+
+The user reports no additional retained cache and explicitly directs skipping
+checks that need the missing supplemental bodies. Their result remains
+`skipped/unavailable`, with zero source or behavioral credit; no refresh, re-pin
+or fabricated pass is permitted. Continue independent public implementation
+and applicable available-input gates. Do not retry the unchanged missing-cache
+checks or request the same cache again.
