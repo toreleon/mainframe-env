@@ -1183,3 +1183,15 @@ gates pass after correcting three shifted research source locators. Earlier
 original producers, without replay or relabeling. This does not establish
 cross-process shared-store exclusion, distributed atomicity, snapshot
 authentication, full Foundation, licensed equivalence or private completion.
+
+### CV-209.postgres-parity-selection acceptance
+
+Status: **Complete (selector wiring only); backend execution pending**. The
+existing disposable PostgreSQL owner now includes the retained artifact-reader
+version compatibility regression alongside its eleven prior controls. Every
+command requires at least one actually passed test through the existing CI
+recorder. Thirty-five Python CI controls, shell syntax and the exact twelve-gate
+list pass; the original missing-selector assertion is retained separately.
+Database lifecycle/reset/cleanup, independent native expectations and summary
+ownership remain unchanged. No PostgreSQL control was executed by this wiring
+slice; all twelve actual backend controls remain required for acceptance.

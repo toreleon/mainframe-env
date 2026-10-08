@@ -107,6 +107,7 @@ class SelectionTests(unittest.TestCase):
             'postgres-atomic-invariants',
             'postgres-work-leases',
             'postgres-storage-profile',
+            'postgres-artifact-read-versions',
             'postgres-readiness',
             'postgres-retention',
             'postgres-durable',
@@ -117,6 +118,8 @@ class SelectionTests(unittest.TestCase):
             'writable_probe_requires_provider_state_dml_and_rolls_everything_back',
             postgres,
         )
+        self.assertIn('postgres_artifact_read_versions_are_compatible_and_fail_closed', postgres)
+        self.assertIn('--gate "$gate" --expect-tests --min-tests 1 --', postgres)
         self.assertIn('mountpoint -q "$state"', postgres)
         self.assertIn('state="$state/parity"', postgres)
         self.assertIn('"$workspace/.postgres/"*', postgres)
