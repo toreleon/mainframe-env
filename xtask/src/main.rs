@@ -14,6 +14,7 @@ mod cics_system_families;
 mod cobol_differential;
 mod conformance_catalog;
 mod conformance_spec_export;
+mod coverage_projection;
 mod db2_statement_catalog;
 mod dependency_licenses;
 mod docs;
@@ -26,6 +27,8 @@ mod mq_conformance;
 mod mq_status_catalog;
 mod profile_intake;
 mod racf_catalog;
+#[cfg(test)]
+mod serialized_coverage_schema_tests;
 mod topic_manifests;
 mod work_package_seal;
 mod zosmf_contracts;
@@ -7976,12 +7979,7 @@ fn check_cics_source_map_schemas(root: &Path) -> TaskResult {
 }
 
 fn compile_draft_2020_12_schema(schema: &Value, path: &Path) -> TaskResult<jsonschema::Validator> {
-    jsonschema::draft202012::meta::validate(schema)
-        .map_err(|error| format!("{} is not valid Draft 2020-12: {error}", path.display()))?;
-    jsonschema::draft202012::options()
-        .offline()
-        .build(schema)
-        .map_err(|error| format!("{} did not compile: {error}", path.display()))
+    coverage_projection::compile_schema(schema, path)
 }
 
 fn check_dataset_oracle(root: &Path) -> TaskResult {
@@ -8231,9 +8229,9 @@ fn validate_0_2_schema_artifacts(root: &Path) -> TaskResult {
     )?;
     artifacts.retain(|path| !path.starts_with(&schemas));
     artifacts.sort();
-    for path in artifacts {
-        let instance = json(&path)?;
-        let version = text(&instance, "schema_version", &path)?;
+    for path in &artifacts {
+        let instance = json(path)?;
+        let version = text(&instance, "schema_version", path)?;
         let schema_name = schema_for_0_2_artifact(version).ok_or_else(|| {
             format!(
                 "{} has no Draft 2020-12 schema binding for {version}",
@@ -8241,10 +8239,10 @@ fn validate_0_2_schema_artifacts(root: &Path) -> TaskResult {
             )
         })?;
         let schema_path = schemas.join(schema_name);
-        validate_schema_instance(&json(&schema_path)?, &instance, &path)?;
+        validate_schema_instance(&json(&schema_path)?, &instance, path)?;
     }
 
-    Ok(())
+    coverage_projection::validate_artifacts(root, &artifacts)
 }
 
 fn schema_for_0_2_artifact(version: &str) -> Option<&'static str> {
@@ -8253,6 +8251,8 @@ fn schema_for_0_2_artifact(version: &str) -> Option<&'static str> {
         "mainframe-env.official-catalog@1" => Some("official-catalog.schema.json"),
         "mainframe-env.topic-manifest@1" => Some("topic-manifest.schema.json"),
         "mainframe-env.coverage-ledger@1" => Some("coverage-ledger.schema.json"),
+        "mainframe-env.coverage-row@1" => Some("coverage-row.schema.json"),
+        "mainframe-env.coverage-evidence@1" => Some("coverage-evidence.schema.json"),
         "mainframe-env.coverage-program-status@1" => Some("program-status.schema.json"),
         "mainframe-env.coverage-work-package-evidence@1" => {
             Some("work-package-evidence.schema.json")

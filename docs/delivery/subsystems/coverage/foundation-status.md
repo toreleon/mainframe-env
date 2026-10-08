@@ -564,3 +564,12 @@ original/reply arguments, preserving identity, bytes and publication order.
 Request-byte and pending-reason provenance remain retained; no discarded reads
 or new refusal predicate is authorized as a lint repair. Strict MQ lint remains
 pending where genuine production roots have no authorized operational caller.
+
+### CV-202.serialized-schema-bindings acceptance
+
+Status: **Complete (serialized coverage authority only)**. The frozen @1 row/evidence/ledger bindings now validate actual serialized shapes through native offline Draft 2020-12 and existing typed evidence/history/catalog owners. All 30 focused tests pass on the joint candidate, preserving valid failure histories, null oracle and empty pending controls. Unknown refs/fields, stale standalone projections and forged derived claims refuse. This does not provide a generic pre-allocation JSON reader.
+Joint schemas/coverage/spec, module, formatting, frozen dependency, metadata and
+diff checks pass. Strict tooling-owner lint passes with `--no-deps`; the unchanged
+dependency-inclusive MQ/CICS lint failures remain separately pending and are not
+waived or described as passed. Foundation/public exit acceptance remains pending.
+Missing supplemental cache checks remain `skipped/unavailable`, zero credit.
