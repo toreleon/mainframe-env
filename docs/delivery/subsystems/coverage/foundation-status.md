@@ -237,3 +237,13 @@ Cargo clean failed before validated exact-target removal, and one terminated
 PostgreSQL child remains defunct under PID 1. No live owned executable/listener
 remains, but all-PIDs-absent is false. This bounded pass does not establish full
 Foundation, global backend, application, official or licensed acceptance.
+
+### CV-209.subsystem-prompt-consistency acceptance
+
+Status: **Complete (documentation only)**. Common execution instructions, phase
+prompts and plan links now use subsystem/phase delivery instead of obsolete
+minor-release and 1.0 planning labels. Existing selectors, work-package IDs,
+wire/spec versions, source identities, six-gate obligations and licensed pending
+requirements are unchanged. The documentation/changelog/subsystem validators
+and frozen dependency policy passed; no product behavior or execution credit
+is established by this wording repair.

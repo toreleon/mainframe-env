@@ -49,7 +49,7 @@ dependency, but no profile.carddemo behavior may regress.
   conformance/oracle evidence harness. Do not leave each subsystem to recreate
   these facilities.
 - Compile the normative Draft 2020-12 schemas with a reviewed validator and
-  validate every catalog, package, evidence, migration, profile, and release
+  validate every catalog, package, evidence, migration, profile, and distribution
   artifact mapped by the schema gate. Handwritten top-level field checks are not
   schema validation.
 - Use the accepted bounded canonical COSE_Mac0 profile through the reviewed

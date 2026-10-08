@@ -19,7 +19,7 @@ typed, lossless, bounded model for every official form.
 - Introduce the shared thin typed Conformance IR v1, mandatory obligation model,
   executable row/obligation/gate binding, replayable canonical verdict events,
   derived coverage ledger, deterministic sharding/cache identity, fast spec
-  compiler, and focused subsystem runner used by all later minors.
+  compiler, and focused subsystem runner used by all later phases.
 - Complete grammar and typed AST for all 44 PROCEDURE DIVISION statement
   families.
 - Catalog all 82 intrinsic functions, 15 compiler-directing statements, five
