@@ -110,10 +110,7 @@ fn original(store: &dyn PlatformStore) -> (RootProviderPublication, EffectRecord
         effect,
     )
 }
-fn observed(
-    store: &dyn PlatformStore,
-    request: &RootProviderPublication,
-) -> (
+type ObservedSnapshot = (
     Option<ExecutionRecord>,
     Option<EffectRecord>,
     Vec<LifecycleEvent>,
@@ -122,7 +119,9 @@ fn observed(
     Vec<ProviderStateRecord>,
     u64,
     u64,
-) {
+);
+
+fn observed(store: &dyn PlatformStore, request: &RootProviderPublication) -> ObservedSnapshot {
     let mut rows = Vec::new();
     for prefix in ["durable-", "native-root-", "exact-", "legacy-"] {
         rows.extend(store.list_provider_state_prefix(prefix, 256).unwrap());

@@ -267,22 +267,22 @@ fn partial_failure_output_is_request_bound_and_numeric_alias_admission_cannot_by
         options: MqMqiOptions::ContractDefault,
     });
     assert!(MqMqiResult::reviewed_output(status, short(), &legacy).is_err());
-    let full = Ok(HostResult::MqMqi(MqMqiHostResult {
+    let full = Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
         limits: request.limits,
         result: good,
-    }));
+    })));
     let bytes = canonical_result_size(&full, MAX_CANONICAL_EFFECT_BYTES).unwrap();
     assert_eq!(canonical_result_size(&full, bytes).unwrap(), bytes);
     assert!(canonical_result_size(&full, bytes - 1).is_err());
     assert_ne!(
         canonical_result_digest(&full).unwrap(),
-        canonical_result_digest(&Ok(HostResult::MqMqi(MqMqiHostResult {
+        canonical_result_digest(&Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
             limits: request.limits,
             result: MqMqiResult {
                 call: MqMqiCall::InquireProperty,
                 outcome: MqMqiOutcome::ReviewedStatus { status }
             }
-        })))
+        }))))
         .unwrap()
     );
 }

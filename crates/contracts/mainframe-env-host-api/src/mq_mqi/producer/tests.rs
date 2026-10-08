@@ -186,15 +186,17 @@ fn additive_producer_tags_frozen_and_feedback_fields_bind_full_host_digest() {
     assert_eq!(actual, tag("MqMqiIgnoredCounter", "PreservedIgnoredInput"));
     let p = result(&input(true, false));
     let digest = |p: MqMqiProduced| {
-        crate::canonical_result_digest(&Ok(crate::HostResult::MqMqi(crate::MqMqiHostResult {
-            limits: Default::default(),
-            result: MqMqiResult {
-                call: MqMqiCall::Put,
-                outcome: MqMqiOutcome::StatusPending {
-                    output: MqMqiOutput::Produced(p),
+        crate::canonical_result_digest(&Ok(crate::HostResult::MqMqi(Box::new(
+            crate::MqMqiHostResult {
+                limits: Default::default(),
+                result: MqMqiResult {
+                    call: MqMqiCall::Put,
+                    outcome: MqMqiOutcome::StatusPending {
+                        output: MqMqiOutput::Produced(p),
+                    },
                 },
             },
-        })))
+        ))))
         .unwrap()
     };
     let original = digest(p.clone());

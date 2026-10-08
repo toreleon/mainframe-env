@@ -229,14 +229,18 @@ fn absent_negative_and_overlapping_offset_capacity_are_raw_then_fail_resolution(
     }
     let c = capture(&group(0, 8), 0);
     assert_eq!(
-        c.charv_region(&[63..66]),
+        c.charv_region(std::slice::from_ref(&(63..66))),
         Err(MqRawPropertyProblem::Overlap)
     );
     assert_eq!(
-        c.charv_region(&[79..81]),
+        c.charv_region(std::slice::from_ref(&(79..81))),
         Err(MqRawPropertyProblem::Overlap)
     );
-    assert_eq!(c.charv_region(&[5..4]), Err(MqRawPropertyProblem::Overlap));
+    let reversed = std::ops::Range { start: 5, end: 4 };
+    assert_eq!(
+        c.charv_region(std::slice::from_ref(&reversed)),
+        Err(MqRawPropertyProblem::Overlap)
+    );
     assert_eq!(c.charv_region(&[0..60, 72..80]), Ok(64..72));
     assert_eq!(
         c.charv_region(&vec![0..0; 9]),
@@ -395,7 +399,7 @@ fn exact_prefix_count_and_protected_scalar_ranges_are_checked_before_write() {
             &inquiry(MqPropertyType::Null, b"abc", 3),
             status(MqCompletion::Ok, "MQRC_NONE"),
             MqMqiLimits::default(),
-            &[20..24]
+            std::slice::from_ref(&(20..24))
         ),
         Err(MqRawPropertyProblem::Overlap)
     ));

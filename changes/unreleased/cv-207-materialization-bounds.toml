@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Preflight host ABI source libraries against aggregate file and byte limits before copying source bytes, preserving provider content, identities and ordering."

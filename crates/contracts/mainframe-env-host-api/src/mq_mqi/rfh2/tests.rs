@@ -151,10 +151,10 @@ fn new_observation_has_independent_full_host_canonical_framing() {
             }),
         },
     };
-    let actual: Result<_, HostProblem> = Ok(HostResult::MqMqi(MqMqiHostResult {
+    let actual: Result<_, HostProblem> = Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
         result: value,
         limits,
-    }));
+    })));
     let expected: Result<_, HostProblem> = Ok(Reference { limits, status });
     let mut bytes = Vec::new();
     let size = encode(
@@ -410,8 +410,10 @@ fn malformed_and_recognized_pending_forms_are_distinct_and_bounded() {
             Err(MqPropertyProblem::Unsupported)
         );
     }
-    let mut small = MqMqiLimits::default();
-    small.buffer_bytes = valid.len() - 1;
+    let small = MqMqiLimits {
+        buffer_bytes: valid.len() - 1,
+        ..MqMqiLimits::default()
+    };
     assert_eq!(
         mq_rfh2_decode(&md, &valid, small),
         Err(MqPropertyProblem::Capacity)

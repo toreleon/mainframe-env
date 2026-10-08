@@ -163,10 +163,10 @@ impl MqRawPropertyCapture {
             return Err(MqRawPropertyProblem::Capacity);
         }
         let prefix = &group[start..end];
-        if let Some(identifier) = layout.identifier {
-            if prefix[..identifier.len()] != identifier {
-                return Err(MqRawPropertyProblem::StructureIdentifier);
-            }
+        if let Some(identifier) = layout.identifier
+            && prefix[..identifier.len()] != identifier
+        {
+            return Err(MqRawPropertyProblem::StructureIdentifier);
         }
         for field in layout.fields {
             let bytes = &prefix[field.offset..field.offset + field.width];

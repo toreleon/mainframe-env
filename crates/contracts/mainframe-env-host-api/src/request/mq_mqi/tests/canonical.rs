@@ -17,7 +17,7 @@ fn hex(value: [u8; 32]) -> String {
 fn actual_host_preimages_are_distinct_and_frozen() {
     let value = effect();
     let request_bytes = bytes(&value.request, REQUEST_DIGEST_DOMAIN);
-    let outcome = Ok(HostResult::MqMqi(reply()));
+    let outcome = Ok(HostResult::MqMqi(Box::new(reply())));
     let result_bytes = bytes(&outcome, RESULT_DIGEST_DOMAIN);
     assert!(
         request_bytes
@@ -67,7 +67,7 @@ fn exact_streaming_budgets_include_host_framing_and_result_discriminant() {
     );
     let mut value = reply();
     let size = canonical_result_size(
-        &Ok(HostResult::MqMqi(value.clone())),
+        &Ok(HostResult::MqMqi(Box::new(value.clone()))),
         MAX_CANONICAL_EFFECT_BYTES,
     )
     .unwrap();
@@ -126,8 +126,8 @@ fn all_host_request_semantics_including_mutation_and_context_change_identity() {
     let mut changed = result.clone();
     changed.limits.selectors -= 1;
     assert_ne!(
-        canonical_result_digest(&Ok(HostResult::MqMqi(result))).unwrap(),
-        canonical_result_digest(&Ok(HostResult::MqMqi(changed))).unwrap()
+        canonical_result_digest(&Ok(HostResult::MqMqi(Box::new(result)))).unwrap(),
+        canonical_result_digest(&Ok(HostResult::MqMqi(Box::new(changed)))).unwrap()
     );
 }
 
@@ -241,7 +241,8 @@ fn actual_issued_handles_keep_registry_generation_epoch_and_role_in_host_identit
 #[test]
 fn result_call_status_payload_and_limits_are_all_in_the_host_identity() {
     let original = reply();
-    let digest = canonical_result_digest(&Ok(HostResult::MqMqi(original.clone()))).unwrap();
+    let digest =
+        canonical_result_digest(&Ok(HostResult::MqMqi(Box::new(original.clone())))).unwrap();
     let mut variants = Vec::new();
     let mut value = original.clone();
     value.result.call = MqMqiCall::Close;
@@ -265,7 +266,7 @@ fn result_call_status_payload_and_limits_are_all_in_the_host_identity() {
     variants.push(value);
     for value in variants {
         assert_ne!(
-            canonical_result_digest(&Ok(HostResult::MqMqi(value))).unwrap(),
+            canonical_result_digest(&Ok(HostResult::MqMqi(Box::new(value)))).unwrap(),
             digest
         );
     }

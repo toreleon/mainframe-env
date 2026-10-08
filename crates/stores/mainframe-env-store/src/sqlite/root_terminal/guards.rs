@@ -237,25 +237,18 @@ impl SqliteStateStore {
             ) {
                 // Exact enrolled identities were checked first. This header
                 // fences an enrolled run; it grants no CALL/schema legality.
-                if let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes) {
-                    if let Some(run) = value
+                if let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes)
+                    && let Some(run) = value
                         .get("owner_run_unit")
                         .and_then(serde_json::Value::as_str)
+                    && let Some(binding) = self.root_optional_row(tx, RUN_NAMESPACE, run).await?
+                {
+                    let root = std::str::from_utf8(&binding.payload)
+                        .map_err(|_| StoreError::IncompatibleVersion)?;
+                    if Document::read(&self.root_row(tx, ROOT_DRIVER_NAMESPACE, root).await?)?.phase
+                        != Phase::Open
                     {
-                        if let Some(binding) =
-                            self.root_optional_row(tx, RUN_NAMESPACE, run).await?
-                        {
-                            let root = std::str::from_utf8(&binding.payload)
-                                .map_err(|_| StoreError::IncompatibleVersion)?;
-                            if Document::read(
-                                &self.root_row(tx, ROOT_DRIVER_NAMESPACE, root).await?,
-                            )?
-                            .phase
-                                != Phase::Open
-                            {
-                                return Err(StoreError::InvalidTransition);
-                            }
-                        }
+                        return Err(StoreError::InvalidTransition);
                     }
                 }
             }

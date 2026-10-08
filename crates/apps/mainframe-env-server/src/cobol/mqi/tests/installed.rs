@@ -127,7 +127,7 @@ impl HostProvider for Provider {
         }
         EffectResult {
             sequence: effect.sequence,
-            outcome: Ok(HostResult::MqMqi(MqMqiHostResult {
+            outcome: Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
                 limits: envelope.limits,
                 result: MqMqiResult {
                     call: envelope.request.call(),
@@ -136,7 +136,7 @@ impl HostProvider for Provider {
                         output,
                     },
                 },
-            })),
+            }))),
         }
     }
 }

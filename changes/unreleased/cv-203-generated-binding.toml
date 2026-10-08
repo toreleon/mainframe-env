@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Regenerate the existing semantic identity catalog binding from current pinned catalog inputs without changing the 1506 identity set or admitting handlers."

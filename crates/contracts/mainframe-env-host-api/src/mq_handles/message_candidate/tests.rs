@@ -51,11 +51,11 @@ fn delete_and_use_abort_leave_every_slot_and_counter_untouched() {
     let object = registry.create_object(owner(), connection).unwrap();
     let message = registry.create_message(owner(), connection).unwrap();
     let before = snapshot(&registry);
-    drop(
-        registry
+    {
+        let _stage = registry
             .stage_message_delete(owner(), connection, message)
-            .unwrap(),
-    );
+            .unwrap();
+    }
     assert_eq!(snapshot(&registry), before);
     assert_eq!(
         registry

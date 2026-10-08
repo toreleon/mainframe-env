@@ -1,7 +1,9 @@
 use super::*;
 use crate::replay_refusal::tests::request;
 use mainframe_env_store_api::JournalStore;
-fn raw(store: &SqliteStateStore) -> (Vec<(String, String, i64, Vec<u8>)>, (i64, i64)) {
+type RawSnapshot = (Vec<(String, String, i64, Vec<u8>)>, (i64, i64));
+
+fn raw(store: &SqliteStateStore) -> RawSnapshot {
     (store.run(sqlx::query_as("SELECT namespace,key,version,CAST(payload AS BLOB) FROM provider_state ORDER BY namespace,key").fetch_all(&store.pool)).unwrap(),
     store.run(sqlx::query_as("SELECT epoch,clock_tick FROM retention_lock WHERE singleton=1").fetch_one(&store.pool)).unwrap())
 }

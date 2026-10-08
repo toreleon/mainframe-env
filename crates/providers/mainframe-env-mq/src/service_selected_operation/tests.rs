@@ -25,6 +25,138 @@ mod restart;
 #[path = "tests/retention_dependencies.rs"]
 mod retention_dependencies;
 
+#[test]
+fn handle_reply_classification_preserves_all_outcomes_and_negative_shapes() {
+    // This is the replay cache-proof predicate, not call validation or handle admission.
+    let owner = MqHandleOwner {
+        environment: MqHostEnvironment::ZosBatch,
+        host_id: 1,
+        process_id: 2,
+        thread_id: 3,
+        task_id: 4,
+        syncpoint_epoch: 5,
+    };
+    let mut registry = MqHandleRegistry::new(9, 8).unwrap();
+    let connection = registry.connect(owner, MqHandleSharing::NonShared).unwrap();
+    let object = registry.create_object(owner, connection).unwrap();
+    let handle = registry.create_message(owner, connection).unwrap();
+    let subscription = registry.create_subscription(owner, connection).unwrap();
+    let reply = |call, outcome| EffectResult {
+        sequence: 7,
+        outcome: Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
+            result: MqMqiResult { call, outcome },
+            limits: MqMqiLimits::default(),
+        }))),
+    };
+    for (call, output) in [
+        (MqMqiCall::Connect, MqMqiOutput::Connected(connection)),
+        (
+            MqMqiCall::Open,
+            MqMqiOutput::Opened {
+                object,
+                dynamic: None,
+            },
+        ),
+        (
+            MqMqiCall::CreateMessageHandle,
+            MqMqiOutput::MessageHandle(handle),
+        ),
+        (
+            MqMqiCall::Subscribe,
+            MqMqiOutput::Subscribed {
+                object,
+                subscription,
+            },
+        ),
+    ] {
+        let status = mainframe_env_host_api::mq_status::MqReviewedStatus::from_symbols(
+            call,
+            "MQCC_OK",
+            "MQRC_NONE",
+        )
+        .unwrap();
+        for outcome in [
+            MqMqiOutcome::Completed {
+                status: MqMqiStatus::OkNone,
+                output: output.clone(),
+            },
+            MqMqiOutcome::Completed {
+                status: MqMqiStatus::FailedEnvironment,
+                output: output.clone(),
+            },
+            MqMqiOutcome::ReviewedOutput {
+                status,
+                output: output.clone(),
+            },
+            MqMqiOutcome::StatusPending { output },
+        ] {
+            assert!(transition::has_handle_reply(&reply(call, outcome)));
+        }
+    }
+    let status = mainframe_env_host_api::mq_status::MqReviewedStatus::from_symbols(
+        MqMqiCall::Disconnect,
+        "MQCC_OK",
+        "MQRC_NONE",
+    )
+    .unwrap();
+    for output in [
+        MqMqiOutput::NoOutput,
+        MqMqiOutput::Attributes {
+            integers: vec![1],
+            characters: vec![0, 255],
+        },
+        MqMqiOutput::UnitOfWork { unit: 1 },
+        MqMqiOutput::PublicationsRequested { count: 1 },
+    ] {
+        for outcome in [
+            MqMqiOutcome::Completed {
+                status: MqMqiStatus::OkNone,
+                output: output.clone(),
+            },
+            MqMqiOutcome::ReviewedOutput {
+                status,
+                output: output.clone(),
+            },
+            MqMqiOutcome::StatusPending { output },
+        ] {
+            assert!(!transition::has_handle_reply(&reply(
+                MqMqiCall::Disconnect,
+                outcome
+            )));
+        }
+    }
+    for outcome in [
+        MqMqiOutcome::ReviewedStatus { status },
+        MqMqiOutcome::CallbackReturned {
+            context: MqMqiOptions::ContractDefault,
+        },
+        MqMqiOutcome::Pending(MqMqiPending::PublicDispatch),
+        MqMqiOutcome::Pending(MqMqiPending::StructureAndWireMapping),
+        MqMqiOutcome::Pending(MqMqiPending::SelectorAndAttributeMapping),
+        MqMqiOutcome::Pending(MqMqiPending::StatusMapping),
+        MqMqiOutcome::Pending(MqMqiPending::TrustedContextAndAuthorization),
+        MqMqiOutcome::Pending(MqMqiPending::ExternalUnitOfWork),
+        MqMqiOutcome::Pending(MqMqiPending::CallbackContext),
+        MqMqiOutcome::UnknownOutcome,
+        MqMqiOutcome::DuplicatePossible,
+    ] {
+        assert!(!transition::has_handle_reply(&reply(
+            MqMqiCall::Disconnect,
+            outcome
+        )));
+    }
+    for outcome in [
+        Err(HostProblem::UnknownOutcome),
+        Err(HostProblem::Malformed),
+        Ok(HostResult::Clock("observation".into())),
+    ] {
+        assert!(!transition::has_handle_reply(&EffectResult {
+            sequence: 7,
+            outcome,
+        }));
+    }
+}
+
 struct Clock(std::sync::atomic::AtomicU64);
 impl MqReplayClock for Clock {
     fn now_tick(&self) -> Result<u64, HostProblem> {
@@ -265,7 +397,7 @@ impl Fixture {
             sequence,
             deadline_tick: 900,
             idempotency_key: Some(key.clone()),
-            request: HostRequest::MqMqi(MqMqiHostRequest {
+            request: HostRequest::MqMqi(Box::new(MqMqiHostRequest {
                 mutation: Mutation {
                     sequence,
                     idempotency_key: key,
@@ -279,7 +411,7 @@ impl Fixture {
                     limits: Default::default(),
                     request,
                 },
-            }),
+            })),
         }
     }
     fn seed(&self, effect: &EffectRequest) {
@@ -345,18 +477,15 @@ impl Fixture {
             EffectState::Intent
         );
         match reply.outcome.unwrap() {
-            HostResult::MqMqi(MqMqiHostResult {
-                result:
-                    MqMqiResult {
-                        outcome:
-                            MqMqiOutcome::Completed {
-                                output: MqMqiOutput::Connected(c),
-                                ..
-                            },
-                        ..
-                    },
-                ..
-            }) => {
+            HostResult::MqMqi(host) => {
+                let MqMqiHostResult { result, .. } = *host;
+                let MqMqiOutcome::Completed {
+                    output: MqMqiOutput::Connected(c),
+                    ..
+                } = result.outcome
+                else {
+                    panic!("connection result")
+                };
                 *self.connection.lock().unwrap() = Some(c);
                 c
             }
@@ -446,17 +575,15 @@ fn lookup() -> MqRouteLookup {
 }
 fn output(reply: EffectResult) -> MqMqiOutput {
     match reply.outcome.unwrap() {
-        HostResult::MqMqi(MqMqiHostResult {
-            result:
-                MqMqiResult {
-                    outcome:
-                        MqMqiOutcome::Completed { output, .. }
-                        | MqMqiOutcome::ReviewedOutput { output, .. }
-                        | MqMqiOutcome::StatusPending { output },
-                    ..
-                },
-            ..
-        }) => output,
+        HostResult::MqMqi(host) => {
+            let MqMqiHostResult { result, .. } = *host;
+            match result.outcome {
+                MqMqiOutcome::Completed { output, .. }
+                | MqMqiOutcome::ReviewedOutput { output, .. }
+                | MqMqiOutcome::StatusPending { output } => output,
+                _ => panic!("typed payload output"),
+            }
+        }
         _ => panic!("typed payload output"),
     }
 }

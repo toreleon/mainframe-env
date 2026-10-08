@@ -53,6 +53,21 @@ custom semantic namespaces cannot overlap; and no generated identity installs a
 handler. Verify with `cargo test -p mainframe-env-host-api` and
 `cargo xtask semantic-identities --check`.
 
+## MQI host envelope migration
+
+`HostRequest::MqMqi` and `HostResult::MqMqi` own boxed payloads. Before public
+release, Rust consumers must migrate construction to `HostRequest::MqMqi(Box::new(dto))`
+or `HostResult::MqMqi(Box::new(dto))`. Bind the payload before matching nested
+fields; move `*payload` when an owned DTO is required. Borrowed validation and
+field access retain the original exclusive ownership, and `Clone` remains a
+deep copy. The public nested DTO fields remain unchanged.
+
+The explicit canonical bytes, domains, digests and durable replay codecs remain
+unchanged. Rust memory layout is not a wire format. Each MQI envelope and each
+deep clone adds one fixed-size heap allocation for its DTO, in addition to its
+existing owned buffers. Inline envelope size limits do not bound total heap
+usage, and `Box::new` does not return a host resource-exhaustion error.
+
 ## Documentation
 
 [Documentation portal](../../../docs/README.md) · [Current package map](../../../docs/architecture/PACKAGE-MAP.md) · [Embedding guide](../../../docs/guides/EMBEDDING.md) · [Contribution and verification](../../../CONTRIBUTING.md)

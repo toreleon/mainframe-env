@@ -116,15 +116,15 @@ fn budget_observations(count: usize) -> Vec<TerminalRowDependency> {
         })
         .collect()
 }
-fn budget_snapshot(
-    store: &MemoryStore,
-) -> (
+type ReadSnapshot = (
     Vec<ProviderStateRecord>,
     Vec<AuditRecord>,
     Vec<EffectRecord>,
     Vec<ExecutionRecord>,
     (usize, u64, u64, u64, usize, usize),
-) {
+);
+
+fn budget_snapshot(store: &MemoryStore) -> ReadSnapshot {
     let counters = counters(store);
     let state = store.lock().unwrap();
     (

@@ -729,32 +729,29 @@ pub(super) fn adopt(
     }
 }
 pub(super) fn has_handle_reply(reply: &EffectResult) -> bool {
+    let Ok(HostResult::MqMqi(host)) = &reply.outcome else {
+        return false;
+    };
     matches!(
-        &reply.outcome,
-        Ok(HostResult::MqMqi(MqMqiHostResult {
-            result: MqMqiResult {
-                outcome: MqMqiOutcome::Completed {
-                    output: MqMqiOutput::Connected(_)
-                        | MqMqiOutput::Opened { .. }
-                        | MqMqiOutput::MessageHandle(_)
-                        | MqMqiOutput::Subscribed { .. },
-                    ..
-                } | MqMqiOutcome::ReviewedOutput {
-                    output: MqMqiOutput::Connected(_)
-                        | MqMqiOutput::Opened { .. }
-                        | MqMqiOutput::MessageHandle(_)
-                        | MqMqiOutput::Subscribed { .. },
-                    ..
-                } | MqMqiOutcome::StatusPending {
-                    output: MqMqiOutput::Connected(_)
-                        | MqMqiOutput::Opened { .. }
-                        | MqMqiOutput::MessageHandle(_)
-                        | MqMqiOutput::Subscribed { .. }
-                },
-                ..
-            },
+        &host.result.outcome,
+        MqMqiOutcome::Completed {
+            output: MqMqiOutput::Connected(_)
+                | MqMqiOutput::Opened { .. }
+                | MqMqiOutput::MessageHandle(_)
+                | MqMqiOutput::Subscribed { .. },
             ..
-        }))
+        } | MqMqiOutcome::ReviewedOutput {
+            output: MqMqiOutput::Connected(_)
+                | MqMqiOutput::Opened { .. }
+                | MqMqiOutput::MessageHandle(_)
+                | MqMqiOutput::Subscribed { .. },
+            ..
+        } | MqMqiOutcome::StatusPending {
+            output: MqMqiOutput::Connected(_)
+                | MqMqiOutput::Opened { .. }
+                | MqMqiOutput::MessageHandle(_)
+                | MqMqiOutput::Subscribed { .. }
+        }
     )
 }
 

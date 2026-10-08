@@ -129,13 +129,13 @@ fn with_limits(
     };
     let mut reply = EffectResult {
         sequence: original.sequence,
-        outcome: Ok(HostResult::MqMqi(MqMqiHostResult {
+        outcome: Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
             result: MqMqiResult {
                 call: env.request.call(),
                 outcome: MqMqiOutcome::Pending(MqMqiPending::PublicDispatch),
             },
             limits: env.limits,
-        })),
+        }))),
     };
     change(&mut reply);
     identity.preflight_result(&reply, 2).map(|_| ())
@@ -573,13 +573,13 @@ fn result_preflight_borrows_actual_reply_and_preserves_uncertainty_identities() 
     ] {
         let reply = EffectResult {
             sequence: e.sequence,
-            outcome: Ok(HostResult::MqMqi(MqMqiHostResult {
+            outcome: Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
                 result: MqMqiResult {
                     call: identity.envelope.request.call(),
                     outcome: outcome.clone(),
                 },
                 limits: identity.envelope.limits,
-            })),
+            }))),
         };
         let preflight = identity.preflight_result(&reply, 2).unwrap();
         assert!(std::ptr::eq(preflight.original, &e));
@@ -615,7 +615,7 @@ fn reviewed_output_preflight_retains_full_host_result_and_unknown_precedence() {
     };
     let mut reply = EffectResult {
         sequence: e.sequence,
-        outcome: Ok(HostResult::MqMqi(MqMqiHostResult {
+        outcome: Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
             limits: env.limits,
             result: MqMqiResult {
                 call: MqMqiCall::Get,
@@ -633,7 +633,7 @@ fn reviewed_output_preflight_retains_full_host_result_and_unknown_precedence() {
                     },
                 },
             },
-        })),
+        }))),
     };
     let before = reply.clone();
     let observed = identity.preflight_result(&reply, 2).unwrap();
@@ -671,13 +671,13 @@ fn complete_result_budget_includes_host_framing_and_live_controls_remain_live() 
     let e = effect(&inv, &mutation(), &envelope());
     let reply = EffectResult {
         sequence: e.sequence,
-        outcome: Ok(HostResult::MqMqi(MqMqiHostResult {
+        outcome: Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
             result: MqMqiResult {
                 call: MqMqiCall::Connect,
                 outcome: MqMqiOutcome::UnknownOutcome,
             },
             limits: MqMqiLimits::default(),
-        })),
+        }))),
     };
     let size = canonical_result_size(&reply.outcome, usize::MAX).unwrap();
     for budget in [size - 1, size] {

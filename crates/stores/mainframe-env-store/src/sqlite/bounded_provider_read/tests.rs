@@ -7,7 +7,9 @@ fn raw(store: &SqliteStateStore, sql: &'static str) {
 
 // Inspect every physical table/cell, including epoch, clock, journal and retention.
 // Fixture identity only; this does not invent an application codec or authority.
-fn footprint(store: &SqliteStateStore) -> Vec<(String, Vec<Vec<Option<Vec<u8>>>>)> {
+type DatabaseFootprint = Vec<(String, Vec<Vec<Option<Vec<u8>>>>)>;
+
+fn footprint(store: &SqliteStateStore) -> DatabaseFootprint {
     let tables = store
         .run(
             sqlx::query("SELECT name FROM sqlite_schema WHERE type='table' ORDER BY name")

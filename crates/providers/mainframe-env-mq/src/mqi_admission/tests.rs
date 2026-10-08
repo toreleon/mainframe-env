@@ -97,10 +97,10 @@ fn effect(
         sequence: mutation.sequence,
         deadline_tick: 90,
         idempotency_key: Some(mutation.idempotency_key.clone()),
-        request: HostRequest::MqMqi(MqMqiHostRequest {
+        request: HostRequest::MqMqi(Box::new(MqMqiHostRequest {
             envelope: envelope.clone(),
             mutation: mutation.clone(),
-        }),
+        })),
     }
 }
 

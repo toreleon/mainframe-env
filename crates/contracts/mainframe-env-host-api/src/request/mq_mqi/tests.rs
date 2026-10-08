@@ -6,6 +6,68 @@ use mainframe_env_execution_api::{IdempotencyKey, InvocationLimits, RunUnitId};
 
 mod canonical;
 
+#[test]
+fn host_envelopes_keep_inline_storage_below_mqi_payloads() {
+    use std::mem::size_of;
+
+    let request = size_of::<HostRequest>();
+    let result = size_of::<HostResult>();
+    eprintln!(
+        "host layout bytes: request={request} result={result} request_dto={} result_dto={} \
+         effect_request={} effect_result={}",
+        size_of::<MqMqiHostRequest>(),
+        size_of::<MqMqiHostResult>(),
+        size_of::<EffectRequest>(),
+        size_of::<EffectResult>(),
+    );
+    assert!(request < size_of::<MqMqiHostRequest>());
+    assert!(result < size_of::<MqMqiHostResult>());
+    // These inline budgets leave room for the remaining IMS variants on the pinned target.
+    // They are regression ceilings, not a stable Rust ABI or a total heap bound.
+    #[cfg(target_pointer_width = "64")]
+    {
+        assert!(request <= 384, "host request exceeds its inline budget");
+        assert!(result <= 288, "host result exceeds its inline budget");
+    }
+}
+
+#[test]
+fn cloned_mqi_host_envelopes_keep_independent_owned_payloads() {
+    let original = effect();
+    let mut cloned = original.clone();
+    let original_occurrence = original
+        .mq_mqi_occurrence(HostLimits::default())
+        .unwrap()
+        .unwrap();
+    let cloned_occurrence = cloned
+        .mq_mqi_occurrence(HostLimits::default())
+        .unwrap()
+        .unwrap();
+    assert!(!std::ptr::eq(
+        original_occurrence.request(),
+        cloned_occurrence.request(),
+    ));
+    assert_eq!(original, cloned);
+    typed(&mut cloned).envelope.context.owner.task_id += 1;
+    assert_ne!(original, cloned);
+    assert_eq!(original_occurrence.envelope().context.owner.task_id, 4);
+
+    let original = HostResult::MqMqi(Box::new(reply()));
+    let mut cloned = original.clone();
+    let (HostResult::MqMqi(original_payload), HostResult::MqMqi(cloned_payload)) =
+        (&original, &mut cloned)
+    else {
+        unreachable!()
+    };
+    assert!(!std::ptr::eq::<MqMqiHostResult>(
+        original_payload.as_ref(),
+        cloned_payload.as_ref(),
+    ));
+    cloned_payload.limits.selectors -= 1;
+    assert_eq!(original_payload.limits.selectors, 256);
+    assert_ne!(original, cloned);
+}
+
 fn owner() -> MqHandleOwner {
     MqHandleOwner {
         environment: MqHostEnvironment::ZosBatch,
@@ -25,7 +87,7 @@ fn effect() -> EffectRequest {
         sequence: 7,
         deadline_tick: 100,
         idempotency_key: Some(key.clone()),
-        request: HostRequest::MqMqi(MqMqiHostRequest {
+        request: HostRequest::MqMqi(Box::new(MqMqiHostRequest {
             envelope: MqMqiRequestEnvelope {
                 context: MqMqiContext {
                     owner: owner(),
@@ -43,7 +105,7 @@ fn effect() -> EffectRequest {
                 idempotency_key: key,
                 transaction: None,
             },
-        }),
+        })),
     }
 }
 
@@ -78,7 +140,7 @@ fn occurrence_borrows_the_original_effect_envelope_and_exact_mutation() {
         unreachable!()
     };
     assert!(std::ptr::eq(occurrence.effect(), &effect));
-    assert!(std::ptr::eq(occurrence.request(), original));
+    assert!(std::ptr::eq(occurrence.request(), original.as_ref()));
     assert!(std::ptr::eq(occurrence.envelope(), &original.envelope));
     assert!(std::ptr::eq(occurrence.mutation(), &original.mutation));
     assert_eq!(occurrence.effect().sequence, occurrence.mutation().sequence);
@@ -233,7 +295,7 @@ fn callback_notification_cannot_be_an_application_command_or_reply() {
         value.result.call = MqMqiCall::CallbackFunction;
         value.result.outcome = outcome;
         assert_eq!(
-            HostResult::MqMqi(value).validate(HostLimits::default()),
+            HostResult::MqMqi(Box::new(value)).validate(HostLimits::default()),
             Err(HostProblem::Malformed)
         );
     }
@@ -279,8 +341,8 @@ fn reviewed_status_uses_the_original_call_validator_and_host_framing() {
     value.result.outcome = MqMqiOutcome::ReviewedStatus { status };
     assert_eq!(value.validate(HostLimits::default()), Ok(()));
     assert_ne!(
-        canonical_result_digest(&Ok(HostResult::MqMqi(value.clone()))).unwrap(),
-        canonical_result_digest(&Ok(HostResult::MqMqi(reply()))).unwrap()
+        canonical_result_digest(&Ok(HostResult::MqMqi(Box::new(value.clone())))).unwrap(),
+        canonical_result_digest(&Ok(HostResult::MqMqi(Box::new(reply())))).unwrap()
     );
     value.result.call = MqMqiCall::Connect;
     assert_eq!(
@@ -301,7 +363,7 @@ fn pending_unknown_and_duplicate_outcomes_remain_distinct_typed_observations() {
         value.result.outcome = outcome.clone();
         assert_eq!(value.validate(HostLimits::default()), Ok(()));
         assert_eq!(value.result.outcome, outcome);
-        hashes.insert(canonical_result_digest(&Ok(HostResult::MqMqi(value))).unwrap());
+        hashes.insert(canonical_result_digest(&Ok(HostResult::MqMqi(Box::new(value)))).unwrap());
     }
     assert_eq!(hashes.len(), 3);
 }
@@ -309,8 +371,10 @@ fn pending_unknown_and_duplicate_outcomes_remain_distinct_typed_observations() {
 #[test]
 fn host_field_limits_and_mqi_product_limits_both_apply() {
     let mut candidate = effect();
-    let mut limits = HostLimits::default();
-    limits.max_name_bytes = 3;
+    let limits = HostLimits {
+        max_name_bytes: 3,
+        ..HostLimits::default()
+    };
     assert_eq!(
         candidate.validate(limits),
         Err(HostProblem::ResourceExhausted)
@@ -340,8 +404,10 @@ fn host_field_limits_and_mqi_product_limits_both_apply() {
             characters: vec![0, 255],
         },
     };
-    let mut limits = HostLimits::default();
-    limits.max_fields = 1;
+    let mut limits = HostLimits {
+        max_fields: 1,
+        ..HostLimits::default()
+    };
     assert_eq!(value.validate(limits), Err(HostProblem::ResourceExhausted));
     limits.max_fields = 2;
     limits.max_record_bytes = 1;
@@ -424,9 +490,11 @@ fn payloads_and_output_capacities_are_preflighted_against_host_limits() {
             },
         },
     ];
-    let mut limits = HostLimits::default();
-    limits.max_record_bytes = 2;
-    limits.max_fields = 2;
+    let limits = HostLimits {
+        max_record_bytes: 2,
+        max_fields: 2,
+        ..HostLimits::default()
+    };
     for request in requests {
         let mut candidate = effect();
         typed(&mut candidate).envelope.request = request;

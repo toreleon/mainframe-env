@@ -431,10 +431,10 @@ fn full_get_independent_result_preimage_and_core_result_golden() {
                 ),
             )],
         ));
-        let host = Ok(HostResult::MqMqi(MqMqiHostResult {
+        let host = Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
             result: r,
             limits: MqMqiLimits::default(),
-        }));
+        })));
         assert_eq!(
             canonical_result_digest(&host).unwrap(),
             <[u8; 32]>::from(Sha256::digest(&core))
@@ -502,7 +502,7 @@ fn full_message_independent_request_result_preimages_and_host_digest_goldens() {
                     ),
                 )],
             ));
-            let host = HostRequest::MqMqi(MqMqiHostRequest {
+            let host = HostRequest::MqMqi(Box::new(MqMqiHostRequest {
                 envelope: e,
                 mutation: Mutation {
                     sequence: 7,
@@ -513,7 +513,7 @@ fn full_message_independent_request_result_preimages_and_host_digest_goldens() {
                     .unwrap(),
                     transaction: None,
                 },
-            });
+            }));
             assert_eq!(
                 canonical_request_digest(&host).unwrap(),
                 <[u8; 32]>::from(Sha256::digest(&core))
@@ -551,10 +551,10 @@ fn full_message_independent_request_result_preimages_and_host_digest_goldens() {
                 ),
             )],
         ));
-        let host = Ok(HostResult::MqMqi(MqMqiHostResult {
+        let host = Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
             result: r,
             limits: MqMqiLimits::default(),
-        }));
+        })));
         assert_eq!(
             canonical_result_digest(&host).unwrap(),
             <[u8; 32]>::from(Sha256::digest(&core))

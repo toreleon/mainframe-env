@@ -123,7 +123,9 @@ pub(super) fn render(
         attribute(value)?
     ))
 }
-fn tag(input: &str) -> Result<(&str, Vec<(&str, &str)>), MqPropertyProblem> {
+type Tag<'a> = (&'a str, Vec<(&'a str, &'a str)>);
+
+fn tag(input: &str) -> Result<Tag<'_>, MqPropertyProblem> {
     let split = input.find(char::is_whitespace).unwrap_or(input.len());
     let name = &input[..split];
     let mut tail = input[split..].trim();
@@ -283,7 +285,9 @@ pub(super) fn parse(
                 if raw.len() % 2 != 0 || !raw.iter().all(u8::is_ascii_hexdigit) {
                     return Err(MqPropertyProblem::Value);
                 }
-                raw.chunks_exact(2)
+                raw.as_chunks::<2>()
+                    .0
+                    .iter()
                     .map(|pair| {
                         let s = std::str::from_utf8(pair).map_err(|_| MqPropertyProblem::Value)?;
                         u8::from_str_radix(s, 16).map_err(|_| MqPropertyProblem::Value)

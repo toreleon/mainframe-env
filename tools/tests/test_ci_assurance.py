@@ -1,11 +1,12 @@
 import importlib.util
+import io
 import json
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 TOOL = Path(__file__).resolve().parents[1] / 'ci_assurance.py'
 ROOT = TOOL.parent.parent
@@ -229,5 +230,156 @@ class SelectionTests(unittest.TestCase):
             runner=json.loads((Path(d)/'runner.json').read_text())['runner']
             self.assertEqual(code,0);self.assertEqual(runner['ci'],'jenkins')
             self.assertEqual((runner['job_name'],runner['build_number']),('mainframe-env','7'))
+
+class TestFloorTests(unittest.TestCase):
+    def record_log(self, log, *, exit_code=0, min_tests=260, expect_tests=False,
+                   candidate_changed=False, candidate_dirty=False, via_cli=False):
+        identities = [{'candidate': 'a' * 40, 'tree': 'b' * 40}] * 2
+        if candidate_changed:
+            identities[1] = {'candidate': 'c' * 40, 'tree': 'd' * 40}
+        process = Mock(stdout=io.BytesIO(log), wait=Mock(return_value=exit_code))
+        with tempfile.TemporaryDirectory() as directory, \
+                patch.object(ci, 'identity', side_effect=identities), \
+                patch.object(ci.subprocess, 'Popen', return_value=process), \
+                patch.object(ci.subprocess, 'check_output',
+                             return_value=b' M tracked.py' if candidate_dirty else b''), \
+                patch.object(ci.shutil, 'which', return_value=None), \
+                patch.object(ci.sys, 'stdout', Mock(buffer=io.BytesIO())):
+            output = Path(directory)
+            if via_cli:
+                arguments = ['ci_assurance.py', '--root', str(ROOT), 'record',
+                             '--output', str(output), '--gate', 'tests', '--expect-tests',
+                             '--min-tests', str(min_tests), '--', 'fixture-runner']
+                with patch.object(ci.sys, 'argv', arguments):
+                    code = ci.main()
+            else:
+                code = ci.record(ROOT, output, 'tests', ['fixture-runner'],
+                                 expect_tests, min_tests=min_tests)
+            return code, json.loads((output / 'tests.json').read_text())
+
+    def test_workspace_floor_refuses_259_actual_passes(self):
+        log = (b'running 300 tests\n'
+               b'test result: ok. 259 passed; 0 failed; 41 ignored; 0 measured; '
+               b'0 filtered out; finished in 0.05s\n')
+        code, receipt = self.record_log(log)
+        self.assertNotEqual(code, 0)
+        self.assertEqual(receipt['status'], 'failed')
+        self.assertEqual(receipt['observed_passed_tests'], 259)
+
+    def test_workspace_floor_accepts_exactly_260_actual_passes(self):
+        log = (b'test result: ok. 260 passed; 0 failed; 100 ignored; 0 measured; '
+               b'10 filtered out; finished in 0.05s\n')
+        code, receipt = self.record_log(log)
+        self.assertEqual(code, 0)
+        self.assertEqual(receipt['status'], 'passed')
+        self.assertEqual(receipt['observed_passed_tests'], 260)
+        self.assertEqual(receipt['minimum_passed_tests'], 260)
+        self.assertFalse(receipt['full_assurance_credit'])
+        self.assertEqual(receipt['licensed_credit'], 0)
+
+    def test_floor_sums_multiline_binary_totals_without_ignored_credit(self):
+        log = (b'test result: ok. 100 passed; 0 failed; 200 ignored; 0 measured; '
+               b'0 filtered out; finished in 0.01s\n'
+               b'Running integration tests\n'
+               b'\x1b[32mtest result: ok. 160 passed; 0 failed; 0 ignored; 0 measured; '
+               b'0 filtered out; finished in 0.02s\x1b[0m\n'
+               b'test result: ok. 0 passed; 0 failed; 4 ignored; 0 measured; '
+               b'0 filtered out; finished in 0.00s\n')
+        code, receipt = self.record_log(log)
+        self.assertEqual(code, 0)
+        self.assertEqual(receipt['observed_passed_tests'], 260)
+
+    def test_floor_refuses_zero_ignored_only_and_malformed_output(self):
+        for log in [
+            b'',
+            b'test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; '
+            b'0 filtered out; finished in 0.00s\n',
+            b'test result: ok. 0 passed; 0 failed; 260 ignored; 0 measured; '
+            b'0 filtered out; finished in 0.00s\n',
+            b'test result: ok. 260 passed;\n',
+            b'test result: ok. many passed; 0 failed;\n',
+            b'fixture says test result: ok. 260 passed; 0 failed; 0 ignored; '
+            b'0 measured; 0 filtered out; finished in 0.00s\n',
+        ]:
+            with self.subTest(log=log):
+                code, receipt = self.record_log(log)
+                self.assertNotEqual(code, 0)
+                self.assertEqual(receipt['status'], 'failed')
+
+    def test_floor_refuses_failed_or_malformed_summary_after_valid_passes(self):
+        passed = (b'test result: ok. 260 passed; 0 failed; 0 ignored; 0 measured; '
+                  b'0 filtered out; finished in 0.01s\n')
+        for tail in [
+            b'test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; '
+            b'0 filtered out; finished in 0.01s\n',
+            b'test result: ok. 1 passed; 1 failed; 0 ignored; 0 measured; '
+            b'0 filtered out; finished in 0.01s\n',
+            b'test result: ok. broken passed;\n',
+        ]:
+            with self.subTest(tail=tail):
+                code, receipt = self.record_log(passed + tail)
+                self.assertNotEqual(code, 0)
+                self.assertEqual(receipt['status'], 'failed')
+        code, receipt = self.record_log(passed, exit_code=1)
+        self.assertEqual(code, 1)
+        self.assertEqual(receipt['status'], 'failed')
+
+    def test_floor_preserves_candidate_binding(self):
+        log = (b'test result: ok. 260 passed; 0 failed; 0 ignored; 0 measured; '
+               b'0 filtered out; finished in 0.01s\n')
+        for change in [{'candidate_changed': True}, {'candidate_dirty': True}]:
+            with self.subTest(change=change):
+                code, receipt = self.record_log(log, **change)
+                self.assertNotEqual(code, 0)
+                self.assertFalse(receipt['candidate_unchanged'])
+
+    def test_floor_excludes_skipped_tooling_tests(self):
+        for log, expected_count, expected_code in [
+            (b'tooling test result: ok. 260 executed; 1 skipped;\n', 259, 1),
+            (b'tooling test result: ok. 260 executed; 260 skipped;\n', 0, 1),
+            (b'tooling test result: ok. 261 executed; 1 skipped; '
+             b'3 python files; 1 shell test files; 4 shell syntax checks\n', 260, 0),
+        ]:
+            with self.subTest(log=log):
+                code, receipt = self.record_log(log)
+                self.assertEqual(code, expected_code)
+                self.assertEqual(receipt['observed_passed_tests'], expected_count)
+
+    def test_floor_cli_rejects_insufficient_output_and_accepts_threshold(self):
+        for log, expected_code in [
+            (b'test result: ok. 259 passed; 0 failed; 1 ignored; 0 measured; '
+             b'0 filtered out; finished in 0.01s\n', 1),
+            (b'test result: ok. 260 passed; 0 failed; 1 ignored; 0 measured; '
+             b'0 filtered out; finished in 0.01s\n', 0),
+        ]:
+            with self.subTest(log=log):
+                code, receipt = self.record_log(log, via_cli=True)
+                self.assertEqual(code, expected_code)
+                self.assertEqual(receipt['minimum_passed_tests'], 260)
+                self.assertTrue(receipt['requires_nonempty_tests'])
+
+    def test_invalid_floor_refuses_before_running_command(self):
+        for minimum in [0, -1, True, 1.5, '260']:
+            with self.subTest(minimum=minimum), \
+                    patch.object(ci.subprocess, 'Popen') as process:
+                with self.assertRaises(ValueError):
+                    ci.record(ROOT, Path('.'), 'tests', ['fixture-runner'],
+                              min_tests=minimum)
+                process.assert_not_called()
+
+    def test_optional_floor_preserves_focused_nonempty_tests(self):
+        log = (b'test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; '
+               b'0 filtered out; finished in 0.01s\n')
+        code, receipt = self.record_log(log, min_tests=None, expect_tests=True)
+        self.assertEqual(code, 0)
+        self.assertTrue(receipt['requires_nonempty_tests'])
+        self.assertNotIn('minimum_passed_tests', receipt)
+
+    def test_jenkins_requires_floor_only_for_existing_workspace_tests(self):
+        pipeline = (ROOT / 'Jenkinsfile').read_text()
+        self.assertIn('--gate tests --expect-tests --min-tests 260 -- cargo test '
+                      '--workspace --all-features --locked --no-fail-fast', pipeline)
+        self.assertEqual(pipeline.count('--min-tests'), 1)
+
 
 if __name__=='__main__':unittest.main()

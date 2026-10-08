@@ -193,10 +193,10 @@ impl MqService {
                 MqMqiAdmission::ForbiddenContext(result) => {
                     return Ok(EffectResult {
                         sequence: original_sequence,
-                        outcome: Ok(HostResult::MqMqi(MqMqiHostResult {
+                        outcome: Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
                             limits: original_limits,
                             result: result.clone(),
-                        })),
+                        }))),
                     });
                 }
             };
@@ -493,10 +493,10 @@ impl MqService {
                 };
                 let mut reply = EffectResult {
                     sequence: admitted.effect().sequence,
-                    outcome: Ok(HostResult::MqMqi(MqMqiHostResult {
+                    outcome: Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
                         limits: admitted.envelope.limits,
                         result,
-                    })),
+                    }))),
                 };
                 let decision_tick = clock.now_tick()?;
                 producer::recheck(

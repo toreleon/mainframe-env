@@ -239,10 +239,10 @@ fn selected_protection_delegates_full_storage_v2_without_execution_or_age() {
         storage["schema_version"],
         "mainframe-env.mq-mqi-result-storage@2"
     );
-    let digest = canonical_result_digest(&Ok(HostResult::MqMqi(MqMqiHostResult {
+    let digest = canonical_result_digest(&Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
         limits: MqMqiLimits::default(),
         result,
-    })))
+    }))))
     .unwrap();
     // A shape-only receipt fixture, not a dispatched GET or core completion.
     let row = rows

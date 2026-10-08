@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Reconcile Foundation implementation versus acceptance status and declare bounded public repairs with preserved pending conformance and licensed gates."

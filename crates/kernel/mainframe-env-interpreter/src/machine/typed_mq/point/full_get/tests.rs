@@ -767,7 +767,7 @@ fn final_callback_refusal_cancel_drop_and_original_envelope_mismatch_fence() {
                     } else {
                         e.sequence
                     },
-                    outcome: Ok(HostResult::MqMqi(MqMqiHostResult {
+                    outcome: Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
                         limits,
                         result: MqMqiResult {
                             call: if defect == 5 {
@@ -777,7 +777,7 @@ fn final_callback_refusal_cancel_drop_and_original_envelope_mismatch_fence() {
                             },
                             outcome: out,
                         },
-                    })),
+                    }))),
                 };
                 assert!(m.resume_host(result).is_err());
                 assert_eq!(m.bases, before);

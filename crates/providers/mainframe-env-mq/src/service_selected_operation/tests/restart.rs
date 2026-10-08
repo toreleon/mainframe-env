@@ -135,7 +135,7 @@ fn sqlite_physical_reopen_preserves_pending_owners_receipts_and_uncompleted_inte
     e.sequence = 4;
     e.idempotency_key =
         Some(IdempotencyKey::new("cold-connect", InvocationLimits::default()).unwrap());
-    e.request = HostRequest::MqMqi(MqMqiHostRequest {
+    e.request = HostRequest::MqMqi(Box::new(MqMqiHostRequest {
         mutation: Mutation {
             sequence: 4,
             idempotency_key: e.idempotency_key.clone().unwrap(),
@@ -153,7 +153,7 @@ fn sqlite_physical_reopen_preserves_pending_owners_receipts_and_uncompleted_inte
                 options: MqMqiOptions::ContractDefault,
             }),
         },
-    });
+    }));
     let original = store
         .effect(pending.idempotency_key.as_ref().unwrap())
         .unwrap()

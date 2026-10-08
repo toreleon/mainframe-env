@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Allow identical Db2 catalog seeds at table capacity, preserve same-key conflicts, and reject retained generation identity replacement after rollback."

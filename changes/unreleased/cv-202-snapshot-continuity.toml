@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Preserve coverage row identities, unit and gate applicability, and complete retained evidence histories across snapshot generations; reject out-of-order evidence without changing store state."

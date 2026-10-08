@@ -28,10 +28,10 @@ impl MqRfh2Observation {
         if !matches!(call, MqMqiCall::BufferToHandle | MqMqiCall::HandleToBuffer) {
             return Err(MqPropertyProblem::Call);
         }
-        if let Some(length) = self.data_length {
-            if length < 0 || length as usize > limits.buffer_bytes {
-                return Err(MqPropertyProblem::Capacity);
-            }
+        if let Some(length) = self.data_length
+            && (length < 0 || length as usize > limits.buffer_bytes)
+        {
+            return Err(MqPropertyProblem::Capacity);
         }
         match &self.buffer {
             MqRfh2BufferObservation::Unchanged => {

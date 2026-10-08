@@ -386,14 +386,14 @@ impl ReferenceMachine {
         }
         let connx_profile = targets.connx.as_ref().map(|capture| capture.profile);
         let step = self.effect(
-            HostRequest::MqMqi(MqMqiHostRequest {
+            HostRequest::MqMqi(Box::new(MqMqiHostRequest {
                 envelope: MqMqiRequestEnvelope {
                     context: profile.context,
                     limits: profile.limits,
                     request,
                 },
                 mutation: self.mutation()?,
-            }),
+            })),
             PendingKind::MqMqi(targets),
         )?;
         if let Some(Pending {

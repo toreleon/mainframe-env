@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 236,
+    "markdown_documents": 237,
     "navigation_groups": 8,
-    "normative_documents": 97,
+    "normative_documents": 98,
     "xtask_commands": 163
   },
   "documents": [
@@ -178,7 +178,7 @@
       "normative": false,
       "path": "crates/contracts/mainframe-env-host-api/README.md",
       "relative_links": 5,
-      "sha256": "sha256:6f715444b2c08fa30dd04b327fd5d6e3030b8babf6099d2a2ad7ec68f02b1342",
+      "sha256": "sha256:08a842fe78750b6985badd884dcb0db53e3b0d1a59adca0483df82c8331d1c16",
       "title": "mainframe-env-host-api",
       "xtask_commands": 1
     },
@@ -341,8 +341,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 178,
-      "sha256": "sha256:39a00db95108b48c74d643725323b3e727c89fcc3bbceffc2b3ecb1197e77b34",
+      "relative_links": 179,
+      "sha256": "sha256:310973c140115d2e72f0a1b32e26fd7f0f538c994e8636c72b53538c15b13a0e",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -1435,10 +1435,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env current shared host contracts",
+      "normative": true,
+      "owner": "Shared host-contract maintainers",
+      "path": "docs/decisions/0050-host-effect-envelope-layout.md",
+      "relative_links": 1,
+      "scope": "In-process HostRequest and HostResult representation",
+      "sha256": "sha256:7d581459f18808111ab7f6871073eebf83e47945e24c6dca652affe87453c05d",
+      "status": "Accepted implementation; scoped compatibility validation passed",
+      "title": "ADR-0050: Box the largest shared host-effect payloads",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 52,
-      "sha256": "sha256:332280c021b10c687ecc8e0305fd71f2c57ce3fb5032a866fc1ff31b0053c68b",
+      "relative_links": 53,
+      "sha256": "sha256:43f9927331159d83f380ef579a56c577b54c4fcdc6aae56121dc8a9ebb8b086b",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1470,7 +1482,7 @@
       "normative": false,
       "path": "docs/delivery/IMPLEMENTATION-STATUS.md",
       "relative_links": 20,
-      "sha256": "sha256:814f15279d3ab30b6140313a8d174f497b7425a770c37772f87346627438786a",
+      "sha256": "sha256:97682531fc04d54e83ad4fbaa52f9aea058a6b774bc2780774d57f76633640d4",
       "title": "Subsystem implementation status",
       "xtask_commands": 1
     },
@@ -1678,7 +1690,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/coverage/foundation-plan.md",
       "relative_links": 0,
-      "sha256": "sha256:2ab3f91c29c487eb6d45db74ab2ca35ead806acc862a166001d25ae86f93ce80",
+      "sha256": "sha256:cf9dca2ba8f63e9d973506ffc9eb43e310c3a95ef7f8723eb67fe50b55630795",
       "title": "Coverage and conformance — Coverage authority",
       "xtask_commands": 0
     },
@@ -1686,7 +1698,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/coverage/foundation-status.md",
       "relative_links": 2,
-      "sha256": "sha256:f3eb3cd342d3d374f3e1558b1fcb7d3fb5d5afa6d476f2ad863d48dfd3e402d8",
+      "sha256": "sha256:459692406df692caf81f4df5d572ceda0a88f6cefdad60cb2af0e2fec6a377f5",
       "title": "Coverage and conformance — Coverage authority progress",
       "xtask_commands": 6
     },
@@ -2722,6 +2734,10 @@
         {
           "label": "ADR-0030: Common CICS source condition authority",
           "path": "docs/decisions/0030-cics-source-condition-authority.md"
+        },
+        {
+          "label": "ADR-0050: Boxed shared host-effect payloads",
+          "path": "docs/decisions/0050-host-effect-envelope-layout.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -2944,7 +2960,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:b8bbac5dd07baab7b80554ade33568ac99c012b4f9d4eefa3e07d9e461a5d1bb",
+  "registry_sha256": "sha256:95ac25532cbc184708b38511837822158295432cd22aa8f47003e7df3aeeeb6a",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

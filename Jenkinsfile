@@ -240,7 +240,7 @@ pipeline {
                     # The output directory is ignored and archived by the existing CI owner.
                     export MAINFRAME_ENV_CONFORMANCE_SPEC_EXPORT="$out/effective-conformance-spec.json"
                     cargo run --quiet --locked -p xtask -- conformance-spec-export > "$MAINFRAME_ENV_CONFORMANCE_SPEC_EXPORT"
-                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate tests --expect-tests -- cargo test --workspace --all-features --locked --no-fail-fast
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate tests --expect-tests --min-tests 260 -- cargo test --workspace --all-features --locked --no-fail-fast
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate clippy -- cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
                 '''
             }

@@ -74,13 +74,13 @@ fn actual_compiled_calls_first_child_warning_preserve_original_effect_and_result
         let request_digest = canonical_request_digest(&effect.request).unwrap();
         let result = EffectResult {
             sequence: effect.sequence,
-            outcome: Ok(HostResult::MqMqi(MqMqiHostResult {
+            outcome: Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
                 limits: request.envelope.limits,
                 result: MqMqiResult {
                     call,
                     outcome: warning(call, frame.connection),
                 },
-            })),
+            }))),
         };
         let result_digest = canonical_result_digest(&result.outcome).unwrap();
         let original = result.clone();
@@ -95,13 +95,13 @@ fn actual_compiled_calls_first_child_warning_preserve_original_effect_and_result
             canonical_result_digest(&original.outcome).unwrap(),
             result_digest
         );
-        let ok = Ok(HostResult::MqMqi(MqMqiHostResult {
+        let ok = Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
             limits: request.envelope.limits,
             result: MqMqiResult {
                 call,
                 outcome: success(frame.connection),
             },
-        }));
+        })));
         assert_ne!(canonical_result_digest(&ok).unwrap(), result_digest);
         // No provider registry or UOW operation occurred in the adapter. The
         // independent fixture token predates this child's first observation.
@@ -209,7 +209,7 @@ fn both_warning_calls_require_exact_result_call_limits_and_sequence() {
             }
             let result = EffectResult {
                 sequence: effect.sequence + u64::from(mode == 1),
-                outcome: Ok(HostResult::MqMqi(MqMqiHostResult {
+                outcome: Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
                     limits,
                     result: MqMqiResult {
                         call: if mode == 2 {
@@ -219,7 +219,7 @@ fn both_warning_calls_require_exact_result_call_limits_and_sequence() {
                         },
                         outcome: warning(call, frame.connection),
                     },
-                })),
+                }))),
             };
             assert_eq!(
                 machine.resume_host(result),

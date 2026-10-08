@@ -14,7 +14,7 @@ inputs; it does not establish a fresh full-suite pass or licensed equivalence.
 <!-- BEGIN GENERATED SUBSYSTEM INDEX -->
 | Subsystem | Phase | Recorded progress |
 |---|---|---|
-| Coverage and conformance | Coverage authority | [Complete implementation candidate](subsystems/coverage/foundation-status.md) |
+| Coverage and conformance | Coverage authority | [Implementation candidate; acceptance pending](subsystems/coverage/foundation-status.md) |
 | COBOL | Grammar and types | [CB-306 complete; full-phase acceptance next](subsystems/cobol/structure-status.md) |
 | COBOL | Execution semantics | [CB-401 through CB-406 locally complete — pass-with-licensed-differential-pending](subsystems/cobol/execution-status.md) |
 | RACF / SAF | Commands and authorization | [Implementation candidate; pass with licensed differential pending](subsystems/racf/security-status.md) |

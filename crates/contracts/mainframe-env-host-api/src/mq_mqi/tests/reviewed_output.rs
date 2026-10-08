@@ -303,7 +303,7 @@ fn full_host_result_encoding_has_independent_new_variant_framing_and_lossless_fi
         result: result.clone(),
         limits,
     };
-    let actual: Result<_, HostProblem> = Ok(HostResult::MqMqi(host.clone()));
+    let actual: Result<_, HostProblem> = Ok(HostResult::MqMqi(Box::new(host.clone())));
     let MqMqiOutcome::ReviewedOutput { status, output } = &result.outcome else {
         unreachable!()
     };
@@ -377,7 +377,7 @@ fn full_host_result_encoding_has_independent_new_variant_framing_and_lossless_fi
         }
         assert!(host.validate(HostLimits::default()).is_ok());
         assert_ne!(
-            canonical_result_digest(&Ok(HostResult::MqMqi(host))).unwrap(),
+            canonical_result_digest(&Ok(HostResult::MqMqi(Box::new(host)))).unwrap(),
             canonical_result_digest(&actual).unwrap()
         );
     }

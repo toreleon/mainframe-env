@@ -5,6 +5,7 @@
 mod candidate;
 mod conformance;
 mod gate;
+mod store;
 
 pub use candidate::*;
 pub use conformance::*;
@@ -379,100 +380,6 @@ pub struct CoverageStore {
     snapshots: BTreeMap<String, BTreeMap<u64, CoverageSnapshot>>,
 }
 
-impl CoverageStore {
-    pub fn append_evidence(
-        &mut self,
-        record: EvidenceRecord,
-        limits: CoverageLimits,
-    ) -> Result<(), CoverageProblem> {
-        if let Some(existing) = self.evidence.get(record.identity()) {
-            return if existing == &record {
-                Ok(())
-            } else {
-                Err(CoverageProblem::EvidenceConflict)
-            };
-        }
-        if self.evidence.len() >= limits.max_evidence_records {
-            return Err(CoverageProblem::LimitExceeded);
-        }
-        let key = (
-            record.row_id().to_string(),
-            record.gate(),
-            record.sequence(),
-        );
-        if self.evidence_keys.contains_key(&key) {
-            return Err(CoverageProblem::EvidenceConflict);
-        }
-        self.evidence_keys
-            .insert(key, record.identity().to_string());
-        self.evidence.insert(record.identity().to_string(), record);
-        Ok(())
-    }
-
-    pub fn commit(
-        &mut self,
-        snapshot: CoverageSnapshot,
-        limits: CoverageLimits,
-    ) -> Result<(), CoverageProblem> {
-        for record in snapshot.evidence() {
-            if self.evidence.get(record.identity()) != Some(record) {
-                return Err(CoverageProblem::MissingEvidence);
-            }
-        }
-        let baseline = snapshot.baseline_id().to_string();
-        let anchor = (
-            snapshot.catalog_digest().to_string(),
-            snapshot.denominator(),
-        );
-        let anchor_is_new = if let Some(existing) = self.anchors.get(&baseline) {
-            if existing != &anchor {
-                return Err(CoverageProblem::DenominatorDrift);
-            }
-            false
-        } else {
-            true
-        };
-        let generations = self.snapshots.get(&baseline);
-        if let Some(existing) = generations.and_then(|values| values.get(&snapshot.generation())) {
-            return if existing == &snapshot {
-                Ok(())
-            } else {
-                Err(CoverageProblem::GenerationConflict)
-            };
-        }
-        if generations.is_some_and(|values| values.len() >= limits.max_generations_per_baseline) {
-            return Err(CoverageProblem::LimitExceeded);
-        }
-        if generations
-            .and_then(BTreeMap::last_key_value)
-            .is_some_and(|(generation, _)| *generation >= snapshot.generation())
-        {
-            return Err(CoverageProblem::StaleGeneration);
-        }
-        if anchor_is_new {
-            self.anchors.insert(baseline.clone(), anchor);
-        }
-        self.snapshots
-            .entry(baseline)
-            .or_default()
-            .insert(snapshot.generation(), snapshot);
-        Ok(())
-    }
-
-    #[must_use]
-    pub fn latest(&self, baseline: &str) -> Option<&CoverageSnapshot> {
-        self.snapshots
-            .get(baseline)?
-            .last_key_value()
-            .map(|(_, value)| value)
-    }
-
-    #[must_use]
-    pub fn evidence(&self, identity: &str) -> Option<&EvidenceRecord> {
-        self.evidence.get(identity)
-    }
-}
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CoverageProblem {
     InvalidIdentity,
@@ -679,5 +586,264 @@ mod tests {
             Err(CoverageProblem::DenominatorDrift)
         );
         assert_eq!(store.latest("baseline").unwrap().generation(), 1);
+    }
+
+    fn continuity_row(records: &[EvidenceRecord]) -> CoverageRow {
+        let mut row = CoverageRow::new(
+            "baseline",
+            "unit",
+            "row",
+            CoverageGate::ALL,
+            CoverageLimits::default(),
+        )
+        .unwrap();
+        for record in records {
+            row.record(record.clone()).unwrap();
+        }
+        row
+    }
+
+    fn continuity_snapshot(generation: u64, row: CoverageRow) -> CoverageSnapshot {
+        CoverageSnapshot::new(
+            "baseline",
+            sha(1),
+            generation,
+            1,
+            vec![row],
+            CoverageLimits::default(),
+        )
+        .unwrap()
+    }
+
+    fn assert_continuity_unchanged(store: &CoverageStore, before: &CoverageStore) {
+        assert_eq!(store.anchors, before.anchors);
+        assert_eq!(store.evidence, before.evidence);
+        assert_eq!(store.evidence_keys, before.evidence_keys);
+        assert_eq!(store.snapshots, before.snapshots);
+    }
+
+    #[test]
+    fn snapshot_continuity_rejects_same_count_descriptor_drift() {
+        let limits = CoverageLimits::default();
+        let mut store = CoverageStore::default();
+        store
+            .commit(continuity_snapshot(1, continuity_row(&[])), limits)
+            .unwrap();
+        for (unit, row_id, gates) in [
+            ("unit", "replacement", CoverageGate::ALL.to_vec()),
+            ("replacement", "row", CoverageGate::ALL.to_vec()),
+            ("unit", "row", vec![CoverageGate::Recognized]),
+            (
+                "unit",
+                "row",
+                CoverageGate::ALL
+                    .into_iter()
+                    .filter(|gate| *gate != CoverageGate::Differential)
+                    .collect(),
+            ),
+        ] {
+            let before = store.clone();
+            let row = CoverageRow::new("baseline", unit, row_id, gates, limits).unwrap();
+            assert_eq!(
+                store.commit(continuity_snapshot(2, row), limits),
+                Err(CoverageProblem::DenominatorDrift),
+                "descriptor drift: {unit}/{row_id}"
+            );
+            assert_continuity_unchanged(&store, &before);
+        }
+    }
+
+    #[test]
+    fn snapshot_continuity_rejects_changed_or_extended_applicability() {
+        let limits = CoverageLimits::default();
+        let mut store = CoverageStore::default();
+        let first = CoverageRow::new(
+            "baseline",
+            "unit",
+            "row",
+            [CoverageGate::Recognized],
+            limits,
+        )
+        .unwrap();
+        store.commit(continuity_snapshot(1, first), limits).unwrap();
+        for gates in [
+            vec![CoverageGate::Validated],
+            vec![CoverageGate::Recognized, CoverageGate::Validated],
+        ] {
+            let before = store.clone();
+            let row = CoverageRow::new("baseline", "unit", "row", gates, limits).unwrap();
+            assert_eq!(
+                store.commit(continuity_snapshot(2, row), limits),
+                Err(CoverageProblem::DenominatorDrift)
+            );
+            assert_continuity_unchanged(&store, &before);
+        }
+    }
+
+    #[test]
+    fn snapshot_continuity_rejects_dropped_committed_history() {
+        let limits = CoverageLimits::default();
+        let pass = evidence("row", CoverageGate::Recognized, 1, EvidenceOutcome::Pass);
+        let fail = evidence("row", CoverageGate::Recognized, 2, EvidenceOutcome::Fail);
+        let mut store = CoverageStore::default();
+        for record in [&pass, &fail] {
+            store.append_evidence(record.clone(), limits).unwrap();
+        }
+        store
+            .commit(
+                continuity_snapshot(1, continuity_row(&[pass.clone(), fail.clone()])),
+                limits,
+            )
+            .unwrap();
+        for records in [vec![], vec![pass], vec![fail]] {
+            let before = store.clone();
+            assert_eq!(
+                store.commit(continuity_snapshot(2, continuity_row(&records)), limits),
+                Err(CoverageProblem::EvidenceConflict)
+            );
+            assert_continuity_unchanged(&store, &before);
+        }
+    }
+
+    #[test]
+    fn snapshot_continuity_cannot_hide_retained_failure_before_first_or_next_commit() {
+        let limits = CoverageLimits::default();
+        let pass = evidence("row", CoverageGate::Recognized, 1, EvidenceOutcome::Pass);
+        let fail = evidence("row", CoverageGate::Recognized, 2, EvidenceOutcome::Fail);
+        for previous_generation in [false, true] {
+            let mut store = CoverageStore::default();
+            store.append_evidence(pass.clone(), limits).unwrap();
+            let passing = continuity_snapshot(1, continuity_row(std::slice::from_ref(&pass)));
+            if previous_generation {
+                store.commit(passing.clone(), limits).unwrap();
+            }
+            store.append_evidence(fail.clone(), limits).unwrap();
+            if previous_generation {
+                // A retry acknowledges the immutable old generation, not a new observation.
+                store.commit(passing, limits).unwrap();
+            }
+            let before = store.clone();
+            let generation = if previous_generation { 2 } else { 1 };
+            assert_eq!(
+                store.commit(
+                    continuity_snapshot(generation, continuity_row(std::slice::from_ref(&pass))),
+                    limits,
+                ),
+                Err(CoverageProblem::MissingEvidence)
+            );
+            assert_continuity_unchanged(&store, &before);
+            let accepted =
+                continuity_snapshot(generation, continuity_row(&[pass.clone(), fail.clone()]));
+            store.commit(accepted, limits).unwrap();
+            let latest = store.latest("baseline").unwrap();
+            assert_eq!(latest.count(CoverageGate::Recognized).numerator, 0);
+            assert_eq!(latest.complete_rows(), 0);
+        }
+    }
+
+    #[test]
+    fn snapshot_continuity_rejects_reordered_history_and_unstored_replacement() {
+        let limits = CoverageLimits::default();
+        let pass = evidence("row", CoverageGate::Recognized, 1, EvidenceOutcome::Pass);
+        let fail = evidence("row", CoverageGate::Recognized, 2, EvidenceOutcome::Fail);
+        let mut store = CoverageStore::default();
+        for record in [&pass, &fail] {
+            store.append_evidence(record.clone(), limits).unwrap();
+        }
+        let before = store.clone();
+        // Exercise admission against malformed retained history, bypassing the row builder.
+        let mut reordered = continuity_row(&[pass.clone(), fail.clone()]);
+        reordered
+            .evidence
+            .get_mut(&CoverageGate::Recognized)
+            .unwrap()
+            .reverse();
+        assert_eq!(
+            store.commit(continuity_snapshot(1, reordered), limits),
+            Err(CoverageProblem::EvidenceConflict)
+        );
+        assert_continuity_unchanged(&store, &before);
+        let replacement = evidence("row", CoverageGate::Recognized, 2, EvidenceOutcome::Pass);
+        assert_eq!(
+            store.commit(
+                continuity_snapshot(1, continuity_row(&[pass, replacement])),
+                limits,
+            ),
+            Err(CoverageProblem::MissingEvidence)
+        );
+        assert_continuity_unchanged(&store, &before);
+    }
+
+    #[test]
+    fn snapshot_continuity_rejects_out_of_order_retention_without_mutation() {
+        let limits = CoverageLimits::default();
+        let fail = evidence("row", CoverageGate::Recognized, 2, EvidenceOutcome::Fail);
+        let pass = evidence("row", CoverageGate::Recognized, 1, EvidenceOutcome::Pass);
+        let mut store = CoverageStore::default();
+        store.append_evidence(fail.clone(), limits).unwrap();
+        let before = store.clone();
+        assert_eq!(
+            store.append_evidence(pass, limits),
+            Err(CoverageProblem::StaleEvidence)
+        );
+        assert_continuity_unchanged(&store, &before);
+        store.append_evidence(fail, limits).unwrap();
+        assert_continuity_unchanged(&store, &before);
+    }
+
+    #[test]
+    fn snapshot_continuity_accepts_monotonic_append_and_historical_retry() {
+        let limits = CoverageLimits::default();
+        let mut store = CoverageStore::default();
+        let mut row = continuity_row(&[]);
+        let first = continuity_snapshot(1, row.clone());
+        store.commit(first.clone(), limits).unwrap();
+        for (generation, outcome) in [
+            (2, EvidenceOutcome::Pass),
+            (3, EvidenceOutcome::Fail),
+            (4, EvidenceOutcome::Pass),
+        ] {
+            let record = evidence("row", CoverageGate::Recognized, generation, outcome);
+            store.append_evidence(record.clone(), limits).unwrap();
+            row.record(record).unwrap();
+            let next = continuity_snapshot(generation, row.clone());
+            store.commit(next.clone(), limits).unwrap();
+            store.commit(next, limits).unwrap();
+        }
+        let before = store.clone();
+        store.commit(first, limits).unwrap();
+        assert_continuity_unchanged(&store, &before);
+        let latest = store.latest("baseline").unwrap();
+        assert_eq!(latest.generation(), 4);
+        assert_eq!(latest.evidence().count(), 3);
+        assert_eq!(latest.count(CoverageGate::Recognized).numerator, 1);
+        assert_eq!(latest.count(CoverageGate::Differential).numerator, 0);
+        assert_eq!(latest.complete_rows(), 0);
+    }
+
+    #[test]
+    fn snapshot_continuity_closure_is_scoped_to_admitted_rows_and_gates() {
+        let limits = CoverageLimits::default();
+        let mut store = CoverageStore::default();
+        for (row, gate) in [
+            ("other-row", CoverageGate::Recognized),
+            ("row", CoverageGate::Executed),
+        ] {
+            store
+                .append_evidence(evidence(row, gate, 1, EvidenceOutcome::Fail), limits)
+                .unwrap();
+        }
+        let row = CoverageRow::new(
+            "baseline",
+            "unit",
+            "row",
+            [CoverageGate::Recognized, CoverageGate::Validated],
+            limits,
+        )
+        .unwrap();
+        store.commit(continuity_snapshot(1, row), limits).unwrap();
+        let latest = store.latest("baseline").unwrap();
+        assert_eq!(latest.count(CoverageGate::Recognized).numerator, 0);
+        assert_eq!(latest.count(CoverageGate::Validated).denominator, 1);
     }
 }

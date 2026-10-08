@@ -46,7 +46,7 @@ mod tests {
             };
             let result = EffectResult {
                 sequence: r.sequence,
-                outcome: Ok(HostResult::MqMqi(MqMqiHostResult {
+                outcome: Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
                     limits,
                     result: MqMqiResult {
                         call: MqMqiCall::Inquire,
@@ -58,7 +58,7 @@ mod tests {
                             },
                         },
                     },
-                })),
+                }))),
             };
             // A fixture receipt is structural input; original core/audit are genuinely
             // created by OriginalDispatch, not seeded Completed/Running permission.
@@ -253,7 +253,7 @@ mod tests {
             sequence: 1,
             deadline_tick: 100,
             idempotency_key: Some(key.clone()),
-            request: HostRequest::MqMqi(MqMqiHostRequest {
+            request: HostRequest::MqMqi(Box::new(MqMqiHostRequest {
                 envelope: MqMqiRequestEnvelope {
                     context: MqMqiContext {
                         owner,
@@ -267,7 +267,7 @@ mod tests {
                     idempotency_key: key,
                     transaction: None,
                 },
-            }),
+            })),
         }
     }
     fn exercise(store: Arc<dyn PlatformStore>, mode: u8, count: usize, legacy: bool) {
