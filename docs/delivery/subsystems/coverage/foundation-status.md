@@ -399,6 +399,19 @@ is unchanged. Publication behavior, installer/publication schema repairs and
 standards-envelope adoption remain separate slices. Shared contract inventories,
 architecture docs and generated metadata remain manager-owned.
 
+### Catalog locator membership scope
+
+Declare `CV-201.catalog-locator-membership` under CV-201. Owners are the existing
+coverage/catalog/compiler check in `xtask/src/main.rs`, `conformance_catalog.rs`
+and `topic_manifests.rs`, with focused private tests. Join each official catalog
+locator to its indexed baseline manifest or existing supporting-source receipt.
+An unpinned or wrong-product locator must refuse even if its modified catalog
+digest is internally consistent. Preserve embedded/link locators and the five
+explicit zero-credit roadmap-normalization dispositions; no catalog row, pin,
+denominator or publication body is rewritten or fetched. Source-body verification
+remains separate. Prepare independent mutation tests first; Cargo grant is
+manager-controlled and completion requires affected offline metadata checks.
+
 ### CV-204.package-bounds acceptance
 
 Status: **Complete (bounded package admission and codec only)**. The independently reproduced allocation/codec refusals are repaired. All 33 focused package tests and dependency-inclusive strict Clippy pass in the producing checkout; integrated application-package/spec/coverage, module, formatting and frozen dependency gates pass. Streaming preflight checks counts, text and checked footprint before typed decoding; capped export borrows retained packages and stops before full encoding. Duplicate JSON members refuse. Serde scratch and bounded metadata sets still allocate; this is not a process-wide heap quota. Identity framing and publication fencing remain pending.
