@@ -83,7 +83,8 @@ IMS metadata publication uses the shared `mainframe-env.ims-metadata@1` DTO and
 validator. The provider atomically retains the package-bound generation and
 advances its selected-generation row through `ProviderStateStore`; rollback
 selects the exact retained generation. A package without the optional field
-keeps the historical package identity and publishes an explicit no-metadata
+keeps its frozen @2 identity when retained; current @3 frames optional-field
+presence explicitly. It publishes an explicit no-metadata
 selection, so a later generation cannot accidentally inherit stale IMS state.
 
 `ProductServer` owns the v2 installer. Its production constructor receives a
@@ -95,6 +96,28 @@ Missing, revoked, or malformed material denies the package; plaintext keys and
 signing operations are absent from the production verifier. Subsystem
 publishers obtain an opaque selected-generation handle from the installer,
 never a caller-provided digest.
+
+Fresh production packages use the bounded canonical `cose-mac0-hmac256@1`
+profile ([ADR 0055](../decisions/0055-standard-package-mac-envelope.md)):
+tagged COSE_Mac0, protected HMAC-256 algorithm and matching UTF-8 key ID,
+empty unprotected headers, the attached computed package identity, a 32-byte
+MAC and fixed application-authentication external AAD. Key IDs are 1–64 bytes
+and contain no control characters. Encoded signatures are capped at 256 bytes
+and decoded envelopes at 192 bytes before parsing. Noncanonical, duplicate,
+unknown or critical headers, trailing data and mismatched identities refuse
+before secret resolution. These bounds limit parser work, not total process heap.
+
+The existing `hmac-sha256@1` profile remains an explicit retained verification
+branch, with a 43-byte encoded cap, exactly 32 decoded MAC bytes and retained
+key IDs up to 128 bytes. Configured references retain that 128-byte limit; both
+profiles require resolved secrets of 32–4096 bytes. Production fresh admission
+accepts only the COSE profile. Retained raw @2 or @3 packages recover under
+current trust without rewriting their signature. If either side of an
+existing-generation retry uses the legacy policy, the complete package must
+equal the retained package; retry cannot upgrade or downgrade its envelope.
+Custom injected verifiers retain their explicit policy and are not evidence
+that production trust accepted a package. Symmetric MAC authentication does
+not provide nonrepudiation or authenticate an arbitrary storage snapshot.
 
 The migration from `mainframe-env.application-package@1` to version 2 is
 non-destructive. The old reader remains, and rollback remains possible by

@@ -1,3 +1,6 @@
+mod package_authentication;
+pub use package_authentication::HmacSha256PackageTrust;
+
 mod dataset_helpers;
 use dataset_helpers::{
     dataset_attributes, dataset_mutation, join_records, member_name, records_for_write,
@@ -22,10 +25,7 @@ use crate::jes_worker::{
     clear_worker_progress, heartbeat_durable_work,
 };
 use crate::retention_maintenance::provider::RetentionPlanner;
-use crate::{
-    ArtifactProfile, DefaultProgramRouter, EnvironmentSecretResolver, ServerConfig,
-    default_program_router,
-};
+use crate::{ArtifactProfile, DefaultProgramRouter, ServerConfig, default_program_router};
 use axum::http::StatusCode;
 use base64::Engine;
 use mainframe_env_application::{
@@ -87,7 +87,6 @@ use mainframe_env_zosmf::{
     Authentication, GatewayCallContext, GatewayProblem, GatewayRequest, GatewayResponse,
     ZosmfBackend, ZosmfLimits,
 };
-use ring::hmac;
 use ring::rand::{SecureRandom, SystemRandom};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use serde::{Deserialize, Serialize};
@@ -539,76 +538,6 @@ struct DurableApplicationsV2 {
     installer: ApplicationInstallerV2,
     store_version: u64,
     verifier: Arc<dyn PackageSignatureVerifier>,
-}
-
-pub struct HmacSha256PackageTrust {
-    references: BTreeMap<String, SecretRef>,
-    secrets: Arc<dyn SecretResolver>,
-}
-
-impl HmacSha256PackageTrust {
-    pub fn new(
-        references: BTreeMap<String, SecretRef>,
-        secrets: Arc<dyn SecretResolver>,
-    ) -> Result<Self, HostProblem> {
-        if references.len() > 1_024
-            || references.iter().any(|(key_id, _)| {
-                key_id.is_empty() || key_id.len() > 128 || key_id.chars().any(char::is_control)
-            })
-        {
-            return Err(HostProblem::Malformed);
-        }
-        Ok(Self {
-            references,
-            secrets,
-        })
-    }
-
-    pub fn from_environment(
-        environment: &BTreeMap<String, String>,
-        secrets: Arc<dyn SecretResolver>,
-    ) -> Result<Self, HostProblem> {
-        let Some(encoded) = environment.get("MAINFRAME_ENV_PACKAGE_HMAC_KEY_REFS") else {
-            return Self::new(BTreeMap::new(), secrets);
-        };
-        let encoded: BTreeMap<String, String> =
-            serde_json::from_str(encoded).map_err(|_| HostProblem::Malformed)?;
-        let references = encoded
-            .into_iter()
-            .map(|(key_id, reference)| {
-                EnvironmentSecretResolver::parse_reference(&reference)
-                    .map(|reference| (key_id, reference))
-            })
-            .collect::<Result<BTreeMap<_, _>, _>>()?;
-        Self::new(references, secrets)
-    }
-}
-
-impl PackageSignatureVerifier for HmacSha256PackageTrust {
-    fn verify(&self, key_id: &str, algorithm: &str, identity: &str, signature: &str) -> bool {
-        if algorithm != "hmac-sha256@1" {
-            return false;
-        }
-        let Some(reference) = self.references.get(key_id) else {
-            return false;
-        };
-        let Ok(key) = self.secrets.resolve(reference) else {
-            return false;
-        };
-        if key.len() < 32 || key.len() > 4_096 {
-            return false;
-        }
-        let Ok(signature) = base64::engine::general_purpose::STANDARD_NO_PAD.decode(signature)
-        else {
-            return false;
-        };
-        hmac::verify(
-            &hmac::Key::new(hmac::HMAC_SHA256, &key),
-            identity.as_bytes(),
-            &signature,
-        )
-        .is_ok()
-    }
 }
 
 struct RejectPackageTrust;
@@ -5704,6 +5633,7 @@ mod tests {
     };
     use mainframe_env_store::{PostgresArtifactStore, PostgresStateStore, SqliteStateStore};
     use mainframe_env_store_api::{RetentionRequest, RetentionStore, WorkStore};
+    use ring::hmac;
     use std::sync::Barrier;
     use tower::ServiceExt;
 
@@ -10130,8 +10060,41 @@ mod tests {
         .unwrap()
     }
 
-    fn sign_test_package_identity(identity: &str) -> String {
-        sign_package_identity_with_key(TEST_PACKAGE_KEY, identity)
+    #[test]
+    fn package_trust_cose_mac0_accepts_independent_vector() {
+        // Independent stdlib HMAC fixture; bytes are not produced by the package codec.
+        let resolver = Arc::new(MemorySecretResolver::default());
+        let reference = SecretRef::new("secret:independent-key", HostLimits::default()).unwrap();
+        resolver.insert(reference.as_str(), (0_u8..32).collect());
+        let trust = HmacSha256PackageTrust::new(
+            BTreeMap::from([("review-key".into(), reference)]),
+            resolver,
+        )
+        .unwrap();
+        assert!(trust.verify(
+            "review-key",
+            "cose-mac0-hmac256@1",
+            "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            concat!(
+                "0YRPogEFBEpyZXZpZXcta2V5oFhHc2hhMjU2OmUzYjBjNDQyOThmYzFjMTQ5YWZiZjRj",
+                "ODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTVYIInc9L64UV87",
+                "fn2kbI1Vc4PWZ1JF0/G+Fe9JLfxR84E8"
+            ),
+        ));
+    }
+
+    fn sign_test_package_identity(identity: &str) -> mainframe_env_application::PackageSignature {
+        mainframe_env_application::encode_package_authentication(
+            "test-production-key",
+            identity,
+            |data| {
+                hmac::sign(&hmac::Key::new(hmac::HMAC_SHA256, TEST_PACKAGE_KEY), data)
+                    .as_ref()
+                    .try_into()
+                    .unwrap()
+            },
+        )
+        .unwrap()
     }
 
     fn sign_package_identity_with_key(key: &[u8], identity: &str) -> String {
@@ -10252,13 +10215,13 @@ mod tests {
                 security_resources: Vec::new(),
             },
             signature: PackageSignature {
-                algorithm: "hmac-sha256@1".into(),
+                algorithm: mainframe_env_application::PACKAGE_AUTHENTICATION_ALGORITHM.into(),
                 key_id: "test-production-key".into(),
                 value: "invalid".into(),
             },
         };
         let identity = mainframe_env_application::package_generation_identity(&package).unwrap();
-        package.signature.value = sign_test_package_identity(&identity);
+        package.signature = sign_test_package_identity(&identity);
         package
     }
 
@@ -10267,7 +10230,7 @@ mod tests {
         _trust: &HmacSha256PackageTrust,
     ) {
         let identity = mainframe_env_application::package_generation_identity(package).unwrap();
-        package.signature.value = sign_test_package_identity(&identity);
+        package.signature = sign_test_package_identity(&identity);
     }
 
     fn signed_db2_package(
@@ -10370,7 +10333,7 @@ mod tests {
         entry.bytes = bytes.len();
         package.base.blobs.insert(sha256, bytes);
         let identity = mainframe_env_application::package_generation_identity(&package).unwrap();
-        package.signature.value = sign_test_package_identity(&identity);
+        package.signature = sign_test_package_identity(&identity);
         (package, definitions)
     }
 

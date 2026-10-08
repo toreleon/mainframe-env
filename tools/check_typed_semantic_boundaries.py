@@ -223,6 +223,50 @@ def between(source: str, start: str, end: str) -> str:
     return source.split(start, 1)[1].split(end, 1)[0]
 
 
+def linked_production(parent: Path, module: str, exported: str) -> str:
+    """Follow one plain private module and its explicit public re-export."""
+    require(
+        all(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) for name in (module, exported)),
+        "linked production source expects Rust identifiers",
+    )
+    source = production(parent.read_text(encoding="utf-8"))
+    # Use the same lexer and cfg(test) exclusion as every production check.
+    code = list(source)
+    cursor = 0
+    while cursor < len(source):
+        skipped = skip_non_code(source, cursor)
+        if skipped != cursor:
+            code[cursor:skipped] = ["\n" if char == "\n" else " " for char in source[cursor:skipped]]
+            cursor = skipped
+        else:
+            cursor += 1
+    code = "".join(code)
+    statements = []
+    depth = start = 0
+    for position, char in enumerate(code):
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                start = position + 1
+        elif char == ";" and depth == 0:
+            statements.append(code[start:position + 1])
+            start = position + 1
+    require(
+        any(re.fullmatch(rf"\s*mod\s+{module}\s*;\s*", item) for item in statements),
+        f"production parent omits plain private module {module}",
+    )
+    require(
+        any(re.fullmatch(rf"\s*pub\s+use\s+{module}\s*::\s*{exported}\s*;\s*", item)
+            for item in statements),
+        f"production parent omits explicit re-export {module}::{exported}",
+    )
+    require(parent.suffix == ".rs" and parent.stem != "mod", "unsupported linked parent source")
+    child = parent.with_suffix("") / f"{module}.rs"
+    return production(child.read_text(encoding="utf-8"))
+
+
 def reject(source: str, patterns: list[str], scope: str) -> None:
     for pattern in patterns:
         require(pattern not in source, f"{scope} contains forbidden runtime grammar path {pattern}")
@@ -642,6 +686,13 @@ def check(root: Path) -> None:
 
 
 def main() -> None:
+    if sys.argv[1:] == ["--production-linked-file"]:
+        request = json.load(sys.stdin)
+        require(isinstance(request, list) and len(request) == 3
+                and all(isinstance(item, str) for item in request),
+                "linked production scanner expects parent, module and export")
+        json.dump([linked_production(Path(request[0]), request[1], request[2])], sys.stdout)
+        return
     if sys.argv[1:] == ["--production-files"]:
         paths = json.load(sys.stdin)
         require(

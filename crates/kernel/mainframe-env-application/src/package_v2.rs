@@ -188,6 +188,12 @@ pub struct ApplicationPackageV2 {
 
 pub trait PackageSignatureVerifier: Send + Sync {
     fn verify(&self, key_id: &str, algorithm: &str, identity: &str, signature: &str) -> bool;
+
+    /// Pure admission policy; verification and secret resolution belong to `verify` alone.
+    /// Trusted injected verifiers retain their existing explicit algorithm policy by default.
+    fn allows_fresh_algorithm(&self, _algorithm: &str) -> bool {
+        true
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -398,6 +404,9 @@ impl ApplicationInstallerV2 {
             identity,
             footprint,
         } = validate_v2(package, &self.product, self.limits, self.verifier.as_ref())?;
+        let allows_fresh = self
+            .verifier
+            .allows_fresh_algorithm(&package.signature.algorithm);
         let key = package.base.manifest.name.to_ascii_uppercase();
         let mut applications = self
             .applications
@@ -410,12 +419,17 @@ impl ApplicationInstallerV2 {
             .get(&key)
             .and_then(|installed| installed.generations.get(&package.generation))
         {
+            let retained = applications
+                .get(&key)
+                .and_then(|installed| installed.packages.get(&package.generation))
+                .ok_or(InstallProblem::IdentityConflict)?;
+            let exact_retry = package.sections.schema_version == APPLICATION_PACKAGE_V2_CONTRACT
+                || !allows_fresh
+                || !self
+                    .verifier
+                    .allows_fresh_algorithm(&retained.signature.algorithm);
             return if existing.identity == identity
-                && (package.sections.schema_version != APPLICATION_PACKAGE_V2_CONTRACT
-                    || applications
-                        .get(&key)
-                        .and_then(|installed| installed.packages.get(&package.generation))
-                        .is_some_and(|retained| retained.as_ref() == package))
+                && (!exact_retry || retained.as_ref() == package)
             {
                 Ok(existing.clone())
             } else {
@@ -426,6 +440,9 @@ impl ApplicationInstallerV2 {
             && package.sections.schema_version != APPLICATION_PACKAGE_V3_CONTRACT
         {
             return Err(InstallProblem::InvalidIdentity);
+        }
+        if admission == PackageAdmission::Fresh && !allows_fresh {
+            return Err(InstallProblem::InvalidSignature);
         }
         let _total_retained_bytes = applications
             .values()
@@ -498,13 +515,18 @@ impl ApplicationInstallerV2 {
             .generations
             .get(&package.generation)
             .ok_or(InstallProblem::UnknownStage)?;
-        if record.identity != identity
-            || (package.sections.schema_version == APPLICATION_PACKAGE_V2_CONTRACT
-                && !installed
-                    .packages
-                    .get(&package.generation)
-                    .is_some_and(|retained| retained.as_ref() == package))
-        {
+        let retained = installed
+            .packages
+            .get(&package.generation)
+            .ok_or(InstallProblem::IdentityConflict)?;
+        let exact_retry = package.sections.schema_version == APPLICATION_PACKAGE_V2_CONTRACT
+            || !self
+                .verifier
+                .allows_fresh_algorithm(&package.signature.algorithm)
+            || !self
+                .verifier
+                .allows_fresh_algorithm(&retained.signature.algorithm);
+        if record.identity != identity || (exact_retry && retained.as_ref() != package) {
             return Err(InstallProblem::IdentityConflict);
         }
         if record.state == InstallState::Ready {
@@ -968,6 +990,7 @@ fn digest_optional(digest: &mut Sha256, value: Option<&str>) {
 mod tests {
     use super::*;
     mod identity_framing;
+    mod standard_envelope;
     use crate::package_v1::sha256;
     use crate::{ApplicationManifest, EntryKind, PackageEntry};
 

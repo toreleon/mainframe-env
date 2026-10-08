@@ -12,6 +12,42 @@ SPEC.loader.exec_module(typed_boundaries)
 
 
 class TypedSemanticBoundaryTests(unittest.TestCase):
+    def test_linked_production_requires_real_top_level_module_and_export(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory) / "product.rs"
+            child = Path(directory) / "product" / "trust.rs"
+            child.parent.mkdir()
+            child.write_text('pub struct Authority;\n#[cfg(test)] mod tests { const KEY: &str = "SECRET"; }')
+            parent.write_text("mod trust;\npub use trust::Authority;")
+            self.assertIn("pub struct Authority", typed_boundaries.linked_production(parent, "trust", "Authority"))
+            self.assertNotIn("SECRET", typed_boundaries.linked_production(parent, "trust", "Authority"))
+            for source in (
+                "pub use trust::Authority;",
+                "mod trust;",
+                "// mod trust;\npub use trust::Authority;",
+                'const TEXT: &str = "mod trust;";\npub use trust::Authority;',
+                "#[cfg(test)] mod trust;\npub use trust::Authority;",
+                "mod trust;\n#[cfg(test)] pub use trust::Authority;",
+                "mod nested { mod trust; }\npub use trust::Authority;",
+                'fn fixture() { let text = "mod trust;"; }\npub use trust::Authority;',
+                '/* mod trust; */\npub use trust::Authority;',
+                '#[path = "other.rs"] mod trust;\npub use trust::Authority;',
+            ):
+                with self.subTest(source=source):
+                    parent.write_text(source)
+                    with self.assertRaises(typed_boundaries.BoundaryError):
+                        typed_boundaries.linked_production(parent, "trust", "Authority")
+
+    def test_linked_production_refuses_missing_child_and_path_identifiers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory) / "product.rs"
+            parent.write_text("mod trust;\npub use trust::Authority;")
+            with self.assertRaises(FileNotFoundError):
+                typed_boundaries.linked_production(parent, "trust", "Authority")
+            for module, exported in (("../trust", "Authority"), ("trust", "Authority;")):
+                with self.assertRaises(typed_boundaries.BoundaryError):
+                    typed_boundaries.linked_production(parent, module, exported)
+
     def test_production_keeps_code_after_inline_cfg_test_method(self):
         source = (
             "impl Pilot {\n"

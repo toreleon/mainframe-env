@@ -983,3 +983,88 @@ claimed. Dependency-inclusive MQ lint and Foundation acceptance remain pending.
 No private behavior is activated, no failed test is hidden, and no official or
 licensed numerator changes. Source skips and the three unready CICS gates remain
 unchanged.
+
+### Standard envelope dependency and focused execution
+
+The preparation consumes all fourteen current seals at bc810e89. Manager approves
+only the reviewed coset 0.4.2 defaults-off adapter, existing base64 direct edge,
+and six exact new lock nodes: coset/ciborium/ciborium-io/ciborium-ll/half plus
+the separately qualified SPIR-V crunchy edge. Existing versions/checksums stay
+unchanged. Adopt a candidate lock adjusted for the consumed dev edges, then
+validate actual frozen metadata/features/checksums, source/license/advisory
+policy before accepting or compiling new dependency code. No floating upgrades,
+new production crypto provider or SPIR-V support claim.
+
+One checkout-local Cargo sequence may first execute the preserved independent
+literal-vector assertion on untouched current production, then restore the
+candidate and run application codec/policy/recovery and server trust/publication
+producer controls. Compile affected server/conformance targets and run strict
+affected-owner lint without suppressions. Current production signer defaults
+are tested separately from explicit raw retained verification. All framed
+identity, exact legacy retry, reference/budget, signature and secret-resolution
+expectations remain unchanged. Retain every initial/setup/actual result and the
+resolved graph, source hashes and fresh binaries before cleaning this exact
+target. Manager owns downward facade ratchets, current-profile documentation,
+integration and sealing. No workspace/full CardDemo, private/licensed or source
+campaign is part of this grant.
+
+### Conformance owner mechanical lint preparation
+
+Manager declares `CV-209.conformance-contract-lint` for the four real diagnostics
+exposed by affected-owner lint in standard-envelope execution. The exact owners
+are `carddemo/journey_observations.rs`, `carddemo/serve.rs` and
+`mq_selected/product.rs` in the existing conformance crate. Only equivalent
+let-chain short circuits and redundant borrows may change. Preserve lookup,
+comparison, SAF-revocation and error order, every source/expected literal and
+public function signature. No new behavior, private activation or suppression.
+Prepare the bounded patch and existing regression selectors without Cargo;
+manager will grant the integrated strict owner check after a slot is available.
+Source/hash/policy inputs and Foundation/private pending gates remain unchanged.
+
+### Standard envelope linked-owner metadata repair
+
+Manager extends `CV-204.standard-envelope` to repair the actual failed
+application-package composition gate after trust moves into its registered
+private module. Follow only the explicitly linked owned trust source through
+the existing production scanner; preserve key-reference configuration, trust
+composition and fresh-profile obligations. Comments, literals, unlinked files
+and test-only items must not satisfy module linkage. Retain the original failed
+metadata receipt and execute independent missing-link/config refusal controls.
+No trust, schema, source, identity or acceptance-policy weakening is authorized.
+
+### CardDemo transaction focused initial execution
+
+Manager grants `CV-209.carddemo-transactions` one focused initial execution of
+the fourteen registered independent controls on the retained pinned public
+corpus. Compile and run only the declared transaction test selector with frozen
+dependencies, jobs two and a checkout-local target. Preserve initial compilation,
+setup and actual route failures distinctly, source/input hashes, raw artifacts
+and fresh binary before cleaning only that target. Fix compilation only within
+the seven already reviewed harness paths while preserving every input and
+assertion. No runtime/provider/compiler semantic repair, observation binding,
+full CardDemo, source refresh, private implementation or licensed campaign is
+authorized by this grant. Actual prerequisite failures are not missing-token
+regressions. Manager retains all integration, status and sealing responsibility.
+
+### CV-204.standard-envelope acceptance
+
+Status: **Complete (bounded production MAC envelope only)**. Current fresh
+production admission requires canonical tagged COSE_Mac0 through the existing
+HMAC/SecretRef owner; explicit raw verification remains available for exact
+retained recovery/retry without profile rewriting. Sixty-three application,
+six trust and twenty-two server/schema/IMS controls pass in the producing scope.
+The actual independent literal-vector failure is retained separately. The joint
+application/server/conformance/tooling strict owner check passes after the
+separate mechanical conformance repair. Dependency acceptance adds exactly six
+reviewed nodes and preserves all 333 prior identities. Parser caps, key/secret
+limits, retained equality and custom-verifier limitations are documented.
+
+The initial composition metadata failure is repaired by following only a real
+plain private module and its explicit re-export through the existing scanner.
+Five native scanner controls and twelve Python controls pass; comments,
+literals, nested declarations, test-only links and alternate path attributes
+cannot establish this link. Fresh package/spec/coverage/registry, module,
+formatting, frozen dependency and diff gates pass; original receipts remain
+bound to their producing inputs. Only the two reviewed facade budgets ratchet
+down. No storage-snapshot authentication, nonrepudiation, global heap quota,
+licensed equivalence or whole Foundation completion is claimed.

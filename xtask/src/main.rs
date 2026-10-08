@@ -9085,7 +9085,6 @@ fn check_application_packages(root: &Path) -> TaskResult {
         "applications_v2: Mutex<DurableApplicationsV2>",
         "pub fn open_with_package_trust",
         "HmacSha256PackageTrust",
-        "MAINFRAME_ENV_PACKAGE_HMAC_KEY_REFS",
         "APPLICATION_PUBLICATION_CONTRACT",
         "pub fn publish_application_generation",
         "pub fn rollback_application_generation",
@@ -9094,6 +9093,23 @@ fn check_application_packages(root: &Path) -> TaskResult {
         require(
             production_product.contains(required),
             &format!("production composition omits {required}"),
+        )?;
+    }
+    let production_trust = production_scanner::read_linked_source(
+        root,
+        &root.join("crates/apps/mainframe-env-server/src/product.rs"),
+        "package_authentication",
+        "HmacSha256PackageTrust",
+    )?;
+    for required in [
+        "MAINFRAME_ENV_PACKAGE_HMAC_KEY_REFS",
+        "impl PackageSignatureVerifier for HmacSha256PackageTrust",
+        "fn allows_fresh_algorithm",
+        "PACKAGE_AUTHENTICATION_ALGORITHM",
+    ] {
+        require(
+            production_trust.contains(required),
+            &format!("production trust composition omits {required}"),
         )?;
     }
     Ok(())

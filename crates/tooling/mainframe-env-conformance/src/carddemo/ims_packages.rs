@@ -5,6 +5,26 @@ use mainframe_env_host_api::{
     ImsDbLevel, ImsFieldMetadata, ImsMetadataCatalog, ImsPcbMetadata, ImsPsbMetadata,
     ImsSecondaryIndexMetadata, ImsSegmentMetadata, ImsSensitiveSegmentMetadata,
 };
+use ring::hmac;
+
+pub(super) fn sign_carddemo_package_identity(
+    identity: &str,
+) -> Result<PackageSignature, CorpusProblem> {
+    mainframe_env_application::encode_package_authentication(
+        "carddemo-conformance-key",
+        identity,
+        |data| {
+            hmac::sign(
+                &hmac::Key::new(hmac::HMAC_SHA256, b"carddemo-conformance-hmac-key-0001"),
+                data,
+            )
+            .as_ref()
+            .try_into()
+            .expect("HMAC-SHA256 tag has 32 bytes")
+        },
+    )
+    .map_err(package_problem)
+}
 
 pub(super) const APPLICATION: &str = "CARDDEMO-IMS-CORPUS";
 const PREFIX: &str = "app/app-authorization-ims-db2-mq";
@@ -335,13 +355,13 @@ pub(super) fn package(
             security_resources: Vec::new(),
         },
         signature: PackageSignature {
-            algorithm: "hmac-sha256@1".into(),
+            algorithm: mainframe_env_application::PACKAGE_AUTHENTICATION_ALGORITHM.into(),
             key_id: "carddemo-conformance-key".into(),
             value: "pending".into(),
         },
     };
-    package.signature.value = sign_carddemo_package_identity(
+    package.signature = sign_carddemo_package_identity(
         &package_generation_identity(&package).map_err(package_problem)?,
-    );
+    )?;
     Ok(package)
 }

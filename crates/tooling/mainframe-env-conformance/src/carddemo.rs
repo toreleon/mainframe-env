@@ -112,7 +112,6 @@ use mainframe_env_store::{
     MemoryStore, PostgresArtifactStore, PostgresStateStore, SqliteStateStore,
 };
 use mainframe_env_store_api::AuditSink;
-use ring::hmac;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -4632,13 +4631,6 @@ fn carddemo_package_trust() -> Result<Arc<HmacSha256PackageTrust>, CorpusProblem
     .map_err(terminal_problem)
 }
 
-fn sign_carddemo_package_identity(identity: &str) -> String {
-    base64::engine::general_purpose::STANDARD_NO_PAD.encode(hmac::sign(
-        &hmac::Key::new(hmac::HMAC_SHA256, b"carddemo-conformance-hmac-key-0001"),
-        identity.as_bytes(),
-    ))
-}
-
 fn carddemo_db2_column(
     name: &str,
     nullable: bool,
@@ -4963,13 +4955,13 @@ fn install_carddemo_db2_package(
             security_resources: Vec::new(),
         },
         signature: PackageSignature {
-            algorithm: "hmac-sha256@1".into(),
+            algorithm: mainframe_env_application::PACKAGE_AUTHENTICATION_ALGORITHM.into(),
             key_id: "carddemo-conformance-key".into(),
             value: "pending".into(),
         },
     };
     let identity = package_generation_identity(&package).map_err(package_problem)?;
-    package.signature.value = sign_carddemo_package_identity(&identity);
+    package.signature = ims_packages::sign_carddemo_package_identity(&identity)?;
     let installed = server
         .install_application_package_v2(&package)
         .map_err(terminal_problem)?;

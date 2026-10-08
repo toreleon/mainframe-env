@@ -2,8 +2,14 @@
 
 #![forbid(unsafe_code)]
 
+mod package_authentication;
 mod package_v1;
 mod package_v2;
+
+pub use package_authentication::{
+    LEGACY_PACKAGE_AUTHENTICATION_ALGORITHM, PACKAGE_AUTHENTICATION_ALGORITHM,
+    encode_package_authentication, verify_package_authentication,
+};
 
 pub use package_v1::*;
 pub(crate) use package_v1::{digest_field, validate_package, validate_sha256, validate_text};
