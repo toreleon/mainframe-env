@@ -260,13 +260,17 @@ No live client, whole campaign, portable sandbox or official/licensed credit.
 
 ### Navigation prerequisite disposition
 
-The first sixteen-control navigation run executed four passing physical-index/
-source-gap controls and twelve terminal prerequisite failures. Actual menu fields
-contained occurrence-one text, parentheses and binary index bytes instead of the
-independent option labels. All seventeen fixtures shut down and the exact target
-was cleaned after retention. No CT navigation, PF7 or missing-token assertion was
-reached; no application observation was bound. Preserve these results and the
-original expectations while repairing the generic prerequisite below.
+The STRING repair clears the actual menu-label prerequisite. The changed-runtime
+sixteen-control continuation executes six passes and ten failures, including the
+four uncredited physical-index/source-gap controls. List entry now refuses the
+independent blank error-field comparison with `Tran ID must be Numeric ...`;
+missing detail also fails the exact keyed READ comparison. PF7 and the aggregate
+receipt seam remain unreached. No navigation/AIX application observation is bound.
+
+Original menu failures and changed-runtime observations retain separate external
+producers and unchanged expected bytes. Preserve every actual error and shutdown
+while classifying the next generic runtime versus fixture/source boundary; no
+provider fix, expectation adjustment or unchanged retry is granted here.
 
 ### CV-209.cobol-string-references acceptance
 
@@ -297,3 +301,52 @@ frozen dependency policy and docs/fragment/subsystem validation passed. Pins,
 targets, runtime, legal inputs and containment are unchanged. No Docker build,
 current image size, speed, sandbox workload or application batch pass is implied;
 those remain final-candidate gates.
+
+### CV-209.public-client-command declaration
+
+Manager accepts the source-only finite command packet and grants exactly the
+existing `tools/ci_assurance.py`, `tools/tests/test_ci_assurance.py` and one unique
+fragment. Reuse the accepted optional input validator and Linux supervisor; add
+only keyword-only `env=None` and `on_reaped=None`, preserving ordinary callers,
+receipt schemas and floors. Actual wait completion and infrastructure failure
+must remain distinct; callback failure cannot restore group authority or change
+an actual child exit into the fallback status.
+
+Freeze ten action shapes with scalar applicability, twelve explicit file roles,
+one tree and one fresh private run directory. No arbitrary argv, supplied
+credential/env/mount configuration, separate launcher module or profile reader.
+Build the fixed reviewed bwrap/Node vector with empty parent environment, own
+synthetic identity/settings/JCL, readonly accepted inputs and bounded separate
+raw streams. Revalidate lock/input identities and owned seeds after each command.
+This owner reports transport completion only; Rust later owns HTTP, job/spool,
+authentication, teardown and semantic assertions. Loopback requires inherited
+network; host bootstrap, synchronous byte checks and inspection quotas stay
+qualified, without claiming egress isolation or a hard filesystem quota.
+
+First retain independent inert/mocked action, scalar, binding, capture and exit
+boundary reds; then run affected Python controls. Two tiny native Python controls
+may verify the new environment/callback paths; no Node, bwrap, version, server,
+job, network, extraction, source-cache or repeated actual-byte workload is granted.
+One full focused CI-assurance Python suite after the changed owner verifies
+existing compatibility. Manager owns runbook/status/generated files, integration
+and seal. No Cargo, product implementation or official/licensed credit.
+
+### CV-209.cobol-figurative-comparisons acceptance
+
+Status: **Complete (ordinary byte-relation figurative width)**. Explicit unquoted
+figurative constants use the evaluated opposing byte operand's width. Ordinary
+identifier/literal space padding, numeric ZERO, mixed numeric handling, collating
+sequence, parser/reference/layout and level-88 behavior remain unchanged. A
+private condition owner reduces the legacy facade from 11,683 to 11,498
+production lines; the new owner has 216. Eight frozen native controls pass after
+six genuine runtime failures, covering 71 literal branch comparisons and 28
+unchanged storage checks. The existing forty-four-fixture method passes as one
+Rust test, and three existing interpreter condition-selected controls pass.
+Strict affected-owner lint and integration policy/module checks pass separately;
+native receipts retain their actual producing candidate and bytes.
+
+Missing COBOL bodies remain user-skipped/zero. This generic public/native repair
+grants no IBM differential, licensed, full grammar or CardDemo navigation credit.
+One changed-runtime navigation continuation may now examine the unchanged
+expectations; the separate NOTFND secondary-code oracle remains unresolved.
+Original runtime failures and qualified source/reference boundaries are retained.

@@ -463,6 +463,274 @@ mod tests {
         .map_err(|error| format!("retain test execution bytes: {error}"))
     }
 
+    fn check_figurative_relation(source: &str, expected_output: &[u8], fields: &[(&str, &[u8])]) {
+        retain_execution_bytes(source, "cbl", source.as_bytes()).unwrap();
+        retain_execution_bytes(source, "expected-output", expected_output).unwrap();
+        let (output, machine) =
+            execute_without_effects(source).expect("figurative relation runtime");
+        let mut observations = Vec::new();
+        for (name, expected) in fields {
+            let actual = machine
+                .variable(name)
+                .expect("observed storage")
+                .bytes()
+                .to_vec();
+            retain_execution_bytes(source, &format!("{name}.actual"), &actual).unwrap();
+            retain_execution_bytes(source, &format!("{name}.expected"), expected).unwrap();
+            eprintln!("field={name}; expected={expected:?}; actual={actual:?}");
+            observations.push((name, expected, actual));
+        }
+        eprintln!("expected-output={expected_output:?}; actual-output={output:?}");
+        for (name, expected, actual) in observations {
+            assert_eq!(actual, *expected, "unchanged storage {name}");
+        }
+        assert_eq!(output, expected_output, "literal branch outcomes");
+    }
+
+    #[test]
+    fn figurative_relation_low_both_positions() {
+        let source = r#"
+IDENTIFICATION DIVISION. PROGRAM-ID. FIG-LOW.
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 WIDE-X PIC X(16).
+PROCEDURE DIVISION.
+    MOVE LOW-VALUES TO WIDE-X.
+    IF WIDE-X = LOW-VALUES DISPLAY 'T1' ELSE DISPLAY 'F1' END-IF.
+    IF LOW-VALUES = WIDE-X DISPLAY 'T2' ELSE DISPLAY 'F2' END-IF.
+    IF WIDE-X = LOW-VALUE DISPLAY 'T3' ELSE DISPLAY 'F3' END-IF.
+    IF LOW-VALUE = WIDE-X DISPLAY 'T4' ELSE DISPLAY 'F4' END-IF.
+    STOP RUN.
+"#;
+        check_figurative_relation(source, b"T1\nT2\nT3\nT4\n", &[("WIDE-X", &[0; 16])]);
+    }
+
+    #[test]
+    fn figurative_relation_high_null_aliases() {
+        let source = r#"
+IDENTIFICATION DIVISION. PROGRAM-ID. FIG-HIGH-NULL.
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 HIGH-X PIC X(5). 01 NULL-X PIC X(7).
+PROCEDURE DIVISION.
+    MOVE HIGH-VALUES TO HIGH-X. MOVE LOW-VALUES TO NULL-X.
+    IF HIGH-X = HIGH-VALUE DISPLAY 'T1' ELSE DISPLAY 'F1' END-IF.
+    IF HIGH-VALUE = HIGH-X DISPLAY 'T2' ELSE DISPLAY 'F2' END-IF.
+    IF HIGH-X = HIGH-VALUES DISPLAY 'T3' ELSE DISPLAY 'F3' END-IF.
+    IF HIGH-VALUES = HIGH-X DISPLAY 'T4' ELSE DISPLAY 'F4' END-IF.
+    IF NULL-X = NULL DISPLAY 'T5' ELSE DISPLAY 'F5' END-IF.
+    IF NULL = NULL-X DISPLAY 'T6' ELSE DISPLAY 'F6' END-IF.
+    IF NULL-X = NULLS DISPLAY 'T7' ELSE DISPLAY 'F7' END-IF.
+    IF NULLS = NULL-X DISPLAY 'T8' ELSE DISPLAY 'F8' END-IF.
+    STOP RUN.
+"#;
+        check_figurative_relation(
+            source,
+            b"T1\nT2\nT3\nT4\nT5\nT6\nT7\nT8\n",
+            &[("HIGH-X", &[255; 5]), ("NULL-X", &[0; 7])],
+        );
+    }
+
+    #[test]
+    fn figurative_relation_abbreviated_branches() {
+        let source = r#"
+IDENTIFICATION DIVISION. PROGRAM-ID. FIG-ABBREVIATED.
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 LOW-X PIC X(4). 01 SPACE-X PIC X(4) VALUE SPACES.
+01 OTHER-X PIC X(4) VALUE 'ABCD'.
+PROCEDURE DIVISION.
+    MOVE LOW-VALUES TO LOW-X.
+    IF LOW-X = SPACES OR LOW-VALUES DISPLAY 'T1' ELSE DISPLAY 'F1' END-IF.
+    IF SPACE-X = SPACES OR LOW-VALUES DISPLAY 'T2' ELSE DISPLAY 'F2' END-IF.
+    IF OTHER-X = SPACES OR LOW-VALUES DISPLAY 'T3' ELSE DISPLAY 'F3' END-IF.
+    IF LOW-X NOT = SPACES AND LOW-VALUES DISPLAY 'T4' ELSE DISPLAY 'F4' END-IF.
+    IF SPACE-X NOT = SPACES AND LOW-VALUES DISPLAY 'T5' ELSE DISPLAY 'F5' END-IF.
+    IF OTHER-X NOT = SPACES AND LOW-VALUES DISPLAY 'T6' ELSE DISPLAY 'F6' END-IF.
+    IF NOT (LOW-X = SPACES OR LOW-VALUES) DISPLAY 'T7' ELSE DISPLAY 'F7' END-IF.
+    IF NOT (SPACE-X = SPACES OR LOW-VALUES) DISPLAY 'T8' ELSE DISPLAY 'F8' END-IF.
+    IF NOT (OTHER-X = SPACES OR LOW-VALUES) DISPLAY 'T9' ELSE DISPLAY 'F9' END-IF.
+    STOP RUN.
+"#;
+        check_figurative_relation(
+            source,
+            b"T1\nT2\nF3\nF4\nF5\nT6\nF7\nF8\nT9\n",
+            &[
+                ("LOW-X", &[0; 4]),
+                ("SPACE-X", b"    "),
+                ("OTHER-X", b"ABCD"),
+            ],
+        );
+    }
+
+    #[test]
+    fn figurative_relation_alphanumeric_zero_space_aliases() {
+        let source = r#"
+IDENTIFICATION DIVISION. PROGRAM-ID. FIG-ZERO-SPACE.
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 ZERO-X PIC X(6) VALUE '000000'. 01 SPACE-X PIC X(6) VALUE SPACES.
+PROCEDURE DIVISION.
+    IF ZERO-X = ZERO DISPLAY 'T1' ELSE DISPLAY 'F1' END-IF.
+    IF ZERO = ZERO-X DISPLAY 'T2' ELSE DISPLAY 'F2' END-IF.
+    IF ZERO-X = ZEROS DISPLAY 'T3' ELSE DISPLAY 'F3' END-IF.
+    IF ZEROS = ZERO-X DISPLAY 'T4' ELSE DISPLAY 'F4' END-IF.
+    IF ZERO-X = ZEROES DISPLAY 'T5' ELSE DISPLAY 'F5' END-IF.
+    IF ZEROES = ZERO-X DISPLAY 'T6' ELSE DISPLAY 'F6' END-IF.
+    IF SPACE-X = SPACE DISPLAY 'T7' ELSE DISPLAY 'F7' END-IF.
+    IF SPACE = SPACE-X DISPLAY 'T8' ELSE DISPLAY 'F8' END-IF.
+    IF SPACE-X = SPACES DISPLAY 'T9' ELSE DISPLAY 'F9' END-IF.
+    IF SPACES = SPACE-X DISPLAY 'TA' ELSE DISPLAY 'FA' END-IF.
+    STOP RUN.
+"#;
+        check_figurative_relation(
+            source,
+            b"T1\nT2\nT3\nT4\nT5\nT6\nT7\nT8\nT9\nTA\n",
+            &[("ZERO-X", b"000000"), ("SPACE-X", b"      ")],
+        );
+    }
+
+    #[test]
+    fn figurative_relation_ordinary_padding_quoted_literals() {
+        let source = r#"
+IDENTIFICATION DIVISION. PROGRAM-ID. FIG-ORDINARY.
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 SHORT-X PIC X. 01 WIDE-X PIC X(4).
+01 PAD-X PIC X(4). 01 TEXT-X PIC X(10) VALUE 'LOW-VALUES'.
+01 ZERO-TEXT PIC X(6) VALUE 'ZERO'. 01 ASCII-X PIC X(6) VALUE '000000'.
+01 LETTER-X PIC X(4) VALUE 'A'.
+PROCEDURE DIVISION.
+    MOVE LOW-VALUES TO SHORT-X WIDE-X.
+    MOVE SPACES TO PAD-X. MOVE LOW-VALUES TO PAD-X(1:1).
+    IF SHORT-X = WIDE-X DISPLAY 'T1' ELSE DISPLAY 'F1' END-IF.
+    IF WIDE-X = SHORT-X DISPLAY 'T2' ELSE DISPLAY 'F2' END-IF.
+    IF SHORT-X = PAD-X DISPLAY 'T3' ELSE DISPLAY 'F3' END-IF.
+    IF TEXT-X = 'LOW-VALUES' DISPLAY 'T4' ELSE DISPLAY 'F4' END-IF.
+    IF 'LOW-VALUES' = TEXT-X DISPLAY 'T5' ELSE DISPLAY 'F5' END-IF.
+    IF ZERO-TEXT = 'ZERO' DISPLAY 'T6' ELSE DISPLAY 'F6' END-IF.
+    IF 'ZERO' = ZERO-TEXT DISPLAY 'T7' ELSE DISPLAY 'F7' END-IF.
+    IF WIDE-X = 'LOW-VALUES' DISPLAY 'T8' ELSE DISPLAY 'F8' END-IF.
+    IF ASCII-X = 'ZERO' DISPLAY 'T9' ELSE DISPLAY 'F9' END-IF.
+    IF LETTER-X = 'A' DISPLAY 'TA' ELSE DISPLAY 'FA' END-IF.
+    STOP RUN.
+"#;
+        check_figurative_relation(
+            source,
+            b"F1\nF2\nT3\nT4\nT5\nT6\nT7\nF8\nF9\nTA\n",
+            &[
+                ("SHORT-X", &[0]),
+                ("WIDE-X", &[0; 4]),
+                ("PAD-X", b"\0   "),
+                ("TEXT-X", b"LOW-VALUES"),
+                ("ZERO-TEXT", b"ZERO  "),
+                ("ASCII-X", b"000000"),
+                ("LETTER-X", b"A   "),
+            ],
+        );
+    }
+
+    #[test]
+    fn figurative_relation_selected_reference_width() {
+        let source = r#"
+IDENTIFICATION DIVISION. PROGRAM-ID. FIG-REFERENCES.
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 FIRST-GROUP. 05 LEAF-X PIC X(6) VALUE 'ABCDEF'.
+01 SECOND-GROUP. 05 LEAF-X PIC X(6) VALUE 'L000R!'.
+01 TABLE-ROOT. 05 ITEM-X PIC X(3) OCCURS 2 TIMES.
+01 WS-IDX PIC 9 VALUE 2.
+PROCEDURE DIVISION.
+    MOVE LOW-VALUES TO LEAF-X OF SECOND-GROUP(2:3).
+    MOVE 'ONE' TO ITEM-X(1). MOVE HIGH-VALUES TO ITEM-X(2).
+    IF LEAF-X OF SECOND-GROUP(2:3) = LOW-VALUES DISPLAY 'T1' ELSE DISPLAY 'F1' END-IF.
+    IF LOW-VALUES = LEAF-X OF SECOND-GROUP(2:3) DISPLAY 'T2' ELSE DISPLAY 'F2' END-IF.
+    IF LEAF-X OF SECOND-GROUP = LOW-VALUES DISPLAY 'T3' ELSE DISPLAY 'F3' END-IF.
+    IF ITEM-X(WS-IDX) = HIGH-VALUES DISPLAY 'T4' ELSE DISPLAY 'F4' END-IF.
+    IF HIGH-VALUES = ITEM-X(WS-IDX) DISPLAY 'T5' ELSE DISPLAY 'F5' END-IF.
+    STOP RUN.
+"#;
+        check_figurative_relation(
+            source,
+            b"T1\nT2\nF3\nT4\nT5\n",
+            &[
+                ("FIRST-GROUP", b"ABCDEF"),
+                ("SECOND-GROUP", b"L\0\0\0R!"),
+                ("TABLE-ROOT", b"ONE\xff\xff\xff"),
+                ("WS-IDX", b"2"),
+            ],
+        );
+    }
+
+    #[test]
+    fn figurative_relation_numeric_level88_baseline() {
+        let source = r#"
+IDENTIFICATION DIVISION. PROGRAM-ID. FIG-BASELINE.
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 NUM PIC 9(3) VALUE 0.
+01 LOW-X PIC X(4). 88 IS-LOW VALUE LOW-VALUES.
+01 HIGH-X PIC X(4). 88 IS-HIGH VALUE HIGH-VALUES.
+01 SPACE-X PIC X(4) VALUE SPACES. 88 IS-SPACE VALUE SPACES.
+01 ZERO-X PIC X(4) VALUE '0000'. 88 IS-ZERO VALUE ZEROS.
+PROCEDURE DIVISION.
+    MOVE LOW-VALUES TO LOW-X. MOVE HIGH-VALUES TO HIGH-X.
+    IF NUM = ZERO DISPLAY 'T1' ELSE DISPLAY 'F1' END-IF.
+    IF NUM = ZEROS DISPLAY 'T2' ELSE DISPLAY 'F2' END-IF.
+    IF NUM = ZEROES DISPLAY 'T3' ELSE DISPLAY 'F3' END-IF.
+    IF IS-LOW DISPLAY 'T4' ELSE DISPLAY 'F4' END-IF.
+    IF IS-HIGH DISPLAY 'T5' ELSE DISPLAY 'F5' END-IF.
+    IF IS-SPACE DISPLAY 'T6' ELSE DISPLAY 'F6' END-IF.
+    IF IS-ZERO DISPLAY 'T7' ELSE DISPLAY 'F7' END-IF.
+    STOP RUN.
+"#;
+        check_figurative_relation(
+            source,
+            b"T1\nT2\nT3\nT4\nT5\nT6\nT7\n",
+            &[
+                ("NUM", b"000"),
+                ("LOW-X", &[0; 4]),
+                ("HIGH-X", &[255; 4]),
+                ("SPACE-X", b"    "),
+                ("ZERO-X", b"0000"),
+            ],
+        );
+    }
+
+    #[test]
+    fn figurative_relation_operators_collation() {
+        let source = r#"
+IDENTIFICATION DIVISION. PROGRAM-ID. FIG-OPERATORS.
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 LOW-X PIC X(4). 01 HIGH-X PIC X(4).
+01 LETTER-X PIC X(4) VALUE 'AAAA'. 01 DIGIT-X PIC X(4) VALUE '0000'.
+PROCEDURE DIVISION.
+    MOVE LOW-VALUES TO LOW-X. MOVE HIGH-VALUES TO HIGH-X.
+    IF LOW-X = LOW-VALUES DISPLAY 'T1' ELSE DISPLAY 'F1' END-IF.
+    IF LOW-X <> LOW-VALUES DISPLAY 'T2' ELSE DISPLAY 'F2' END-IF.
+    IF LOW-X >= LOW-VALUES DISPLAY 'T3' ELSE DISPLAY 'F3' END-IF.
+    IF LOW-X <= LOW-VALUES DISPLAY 'T4' ELSE DISPLAY 'F4' END-IF.
+    IF LOW-X < LOW-VALUES DISPLAY 'T5' ELSE DISPLAY 'F5' END-IF.
+    IF LOW-X > LOW-VALUES DISPLAY 'T6' ELSE DISPLAY 'F6' END-IF.
+    IF LOW-X NOT = LOW-VALUES DISPLAY 'T7' ELSE DISPLAY 'F7' END-IF.
+    IF HIGH-X = HIGH-VALUES DISPLAY 'T8' ELSE DISPLAY 'F8' END-IF.
+    IF HIGH-X <> HIGH-VALUES DISPLAY 'T9' ELSE DISPLAY 'F9' END-IF.
+    IF HIGH-X >= HIGH-VALUES DISPLAY 'TA' ELSE DISPLAY 'FA' END-IF.
+    IF HIGH-X <= HIGH-VALUES DISPLAY 'TB' ELSE DISPLAY 'FB' END-IF.
+    IF HIGH-X < HIGH-VALUES DISPLAY 'TC' ELSE DISPLAY 'FC' END-IF.
+    IF HIGH-X > HIGH-VALUES DISPLAY 'TD' ELSE DISPLAY 'FD' END-IF.
+    IF HIGH-X NOT = HIGH-VALUES DISPLAY 'TE' ELSE DISPLAY 'FE' END-IF.
+    IF LOW-VALUES < LETTER-X DISPLAY 'TF' ELSE DISPLAY 'FF' END-IF.
+    IF HIGH-VALUES > LETTER-X DISPLAY 'TG' ELSE DISPLAY 'FG' END-IF.
+    IF LETTER-X < ZEROES DISPLAY 'TH' ELSE DISPLAY 'FH' END-IF.
+    IF DIGIT-X > LETTER-X DISPLAY 'TI' ELSE DISPLAY 'FI' END-IF.
+    STOP RUN.
+"#;
+        check_figurative_relation(
+            source,
+            b"T1\nF2\nT3\nT4\nF5\nF6\nF7\nT8\nF9\nTA\nTB\nFC\nFD\nFE\nTF\nTG\nTH\nTI\n",
+            &[
+                ("LOW-X", &[0; 4]),
+                ("HIGH-X", &[255; 4]),
+                ("LETTER-X", b"AAAA"),
+                ("DIGIT-X", b"0000"),
+            ],
+        );
+    }
+
     const STRING_REFERENCE_MENU_DATA: &str = r#"
 DATA DIVISION.
 WORKING-STORAGE SECTION.
