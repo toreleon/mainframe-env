@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 238,
+    "markdown_documents": 239,
     "navigation_groups": 8,
-    "normative_documents": 99,
+    "normative_documents": 100,
     "xtask_commands": 163
   },
   "documents": [
@@ -341,8 +341,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 180,
-      "sha256": "sha256:a57c8428a3e928e882096227387821601785f311c8b710e6f3b72015d923c335",
+      "relative_links": 181,
+      "sha256": "sha256:3e28ea1a9fa02ed1e6f23fd9ec529acae6e4c836452fbb1d7888d95cc5273983",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -1459,10 +1459,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env current public provider hardening",
+      "normative": true,
+      "owner": "CICS runtime and embedding maintainers",
+      "path": "docs/decisions/0052-cics-operation-contexts.md",
+      "relative_links": 0,
+      "scope": "BTS mutation inputs, partition submission and explicit receipt retention",
+      "sha256": "sha256:909970afc28c76f18afde884727bfc09a28ca4b3c4f7abd56c955bab5a6c40a0",
+      "status": "Accepted design; implementation pending",
+      "title": "ADR-0052: Group borrowed CICS operation inputs before public release",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 54,
-      "sha256": "sha256:3c2b086dc70a8f9f86731835cb07818ba2e88f79391b82f11dd3bc0fe60a5317",
+      "relative_links": 55,
+      "sha256": "sha256:877a8b782bbcef1524d4e50405432614f99c1aaf577c7868d1d0eeb4e085c6a8",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1709,8 +1721,8 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/coverage/foundation-status.md",
-      "relative_links": 3,
-      "sha256": "sha256:ed14b8540272f8bdd53bc7eb4928307f48aca6d7be398dadd771f985d8f97f9c",
+      "relative_links": 4,
+      "sha256": "sha256:17b59f7bdc91d435b700b8ad1a14aa5a93eab777c8d1b8b6263469c50888bfef",
       "title": "Coverage and conformance — Coverage authority progress",
       "xtask_commands": 6
     },
@@ -2754,6 +2766,10 @@
         {
           "label": "ADR-0051: Framed package identity and retained compatibility",
           "path": "docs/decisions/0051-package-identity-framing.md"
+        },
+        {
+          "label": "ADR-0052: Borrowed CICS operation inputs",
+          "path": "docs/decisions/0052-cics-operation-contexts.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -2976,7 +2992,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:9356731b3349cfb748c008217b6b5267ad67f1365a1c8bf566dc61b15e34f91f",
+  "registry_sha256": "sha256:9179caa258594ec611351b708f7301ac8517e7b939d6bf426ab645e8dbb28437",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {
