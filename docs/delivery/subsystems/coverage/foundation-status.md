@@ -218,23 +218,26 @@ requirements are unchanged. The documentation/changelog/subsystem validators
 and frozen dependency policy passed; no product behavior or execution credit
 is established by this wording repair.
 
-### CV-209.public-client-inputs declaration
+### CV-209.public-client-inputs acceptance
 
-Manager accepts the external optional-input design and grants its exact existing
-lock, supply-chain validator/tests, CI supply-chain runbook and one unique fragment.
-Use the same input lock with deliberate `ci-input-lock@2` dispatch and a finite
-strict retained @1 reader. One optional `public-client-linux-x86_64` development
-profile records reviewed immutable bytes, with no host paths or new lock/ledger.
-The exact eight required tools and existing CI/all runtime scopes remain unchanged.
+Status: **Complete (optional input grammar and byte admission only)**. The existing
+lock has strict retained @1 and finite @2 readers; @2 adds one explicitly selected
+Linux development profile without changing the eight required tools or ordinary
+CI/runtime scopes. Twelve fixed file roles, archive/SRI/tree bytes, package
+identity, bounded membership and nonsymlink stable metadata are checked without
+execution, extraction, download or package resolution. Byte authority stays in
+the existing lock. All thirty-three focused controls pass after an independent
+three-subcase float-mode red and exact-integer repair; original controls and pins
+are unchanged. The earlier twelve-role byte admission remains bound to its
+original producer and unchanged inputs, not relabeled as a new runtime result.
 
-Validate explicit role bindings, archive/SRI/tree bytes and fixed profile grammar
-without native execution, downloading, extraction or package resolution. Share
-the existing validator with the later supervised launcher; no dynamic mount/argv
-interpreter is granted. Keep upstream-signature and bwrap host-bootstrap limits
-explicit. First retain independent malformed/drift/compatibility reds, then run
-affected supply-chain Python controls only. Manager owns status, generated docs,
-sealing and final affected integration gates. No Cargo, startup, live job, fixture,
-source-cache, product behavior or licensed/official execution credit is granted.
+Node LICENSE follows the accepted design prose; the retained Zowe tree digest
+uses the original producer's path-component ordering, independently controlled.
+Node trust signatures remain unverified; Zowe SRI is not source-build attestation;
+bwrap/library bytes remain host-qualified with bootstrap outside its namespace.
+This does not provide launcher containment, live jobs, public-route, whole
+workspace/backend, official or licensed credit. The finite command owner and
+actual ProductServer/client fixture remain the next separate dependencies.
 
 ### CV-209.command-supervision acceptance
 

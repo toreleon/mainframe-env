@@ -1,6 +1,6 @@
 {
-  "schema_version": "mainframe-env.ci-input-lock@1",
-  "reviewed_on": "2026-10-07",
+  "schema_version": "mainframe-env.ci-input-lock@2",
+  "reviewed_on": "2026-10-08",
   "rust": {
     "workspace": {
       "version": "1.98.0",
@@ -62,5 +62,88 @@
     "tools/offline_bundle_assets/",
     "tools/offline_dev_assets/",
     "tools/package_offline_bundle.sh"
-  ]
+  ],
+  "development_profiles": {
+    "public-client-linux-x86_64": {
+      "platform": "linux-x86_64",
+      "purpose": "optional-development-client",
+      "node": {
+        "version": "24.19.0",
+        "archive": {
+          "url": "https://nodejs.org/dist/v24.19.0/node-v24.19.0-linux-x64.tar.xz",
+          "bytes": 31633904,
+          "sha256": "14b342e71204f811bde6153be8e04b62aef63c236fef92b55f9c83154b409647"
+        },
+        "binary": {
+          "bytes": 125989464,
+          "mode": 493,
+          "sha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12"
+        },
+        "license": {
+          "bytes": 157606,
+          "sha256": "148eacf7863ef4329224a29398623077200a27194aa075569faf4a0a85566ca5"
+        }
+      },
+      "zowe": {
+        "version": "8.39.0",
+        "archive": {
+          "url": "https://registry.npmjs.org/@zowe/cli/-/cli-8.39.0.tgz",
+          "bytes": 12073305,
+          "sha256": "e4412f5a5291abf98fddd54d0f6e18e574fcbf0d74085aa83504c012c5d3f7e5",
+          "integrity": "sha512-YNCE3tinS8L4JyuBsuzkJMX8L9mPEE3VZ2NLV4E/bm2P/6exhIge/8yFpvMRkgDQ0TXloYNNJb7PAjvHsqZO5g=="
+        },
+        "tree": {
+          "sha256": "fd8c0263fbac6672aa3db9095152f668b2e499f99f3ec7924926feda0298b4cc",
+          "files": 10216,
+          "bytes": 42715208,
+          "max_file_bytes": 1048945,
+          "max_depth": 12,
+          "modes": [
+            420,
+            493
+          ]
+        }
+      },
+      "bubblewrap": {
+        "version": "0.12.0",
+        "bytes": 80248,
+        "mode": 493,
+        "sha256": "573236e5328ac2ebb08f59ae3a9805b4f8d12bdef14be8af4450d5463294985f"
+      },
+      "libraries": {
+        "loader": {
+          "bytes": 225672,
+          "sha256": "438c546d8e8cc48496bf3a95f753051afd9db66a629a74e31a9ded71586b56e0"
+        },
+        "libdl": {
+          "bytes": 14408,
+          "sha256": "295fa521a03cd2faa99974f378c9e23dd622021ec7d32bcad4f8ea61aec8a872"
+        },
+        "libstdcxx": {
+          "bytes": 2497768,
+          "sha256": "972bb2a18b71140dab0240f8a1f68ab3fb1d56bcd4c4f824a91b70888faf5a00"
+        },
+        "libm": {
+          "bytes": 977112,
+          "sha256": "6d567d53e895273ca14a1f9dc164fc6c8d39aed2f60aa46a733c2784228915f3"
+        },
+        "libgcc": {
+          "bytes": 182856,
+          "sha256": "30c61ab012a4241bed033725a09b61f5fdd3bb7df95ee852d0b096520524c7af"
+        },
+        "libpthread": {
+          "bytes": 14408,
+          "sha256": "85e21f7dba0394411d00959176fd18b470e575b0b05f1f4f41e5636802ce0500"
+        },
+        "libc": {
+          "bytes": 1995216,
+          "sha256": "fa430b8f298f817a266046af84a77533185ad6fc4406c7d3787b5a0a0c207826"
+        },
+        "libnss_files": {
+          "bytes": 14336,
+          "sha256": "8c93b2ae43dac3c2d688d227609d713f71620d3f0980ebf6bbb371c6eb542108"
+        }
+      }
+    }
+  }
 }

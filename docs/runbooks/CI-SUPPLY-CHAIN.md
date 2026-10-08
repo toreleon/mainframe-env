@@ -77,6 +77,59 @@ different installed version fails before it can receive assurance
 credit.
 
 
+## Optional public client byte admission
+
+The same CI input lock uses `mainframe-env.ci-input-lock@2` to add one explicitly
+selected development profile, `public-client-linux-x86_64`. The validator also
+retains the strict six-field @1 reader: @1 cannot carry development profiles.
+The eight standard tools, existing runtime scopes, Jenkins selection and
+cross-platform repository checks retain their requirements. Plain `check`
+validates optional pin grammar without reading external profile files. Selected
+profile checks require Linux x86_64; missing selected inputs fail.
+
+Use `check --development-profile public-client-linux-x86_64`, one repeated
+`--profile-file ROLE=/absolute/resolved/file` for each required role, and
+`--profile-tree /absolute/resolved/root-above-package`. File roles are exactly
+`node-archive`, `node`, `zowe-archive`, `bubblewrap`, `loader`, `libdl`,
+`libstdcxx`, `libm`, `libgcc`, `libpthread`, `libc`, and `libnss_files`.
+The tree contains `package/lib/main.js`; it is not the `package/` directory
+itself. Transient paths stay in invocation arguments and external receipts.
+There is no implicit PATH/environment discovery, download, installation,
+extraction, native command or alternate input fallback. Adding an explicit
+`--runtime` retains that scope's existing execution behavior; profile selection
+alone does not select a runtime scope.
+
+The byte validator checks nonsymlink regular inputs, stable read metadata,
+ownership, write/privilege modes and file capabilities. It checks official Node
+archive identity and the selected binary and LICENSE pins, and Zowe SHA-256
+plus SHA-512 SRI before bounded archive parsing. Exact Zowe archive/tree
+membership, modes, payloads, directory ancestry and canonical paths are required.
+Empty regular leaves are valid. The retained Zowe digest uses path-component-sorted
+`path`, `bytes`, `sha256`, `mode` rows, compact JSON with sorted keys, default
+ASCII escaping and no newline. This preserves the historical producer's `Path`
+ordering, including directory names that are prefixes of sibling filenames;
+lexical ordering of complete path strings produces a different digest.
+It is distinct from the existing framed
+`mainframe-env.offline-tree@1` identity, which remains unchanged. The Node
+LICENSE pin is in the optional lock alongside its binary pin; validator source
+does not duplicate input digests.
+
+The in-process `validate_development_inputs` entry returns only validated source
+roles, the tree root and observed identities for the later fixed CI launcher.
+Profile data cannot supply mount destinations, argv, host directories, plugins
+or package resolution. The complete client tree stays intact. Byte admission
+does not grant native launch or job execution and contributes no test workload,
+official coverage, licensed, release or Foundation acceptance credit.
+
+These pins preserve reviewed bytes, not a hermetic source build. Node release
+signatures have no verified release-key trust anchor here. Zowe SRI/bundled
+bytes do not establish upstream signature or deterministic source-build
+equivalence. Bubblewrap and library pins are retained host observations;
+bubblewrap starts outside containment and its host loader/library bootstrap
+remains qualified. Namespace admission and any future native requirements need
+their separately authorized existing launcher checks. No host filesystem
+widening or additional library is implied by this profile.
+
 ## Reviewed updates
 
 Every input update is a normal reviewed repository change:
