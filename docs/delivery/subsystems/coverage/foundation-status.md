@@ -525,3 +525,13 @@ authority check, durable codec and retention algorithm; no automatic cleanup or
 private command activation is authorized. Strict CICS lint, affected owner tests
 and server caller compilation must pass before acceptance. The accepted design
 does not complete this slice or change any official coverage gate.
+
+The receipt export is a manual raw-store maintenance primitive. Its trusted
+embedding must establish explicit authority, conservative post-persist age,
+archive policy, complete protected effect/checkpoint references and coordination
+with concurrent replay/recovery under the existing
+[retention contract](../../../contracts/RETENTION-LIFECYCLE-V1.md). A receipt's
+deadline is not a resolution tick or proof of safe reclamation. Preserve the
+existing conditional per-row deletions and partial-error limitation, documenting
+these obligations on the public function. This export supplies no complete
+retention-framework or licensed gate credit.
