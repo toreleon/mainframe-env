@@ -1665,6 +1665,26 @@ class PublicClientValidationCostTests(unittest.TestCase):
         self.assertIn(b'input postcheck failed', (run / 'supervision-error.txt').read_bytes())
 
 
+class PublicClientTreeAuthorityCommandTests(unittest.TestCase):
+    setUp = PublicClientValidationCostTests.setUp
+    command = PublicClientValidationCostTests.command
+
+    def test_every_action_resolves_root_manifest_and_closing_root_per_phase(self):
+        self.assertEqual(self.fixture.payloads, {
+            'package/package.json': b'{"name":"@zowe/cli","version":"8.39.0"}',
+            'package/lib/main.js': b'fixture-only\n', 'package/empty': b''})
+        original = self.supply.canonical_input
+        names = []
+        def observed(path):
+            if path.is_relative_to(self.fixture.tree):
+                names.append(path.relative_to(self.fixture.tree).as_posix())
+            return original(path)
+        with patch.object(self.supply, 'canonical_input', side_effect=observed):
+            for name in ('first', 'second'):
+                self.assertEqual(self.command(self.fixture.root / name), 0)
+        self.assertEqual(names, ['.', 'package/package.json', '.'] * 4)
+
+
 class PublicClientSupervisorKeywordTests(unittest.TestCase):
     def supervise(self, *, env=None, callback=None, code=17, wait_error=None):
         from types import SimpleNamespace

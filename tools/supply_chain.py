@@ -455,7 +455,9 @@ def zowe_archive_rows(path: Path, zowe: dict) -> dict[str, dict]:
     return rows
 
 
-def validate_zowe_tree(tree: Path, rows: dict[str, dict], zowe: dict) -> dict:
+def validate_zowe_tree(tree: Path, rows: dict[str, dict], zowe: dict, _command=False) -> dict:
+    if _command:
+        return _validate_zowe_tree_command(tree, rows, zowe)
     canonical_input(tree)
     require(stat.S_ISDIR(tree.lstat().st_mode), "Zowe tree root is not a directory")
     safe_input_mode(tree.lstat(), str(tree))
@@ -505,6 +507,134 @@ def validate_zowe_tree(tree: Path, rows: dict[str, dict], zowe: dict) -> dict:
     return {"sha256": digest, "files": len(found), "bytes": total}
 
 
+@contextmanager
+def _tree_directory(path: Path, before: os.stat_result, parent=None, name=None):
+    require(stat.S_ISDIR(before.st_mode), "Zowe tree directory type differs")
+    safe_input_mode(before, str(path))
+    descriptor = os.open(path if parent is None else name,
+                         os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                         **({} if parent is None else {"dir_fd": parent}))
+    try:
+        require(file_state(os.fstat(descriptor)) == file_state(before), "Zowe directory changed before open")
+        yield descriptor
+        if parent is None:
+            canonical_input(path)
+        relative = path.lstat() if parent is None else os.stat(name, dir_fd=parent, follow_symlinks=False)
+        require(file_state(os.fstat(descriptor)) == file_state(before)
+                == file_state(relative) == file_state(path.lstat()), "Zowe directory changed during read")
+    finally:
+        os.close(descriptor)
+
+
+@contextmanager
+def _tree_file(parent: int, name: str, path: Path, before: os.stat_result, pin: dict):
+    # The held parent chain supplies namespace authority instead of resolving
+    # every absolute ancestor again. Leaf admission/fences match checked_input.
+    require(stat.S_ISREG(before.st_mode) and before.st_size == pin["bytes"],
+            f"profile input size/type differs: {path}")
+    safe_input_mode(before, str(path))
+    if "mode" in pin:
+        require(stat.S_IMODE(before.st_mode) == pin["mode"], f"profile input mode differs: {path}")
+    descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
+    try:
+        # Retain raw-fd ownership even if stream construction fails. Closing the
+        # stream precedes the sole raw close; fdopen never implicitly owns it.
+        with os.fdopen(descriptor, "rb", closefd=False) as source:
+            require(file_state(os.fstat(source.fileno())) == file_state(before), f"profile input changed before read: {path}")
+            try:
+                capability = os.getxattr(source.fileno(), "security.capability")
+            except OSError as error:
+                require(error.errno in {errno.ENODATA, errno.ENOTSUP}, f"cannot inspect profile capabilities: {path}")
+                capability = b""
+            require(not capability, f"profile input has capabilities: {path}")
+            yield source, before
+            require(file_state(os.fstat(source.fileno())) == file_state(before)
+                    == file_state(os.stat(name, dir_fd=parent, follow_symlinks=False))
+                    == file_state(path.lstat()), f"profile input changed during read: {path}")
+    finally:
+        os.close(descriptor)
+
+
+def _validate_zowe_tree_command(tree: Path, rows: dict[str, dict], zowe: dict) -> dict:
+    """Fresh command-only walk; no descriptor/admission survives this call."""
+    canonical_input(tree)
+    root_before = tree.lstat()
+    parents = {str(parent) for name in rows for parent in PurePosixPath(name).parents if str(parent) != "."}
+    found, directories = set(), set()
+    directory_states = {}
+    total = 0
+
+    def entries(descriptor, path):
+        children = []
+        # Close scandir before descending, so only the depth-bounded authority
+        # stack is held; an untrusted directory cannot grow an unbounded list.
+        with os.scandir(descriptor) as iterator:
+            for entry in iterator:
+                require(len(children) < zowe["tree"]["files"] + ZOWE_DIRECTORIES,
+                        "Zowe directory entries exceed bound")
+                child = path / entry.name
+                name = child.relative_to(tree).as_posix()
+                metadata = entry.stat(follow_symlinks=False)
+                archive_name(name, "package", stat.S_ISDIR(metadata.st_mode))
+                require(len(PurePosixPath(name).parts) <= zowe["tree"]["max_depth"], "Zowe tree depth exceeds bound")
+                safe_input_mode(metadata, name)
+                children.append((entry.name, child, name, metadata))
+        return children
+
+    def visit(descriptor, path):
+        nonlocal total
+        for leaf, child, name, metadata in entries(descriptor, path):
+            if stat.S_ISDIR(metadata.st_mode):
+                require(name in parents and name not in directories and len(directories) < ZOWE_DIRECTORIES,
+                        "unexpected Zowe tree directory")
+                directories.add(name)
+                directory_states[child] = file_state(metadata)
+                with _tree_directory(child, metadata, descriptor, leaf) as child_descriptor:
+                    visit(child_descriptor, child)
+            else:
+                require(stat.S_ISREG(metadata.st_mode) and name in rows and name not in found
+                        and len(found) < zowe["tree"]["files"], "unexpected Zowe tree file")
+                with _tree_file(descriptor, leaf, child, metadata, rows[name]) as (source, before):
+                    identity = _verify_profile_source(child, source, before, rows[name])
+                require(identity["mode"] == rows[name]["mode"], "Zowe tree mode differs")
+                total += identity["bytes"]
+                require(total <= zowe["tree"]["bytes"], "Zowe tree payload exceeds bound")
+                found.add(name)
+
+    with _tree_directory(tree, root_before) as root_descriptor:
+        children = entries(root_descriptor, tree)
+        require(len(children) == 1 and children[0][2] == "package" and stat.S_ISDIR(children[0][3].st_mode)
+                and "package" in parents, "Zowe tree root membership differs")
+        leaf, package, name, metadata = children[0]
+        directories.add(name); directory_states[package] = file_state(metadata)
+        require(len(directories) <= ZOWE_DIRECTORIES, "unexpected Zowe tree directory")
+        # Root and package stay held across the fresh manifest and ALL final
+        # namespace checks, including already processed descendant directories.
+        with _tree_directory(package, metadata, root_descriptor, leaf) as package_descriptor:
+            visit(package_descriptor, package)
+            require(found == set(rows) and directories == parents, "Zowe tree membership differs")
+            canonical = json.dumps([rows[key] for key in sorted(rows, key=PurePosixPath)],
+                                   sort_keys=True, separators=(",", ":")).encode("utf-8")
+            digest = hashlib.sha256(canonical).hexdigest()
+            require(digest == zowe["tree"]["sha256"], "Zowe retained comparison digest differs")
+            manifest_path = package / "package.json"
+            require("package/package.json" in rows and "package/lib/main.js" in rows,
+                    "Zowe tree lacks manifest/fixed entry")
+            require(rows["package/package.json"]["bytes"] <= MAX_JSON_BYTES, "Zowe package manifest exceeds bound")
+            with checked_input(manifest_path, rows["package/package.json"]) as (source, _):
+                data = source.read(MAX_JSON_BYTES + 1)
+                require(hashlib.sha256(data).hexdigest() == rows["package/package.json"]["sha256"], "Zowe manifest changed")
+                try:
+                    manifest_value = json.loads(data, object_pairs_hook=unique_json_object)
+                except (UnicodeError, json.JSONDecodeError) as error:
+                    raise SupplyChainError("invalid Zowe package manifest") from error
+            require(isinstance(manifest_value, dict) and manifest_value.get("name") == "@zowe/cli"
+                    and manifest_value.get("version") == zowe["version"], "Zowe package identity differs")
+            for path, before in directory_states.items():
+                require(file_state(path.lstat()) == before, "Zowe directory namespace changed after manifest")
+    return {"sha256": digest, "files": len(found), "bytes": total}
+
+
 def profile_bindings(values: list[str]) -> dict[str, Path]:
     result = {}
     require(len(values) <= len(CLIENT_ROLES), "too many profile role bindings")
@@ -521,7 +651,7 @@ def validate_development_inputs(lock: dict, profile_name: str, files: dict[str, 
     return _development_input_parts(lock, profile_name, files, tree)[0]
 
 
-def _development_input_parts(lock: dict, profile_name: str, files: dict[str, Path], tree: Path) -> tuple:
+def _development_input_parts(lock: dict, profile_name: str, files: dict[str, Path], tree: Path, _command=False) -> tuple:
     require(profile_name == DEVELOPMENT_PROFILE, "unknown development profile")
     exact_keys(lock.get("development_profiles"), {DEVELOPMENT_PROFILE}, "development profiles")
     profile = lock["development_profiles"][profile_name]
@@ -533,7 +663,8 @@ def _development_input_parts(lock: dict, profile_name: str, files: dict[str, Pat
         identities = {name: verify_profile_file(files[name], pins[name]) for name in sorted(CLIENT_ROLES)}
         validate_node_archive(files["node-archive"], profile["node"])
         rows = zowe_archive_rows(files["zowe-archive"], profile["zowe"])
-        identities["tree"] = validate_zowe_tree(tree, rows, profile["zowe"])
+        identities["tree"] = (validate_zowe_tree(tree, rows, profile["zowe"], True) if _command
+                              else validate_zowe_tree(tree, rows, profile["zowe"]))
     except OSError as error:
         raise SupplyChainError(f"development input unavailable: {error}") from error
     return {"files": dict(files), "tree": tree, "identities": identities}, rows
@@ -558,7 +689,7 @@ def _development_input_command(lock: dict, profile_name: str, files: dict[str, P
     except (UnicodeError, ValueError, TypeError) as error:
         raise SupplyChainError("invalid command input proof lock") from error
     bindings = tuple(sorted(files.items()))
-    validated, rows = _development_input_parts(lock, profile_name, files, tree)
+    validated, rows = _development_input_parts(lock, profile_name, files, tree, True)
     require(json.dumps(lock, sort_keys=True, separators=(",", ":")) == lock_identity
             and tuple(sorted(files.items())) == bindings,
             "command input PRE identities changed before proof mint")
@@ -608,7 +739,7 @@ def _development_input_command(lock: dict, profile_name: str, files: dict[str, P
                     identities[role] = verify_profile_file(current_files[role], pins[role])
                 current_rows = {name: {"path": path, "bytes": size, "sha256": digest, "mode": mode}
                                 for name, path, size, digest, mode in frozen_rows}
-                identities["tree"] = validate_zowe_tree(current_tree, current_rows, profile["zowe"])
+                identities["tree"] = validate_zowe_tree(current_tree, current_rows, profile["zowe"], True)
                 bound()
             return {"files": dict(current_files), "tree": current_tree, "identities": identities}
         except OSError as error:

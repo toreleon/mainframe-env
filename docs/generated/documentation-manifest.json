@@ -1758,7 +1758,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/coverage/foundation-status.md",
       "relative_links": 0,
-      "sha256": "sha256:62788c0c776bf9a9c9fd736c5e001611eaa8987876bf52b1a63023178c97d6a8",
+      "sha256": "sha256:33fcbce7b4ecc1b6bb58502696fa44e697897145e217ba931531ad4f7e8754b9",
       "title": "Coverage and conformance — Coverage authority progress",
       "xtask_commands": 7
     },
@@ -2278,7 +2278,7 @@
       "normative": false,
       "path": "docs/runbooks/CI-SUPPLY-CHAIN.md",
       "relative_links": 0,
-      "sha256": "sha256:9f29a7e3b78be4b6a4e0302dc8a15f4800b65ee2d845a52dda4fae1022bab736",
+      "sha256": "sha256:d94767e9e6db8151de621fa36c807888ef9ed07de5a877d1fa75e61e9a83dddf",
       "title": "CI supply-chain inputs",
       "xtask_commands": 1
     },

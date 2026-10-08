@@ -186,6 +186,14 @@ checks SRI and all role/tree/manifest bytes, and holds both archive state fences
 through completion. Changed inputs refuse. No proof is accepted from CLI or a
 file, and no admission cache survives across commands. Standalone input validation
 still performs the complete archive parses.
+The command path also walks the admitted tree relative to a depth-bounded stack
+of held directory descriptors. It freshly hashes every leaf, reads the manifest,
+and checks descriptor/relative/absolute namespaces before closing. Root/package
+remain held through the manifest and final fences; no directory admission survives
+the phase. Ordinary standalone tree validation keeps its original path. These
+checks do not provide a continuous atomic snapshot against outside writers or
+establish that a complete client action meets its time allowance.
+
 
 Admission requires Linux x86_64, uid/gid 1000, the reviewed supplementary groups
 and zero effective/permitted/ambient capabilities. The launcher mounts accepted

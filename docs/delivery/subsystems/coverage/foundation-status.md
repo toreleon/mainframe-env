@@ -58,6 +58,7 @@ flowchart LR
 | `CV-209.public-client-compatibility` | Seven frozen fixture controls pass; second real run reaches files then exceeds the ten-second action allowance | Four commands make five real HTTP observations: submit 201 and list/query/files 200. Further validation-cost repair, content and authentication/ownership acceptance remain pending |
 | `CV-209.public-client-action-layout` | Finite layout/log repair complete; 146 qualified private-PID controls pass | Real client workload acceptance remains separate; preserve exact readonly mounts and byte/type/mode/link bounds |
 | `CV-209.public-client-validation-cost` | Command-local optimization complete; 106 combined controls pass | Every POST byte remains hashed; one byte-only timing diagnostic does not prove the full action meets its allowance |
+| `CV-209.public-client-tree-directory-authority` | Command-local descriptor traversal complete; 112 affected controls pass | Fresh bytes and all closing fences remain; repeated member ancestor resolution is removed. Changed-tree timing and real-client acceptance remain pending |
 | `CV-209.cics-bms-input-storage` | Supported symbolic input storage complete; eight final controls and seventeen regression methods pass | Preserve raw/non-BMS behavior and fixed-group checks; provider/official/full-layout acceptance remains separate |
 | `CV-209.carddemo-transaction-navigation` | Latest changed-runtime run: eleven passes, five failures, nineteen completed shutdowns | Preserve all four actual failed producers. Resolve CICS first reverse-read positioning and separately reviewed private oracle errors; navigation token and full closure remain pending |
 | `CV-209.test-floor` and integrated exit | Minimum 260-pass recorder wiring implemented; full exit pending | Count actually executed passing tests on the selected unchanged candidate; preserve every affected architecture/profile/schema/package/source/backend gate |
@@ -571,28 +572,33 @@ No Cargo or native repeat, transport/token binding or fragment is granted during
 this preparation. The CICS positioning repair and actual validation remain
 separate pending dependencies owned by the manager.
 
-### Command-local tree directory authority
+### Command-local tree directory authority acceptance
 
-The sole unchanged-source byte diagnostic completes PRE and POST successfully,
-with 10,216 member canonical-path resolutions in each phase. Its instrumented
-PRE/POST totals are 6.571/2.865 seconds; overlapping attribution timers are not
-additive and do not predict the live ten-second action result.
+Status: **Complete (bounded command-local namespace admission only)**. Private
+PRE/POST use a fresh depth-bounded descriptor-relative tree walk. Held ancestors
+authorize each leaf; root/package remain held across the fresh manifest and late
+directory checks. Closing root resolution precedes its final descriptor/path
+identity comparison. Explicit raw leaf descriptor ownership covers stream-open
+failure. Full current byte/hash/SRI, type/uid/mode/capability, exact member/count/
+depth/byte and component-order digest checks remain. Existing hardlink policy and
+ordinary standalone validation remain unchanged; both POST archives surround all
+remaining checks. No persistent or cross-command admission cache is introduced.
 
-Manager grants implementation in the new isolated tree-authority checkout only:
-`tools/supply_chain.py`, its existing supply-chain and CI assurance test owners,
-and one unique tree-directory-authority fragment. Freeze an independent tiny
-three-file fixture and genuine original-owner duplicate-work failure first.
-Private command PRE/POST may use a depth-bounded held directory-descriptor walk,
-preserving every current-byte hash, exact member/manifest identity, metadata and
-namespace closing fence. Default standalone validation and both held POST
-archives remain intact. No persistent admission, deadline expansion, Rust,
-production CI owner, input lock or schema change is granted.
+Independent duplicate-work controls genuinely fail on the old owner. The final
+tiny fixture observes root/manifest/closing-root checks in every phase without
+per-member absolute resolution. Two independently exposed closing-order and
+stream-open leak defects have retained failures followed by minimal repairs.
+All 112 selected controls pass, including thirteen new controls; integrated root
+validation also passes the same selector. Old test bodies and all pins remain
+byte-preserved. Independent review accepts the bounded authority/cleanup model.
+The earlier incomplete safety model, observer-setup failures and successful
+intermediate producer retain their own external qualifications.
 
-Run bounded selected Python correctness controls and static checks only; retain
-original failures and exact producer inputs outside Git. Changed-source timing,
-native client repetition and acceptance require separate manager sequencing.
-The two failed real-client producers remain unchanged and unreleased acceptance
-stays pending. Any extra owner or weakened fence requires a new exact declaration.
+This establishes focused mocked/tiny-fixture correctness, not accepted-tree
+latency, a continuously atomic filesystem snapshot, native containment or a live
+ten-second action pass. Both real-client failures remain unchanged. A separately
+bounded changed-source timing diagnostic and real fixture continuation remain
+pending under manager sequencing. Full client/Foundation acceptance is pending.
 
 ### CICS first reverse position prerequisite
 

@@ -689,5 +689,261 @@ class CommandInputValidationTests(unittest.TestCase):
                             self.assertRaises(supply_chain.SupplyChainError): self.post(post)
 
 
+class TreeDirectoryAuthorityTests(unittest.TestCase):
+    def setUp(self):
+        self.fixture = DevelopmentInputTests(); self.fixture.setUp()
+        self.addCleanup(self.fixture.doCleanups)
+        self.tree = self.fixture.tree
+        self.raw = json.dumps(self.fixture.lock).encode()
+        self.addCleanup(mock.patch.stopall)
+        mock.patch.object(supply_chain.subprocess, 'Popen', side_effect=AssertionError('no child')).start()
+        mock.patch.object(supply_chain.subprocess, 'check_output', side_effect=AssertionError('no execution')).start()
+        mock.patch.object(supply_chain.urllib.request, 'urlopen', side_effect=AssertionError('no network')).start()
+        mock.patch.object(supply_chain.tarfile.TarFile, 'extractall', side_effect=AssertionError('no extraction')).start()
+
+    def command_pair(self, between=None):
+        raw = json.dumps(self.fixture.lock).encode()
+        with supply_chain._development_input_command(self.fixture.lock, PROFILE,
+                self.fixture.files, self.tree, lock_bytes=raw) as (before, post):
+            if between: between()
+            after = post(self.fixture.lock, PROFILE, self.fixture.files, self.tree, lock_bytes=raw)
+        self.assertEqual(before, after)
+        return after
+
+    def nested(self):
+        # Three literal members, unchanged bytes; only the zero-byte member moves.
+        (self.tree / 'package/empty').unlink()
+        path = self.tree / 'package/lib/nested/empty'; path.parent.mkdir()
+        path.write_bytes(b''); path.chmod(0o644)
+        self.fixture.payloads = {
+            'package/package.json': b'{"name":"@zowe/cli","version":"8.39.0"}',
+            'package/lib/main.js': b'fixture-only\n', 'package/lib/nested/empty': b''}
+        inert_tar(self.fixture.files['zowe-archive'],
+            [(name, data, 0o644, tarfile.REGTYPE) for name, data in self.fixture.payloads.items()], 'gz')
+        self.fixture.repin_zowe()
+        self.fixture.profile['zowe']['tree'].update(max_depth=4,
+            sha256='bbd64e4b8a483021d10100daec34b841d86d296178f39cdfe949ddaa037c3006')
+
+    def directory_audit(self):
+        from contextlib import contextmanager
+        @contextmanager
+        def audited():
+            opened, live, peak = set(), set(), [0]
+            original_open, original_close = os.open, os.close
+            def opening(path, flags, *args, **kwargs):
+                descriptor = original_open(path, flags, *args, **kwargs)
+                if flags & os.O_DIRECTORY:
+                    opened.add(descriptor); live.add(descriptor); peak[0] = max(peak[0], len(live))
+                return descriptor
+            def closing(descriptor):
+                original_close(descriptor); live.discard(descriptor)
+            try:
+                with mock.patch.object(os, 'open', side_effect=opening), mock.patch.object(os, 'close', side_effect=closing):
+                    yield peak
+            finally:
+                self.assertFalse(live)
+                for descriptor in opened:
+                    with self.assertRaises(OSError): os.fstat(descriptor)
+                self.assertLessEqual(peak[0], self.fixture.profile['zowe']['tree']['max_depth'])
+        return audited()
+
+    def test_literal_three_file_identity_and_default_path_unchanged(self):
+        original = supply_chain.canonical_input
+        observed = []
+        def canonical(path):
+            if path.is_relative_to(self.tree): observed.append(path.relative_to(self.tree).as_posix())
+            return original(path)
+        with mock.patch.object(supply_chain, 'canonical_input', side_effect=canonical):
+            default = self.fixture.check()
+        self.assertEqual(len(observed), 5)
+        with self.directory_audit() as peak:
+            selected = self.command_pair()
+        self.assertEqual(default, selected)
+        self.assertEqual(selected['identities']['tree'], {'sha256': TREE_GOLDEN, 'files': 3, 'bytes': 52})
+        self.assertEqual(peak[0], 3)
+
+    def test_tree_hardlink_policy_is_unchanged(self):
+        os.link(self.tree / 'package/empty', self.fixture.root / 'same-empty')
+        self.assertEqual(self.fixture.check()['identities']['tree']['sha256'], TREE_GOLDEN)
+        with self.directory_audit(): self.command_pair()
+
+    def test_root_directory_and_leaf_symlinks_and_fifo_refuse(self):
+        for kind in ('root-link', 'directory-link', 'leaf-link', 'fifo'):
+            original_tree = self.tree
+            if kind == 'root-link':
+                link = self.fixture.root / 'tree-link'; link.symlink_to(self.tree, target_is_directory=True); self.tree = link
+            elif kind == 'directory-link':
+                path = self.tree / 'package/lib'; saved = self.fixture.root / 'saved-lib'
+                path.rename(saved); path.symlink_to(saved, target_is_directory=True)
+            else:
+                path = self.tree / 'package/empty'; path.unlink()
+                if kind == 'leaf-link': path.symlink_to(self.tree / 'package/package.json')
+                else: os.mkfifo(path, 0o644)
+            try:
+                with self.subTest(kind=kind), self.directory_audit(), self.assertRaises((supply_chain.SupplyChainError, OSError)):
+                    self.command_pair()
+            finally:
+                if kind == 'root-link': self.tree = original_tree; link.unlink()
+                elif kind == 'directory-link': path.unlink(); saved.rename(path)
+                else: path.unlink(); path.write_bytes(b''); path.chmod(0o644)
+
+    def test_same_byte_ancestor_rebind_during_leaf_read_refuses(self):
+        import shutil
+        original = supply_chain.stream_hash
+        path = self.tree / 'package/lib'
+        leaf_inode = (path / 'main.js').stat().st_ino
+        def rebind(source, maximum):
+            result = original(source, maximum)
+            try: descriptor = source.fileno()
+            except (AttributeError, io.UnsupportedOperation): return result
+            if os.fstat(descriptor).st_ino == leaf_inode:
+                path.rename(self.fixture.root / 'saved-lib')
+                shutil.copytree(self.fixture.root / 'saved-lib', path)
+            return result
+        with self.directory_audit(), mock.patch.object(supply_chain, 'stream_hash', side_effect=rebind), \
+                self.assertRaises((supply_chain.SupplyChainError, OSError)):
+            self.command_pair()
+
+    def test_processed_intermediate_rebind_during_fresh_manifest_refuses(self):
+        from contextlib import contextmanager
+        import shutil
+        self.nested()
+        original = supply_chain.checked_input
+        changed = False
+        @contextmanager
+        def manifest_change(path, pin):
+            nonlocal changed
+            with original(path, pin) as value:
+                if path == self.tree / 'package/package.json' and not changed:
+                    changed = True
+                    nested = self.tree / 'package/lib/nested'
+                    nested.rename(self.fixture.root / 'saved-nested')
+                    shutil.copytree(self.fixture.root / 'saved-nested', nested)
+                yield value
+        with self.directory_audit(), mock.patch.object(supply_chain, 'checked_input', side_effect=manifest_change), \
+                self.assertRaisesRegex(supply_chain.SupplyChainError, 'directory.*changed'):
+            self.command_pair()
+        self.assertTrue(changed)
+
+    def test_root_mode_change_during_manifest_refuses(self):
+        from contextlib import contextmanager
+        original = supply_chain.checked_input
+        @contextmanager
+        def manifest_change(path, pin):
+            with original(path, pin) as value:
+                if path == self.tree / 'package/package.json': self.tree.chmod(0o777)
+                yield value
+        with self.directory_audit(), mock.patch.object(supply_chain, 'checked_input', side_effect=manifest_change), \
+                self.assertRaises((supply_chain.SupplyChainError, OSError)):
+            self.command_pair()
+
+    def test_above_root_symlink_rebind_during_manifest_refuses(self):
+        from contextlib import contextmanager
+        original = supply_chain.checked_input
+        base = self.fixture.root
+        saved = base.with_name(base.name + '-saved-ancestor')
+        changed = False
+        @contextmanager
+        def manifest_change(path, pin):
+            nonlocal changed
+            with original(path, pin) as value:
+                if path == self.tree / 'package/package.json' and not changed:
+                    changed = True; base.rename(saved); base.symlink_to(saved, target_is_directory=True)
+                yield value
+        try:
+            with self.directory_audit(), mock.patch.object(supply_chain, 'checked_input', side_effect=manifest_change), \
+                    self.assertRaisesRegex(supply_chain.SupplyChainError, 'profile input is unavailable'):
+                self.command_pair()
+        finally:
+            if changed: base.unlink(); saved.rename(base)
+        self.assertTrue(changed)
+
+    def test_leaf_modes_and_capabilities_remain_checked(self):
+        path = self.tree / 'package/empty'
+        for mode in (0o755, 0o666, 0o1644):
+            path.chmod(mode)
+            try:
+                with self.subTest(mode=mode), self.directory_audit(), self.assertRaises(supply_chain.SupplyChainError):
+                    self.command_pair()
+            finally: path.chmod(0o644)
+        original = os.getxattr
+        def capability(descriptor, name):
+            if os.fstat(descriptor).st_ino == path.stat().st_ino: return b'elevated'
+            return original(descriptor, name)
+        with self.directory_audit(), mock.patch.object(os, 'getxattr', side_effect=capability), \
+                self.assertRaises(supply_chain.SupplyChainError): self.command_pair()
+
+    def test_leaf_read_failure_closes_ancestors(self):
+        original = supply_chain.stream_hash
+        inode = (self.tree / 'package/lib/main.js').stat().st_ino
+        def unreadable(source, maximum):
+            try: descriptor = source.fileno()
+            except (AttributeError, io.UnsupportedOperation): return original(source, maximum)
+            if os.fstat(descriptor).st_ino == inode:
+                raise OSError('controlled leaf read failure')
+            return original(source, maximum)
+        with self.directory_audit(), mock.patch.object(supply_chain, 'stream_hash', side_effect=unreadable), \
+                self.assertRaises(supply_chain.SupplyChainError): self.command_pair()
+
+    def test_above_root_rebind_during_final_resolution_refuses(self):
+        import shutil
+        original = supply_chain.canonical_input
+        base = self.fixture.root
+        saved = base.with_name(base.name + '-saved-final')
+        root_calls = 0
+        rows = supply_chain.zowe_archive_rows(self.fixture.files['zowe-archive'], self.fixture.profile['zowe'])
+        def canonical(path):
+            nonlocal root_calls
+            if path == self.tree:
+                root_calls += 1
+                if root_calls == 2:
+                    base.rename(saved)
+                    shutil.copytree(saved, base)
+            return original(path)
+        try:
+            with self.directory_audit(), mock.patch.object(supply_chain, 'canonical_input', side_effect=canonical), \
+                    self.assertRaisesRegex(supply_chain.SupplyChainError, 'directory changed during read'):
+                supply_chain.validate_zowe_tree(self.tree, rows, self.fixture.profile['zowe'], True)
+        finally:
+            if saved.exists(): shutil.rmtree(base); saved.rename(base)
+        self.assertEqual(root_calls, 2)
+
+    def test_leaf_stream_construction_failure_closes_raw_descriptor(self):
+        original = os.fdopen
+        inode = (self.tree / 'package/lib/main.js').stat().st_ino
+        failed = []
+        def construction(descriptor, *args, **kwargs):
+            if os.fstat(descriptor).st_ino == inode:
+                failed.append(descriptor)
+                raise OSError('controlled leaf stream construction failure')
+            return original(descriptor, *args, **kwargs)
+        try:
+            with self.directory_audit(), mock.patch.object(os, 'fdopen', side_effect=construction), \
+                    self.assertRaises(supply_chain.SupplyChainError): self.command_pair()
+            self.assertEqual(len(failed), 1)
+            with self.assertRaises(OSError): os.fstat(failed[0])
+        finally:
+            for descriptor in failed:
+                try: os.fstat(descriptor)
+                except OSError: pass
+                else: os.close(descriptor)
+
+    def test_depth_bound_and_membership_remain_finite(self):
+        for change in ('depth', 'extra-file', 'extra-directory', 'missing'):
+            if change == 'depth':
+                saved_depth = self.fixture.profile['zowe']['tree']['max_depth']; self.fixture.profile['zowe']['tree']['max_depth'] = 2
+            elif change == 'extra-file': (self.tree / 'package/extra').write_bytes(b'')
+            elif change == 'extra-directory': (self.tree / 'package/extra').mkdir()
+            else: (self.tree / 'package/empty').unlink()
+            try:
+                with self.subTest(change=change), self.directory_audit(), self.assertRaises(supply_chain.SupplyChainError):
+                    self.command_pair()
+            finally:
+                if change == 'depth': self.fixture.profile['zowe']['tree']['max_depth'] = saved_depth
+                elif change == 'extra-file': (self.tree / 'package/extra').unlink()
+                elif change == 'extra-directory': (self.tree / 'package/extra').rmdir()
+                else: (self.tree / 'package/empty').write_bytes(b''); (self.tree / 'package/empty').chmod(0o644)
+
+
 if __name__ == "__main__":
     unittest.main()
