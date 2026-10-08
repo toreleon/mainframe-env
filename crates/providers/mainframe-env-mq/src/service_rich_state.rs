@@ -131,7 +131,7 @@ impl From<DeliveryRowError> for ReadError {
 
 pub(super) enum StoredAuthority {
     Legacy(DurableState),
-    Rich(RichStoredState),
+    Rich(Box<RichStoredState>),
 }
 
 pub(super) struct RichStoredState {
@@ -387,7 +387,7 @@ pub(super) fn decode_records(
                 limits.default_persistence,
             )?;
             ownership.validate_delivery(&delivery, &rows)?;
-            Ok(StoredAuthority::Rich(RichStoredState {
+            Ok(StoredAuthority::Rich(Box::new(RichStoredState {
                 catalog,
                 delivery,
                 rows,
@@ -399,7 +399,7 @@ pub(super) fn decode_records(
                 receipts,
                 runtime: None,
                 limits,
-            }))
+            })))
         }
         _ => Err(ReadError::Corrupt),
     }

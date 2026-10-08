@@ -118,13 +118,15 @@ impl OccurrenceReceipt {
 
     pub(super) fn capture(
         admitted: &MqMqiAdmitted<'_>,
-        reply: &EffectResult,
+        preflight: &crate::mqi_admission::MqMqiResultPreflight<'_>,
         control: &Control,
         now: u64,
         host_limits: HostLimits,
         byte_ceiling: usize,
         resources: Vec<authorization::StoredResource>,
     ) -> Result<Self, HostProblem> {
+        let original = preflight.original;
+        let reply = preflight.reply;
         let Ok(HostResult::MqMqi(result)) = &reply.outcome else {
             return Err(HostProblem::Unsupported);
         };
@@ -143,8 +145,8 @@ impl OccurrenceReceipt {
             principal: inv.principal.id().as_str().into(),
             invocation_key: inv.idempotency_key.as_str().into(),
             attempt: inv.attempt,
-            sequence: admitted.effect().sequence,
-            deadline: inv.deadline_tick.min(admitted.effect().deadline_tick),
+            sequence: original.sequence,
+            deadline: inv.deadline_tick.min(original.deadline_tick),
             observed_tick: now,
             generation: control.generation,
             fence: control.fence,

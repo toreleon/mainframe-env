@@ -32,6 +32,7 @@ use mainframe_env_host_api::{
 };
 
 mod result;
+pub(crate) use result::MqMqiResultPreflight;
 
 /// Trusted service-owned scope. Host admission/lifecycle provenance is an
 /// explicit construction precondition, not a claim that this helper attests it.
@@ -129,7 +130,7 @@ pub(crate) enum MqMqiAdmission<'a> {
         reason: MqMqiPending,
     },
     /// Source-exact direct-call condition. No provider state was inspected.
-    ForbiddenContext(MqMqiResult),
+    ForbiddenContext(Box<MqMqiResult>),
 }
 
 fn controls(
@@ -294,13 +295,13 @@ pub(crate) fn admit_mqi<'a>(
         )
     {
         controls(invocation, effect, now_tick)?;
-        return Ok(MqMqiAdmission::ForbiddenContext(MqMqiResult {
+        return Ok(MqMqiAdmission::ForbiddenContext(Box::new(MqMqiResult {
             call: envelope.request.call(),
             outcome: MqMqiOutcome::Completed {
                 status: MqMqiStatus::FailedEnvironment,
                 output: MqMqiOutput::NoOutput,
             },
-        }));
+        })));
     }
     let identity = MqMqiAdmitted {
         invocation,

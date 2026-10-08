@@ -167,6 +167,7 @@ pub(crate) struct DeliveryRowDelta {
 }
 
 impl DeliveryRowDelta {
+    #[cfg(test)]
     pub(crate) fn mutations(&self) -> &[ProviderStateMutation] {
         &self.mutations
     }
@@ -240,30 +241,6 @@ impl DeliveryRows {
             return Err(DeliveryRowError::Corrupt);
         }
         prepare(None, kernel, catalog, identity, limits)
-    }
-
-    /// A single prefix scan is a backend snapshot across all row families.
-    /// `expected` must come from the service's current catalog/lease authority.
-    pub(crate) fn load(
-        store: &dyn ProviderStateStore,
-        catalog: &MqObjectCatalog,
-        expected: DeliveryRowIdentity,
-        limits: DeliveryRowLimits,
-        kernel_limits: MqDeliveryLimits,
-        message_limits: MqMessageLimits,
-        default_persistence: MqPersistence,
-    ) -> Result<(Self, MqDeliveryKernel), DeliveryRowError> {
-        limits.validate()?;
-        let records = store.list_provider_state_prefix(PREFIX, limits.rows + 1)?;
-        Self::restore(
-            records,
-            catalog,
-            expected,
-            limits,
-            kernel_limits,
-            message_limits,
-            default_persistence,
-        )
     }
 
     /// Pure restore of an already captured physical snapshot. No store reads.
@@ -797,3 +774,5 @@ fn encode_current(snapshot: &Checkpoint, limit: usize) -> Result<Vec<u8>, MqDeli
 mod full_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+pub(crate) use tests::load_fixture;

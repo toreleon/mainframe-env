@@ -1294,3 +1294,55 @@ Full CardDemo closure still refuses: J06 AIX browse/navigation and all 105 issue
 acceptances remain unbound. This slice does not establish 20/20 journeys, 26/26
 transactions, full application acceptance, backend parity or official/licensed
 credit. Those independent pending obligations are unchanged.
+
+### CV-209.public-client-compatibility preparation declaration
+
+Manager authorizes source-only preparation of a finite first-party API compatibility
+fixture against the actual ProductServer using optional external @zowe/cli 8.39.0
+and the accepted Node 24.19.0/bubblewrap inputs. Existing CI assurance and input
+policy owners remain authoritative. No new ledger/schema, production API change,
+full DD inventory golden, missing-source refresh or official conformance credit.
+
+Freeze exact existing owner paths and lifecycle before implementation: exclusive
+loopback listener/artifact/client directories; valid second principal; actual
+method/URI/status capture; independently expected selected STEP1:SYSPRINT record
+IEFBR14; successful submit/query/files/content and actual authentication/ownership
+refusals with unchanged job/spool state. Query status and lookup refusal have only
+their actual scope. Retain the existing ignored manual-server test unchanged.
+Bounded readiness/client/shutdown and per-command process-group teardown are
+required. Keep HOME/CODEX_HOME unset, verified minimal filesystem binds, disabled
+plugins/native/global lookup and accepted intact external archive. No npm, scripts,
+helper installation, ambient profiles or host filesystem widening.
+
+Preparation is external design/source inspection only: no repository edits, Cargo,
+server/job/client execution, new pins/downloads, CI input mutation or acceptance
+status. Hand off the smallest exact owner plan, source-independent assertions,
+regressions and supervisor lifecycle to the manager for implementation grant.
+
+### CV-209.mq-mechanical-layout acceptance
+
+Status: **Complete (bounded mechanical layout); full MQ contract-lint pending**.
+Five private enum payloads are boxed, preparation arguments share a private
+borrowed context and redundant fixture-only delegates use their existing bounded
+operations. Explicit NoOutput serialization, original preflight/request identity,
+digest and publication order, historical reader limits and retained production
+planners remain unchanged. No suppression, fabricated reads, private feature
+activation or public unsafe API removes a genuine responsibility. Box payloads
+add allocation/allocator overhead; no measured total heap reduction is claimed.
+
+The original producer passed 488 unit/integration/doc tests before fixture-only
+lint repairs. The final candidate compiles all five test targets and passes 76
+distinct tests affected by those twelve fixture files (zero failed or ignored).
+All original test declarations and 495 assertion token arguments are preserved;
+production sources match the earlier tested candidate. The final strict MQ owner
+lint actually returns 101 with exactly 26 retained production diagnostics and no
+unexpected fixture/mechanical diagnostics. Full contract-lint remains pending
+for real legacy-import, decoder/initializer, provenance/lifecycle and fence/upgrade
+composition; these responsibilities are not converted to passing evidence.
+
+All 171 final MQ source inputs byte-match the integrated root. Module boundaries,
+formatting, frozen dependencies and diff checks pass; fresh binaries and original
+failure receipts remain external and the exact worker target is clean. Existing
+Memory/same-process SQLite results do not establish process-crash, official or
+licensed parity. No schema, identity, denominator, source pin or private gate
+changes. Current manager metadata checks pass on the integrated candidate.

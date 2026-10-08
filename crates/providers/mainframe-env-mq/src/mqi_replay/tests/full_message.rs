@@ -299,8 +299,10 @@ fn full_message_strict_storage_rejects_fields_corruption_quota_and_coherent_bad_
     for n in [0, 1, raw.len() - 1] {
         assert!(decode(&raw, HostLimits::default(), MqMqiLimits::default(), n).is_err());
     }
-    let mut h = HostLimits::default();
-    h.max_record_bytes = 2;
+    let h = HostLimits {
+        max_record_bytes: 2,
+        ..Default::default()
+    };
     assert!(decode(&raw, h, MqMqiLimits::default(), BYTES).is_err());
     let mut m = MqMqiLimits::default();
     m.message.identifier_bytes = 23;

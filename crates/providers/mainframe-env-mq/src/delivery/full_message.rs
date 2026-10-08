@@ -41,7 +41,7 @@ impl std::ops::DerefMut for QueueState {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) enum Payload {
     Partial(MqMessage),
-    Complete(MqFullMessage),
+    Complete(Box<MqFullMessage>),
 }
 pub(super) struct PayloadGet {
     pub(super) disposition: MqGetDisposition,
@@ -197,7 +197,7 @@ impl MqDeliveryKernel {
         Ok((
             got.disposition,
             got.message.map(|p| match p {
-                Payload::Complete(m) => m,
+                Payload::Complete(m) => *m,
                 _ => unreachable!("checked profile"),
             }),
             got.cursor,
@@ -255,7 +255,7 @@ impl MqDeliveryKernel {
         let mut next = self.clone();
         let entry = Entry {
             id: next.allocate_id()?,
-            message: Payload::Complete(message),
+            message: Payload::Complete(Box::new(message)),
             expires_at: None,
         };
         if let Some(unit) = unit {

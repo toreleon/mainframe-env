@@ -136,7 +136,7 @@ fn only_removed_gets_change_not_browse_rejected_truncation_puts_or_other_units()
     k.backout_complete_zos(8).unwrap();
     assert_eq!(
         k.queues[&name("A")].entries[0].message,
-        Payload::Complete(m.clone())
+        Payload::Complete(Box::new(m.clone()))
     );
     k.get_full(
         &c,
@@ -149,7 +149,7 @@ fn only_removed_gets_change_not_browse_rejected_truncation_puts_or_other_units()
     k.backout_complete_zos(9).unwrap();
     assert_eq!(
         k.queues[&name("A")].entries[0].message,
-        Payload::Complete(m.clone())
+        Payload::Complete(Box::new(m.clone()))
     );
     k.get_full(
         &c,
@@ -167,13 +167,13 @@ fn only_removed_gets_change_not_browse_rejected_truncation_puts_or_other_units()
     assert_eq!(k.depth(&name("A")), Some(1));
     assert_eq!(
         k.queues[&name("A")].entries[0].message,
-        Payload::Complete(expected)
+        Payload::Complete(Box::new(expected))
     );
     assert_eq!(k.unit_outcome(11), MqDeliveryOutcome::Pending);
     k.commit(11).unwrap();
     assert_eq!(
         k.queues[&name("A")].entries[1].message,
-        Payload::Complete(m)
+        Payload::Complete(Box::new(m))
     );
 }
 

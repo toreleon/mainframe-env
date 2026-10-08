@@ -98,6 +98,7 @@ impl RichPublicationPlan {
         Ok(additions)
     }
 
+    #[cfg(test)]
     pub(in crate::service) fn mutations(&self) -> &[ProviderStateMutation] {
         &self.mutations
     }
@@ -110,16 +111,6 @@ impl RichPublicationPlan {
 }
 
 impl RichStoredState {
-    /// Ordinary logical publication at the EXACT captured identity. The caller
-    /// supplies only a delivery candidate, never old hashes/versions/owners.
-    pub(in crate::service) fn plan_delivery(
-        &self,
-        candidate: &MqDeliveryKernel,
-        limits: PublicationLimits,
-    ) -> Result<RichPublicationPlan, PublicationError> {
-        self.plan(candidate, false, false, Vec::new(), limits)
-    }
-
     /// Owner and receipt changes are validated with the delivery delta as one
     /// prospective snapshot; no intermediate state is accepted or published.
     pub(in crate::service) fn plan_selected_delivery(
@@ -288,7 +279,10 @@ impl RichStoredState {
         {
             return Err(PublicationError::Source);
         }
-        Ok(RichPublicationPlan { mutations, next })
+        Ok(RichPublicationPlan {
+            mutations,
+            next: *next,
+        })
     }
 }
 

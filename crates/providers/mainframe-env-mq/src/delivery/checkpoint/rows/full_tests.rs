@@ -1,3 +1,4 @@
+use super::tests::load_fixture;
 use super::*;
 use crate::delivery::full_message::tests::full;
 use crate::delivery::tests::{catalog, kernel, name};
@@ -105,7 +106,7 @@ fn empty_full_profile_snapshot_has_explicit_independent_golden_and_fence_preserv
         }
     }
     store.mutate_provider_states_atomic(batch).unwrap();
-    let (_, restored) = DeliveryRows::load(
+    let (_, restored) = load_fixture(
         &store,
         &c,
         identity.next_fence().unwrap(),
@@ -117,7 +118,7 @@ fn empty_full_profile_snapshot_has_explicit_independent_golden_and_fence_preserv
     .unwrap();
     assert_eq!(restored, k);
     assert!(
-        DeliveryRows::load(
+        load_fixture(
             &store,
             &c,
             identity,

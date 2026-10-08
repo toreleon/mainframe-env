@@ -109,10 +109,10 @@ fn zero_queue_max_empty_body_nonpersistent_duplicates_and_changed_replay_identit
         assert_eq!(f.execute(&e).unwrap(), first);
         let rows = f.rows();
         let mut changed = e.clone();
-        if let HostRequest::MqMqi(h) = &mut changed.request {
-            if let MqMqiRequest::FullPut { put, .. } = &mut h.envelope.request {
-                put.message.body.push(1);
-            }
+        if let HostRequest::MqMqi(h) = &mut changed.request
+            && let MqMqiRequest::FullPut { put, .. } = &mut h.envelope.request
+        {
+            put.message.body.push(1);
         }
         assert!(f.execute(&changed).is_err());
         assert_eq!(f.rows(), rows);

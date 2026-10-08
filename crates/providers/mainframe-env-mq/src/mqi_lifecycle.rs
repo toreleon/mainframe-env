@@ -206,9 +206,9 @@ impl MqLifecycleDirectory {
         child: &Invocation,
         now: u64,
     ) -> Result<FrameLease, HostProblem> {
-        let (bytes, context) = inspect(child, now)?;
+        let (bytes, context) = inspect_in_mode(child, now, ContextMode::Binding)?;
         let parent_frame = self.frame(parent)?;
-        inspect(&parent_frame.invocation, now)?;
+        inspect_in_mode(&parent_frame.invocation, now, ContextMode::Binding)?;
         let original = &parent_frame.invocation;
         if context.environment != MqHostEnvironment::ZosCics
             || child.parent_execution_id.as_ref() != Some(&original.execution_id)
@@ -465,10 +465,6 @@ fn within(
         && child.max_frames <= parent.max_frames
         && child.max_effects <= parent.max_effects
         && child.max_events <= parent.max_events
-}
-
-fn inspect(invocation: &Invocation, now: u64) -> Result<(usize, AttestedHostContext), HostProblem> {
-    inspect_in_mode(invocation, now, ContextMode::Binding)
 }
 
 fn inspect_in_mode(

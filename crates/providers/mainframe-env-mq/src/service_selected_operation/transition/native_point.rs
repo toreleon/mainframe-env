@@ -246,14 +246,13 @@ impl MqService {
         };
         let point = if let Some(target) = target {
             let queue = match (call, target) {
-                (MqMqiCall::Open, MqTrustedBatchPointTarget::Open { lookup, access })
-                    if matches!(
-                        access,
-                        MqRouteOpenAccess::Output | MqRouteOpenAccess::InputShared
-                    ) =>
-                {
-                    local_lookup(lookup)?
-                }
+                (
+                    MqMqiCall::Open,
+                    MqTrustedBatchPointTarget::Open {
+                        lookup,
+                        access: MqRouteOpenAccess::Output | MqRouteOpenAccess::InputShared,
+                    },
+                ) => local_lookup(lookup)?,
                 (MqMqiCall::PutOne, MqTrustedBatchPointTarget::PutOne { lookup }) => {
                     local_lookup(lookup)?
                 }

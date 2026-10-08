@@ -8,7 +8,9 @@ fn prior_nonhandle_storage_and_host_canonical_golden_are_exact() {
     let hex = "feb3c22c6f1150b7a39bf17cee6612d0b722f524edc582e43b8a401b72826c27";
     let digest: Vec<u8> = hex
         .as_bytes()
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|p| u8::from_str_radix(std::str::from_utf8(p).unwrap(), 16).unwrap())
         .collect();
     assert_eq!(

@@ -146,7 +146,7 @@ fn loaded(b: &Backend, fence: u64) -> RichStoredState {
     let StoredAuthority::Rich(r) = read(b.store(), 3, fence, Default::default()).unwrap() else {
         panic!("rich expected")
     };
-    r
+    *r
 }
 fn request(mode: MqGetMode) -> MqGetContract {
     MqGetContract {
@@ -171,7 +171,7 @@ fn rich_from(records: Vec<ProviderStateRecord>, fence: u64) -> RichStoredState {
     else {
         panic!("rich expected")
     };
-    r
+    *r
 }
 fn audit_fixture(b: &Backend) -> AuditedProviderPublication {
     let l = InvocationLimits::default();
@@ -393,7 +393,9 @@ fn memory_sqlite_ordinary_and_fence_races_in_both_orders_have_exactly_one_winner
             let b = Backend::new(sqlite);
             let r = fixture(&b);
             let p = audit_fixture(&b);
-            let ordinary = r.plan_delivery(&candidate(&r), Default::default()).unwrap();
+            let ordinary = r
+                .plan_selected_delivery(&candidate(&r), Vec::new(), Default::default())
+                .unwrap();
             let fence = r.plan_next_fence(Default::default()).unwrap();
             let (winner, loser) = if fence_first {
                 (fence, ordinary)
@@ -432,7 +434,9 @@ fn final_marker_or_catalog_dependency_conflict_rolls_back_earlier_rows_and_audit
             let b = Backend::new(sqlite);
             let r = fixture(&b);
             let p = audit_fixture(&b);
-            let plan = r.plan_delivery(&candidate(&r), Default::default()).unwrap();
+            let plan = r
+                .plan_selected_delivery(&candidate(&r), Vec::new(), Default::default())
+                .unwrap();
             let key = if ns == STATE_NAMESPACE {
                 STATE_KEY
             } else {
@@ -483,7 +487,7 @@ fn actual_audit_saturation_rolls_back_rows_marker_metadata_replay_and_current_au
         }
         let before = snapshot(&b, &p);
         let plan = next
-            .plan_delivery(&candidate(&next), Default::default())
+            .plan_selected_delivery(&candidate(&next), Vec::new(), Default::default())
             .unwrap();
         let (mutations, uncommitted) = plan.into_parts();
         let mut failed = p.clone();
@@ -550,7 +554,10 @@ fn invalid_cached_identity_catalog_versions_and_candidates_fail_planning_without
         MqPersistence::Persistent,
     )
     .unwrap();
-    assert!(r.plan_delivery(&bad, Default::default()).is_err());
+    assert!(
+        r.plan_selected_delivery(&bad, Vec::new(), Default::default())
+            .is_err()
+    );
     assert_eq!(records(&b), before);
 }
 
@@ -585,7 +592,10 @@ fn exhausted_fence_and_any_dependency_version_reject_without_publication() {
             .unwrap()
             .version = i64::MAX as u64;
         let r = rich_from(exhausted, 5);
-        assert!(r.plan_delivery(&candidate(&r), Default::default()).is_err());
+        assert!(
+            r.plan_selected_delivery(&candidate(&r), Vec::new(), Default::default())
+                .is_err()
+        );
         assert!(r.plan_next_fence(Default::default()).is_err());
     }
     assert_eq!(records(&b), original);
@@ -664,7 +674,8 @@ fn quota_accounting_includes_dependencies_and_never_silently_batches() {
             .unwrap();
     }
     assert_eq!(
-        r.plan_delivery(&k, Default::default()).err(),
+        r.plan_selected_delivery(&k, Vec::new(), Default::default())
+            .err(),
         Some(PublicationError::Bounds)
     );
     assert!(PublicationLimits::default().mutations < MAX_AUDITED_PROVIDER_MUTATIONS);
@@ -677,7 +688,9 @@ fn stale_or_finalized_core_intent_and_composed_trailing_failure_have_no_partial_
         let b = Backend::new(sqlite);
         let r = fixture(&b);
         let p = audit_fixture(&b);
-        let plan = r.plan_delivery(&candidate(&r), Default::default()).unwrap();
+        let plan = r
+            .plan_selected_delivery(&candidate(&r), Vec::new(), Default::default())
+            .unwrap();
         let (mutations, _) = plan.into_parts();
         let before = snapshot(&b, &p);
         let mut failed = p.clone();

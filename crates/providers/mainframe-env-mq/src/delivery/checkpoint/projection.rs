@@ -9,7 +9,7 @@ const COLD_SCHEMA: &str = "mainframe-env.mq-delivery@2";
 
 pub(super) enum StoredMessage {
     Partial(SnapshotMessage),
-    Complete(MqFullMessage),
+    Complete(Box<MqFullMessage>),
 }
 pub(super) mod legacy_message {
     use super::*;
@@ -138,7 +138,7 @@ impl EntryTwo {
     fn into_live(self) -> Result<LiveEntry, MqDeliveryError> {
         let message = match self.message {
             Message::Partial(m) => StoredMessage::Partial(m.message),
-            Message::Complete(m) => StoredMessage::Complete(MqFullMessage {
+            Message::Complete(m) => StoredMessage::Complete(Box::new(MqFullMessage {
                 descriptor: mq_md_value_decode(&m.md, 2048)
                     .map_err(|_| MqDeliveryError::CorruptSnapshot)?,
                 body: m.body,
@@ -147,7 +147,7 @@ impl EntryTwo {
                     .into_iter()
                     .map(SnapshotProperty::into_property)
                     .collect::<Result<_, _>>()?,
-            }),
+            })),
         };
         Ok(LiveEntry {
             id: self.id,
