@@ -65,7 +65,7 @@ projection; it does not rewrite the shared catalog's identities.
 
 ## CV-209.host-contract-lint
 
-Status: **In progress**. This non-semantic slice owns mechanical lint repairs in
+Status: **Complete (bounded mechanical slice only)**. This non-semantic slice owns mechanical lint repairs in
 the existing host-contract package and its tests. It changes no official catalog
 row, public ABI, behavior, source pin or durable schema. The consumed base is
 `e3830278efc8de147f14b0e98da3d759250be782`. The isolated CLI worker must preserve
@@ -228,6 +228,13 @@ acceptance remains pending with this gate and the other exit requirements.
 ### CV-209.host-effect-layout acceptance
 
 Status: **Complete (bounded slice only)**. Scoped compatibility acceptance passed: outer MQI boxing and migrated consumers preserve canonical vectors and retained replay codecs. Rust constructor/pattern migration is explicit in ADR-0050. The two changed local source bindings pass their independent binder; no IBM pin or expected bytes changed.
+Formatting, frozen dependency policy, module, documentation/changelog/subsystem
+and diff checks pass for the reviewed integrated scope. The unavailable CICS
+source freshness gate and full Foundation exit remain pending.
+
+### CV-209.host-contract-lint acceptance
+
+Status: **Complete (bounded slice only)**. Mechanical implementation is in the preceding focused repair commit. With the separately accepted host-layout prerequisite, integrated strict host Clippy and all 355 host tests pass. This closes only the host-package lint slice.
 Formatting, frozen dependency policy, module, documentation/changelog/subsystem
 and diff checks pass for the reviewed integrated scope. The unavailable CICS
 source freshness gate and full Foundation exit remain pending.
