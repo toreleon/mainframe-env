@@ -268,27 +268,25 @@ was cleaned after retention. No CT navigation, PF7 or missing-token assertion wa
 reached; no application observation was bound. Preserve these results and the
 original expectations while repairing the generic prerequisite below.
 
-### CV-209.cobol-string-references declaration
+### CV-209.cobol-string-references acceptance
 
-Manager grants the four-path generic runtime repair packet: interpreter
-`machine.rs` registration/extraction, private `machine/string_ops.rs`, conformance
-`cobol_runtime.rs` controls and one unique fragment. Consume complete STRING
-sender/delimiter references through the existing checked reference owner; retain
-literal/figurative, SIZE, target, pointer and overflow behavior. Extract only
-STRING so the legacy facade decreases; manager owns its exact lowered ratchet.
-No UNSTRING, allocation API, parser/IR/layout or application-source rewrite.
+Status: **Complete (existing checked STRING reference boundary)**. A private
+STRING owner consumes complete sender and identifier-delimiter references through
+the existing reference/read owner, preserving selected raw PIC bytes and leading
+zeros. Literal/figurative, target, pointer, overflow and UNSTRING behavior is
+unchanged. Seven frozen native controls pass after five genuine runtime failures;
+the shared layout baseline and unchanged pointer/UNSTRING preservation control
+also pass. The legacy facade decreases to 11,683 production lines and the new
+private owner has 122. Strict affected-owner lint and selected policy/module
+checks pass on the integrated source; original native receipts retain their
+producing candidate and byte identities.
 
-First run the frozen native reference baseline and independent byte-literal
-controls on unchanged runtime. A shared-layout prerequisite failure needs a new
-scope; only a genuine STRING red permits this repair. Run the same focused
-selector and the existing pointer/UNSTRING control after correction, with jobs=2,
-an exclusive checkout-local target, artifact retention and exact cleanup. No
-navigation rerun until manager accepts this dependency; no full campaign.
-
-The offline Enterprise COBOL 6.5 bodies are unavailable under the retained cache
-and remain skipped/zero; no refresh, repin or repeated request is granted. This
-repairs the existing generic data-reference boundary using independent public
-application/native controls, without asserting an IBM semantic or licensed pass.
+Qualification follows the existing shared resolver boundary; interleaved
+qualification after a subscript is not established. Missing COBOL bodies remain
+skipped/zero. This generic public/native repair grants no IBM differential or
+licensed credit and does not yet establish CardDemo navigation. The original
+navigation prerequisite failures remain immutable; one changed-runtime focused
+continuation is the next dependency, with independent expectations unchanged.
 
 ### CV-209.sandbox-build-parallelism acceptance
 

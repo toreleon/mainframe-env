@@ -420,6 +420,8 @@ mod tests {
 
     fn execute_without_effects(source: &str) -> Result<(Vec<u8>, ReferenceMachine), String> {
         let artifact = crate::compile(source)?;
+        retain_execution_bytes(source, "cbl", source.as_bytes())?;
+        retain_execution_bytes(source, "bin", artifact.payload())?;
         let invocation = crate::invocation(&artifact, 4096);
         let mut machine =
             ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
@@ -440,7 +442,243 @@ mod tests {
                 }
             }
         };
+        retain_execution_bytes(source, "output", &output)?;
         Ok((output, machine))
+    }
+
+    fn retain_execution_bytes(source: &str, extension: &str, bytes: &[u8]) -> Result<(), String> {
+        let Some(directory) = std::env::var_os("MAINFRAME_COBOL_TEST_RECEIPTS") else {
+            return Ok(());
+        };
+        let name = source
+            .split_whitespace()
+            .skip_while(|token| *token != "PROGRAM-ID.")
+            .nth(1)
+            .ok_or("test source has no program identity")?
+            .trim_end_matches('.');
+        std::fs::write(
+            std::path::Path::new(&directory).join(format!("{name}.{extension}")),
+            bytes,
+        )
+        .map_err(|error| format!("retain test execution bytes: {error}"))
+    }
+
+    const STRING_REFERENCE_MENU_DATA: &str = r#"
+DATA DIVISION.
+WORKING-STORAGE SECTION.
+01 WS-IDX PIC S9(4) COMP VALUE 2.
+01 WS-TEXT PIC X(40) VALUE SPACES.
+01 MENU-ROOT.
+   05 MENU-DATA.
+      10 FILLER PIC 9(2) VALUE 1.
+      10 FILLER PIC X(35) VALUE 'Account View'.
+      10 FILLER PIC X(8) VALUE 'COACTVWC'.
+      10 FILLER PIC X VALUE 'U'.
+      10 FILLER PIC 9(2) VALUE 6.
+      10 FILLER PIC X(35) VALUE 'Transaction List'.
+      10 FILLER PIC X(8) VALUE 'COTRN00C'.
+      10 FILLER PIC X VALUE 'U'.
+   05 MENU-TABLE REDEFINES MENU-DATA.
+      10 MENU-ENTRY OCCURS 2 TIMES.
+         15 MENU-NUM PIC 9(2).
+         15 MENU-NAME PIC X(35).
+         15 MENU-PGM PIC X(8).
+         15 MENU-USER PIC X.
+"#;
+
+    #[test]
+    fn string_reference_occurs_sender() {
+        let source = r#"
+IDENTIFICATION DIVISION.
+PROGRAM-ID. STRING-REFERENCE-OCCURS.
+DATA DIVISION.
+WORKING-STORAGE SECTION.
+01 WS-IDX PIC S9(4) COMP VALUE 2.
+01 WS-TEXT PIC X(8) VALUE '--------'.
+01 TABLE-ROOT.
+   05 ITEM-X PIC X(3) OCCURS 2 TIMES.
+PROCEDURE DIVISION.
+    MOVE 'ONE' TO ITEM-X(1).
+    MOVE 'TWO' TO ITEM-X(2).
+    STRING ITEM-X(WS-IDX) DELIMITED BY SIZE
+           '!' DELIMITED BY SIZE INTO WS-TEXT END-STRING.
+    DISPLAY WS-TEXT.
+    STOP RUN.
+"#;
+        let (output, machine) = execute_without_effects(source).expect("OCCURS sender runtime");
+        assert_eq!(output, b"TWO!----\n");
+        assert_eq!(machine.variable("WS-TEXT").unwrap().bytes(), b"TWO!----");
+        assert_eq!(machine.variable("TABLE-ROOT").unwrap().bytes(), b"ONETWO");
+    }
+
+    #[test]
+    fn string_reference_redefines_menu_sender() {
+        let source = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. STRING-REFERENCE-MENU. {STRING_REFERENCE_MENU_DATA}\n\
+             PROCEDURE DIVISION.\n\
+             STRING MENU-NUM(WS-IDX) DELIMITED BY SIZE\n\
+                    '. ' DELIMITED BY SIZE\n\
+                    MENU-NAME(WS-IDX) DELIMITED BY SIZE\n\
+                 INTO WS-TEXT END-STRING.\n\
+             DISPLAY WS-TEXT. STOP RUN."
+        );
+        let (output, machine) = execute_without_effects(&source).expect("menu sender runtime");
+        assert_eq!(output, b"06. Transaction List                    \n");
+        assert_eq!(
+            machine.variable("WS-TEXT").unwrap().bytes(),
+            b"06. Transaction List                    "
+        );
+    }
+
+    #[test]
+    fn string_reference_shared_redefines_baseline() {
+        let source = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. STRING-REFERENCE-BASELINE. {STRING_REFERENCE_MENU_DATA}\n\
+             PROCEDURE DIVISION.\n\
+             DISPLAY MENU-NUM(WS-IDX).\n\
+             DISPLAY MENU-NAME(WS-IDX).\n\
+             DISPLAY MENU-PGM(WS-IDX).\n\
+             DISPLAY MENU-USER(WS-IDX). STOP RUN."
+        );
+        let (output, machine) =
+            execute_without_effects(&source).expect("shared reference baseline");
+        assert_eq!(
+            output,
+            b"06\nTransaction List                   \nCOTRN00C\nU\n"
+        );
+        assert_eq!(
+            machine.variable("WS-TEXT").unwrap().bytes(),
+            b"                                        "
+        );
+        assert_eq!(
+            machine.variable("MENU-DATA").unwrap().bytes(),
+            b"01Account View                       COACTVWCU06Transaction List                   COTRN00CU"
+        );
+    }
+
+    #[test]
+    fn string_reference_qualified_modified_sender() {
+        let source = r#"
+IDENTIFICATION DIVISION.
+PROGRAM-ID. STRING-REFERENCE-QUALIFIED.
+DATA DIVISION.
+WORKING-STORAGE SECTION.
+01 FIRST-GROUP.
+   05 LEAF-X PIC X(6) VALUE 'ABCDEF'.
+01 SECOND-GROUP.
+   05 LEAF-X PIC X(6) VALUE 'uvwxyz'.
+01 WS-TEXT PIC X(10) VALUE '----------'.
+PROCEDURE DIVISION.
+    STRING LEAF-X OF SECOND-GROUP(2:3) DELIMITED BY SIZE
+           '(Q)' DELIMITED BY SIZE INTO WS-TEXT END-STRING.
+    DISPLAY WS-TEXT.
+    STOP RUN.
+"#;
+        let (output, machine) = execute_without_effects(source).expect("qualified modified sender");
+        assert_eq!(output, b"vwx(Q)----\n");
+        assert_eq!(machine.variable("WS-TEXT").unwrap().bytes(), b"vwx(Q)----");
+        assert_eq!(machine.variable("FIRST-GROUP").unwrap().bytes(), b"ABCDEF");
+        assert_eq!(machine.variable("SECOND-GROUP").unwrap().bytes(), b"uvwxyz");
+    }
+
+    #[test]
+    fn string_reference_indexed_delimiter() {
+        let source = r#"
+IDENTIFICATION DIVISION.
+PROGRAM-ID. STRING-REFERENCE-DELIMITER.
+DATA DIVISION.
+WORKING-STORAGE SECTION.
+01 SOURCE-X PIC X(5) VALUE 'AA#BB'.
+01 WS-IDX PIC S9(4) COMP VALUE 2.
+01 WS-TEXT PIC X(8) VALUE '--------'.
+01 DELIMITER-ROOT.
+   05 DELIMITER-X PIC X OCCURS 2 TIMES.
+PROCEDURE DIVISION.
+    MOVE '!' TO DELIMITER-X(1).
+    MOVE '#' TO DELIMITER-X(2).
+    STRING SOURCE-X DELIMITED BY DELIMITER-X(WS-IDX)
+        INTO WS-TEXT END-STRING.
+    DISPLAY WS-TEXT.
+    STOP RUN.
+"#;
+        let (output, machine) = execute_without_effects(source).expect("indexed delimiter runtime");
+        assert_eq!(output, b"AA------\n");
+        assert_eq!(machine.variable("WS-TEXT").unwrap().bytes(), b"AA------");
+        assert_eq!(machine.variable("SOURCE-X").unwrap().bytes(), b"AA#BB");
+        assert_eq!(machine.variable("DELIMITER-ROOT").unwrap().bytes(), b"!#");
+    }
+
+    #[test]
+    fn string_reference_invalid_subscript() {
+        let mut observations = Vec::new();
+        for index in [0, 3] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. STRING-REFERENCE-INVALID-{index}.\n\
+                 DATA DIVISION. WORKING-STORAGE SECTION.\n\
+                 01 WS-IDX PIC S9(4) COMP VALUE {index}.\n\
+                 01 WS-TEXT PIC X(8) VALUE '--------'.\n\
+                 01 TABLE-ROOT. 05 ITEM-X PIC X(3) OCCURS 2 TIMES.\n\
+                 PROCEDURE DIVISION.\n\
+                 MOVE 'ONE' TO ITEM-X(1). MOVE 'TWO' TO ITEM-X(2).\n\
+                 STRING ITEM-X(WS-IDX) DELIMITED BY SIZE INTO WS-TEXT END-STRING.\n\
+                 STOP RUN."
+            );
+            let artifact = crate::compile(&source).expect("invalid-subscript source compiles");
+            retain_execution_bytes(&source, "cbl", source.as_bytes()).unwrap();
+            retain_execution_bytes(&source, "bin", artifact.payload()).unwrap();
+            let mut machine = ReferenceMachine::from_binary(
+                artifact.payload(),
+                crate::invocation(&artifact, 4096),
+                CodecLimits::default(),
+            )
+            .unwrap();
+            let terminal = loop {
+                match machine.drive(MachineResume::Start, Quantum::new(512, 64 * 1024).unwrap()) {
+                    MachineDrive::Continue => {}
+                    terminal => break terminal,
+                }
+            };
+            let target = machine.variable("WS-TEXT").unwrap().bytes().to_vec();
+            let table = machine.variable("TABLE-ROOT").unwrap().bytes().to_vec();
+            retain_execution_bytes(&source, "target", &target).unwrap();
+            eprintln!("index={index}; terminal={terminal:?}; target={target:?}; table={table:?}");
+            observations.push((index, terminal, target, table));
+        }
+        for (index, terminal, target, table) in observations {
+            assert_eq!(
+                target, b"--------",
+                "index {index} must not mutate the target"
+            );
+            assert_eq!(table, b"ONETWO");
+            let MachineDrive::Condition(condition) = terminal else {
+                panic!("index {index} expected checked SubscriptError, got {terminal:?}");
+            };
+            assert_eq!(condition.name, "SUBSCRIPT-ERROR");
+            assert_eq!(condition.response, 3);
+            assert!(!condition.handled);
+        }
+    }
+
+    #[test]
+    fn string_reference_literal_pointer_overflow() {
+        let source = r#"
+IDENTIFICATION DIVISION.
+PROGRAM-ID. STRING-REFERENCE-OVERFLOW.
+DATA DIVISION.
+WORKING-STORAGE SECTION.
+01 WS-TEXT PIC X(5) VALUE '-----'.
+01 PTR-X PIC 9 VALUE 3.
+PROCEDURE DIVISION.
+    STRING 'A(B)' DELIMITED BY SIZE INTO WS-TEXT WITH POINTER PTR-X
+        ON OVERFLOW DISPLAY 'OVERFLOW' END-STRING.
+    DISPLAY WS-TEXT.
+    DISPLAY PTR-X.
+    STOP RUN.
+"#;
+        let (output, machine) = execute_without_effects(source).expect("literal pointer overflow");
+        assert_eq!(output, b"OVERFLOW\n--A(B\n6\n");
+        assert_eq!(machine.variable("WS-TEXT").unwrap().bytes(), b"--A(B");
+        assert_eq!(machine.variable("PTR-X").unwrap().bytes(), b"6");
     }
 
     #[test]

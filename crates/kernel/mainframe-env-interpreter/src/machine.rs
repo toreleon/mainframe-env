@@ -57,6 +57,7 @@ mod layout_resolution;
 mod legacy_mq;
 mod observability;
 mod snapshot_codec;
+mod string_ops;
 mod typed_cics;
 pub(crate) mod typed_mq;
 pub use typed_mq::{MqMqiAbiScope, MqMqiConnxProfile, MqMqiProgramFrame, MqMqiProgramProfile};
@@ -5758,76 +5759,6 @@ impl ReferenceMachine {
         } else {
             Ok(())
         }
-    }
-    fn string_op(&mut self, args: &[String]) -> Result<bool, MachineProblem> {
-        let into = position(args, "INTO").ok_or(MachineProblem::InvalidOperation)?;
-        let mut value = Vec::new();
-        let mut index = 0usize;
-        while index < into {
-            let mut source = self.resolve(&args[index])?;
-            index += 1;
-            if args.get(index).is_some_and(|token| token == "DELIMITED") {
-                if args.get(index + 1).is_none_or(|token| token != "BY") {
-                    return Err(MachineProblem::InvalidOperation);
-                }
-                let delimiter = args
-                    .get(index + 2)
-                    .ok_or(MachineProblem::InvalidOperation)?;
-                if delimiter != "SIZE" {
-                    let delimiter = self.resolve(delimiter)?;
-                    if delimiter.is_empty() {
-                        return Err(MachineProblem::InvalidOperation);
-                    }
-                    if let Some(position) = find_bytes(&source, &delimiter) {
-                        source.truncate(position);
-                    }
-                }
-                index += 3;
-            }
-            value.extend(source);
-        }
-        let target_end = position(&args[into + 1..], "WITH")
-            .or_else(|| position(&args[into + 1..], "ON"))
-            .map(|offset| into + 1 + offset)
-            .unwrap_or(args.len());
-        let target = self.reference(&args[into + 1..target_end])?;
-        let pointer = position(args, "POINTER")
-            .and_then(|at| args.get(at + 1))
-            .cloned();
-        let start = pointer
-            .as_deref()
-            .map(|name| self.decimal(name))
-            .transpose()?
-            .map_or(1, |value| {
-                if value.scale == 0 {
-                    usize::try_from(value.coefficient).unwrap_or(0)
-                } else {
-                    0
-                }
-            });
-        if start == 0 {
-            return Err(MachineProblem::DataException);
-        }
-        let mut target_bytes = self.read_reference(&target)?;
-        let offset = start - 1;
-        let available = target_bytes.len().saturating_sub(offset);
-        let copied = available.min(value.len());
-        if copied > 0 {
-            target_bytes[offset..offset + copied].copy_from_slice(&value[..copied]);
-            self.write_reference(&target, &target_bytes)?;
-        }
-        if let Some(pointer) = pointer {
-            self.write_decimal(
-                &pointer,
-                Decimal {
-                    coefficient: i128::try_from(start.saturating_add(copied))
-                        .map_err(|_| MachineProblem::ResourceExhausted)?,
-                    scale: 0,
-                },
-            )?;
-        }
-        let overflow = offset > target_bytes.len() || copied < value.len();
-        Ok(overflow)
     }
     fn unstring_op(&mut self, args: &[String]) -> Result<bool, MachineProblem> {
         let into = position(args, "INTO").ok_or(MachineProblem::InvalidOperation)?;
