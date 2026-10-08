@@ -53,8 +53,8 @@ flowchart LR
 | `CV-209.mq-mechanical-layout` | Bounded mechanical layout complete; full MQ contract-lint pending | Final affected tests pass; strict lint fails with exactly 26 retained production diagnostics. Keep legacy import, decoder/initializer, provenance/lifecycle and fence/upgrade responsibilities pending under their owners |
 | `CV-209.journey-closure` | Closure authority and observation transport implemented | Full CardDemo refuses incomplete observations; do not infer workload acceptance from harness tests |
 | `CV-209.carddemo-transactions` | Selected date/duplicate comparisons and binding implemented | J06 AIX browse/navigation and all 105 issue acceptance requirements remain unbound; 20/20 journeys and 26/26 transaction closure remain pending |
-| `CV-209.postgres-parity-selection` | Twelve selectors and nonempty-pass checks wired | No live backend result; prepare and execute the existing twelve controls on the intended clean candidate through the existing lifecycle owner |
-| `CV-209.public-client-compatibility` | External input/startup feasibility only; API fixture preparation active | `--version` feasibility is not a job workload pass. Submit/query/files/content, authentication/ownership refusals and actual method/URI/status capture remain pending |
+| `CV-209.postgres-parity-selection` | Twelve selectors and nonempty-pass checks wired | No live backend result yet; the existing twelve-control execution is active on its clean candidate through the existing lifecycle owner |
+| `CV-209.public-client-compatibility` | External input/startup feasibility only; fixture plan prepared and command supervision active | `--version` feasibility is not a job workload pass. Submit/query/files/content, authentication/ownership refusals and actual method/URI/status capture remain pending |
 | `CV-209.test-floor` and integrated exit | Minimum 260-pass recorder wiring implemented; full exit pending | Count actually executed passing tests on the selected unchanged candidate; preserve every affected architecture/profile/schema/package/source/backend gate |
 | `CV-209.public-status-docs` | Current subsystem status and documentation reconciled | Preserve active preparation scope, exact pending gates and implemented sealer; retain raw outputs externally |
 | `CV-209.candidate-cleanliness` | Recorded command boundary validation complete | Existing recorder rejects tracked/untracked source changes before launching and at completion; ignored builds/external logs remain valid. This does not provide continuous source attestation |
@@ -159,3 +159,40 @@ relocated support files/individual dynamic libraries needed by pg_config/initdb/
 pg_ctl/postgres. Keep review/provenance failures and scoped source pins intact.
 Prepare the exact clean-candidate plan/command and finite supervisor/receipt/target
 retention for a later actual twelve-control gate; backend acceptance stays pending.
+
+### CV-209.command-supervision declaration
+
+Manager freezes the next dependency as bounded command supervision in the
+existing CI owner, before the live fixture. Exact implementation owners are
+`tools/ci_assurance.py`, `tools/tests/test_ci_assurance.py` and one unique
+`changes/unreleased/cv-209-command-supervision.toml` fragment. Preserve current
+clean-candidate boundaries, receipt schemas, test floors and ordinary callers.
+Add optional positive finite timeout/output limits and one reusable owned-process
+primitive for later client execution; no client launcher/input profile yet.
+
+Independently demonstrate silent/no-newline hangs, output saturation and owned
+descendant cleanup with small local Python controls before repair. Deadline,
+wait or teardown failure cannot pass or signal an unrelated process group.
+Bound both streams, retain actual partial bytes/exits and always reap the owned
+launcher; closed stdin and process ownership are explicit. No external client,
+server, job, Cargo, backend, whole campaign, pin/cache mutation or new ledger.
+Run the affected CI Python tests only; manager owns docs/generated/status/seal.
+
+### CV-209.postgres-parity execution declaration
+
+Manager accepts the qualified native PostgreSQL 18.6 preparation and grants one
+checkout-local Cargo sequence for the existing twelve parity controls on the
+clean twenty-two-seal candidate. Reuse tools/jenkins/postgres_parity.sh exclusively
+for init/start/reset/stop; retain host loader and absolute timezone qualifications.
+No repository edits, expectation changes, source/cache/pin mutation or replacement
+lifecycle manager. Prepared runtime inputs are external and zero credit until the
+actual controls execute. Backend results retain this precise producing candidate.
+
+Use fresh exclusive external run/receipt directories, reserved loopback port
+54209 after an availability check, jobs=2 and exact checkout target
+`target/cv209-postgres-parity`. A 45-minute outer process-group deadline retains
+actual timeout/failure; same-owner bounded cleanup always runs. Archive all
+actual logs, receipts, summary, invoked binaries and producing inputs before
+exact target and stopped database cleanup. Stop at the first actual failure
+without automatic retry or marking later gates run. This is twelve-control
+backend acceptance only, not full CardDemo/official/licensed/Foundation closure.
