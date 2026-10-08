@@ -543,8 +543,8 @@ candidates pass 30, four and eight focused Rust tests respectively on their
 joint manager input. Native offline schemas, coverage, spec, module, formatting,
 frozen dependency and diff checks pass. Strict lint of the tooling owner alone
 passes with `--no-deps`; dependency-inclusive lint remains failed on the separately
-recorded MQ/CICS prerequisites. These three slices remain pending integration
-seals and do not claim full dependency lint or Foundation acceptance. Locator
+recorded MQ/CICS prerequisites. The bounded-owner seals below record their
+acceptance and do not claim full dependency lint or Foundation acceptance. Locator
 membership preserves all 1,506 rows and existing zero-credit dispositions.
 
 ### MQ responsibility disposition
@@ -564,6 +564,27 @@ original/reply arguments, preserving identity, bytes and publication order.
 Request-byte and pending-reason provenance remain retained; no discarded reads
 or new refusal predicate is authorized as a lint repair. Strict MQ lint remains
 pending where genuine production roots have no authorized operational caller.
+
+### Focused conformance output scope
+
+Declare `CV-209.conformance-output` under CV-209. Owners are the existing focused
+xtask runners, shared canonical event/ledger output and a bounded private output
+adapter with its CLI/tests. Reuse `ConformanceRunReport` and its canonical owners;
+no alternate report schema, evidence ledger, verdict inference or success token
+is authorized. Prepare actual CLI/output regressions for dropped dataset/RACF
+reports, mixed JSON/diagnostic output and JCL's hardcoded destination. Review the
+explicit destination/default-stream policy and serialization/I/O failure behavior
+before implementation. No new IBM semantics or licensed campaign is required.
+
+### Common program policy preparation
+
+Declare `CV-208.common-program-policy` under CV-208. Owners are the existing
+batch common-program catalog/schema/generator and program control declarations.
+Prepare a typed generated representation of the current grammar policy, removing
+name-string policy dispatch without changing control acceptance or utility
+behavior. Manager must decide source-catalog compatibility before any schema
+change; no second registry, new parser framework, product hardcode exception or
+IBM command semantics is authorized. Preserve all current grammar/refusal tests.
 
 ### CV-202.serialized-schema-bindings acceptance
 
