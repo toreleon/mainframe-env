@@ -1758,7 +1758,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/coverage/foundation-status.md",
       "relative_links": 0,
-      "sha256": "sha256:54674bc1a3537fc16bc4288e076eab5cc6137abb3a102b0175d9595345141be7",
+      "sha256": "sha256:b39034b2e2702364c58d414351156cef24a1c54728003ae8f26b4370e4b74e05",
       "title": "Coverage and conformance — Coverage authority progress",
       "xtask_commands": 7
     },

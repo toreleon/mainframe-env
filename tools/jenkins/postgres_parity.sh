@@ -71,7 +71,6 @@ case "$state/" in
   *) echo "unsafe PostgreSQL parity state path: $state" >&2; exit 1 ;;
 esac
 data="$state/data"
-socket="$state/socket"
 log="$state/postgres.log"
 
 cleanup() {
@@ -97,7 +96,7 @@ for tool in initdb pg_ctl pg_isready createdb dropdb psql pg_config; do
 done
 share="$(postgres_share "$bin")"
 rm -rf "$state"
-mkdir -p "$data" "$socket"
+mkdir -p "$data"
 printf '%s\n' "$bin" > "$state/bin-path"
 trap cleanup EXIT INT TERM
 
@@ -105,7 +104,7 @@ trap cleanup EXIT INT TERM
   --auth-host=trust --encoding=UTF8 --no-locale --no-instructions >/dev/null
 port=$((54000 + ${BUILD_NUMBER:-0} % 1000))
 "$bin/pg_ctl" -D "$data" -l "$log" \
-  -o "-F -k $socket -p $port -h 127.0.0.1" start -w -t 30
+  -o "-F -k '' -p $port -h 127.0.0.1" start -w -t 30
 "$bin/pg_isready" -h 127.0.0.1 -p "$port" -U hardening -d postgres
 if [[ "$action" == smoke ]]; then
   "$bin/createdb" -h 127.0.0.1 -p "$port" -U hardening mainframe_env

@@ -42,7 +42,7 @@ flowchart LR
 | CV-206 | Installed typed batch controllers; duplicate-root and root-width admission repaired | Actual signed package/publication selection precedes participant effects; retain affected integration gates |
 | CV-207 | Provider-owned CICS/Db2/MQ source libraries; generated binding and materialization bounds repaired | Preserve ABI bytes, licensing and source identities; local source tests grant no licensed equivalence |
 | CV-208 | Generated official/custom routes and program registration; production scanner and typed common-program policy repaired | Preserve namespace and control ownership; generated registration does not establish execution coverage |
-| CV-209 | Bounded host/store/batch/execution/CICS/server/conformance lint repairs, host/MQ layout, test-floor wiring and canonical conformance output implemented | Full MQ lint, integrated executed-test floor, application closure, backend parity and live client gates remain pending |
+| CV-209 | Bounded host/store/batch/execution/CICS/server/conformance lint repairs, host/MQ layout, test-floor wiring and canonical conformance output implemented | Full MQ lint, integrated executed-test floor, application closure, global backend parity and live client gates remain pending |
 
 ## Current acceptance boundaries
 
@@ -53,7 +53,7 @@ flowchart LR
 | `CV-209.mq-mechanical-layout` | Bounded mechanical layout complete; full MQ contract-lint pending | Final affected tests pass; strict lint fails with exactly 26 retained production diagnostics. Keep legacy import, decoder/initializer, provenance/lifecycle and fence/upgrade responsibilities pending under their owners |
 | `CV-209.journey-closure` | Closure authority and observation transport implemented | Full CardDemo refuses incomplete observations; do not infer workload acceptance from harness tests |
 | `CV-209.carddemo-transactions` | Selected date/duplicate comparisons and binding implemented | J06 AIX browse/navigation and all 105 issue acceptance requirements remain unbound; 20/20 journeys and 26/26 transaction closure remain pending |
-| `CV-209.postgres-parity-selection` | Twelve selectors and nonempty-pass checks wired | No live backend result yet; the existing twelve-control execution is active on its clean candidate through the existing lifecycle owner |
+| `CV-209.postgres-parity-selection` / `CV-209.postgres-loopback-owner` | All twelve existing live controls passed on the qualified source-equivalent producer | TCP-only startup removes an unused Unix socket path limit. Host loader/timezone differences, retained cleanup failures and one defunct PID-1 child remain qualified; this is no global backend or full CardDemo closure |
 | `CV-209.public-client-compatibility` | External input/startup feasibility only; fixture plan prepared and command supervision active | `--version` feasibility is not a job workload pass. Submit/query/files/content, authentication/ownership refusals and actual method/URI/status capture remain pending |
 | `CV-209.test-floor` and integrated exit | Minimum 260-pass recorder wiring implemented; full exit pending | Count actually executed passing tests on the selected unchanged candidate; preserve every affected architecture/profile/schema/package/source/backend gate |
 | `CV-209.public-status-docs` | Current subsystem status and documentation reconciled | Preserve active preparation scope, exact pending gates and implemented sealer; retain raw outputs externally |
@@ -86,8 +86,9 @@ its applicable isolation, backup/restore and restart controls. The selected
 transaction repair supplies only its observed date/duplicate scope. Same-process
 SQLite reopen is not a fresh-process crash/recovery control.
 
-All twelve live PostgreSQL parity controls and the finite authenticated public
-client workload remain pending. Optional Zowe and Node inputs stay outside Git
+The selected twelve live PostgreSQL controls passed on their retained producer;
+global backend acceptance and the finite authenticated public client workload
+remain pending. Optional Zowe and Node inputs stay outside Git
 and the production sandbox image. Query status is not named-status-route
 coverage; lookup refusal is not direct spool 403 coverage; selected SYSPRINT
 content is not complete DD inventory or official z/OSMF profile parity.
@@ -119,8 +120,8 @@ implemented `cargo xtask work-package-seal` owner for exact changed-path
 allowlists and generated commit trailers/digests; its `--check` validates the
 seal. A seal does not create product execution credit. Raw results stay outside
 Git; do not hand-hash a replacement seal or create another controller ledger.
-The next step is the existing external-only client and PostgreSQL preparation below;
-their execution and implementation require the manager's subsequent grant.
+The next dependencies are reviewed command supervision, bounded navigation and
+the finite public client fixture under their explicit manager grants below.
 
 ### CV-209.public-client-compatibility preparation declaration
 
@@ -146,20 +147,6 @@ server/job/client execution, new pins/downloads, CI input mutation or acceptance
 status. Hand off the smallest exact owner plan, source-independent assertions,
 regressions and supervisor lifecycle to the manager for implementation grant.
 
-### CV-209.postgres-parity runtime preparation declaration
-
-Manager authorizes external-only preparation of the exact PostgreSQL 18.6 input
-for the existing twelve-gate parity owner. Inspect retained image/native inputs
-and existing tools/jenkins/postgres_parity.sh; reuse its lifecycle/reset/cleanup.
-No repository edits, database/server/test campaign, new lifecycle manager, Cargo,
-package install/download or input-lock changes. The retained image may be inspected
-and safely copied from an owned stopped container into external scratch, with
-container cleanup; no daemon/host security changes. Verify exact version and
-relocated support files/individual dynamic libraries needed by pg_config/initdb/
-pg_ctl/postgres. Keep review/provenance failures and scoped source pins intact.
-Prepare the exact clean-candidate plan/command and finite supervisor/receipt/target
-retention for a later actual twelve-control gate; backend acceptance stays pending.
-
 ### CV-209.command-supervision declaration
 
 Manager freezes the next dependency as bounded command supervision in the
@@ -178,21 +165,75 @@ launcher; closed stdin and process ownership are explicit. No external client,
 server, job, Cargo, backend, whole campaign, pin/cache mutation or new ledger.
 Run the affected CI Python tests only; manager owns docs/generated/status/seal.
 
-### CV-209.postgres-parity execution declaration
+### CV-209.carddemo-transaction-navigation preparation declaration
 
-Manager accepts the qualified native PostgreSQL 18.6 preparation and grants one
-checkout-local Cargo sequence for the existing twelve parity controls on the
-clean twenty-two-seal candidate. Reuse tools/jenkins/postgres_parity.sh exclusively
-for init/start/reset/stop; retain host loader and absolute timezone qualifications.
-No repository edits, expectation changes, source/cache/pin mutation or replacement
-lifecycle manager. Prepared runtime inputs are external and zero credit until the
-actual controls execute. Backend results retain this precise producing candidate.
+Manager authorizes source-only preparation of the next J06 transaction AIX
+browse and screen-navigation comparisons, after the accepted date/duplicate
+slice. Reuse the preserved corpus, source closure and actual comparisons;
+inspect the real COTRN00C/COTRN01C/COTRN02C CSD/maps/copybooks and current
+private fixture owners. Freeze literal independent browse order/identity/bytes,
+real menu/detail/back navigation and unchanged state/teardown requirements.
+Do not infer tokens from a declared manifest or issue a full closure receipt.
 
-Use fresh exclusive external run/receipt directories, reserved loopback port
-54209 after an availability check, jobs=2 and exact checkout target
-`target/cv209-postgres-parity`. A 45-minute outer process-group deadline retains
-actual timeout/failure; same-owner bounded cleanup always runs. Archive all
-actual logs, receipts, summary, invoked binaries and producing inputs before
-exact target and stopped database cleanup. Stop at the first actual failure
-without automatic retry or marking later gates run. This is twelve-control
-backend acceptance only, not full CardDemo/official/licensed/Foundation closure.
+No repository edit, Cargo, compilation, server/job/native route workload, source
+refresh/re-pin or campaign is granted. Perform only needed offline pinned-source
+lookup; unavailable bodies remain skipped/zero without repeat requests. Exclude
+all private/licensed work and the three unready CICS rows. Hand off the smallest
+exact owner allowlist and independently failing control plan before a later
+implementation grant. Preserve prior eighteen-control producing receipts.
+
+### Command-supervision review correction declaration
+
+Before sealing, manager grants correction of two reviewed defects under the same
+three-path allowlist: pre-launch refusal must not bind a previous invocation's
+log, and process-group authority must not outlive its launched leader's identity.
+Retain the leader without reaping until all owned-group signalling is finished;
+fail before launch where the required non-reaping observation is unavailable.
+Never probe or signal a numeric PGID after the ownership fence is released.
+Preserve actual partial output and prior sixty-eight-control receipts. Add genuine
+focused red controls for stale logs and ownership lifetime, then affected Python
+validation only. Disposition Linux-native orphan controls honestly; unavailable
+platform controls earn no credit. No client/Cargo/backend or schema change.
+
+### CV-209.carddemo-transaction-navigation implementation declaration
+
+Manager accepts the source-only eight-path plan and sixteen independent controls.
+Grant selected six-primary/five-map compilation and bounded terminal navigation,
+plus separately uncredited physical AIX probes through the existing dataset API.
+Keep the sealed date fixture's original two-row bound and eighteen controls.
+Register private navigation owners under the exact proposed allowlist; manager
+owns the facade ratchet, generated files, status and seal. New production modules
+remain below 1,200 lines, without a harness DSL or provider ownership extension.
+
+Use the independently frozen twelve raw rows, complete fields/identities/versions
+and source menu/CSD/map semantics. No retargeted TRANSACT alias, application edit,
+manifest weakening or AIX application token: the real CT00/CT01 browse the primary
+KSDS. The physical AIX probes cannot close that application requirement. Preserve
+the pinned ENDFILE RESP2 qualification and keep official credit pending.
+
+Run only the sixteen-control selector on a checkout-local task target, jobs=2,
+with retained initial prerequisites, actual binary/input identities, captures and
+bounded shutdown. Stop on any genuine compilation, route, PF7 or provider defect;
+report the source-bound red before requesting a different owner scope. A missing
+screen-navigation observation is a behavioral red only after all comparisons
+pass. Only then bind that one token through the existing observation owner and
+rerun affected controls. No full CardDemo, issue credit, private/licensed work,
+cache refresh, provider implementation or automatic prerequisite retry is granted.
+
+### CV-209.postgres-loopback-owner acceptance
+
+Status: **Complete (selected twelve-control live parity)**. The existing lifecycle
+owner now disables its unused Unix socket and retains TCP loopback, allowing the
+actual long workspace to start without a socket-path workaround. All twelve
+unchanged controls passed with one actual passing test each and zero ignored
+tests on their clean producer. Producing runtime/test/tool/source bytes match the
+integrated slice; raw candidate identities remain with the original receipts.
+The CardDemo restart control is synthetic and does not close the public corpus.
+
+Both earlier setup failures remain not-run, not accepted. PostgreSQL 18.6 used
+qualified retained native inputs: host loader and absolute timezone differences
+remain explicit. Database/port/task target were removed after artifact retention;
+Cargo clean failed before validated exact-target removal, and one terminated
+PostgreSQL child remains defunct under PID 1. No live owned executable/listener
+remains, but all-PIDs-absent is false. This bounded pass does not establish full
+Foundation, global backend, application, official or licensed acceptance.
