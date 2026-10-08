@@ -752,3 +752,87 @@ GitHub releases, tags, crate version management, signed release artifacts or
 committed evidence receipts. No Cargo, command campaign or repository mutation
 is authorized during preparation. Manager must review candidate/dirty-input
 binding, exact command scope and fail-closed status before implementation.
+
+### Package-state unsigned generation boundary
+
+The actual state-schema reproduction ran 13 tests: seven passed, six failed.
+The prepared repair then passed 12 tests but the unchanged scalar-bound family
+revealed nested package generation overflow was still structurally admitted.
+Manager rejects a repeated installer-local generation definition. Expand only
+`CV-202.package-state-schema` to add the u64 maximum to the shared package
+schema's existing generation property, alongside actual fixed maximum/overflow
+controls. No DTO, version/domain, identity or runtime admission changes. The
+initial and intermediate failures remain separate; rerun the same 13 tests only
+after this exact shared-authority repair. Native final binding must register
+package plus IMS resources for the existing installer reference. No other
+package grammar change is authorized.
+
+### Common program typed pairing review
+
+Manager review found that the proposed builtin branch returns a policy before
+decoding its execution role. Native @1 permits individually valid but mismatched
+builtin/execution pairs. Before sealing `CV-208.common-program-policy`, add
+actual renderer refusal regressions for the two directions and then validate
+the finite typed association (Idcams with Idcams; other existing builtins with
+ProgramService), independent of program names. No source fields/versions or
+existing runtime behavior change. One focused generator-only Cargo sequence
+is approved, retaining initial assertion failures and old unchanged controls;
+repeat only changed owner checks and clean the exact target afterward.
+
+### Server contract lint preparation
+
+Manager declares `CV-209.server-contract-lint`, parent CV-209, consuming the
+sealed host/controller/identity/CICS prerequisites. The actual strict server
+owner receipt from package-state validation reports existing MQI/replay/instance
+mechanical diagnostics, independent of its new schema tests. Review those exact
+blocks in a new isolated checkout without Cargo, preserving all public/durable
+contracts, algorithms, evaluation order and independent expectations. Private
+RootEntry indirection is permitted without a total-heap claim; proven unused
+test imports, equivalent assertion spelling, private aliases/borrows and nested
+test-module cleanup are permitted. Inventory exact selector bindings before
+any test module rename. No dormant responsibility deletion, cfg suppression,
+new native/private feature or cache lookup is authorized. A later focused Cargo
+grant is required before validation, integration and sealing.
+
+### CardDemo transaction observation preparation
+
+Manager declares `CV-209.carddemo-transactions`, parent CV-209, consuming sealed
+journey closure be9c9e70 and identity 8124e3a6. Prepare independently expected
+real installed CardDemo terminal transaction date-validation and duplicate
+condition cases for CD.J06 using the actual pinned public repository, existing
+program/map/dataset owners and transient observation transport. No Cargo or
+workload execution yet. Inventory only these known missing cases and their
+actual compiled dependencies; do not re-audit the entire corpus. No synthetic
+condition may substitute for execution; a missing source/runtime dependency
+stays explicit. Do not weaken existing assertions, expected requirements or
+full closure, and do not implement future/private IBM semantics to obtain credit.
+A later manager grant must authorize exact harness paths and the real-run scope.
+
+### Focused conformance output execution grant
+
+The prepared six-path adapter/test candidate is approved for one focused Cargo
+sequence after consuming 63bc1118 and the framing/CICS/closure seals. Preserve
+the old six-failure/four-control receipts; execute the 18 declared unit and 14
+real CLI tests and record actual selections, including failure-report and
+refusal controls. Fix compile/setup defects without weakening expectations.
+Run strict xtask owner lint with --no-deps, formatting, frozen dependency policy,
+module and diff checks; known dependency-inclusive failures remain pending and
+are not retried or waived. Retain the producing binary, source hashes and output
+externally, then clean only the exact task target. No aggregate/full workspace,
+CardDemo, backend, licensed or source campaign is authorized by this grant.
+
+### CV-208.common-program-policy acceptance
+
+Status: **Complete (typed existing program policy only)**. The existing frozen
+@1 source retains 21 roles and emits typed control declarations in the same
+14 utility entries and two nested TSO actions. Runtime admission preserves all
+control tokens, data DD behavior, ordering and grammar delegates. Coherent
+unknown-role, extra-field, production-name-dispatch and mismatched typed-pair
+regressions fail on the old owner and pass after repair. Nine generator tests
+pass on the integrated candidate; 28 unchanged program controls and one JES
+refusal control pass in their producing scope. Catalog, schema and generated
+output remain unchanged by the pairing follow-up. Joint metadata/schema/spec/
+coverage/program-registry, module, formatting, frozen dependency policy, docs
+and diff gates pass. Strict tooling-owner lint passes; dependency-inclusive MQ
+and separate server lint remain pending. This grants no official/generated
+execution, licensed or Foundation/public exit credit. Source skips remain zero.

@@ -19,6 +19,21 @@ pub(crate) enum TsoProgramExecution {
     Extract,
 }
 
+impl TsoProgramExecution {
+    pub(super) fn control_declaration(self) -> super::ControlDeclaration {
+        match self {
+            Self::ExecuteScript => super::ControlDeclaration {
+                sources: &["SYSTSIN", "SYSIN"],
+                grammar: super::ControlGrammar::Tso,
+            },
+            Self::Extract => super::ControlDeclaration {
+                sources: &["SYSTSIN", "SYSIN"],
+                grammar: super::ControlGrammar::Tso,
+            },
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SystemServiceProgram {
     Cee3abd,
@@ -36,84 +51,148 @@ pub(crate) static COMMON_PROGRAMS: &[super::CommonProgramEntry] = &[
         disposition: super::UtilityDisposition::ImsController,
         execution: super::ProgramExecution::ImsController,
         builtin: None,
+        control: super::ControlDeclaration {
+            sources: &["PARM", "SYSIN"],
+            grammar: super::ControlGrammar::Ims,
+        },
     },
     super::CommonProgramEntry {
         name: "FTP",
         disposition: super::UtilityDisposition::NetworkFtp,
         execution: super::ProgramExecution::Unsupported,
         builtin: None,
+        control: super::ControlDeclaration {
+            sources: &[],
+            grammar: super::ControlGrammar::Unavailable,
+        },
     },
     super::CommonProgramEntry {
         name: "IEBCOMPR",
         disposition: super::UtilityDisposition::Implemented,
         execution: super::ProgramExecution::ProgramService,
         builtin: Some(BuiltinProgram::Iebcompr),
+        control: super::ControlDeclaration {
+            sources: &["SYSIN"],
+            grammar: super::ControlGrammar::ReadsNone,
+        },
     },
     super::CommonProgramEntry {
         name: "IEBCOPY",
         disposition: super::UtilityDisposition::Implemented,
         execution: super::ProgramExecution::ProgramService,
         builtin: Some(BuiltinProgram::Iebcopy),
+        control: super::ControlDeclaration {
+            sources: &["SYSIN"],
+            grammar: super::ControlGrammar::Cards(&[("COPY", &["INDD", "OUTDD"])]),
+        },
     },
     super::CommonProgramEntry {
         name: "IEBDG",
         disposition: super::UtilityDisposition::Implemented,
         execution: super::ProgramExecution::ProgramService,
         builtin: Some(BuiltinProgram::Iebdg),
+        control: super::ControlDeclaration {
+            sources: &["SYSIN"],
+            grammar: super::ControlGrammar::Cards(&[
+                ("DSD", &["OUTPUT"]),
+                ("FD", &["NAME", "LENGTH", "VALUE"]),
+                ("CREATE", &["QUANTITY", "RECORDS", "LENGTH", "VALUE"]),
+                ("END", &[]),
+            ]),
+        },
     },
     super::CommonProgramEntry {
         name: "IEBEDIT",
         disposition: super::UtilityDisposition::Implemented,
         execution: super::ProgramExecution::ProgramService,
         builtin: Some(BuiltinProgram::Iebedit),
+        control: super::ControlDeclaration {
+            sources: &["SYSIN"],
+            grammar: super::ControlGrammar::Cards(&[(
+                "EDIT",
+                &["START", "STOP", "END", "STEPNAME"],
+            )]),
+        },
     },
     super::CommonProgramEntry {
         name: "IEBGENER",
         disposition: super::UtilityDisposition::Implemented,
         execution: super::ProgramExecution::ProgramService,
         builtin: Some(BuiltinProgram::Iebgener),
+        control: super::ControlDeclaration {
+            sources: &["SYSIN"],
+            grammar: super::ControlGrammar::ReadsNone,
+        },
     },
     super::CommonProgramEntry {
         name: "IEBUPDTE",
         disposition: super::UtilityDisposition::Implemented,
         execution: super::ProgramExecution::ProgramService,
         builtin: Some(BuiltinProgram::Iebupdte),
+        control: super::ControlDeclaration {
+            sources: &["SYSIN"],
+            grammar: super::ControlGrammar::UpdateCards,
+        },
     },
     super::CommonProgramEntry {
         name: "IEFBR14",
         disposition: super::UtilityDisposition::Implemented,
         execution: super::ProgramExecution::ProgramService,
         builtin: Some(BuiltinProgram::Iefbr14),
+        control: super::ControlDeclaration {
+            sources: &[],
+            grammar: super::ControlGrammar::IgnoreInput,
+        },
     },
     super::CommonProgramEntry {
         name: "IDCAMS",
         disposition: super::UtilityDisposition::Implemented,
         execution: super::ProgramExecution::Idcams,
         builtin: Some(BuiltinProgram::Idcams),
+        control: super::ControlDeclaration {
+            sources: &["SYSIN", "PARM"],
+            grammar: super::ControlGrammar::Idcams,
+        },
     },
     super::CommonProgramEntry {
         name: "IKJEFT01",
         disposition: super::UtilityDisposition::Db2Tso,
         execution: super::ProgramExecution::Db2Tso,
         builtin: None,
+        control: super::ControlDeclaration {
+            sources: &["SYSTSIN", "SYSIN"],
+            grammar: super::ControlGrammar::Tso,
+        },
     },
     super::CommonProgramEntry {
         name: "IKJEFT1B",
         disposition: super::UtilityDisposition::ReportRexx,
         execution: super::ProgramExecution::Unsupported,
         builtin: None,
+        control: super::ControlDeclaration {
+            sources: &[],
+            grammar: super::ControlGrammar::Unavailable,
+        },
     },
     super::CommonProgramEntry {
         name: "SDSF",
         disposition: super::UtilityDisposition::CicsFileControl,
         execution: super::ProgramExecution::Sdsf,
         builtin: None,
+        control: super::ControlDeclaration {
+            sources: &["ISFIN"],
+            grammar: super::ControlGrammar::Sdsf,
+        },
     },
     super::CommonProgramEntry {
         name: "SORT",
         disposition: super::UtilityDisposition::Implemented,
         execution: super::ProgramExecution::ProgramService,
         builtin: Some(BuiltinProgram::Sort),
+        control: super::ControlDeclaration {
+            sources: &["SYSIN", "SYMNAMES"],
+            grammar: super::ControlGrammar::Sort,
+        },
     },
 ];
 

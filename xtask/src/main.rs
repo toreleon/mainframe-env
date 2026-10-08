@@ -12,6 +12,7 @@ mod carddemo_serve;
 mod changelog;
 mod cics_system_families;
 mod cobol_differential;
+mod common_program_policy;
 mod conformance_catalog;
 mod conformance_spec_export;
 mod coverage_projection;
@@ -9398,11 +9399,20 @@ fn check_program_registry(root: &Path) -> TaskResult {
         fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))? == expected,
         "common program registry is stale; run cargo xtask program-registry",
     )?;
-    let implementation = read(&root.join("crates/apps/mainframe-env-batch/src/program.rs"))?;
+    let sources = production_scanner::read_sources(
+        root,
+        &[
+            root.join("crates/apps/mainframe-env-batch/src/program.rs"),
+            root.join("crates/apps/mainframe-env-batch/src/service.rs"),
+        ],
+    )?;
+    let implementation = &sources[0];
     for forbidden in [
         "match program.to_ascii_uppercase().as_str()",
         "for name in [",
         "match self.0 {",
+        "match program {",
+        "program == \"",
     ] {
         require(
             !implementation.contains(forbidden),
@@ -9420,7 +9430,7 @@ fn check_program_registry(root: &Path) -> TaskResult {
             &format!("batch program registry integration omits {required}"),
         )?;
     }
-    let service = read(&root.join("crates/apps/mainframe-env-batch/src/service.rs"))?;
+    let service = &sources[1];
     let execution_region = service
         .split("let input = ProgramInput")
         .nth(1)
@@ -9454,6 +9464,9 @@ fn check_program_registry(root: &Path) -> TaskResult {
 fn render_program_registry(root: &Path) -> TaskResult<Vec<u8>> {
     let catalog_path = root.join("conformance/subsystems/coverage/programs/common-programs.json");
     let catalog = json(&catalog_path)?;
+    let schema_path =
+        root.join("conformance/subsystems/coverage/schemas/common-program-catalog.schema.json");
+    validate_schema_instance(&json(&schema_path)?, &catalog, &catalog_path)?;
     require(
         catalog["schema_version"] == Value::String("mainframe-env.common-program-catalog@1".into())
             && catalog["target_subsystem"] == Value::String("coverage.foundation".into())
@@ -9513,6 +9526,7 @@ fn render_program_registry(root: &Path) -> TaskResult<Vec<u8>> {
             &format!("common program {name} disposition or execution is invalid"),
         )?;
         if let Some(builtin) = program["builtin"].as_str() {
+            common_program_policy::ControlPolicy::utility(program, &catalog_path)?;
             require(
                 disposition == Some("implemented")
                     && matches!(execution, "program-service" | "idcams")
@@ -9527,6 +9541,7 @@ fn render_program_registry(root: &Path) -> TaskResult<Vec<u8>> {
             )?;
         }
         if let Some(action) = program["tso_action"].as_str() {
+            common_program_policy::ControlPolicy::tso(action)?;
             require(
                 disposition.is_none()
                     && execution == "unsupported"
@@ -9585,6 +9600,22 @@ fn render_program_registry(root: &Path) -> TaskResult<Vec<u8>> {
         source.push_str(&format!("    {variant},\n"));
     }
     source.push_str("}\n\n");
+    source.push_str("impl TsoProgramExecution {\n");
+    source.push_str("    pub(super) fn control_declaration(self) -> super::ControlDeclaration {\n");
+    source.push_str("        match self {\n");
+    for program in programs {
+        if let Some(action) = program["tso_action"].as_str() {
+            let variant = rust_variant(action)?;
+            if tso_variants.contains(&variant) {
+                source.push_str(&format!("            Self::{variant} => "));
+                common_program_policy::ControlPolicy::tso(action)?
+                    .render(&mut source, "            ");
+                source.push_str(",\n");
+                tso_variants.retain(|value| *value != variant);
+            }
+        }
+    }
+    source.push_str("        }\n    }\n}\n\n");
     system_service_variants.sort();
     source.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
     source.push_str("pub enum SystemServiceProgram {\n");
@@ -9621,6 +9652,10 @@ fn render_program_registry(root: &Path) -> TaskResult<Vec<u8>> {
             "        execution: super::ProgramExecution::{execution},\n"
         ));
         source.push_str(&format!("        builtin: {builtin},\n"));
+        source.push_str("        control: ");
+        common_program_policy::ControlPolicy::utility(program, &catalog_path)?
+            .render(&mut source, "        ");
+        source.push_str(",\n");
         source.push_str("    },\n");
     }
     source.push_str("];\n");
@@ -11540,4 +11575,250 @@ fn runtime_server_sqlite_smoke(root: &Path, binary: &Path) -> TaskResult {
             .map_err(|error| format!("{}: {error}", directory.display()))?;
     }
     result
+}
+#[cfg(test)]
+mod common_program_policy_tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    const CATALOG: &str = "conformance/subsystems/coverage/programs/common-programs.json";
+    const PROGRAM: &str = "crates/apps/mainframe-env-batch/src/program.rs";
+    const GENERATED: &str = "crates/apps/mainframe-env-batch/src/generated/common_programs.rs";
+    const SCHEMA: &str =
+        "conformance/subsystems/coverage/schemas/common-program-catalog.schema.json";
+
+    struct Fixture {
+        root: PathBuf,
+    }
+
+    impl Fixture {
+        fn new() -> Self {
+            let source = repository_root().unwrap();
+            let nonce = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let root =
+                env::temp_dir().join(format!("common-policy-{}-{nonce}", std::process::id()));
+            for relative in [
+                CATALOG,
+                SCHEMA,
+                PROGRAM,
+                "crates/apps/mainframe-env-batch/src/service.rs",
+                "conformance/subsystems/coverage/inventory/contracts.json",
+                "docs/architecture/PROGRAM-AND-ROUTE-REGISTRIES.md",
+                "tools/check_typed_semantic_boundaries.py",
+            ] {
+                let target = root.join(relative);
+                fs::create_dir_all(target.parent().unwrap()).unwrap();
+                fs::copy(source.join(relative), target).unwrap();
+            }
+            let fixture = Self { root };
+            fixture.regenerate();
+            fixture
+        }
+        fn regenerate(&self) {
+            let generated = render_program_registry(&self.root).unwrap();
+            let path = self.root.join(GENERATED);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, generated).unwrap();
+        }
+        fn mutate(&self, mutate: impl FnOnce(&mut Value)) {
+            let path = self.root.join(CATALOG);
+            let mut catalog = json(&path).unwrap();
+            mutate(&mut catalog);
+            assert_eq!(catalog["programs"].as_array().unwrap().len(), 21);
+            assert_eq!(catalog["generated_coverage_credit"], 0);
+            fs::write(path, serde_json::to_vec_pretty(&catalog).unwrap()).unwrap();
+        }
+        fn append_program_source(&self, extra: &str) {
+            let path = self.root.join(PROGRAM);
+            let original = read(&path).unwrap();
+            fs::write(path, format!("{original}\n{extra}\n")).unwrap();
+        }
+    }
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
+
+    #[test]
+    fn common_program_policy_actual_registry_control_is_current_and_deterministic() {
+        let fixture = Fixture::new();
+        let first = render_program_registry(&fixture.root).unwrap();
+        assert_eq!(render_program_registry(&fixture.root).unwrap(), first);
+        assert_eq!(fs::read(fixture.root.join(GENERATED)).unwrap(), first);
+        check_program_registry(&fixture.root).unwrap();
+    }
+
+    #[test]
+    fn common_program_policy_actual_registry_rejects_production_name_policy() {
+        let fixture = Fixture::new();
+        fixture.append_program_source(
+            "fn cv208_policy_mutant(program: &str) -> bool {\n\
+             match program { \"IEBCOPY\" => true, _ => false }\n}",
+        );
+        // Generated bytes/digest remain coherent; no stale-output refusal may count.
+        assert_eq!(
+            render_program_registry(&fixture.root).unwrap(),
+            fs::read(fixture.root.join(GENERATED)).unwrap()
+        );
+        let refusal = check_program_registry(&fixture.root);
+        assert!(
+            refusal.is_err(),
+            "handwritten production control policy passed: {refusal:?}"
+        );
+        assert!(
+            refusal.unwrap_err().contains("dispatch"),
+            "the declared policy boundary, not unrelated metadata, must refuse"
+        );
+    }
+
+    #[test]
+    fn common_program_policy_actual_registry_keeps_independent_test_expectations() {
+        let fixture = Fixture::new();
+        fixture.append_program_source(
+            "#[cfg(test)] mod cv208_expected_route {\n\
+             fn literal_expectation(program: &str) -> bool {\n\
+             match program { \"IEBCOPY\" => true, _ => false }\n}}\n\
+             fn cv208_production_tail() -> bool { true }\n",
+        );
+        // Reuse the sealed production scanner; literal test expectations are legitimate.
+        check_program_registry(&fixture.root).unwrap();
+    }
+
+    #[test]
+    fn common_program_policy_generator_refuses_unbound_builtin_in_one_utility() {
+        let fixture = Fixture::new();
+        fixture.mutate(|catalog| {
+            let row = catalog["programs"]
+                .as_array_mut()
+                .unwrap()
+                .iter_mut()
+                .find(|row| row["name"] == "IEBCOPY")
+                .unwrap();
+            row["builtin"] = json!("cv208_unknown");
+        });
+        // Count, names, lower-case spelling and unique builtin cardinality remain valid.
+        // A policyless identity must be refused by the owner before Rust compilation.
+        let rendered = render_program_registry(&fixture.root);
+        assert!(rendered.is_err(), "unbound builtin generated successfully");
+    }
+
+    #[test]
+    fn common_program_policy_frozen_v1_does_not_silently_accept_new_policy_fields() {
+        let fixture = Fixture::new();
+        fixture.mutate(|catalog| {
+            let row = catalog["programs"]
+                .as_array_mut()
+                .unwrap()
+                .iter_mut()
+                .find(|row| row["name"] == "IEBCOPY")
+                .unwrap();
+            row["control"] = json!({"grammar":"ignore-input","sources":[]});
+        });
+        let schema = json(&fixture.root.join(SCHEMA)).unwrap();
+        let catalog = json(&fixture.root.join(CATALOG)).unwrap();
+        let compiled = compile_draft_2020_12_schema(&schema, &fixture.root.join(SCHEMA)).unwrap();
+        assert!(
+            !compiled.is_valid(&catalog),
+            "frozen @1 unexpectedly permits policy fields"
+        );
+        assert!(
+            render_program_registry(&fixture.root).is_err(),
+            "generator silently ignored a schema-invalid @1 policy override"
+        );
+    }
+
+    #[test]
+    fn common_program_policy_generator_keeps_missing_utility_binding_refusal() {
+        let fixture = Fixture::new();
+        fixture.mutate(|catalog| {
+            let row = catalog["programs"]
+                .as_array_mut()
+                .unwrap()
+                .iter_mut()
+                .find(|row| row["name"] == "IEBCOPY")
+                .unwrap();
+            row["builtin"] = Value::Null;
+        });
+        assert!(render_program_registry(&fixture.root).is_err());
+    }
+
+    #[test]
+    fn common_program_policy_generator_keeps_missing_nested_tso_binding_refusal() {
+        let fixture = Fixture::new();
+        fixture.mutate(|catalog| {
+            let row = catalog["programs"]
+                .as_array_mut()
+                .unwrap()
+                .iter_mut()
+                .find(|row| row["name"] == "DSNTIAD")
+                .unwrap();
+            row["tso_action"] = Value::Null;
+        });
+        assert!(render_program_registry(&fixture.root).is_err());
+    }
+
+    #[test]
+    fn common_program_policy_pairing_refuses_idcams_builtin_with_program_service() {
+        let fixture = Fixture::new();
+        fixture.mutate(|catalog| {
+            let row = catalog["programs"]
+                .as_array_mut()
+                .unwrap()
+                .iter_mut()
+                .find(|row| row["name"] == "IDCAMS")
+                .unwrap();
+            assert_eq!(row["builtin"], "idcams");
+            assert_eq!(row["execution"], "idcams");
+            row["execution"] = json!("program-service");
+        });
+        let schema = json(&fixture.root.join(SCHEMA)).unwrap();
+        let catalog = json(&fixture.root.join(CATALOG)).unwrap();
+        validate_schema_instance(&schema, &catalog, &fixture.root.join(CATALOG)).unwrap();
+        let rendered = render_program_registry(&fixture.root);
+        assert!(
+            rendered.is_err(),
+            "native-valid Idcams builtin with ProgramService execution generated successfully"
+        );
+        assert!(rendered.unwrap_err().contains("builtin/execution pairing"));
+    }
+
+    #[test]
+    fn common_program_policy_pairing_refuses_other_builtins_with_idcams() {
+        for (name, builtin) in [
+            ("IEBCOMPR", "iebcompr"),
+            ("IEBCOPY", "iebcopy"),
+            ("IEBDG", "iebdg"),
+            ("IEBEDIT", "iebedit"),
+            ("IEBGENER", "iebgener"),
+            ("IEBUPDTE", "iebupdte"),
+            ("IEFBR14", "iefbr14"),
+            ("SORT", "sort"),
+        ] {
+            let fixture = Fixture::new();
+            fixture.mutate(|catalog| {
+                let row = catalog["programs"]
+                    .as_array_mut()
+                    .unwrap()
+                    .iter_mut()
+                    .find(|row| row["name"] == name)
+                    .unwrap();
+                assert_eq!(row["builtin"], builtin);
+                assert_eq!(row["execution"], "program-service");
+                row["execution"] = json!("idcams");
+            });
+            let schema = json(&fixture.root.join(SCHEMA)).unwrap();
+            let catalog = json(&fixture.root.join(CATALOG)).unwrap();
+            validate_schema_instance(&schema, &catalog, &fixture.root.join(CATALOG)).unwrap();
+            let rendered = render_program_registry(&fixture.root);
+            assert!(
+                rendered.is_err(),
+                "native-valid {builtin} builtin with Idcams execution generated successfully"
+            );
+            assert!(rendered.unwrap_err().contains("builtin/execution pairing"));
+        }
+    }
 }
