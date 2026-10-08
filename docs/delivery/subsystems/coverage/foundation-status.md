@@ -322,3 +322,9 @@ checks that need the missing supplemental bodies. Their result remains
 or fabricated pass is permitted. Continue independent public implementation
 and applicable available-input gates. Do not retry the unchanged missing-cache
 checks or request the same cache again.
+
+The manager extends `CV-209.journey-closure` to read and bind the existing
+`carddemo-gap-matrix.json` issue denominator (CD-001 through CD-026). No new
+issue ledger or changed expectation is allowed. Unobserved required behaviors,
+including process restart rather than same-process reopen, must remain pending
+and cause full closure to refuse until real observations are implemented.
