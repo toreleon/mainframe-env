@@ -156,7 +156,7 @@ Public methods, error vocabulary and persisted representation are unchanged.
 First-snapshot official membership still comes from the catalog/compiler owner.
 Current integrated spec/coverage, strict lint, formatting and dependency checks
 pass. The module extraction below resolves the facade gate without raising a
-ceiling. Required documentation/changelog/subsystem checks precede sealing;
+ceiling. Required documentation/changelog/subsystem checks and the completion seal pass;
 this closes no Foundation exit or licensed gate.
 
 ### CV-209.store-contract-lint
@@ -176,12 +176,12 @@ The manager integrated only reviewed owned files and isolated fragments from the
 worker checkouts. Source-file hashes and producing-base identities remain in
 external handoffs; those results are not relabeled as integrated receipts.
 
-| Slice | Executed focused result | Remaining integration requirement |
+| Slice | Executed focused result | Accepted scope and remaining parent requirement |
 |---|---|---|
-| `CV-205.catalog-generation` | Original failures reproduced on Memory/file-backed SQLite; 12 new and six existing regressions pass | Integrated dependency-inclusive Clippy and 12 catalog regressions pass; metadata gates and seal pending. Adapter reopen is not process-crash proof |
-| `CV-204.generation-selection` | Seven original failures/two positive controls; all 24 package tests and owned-package Clippy pass | Integrated dependency-inclusive Clippy and all 24 installer tests pass; metadata gates and seal pending; signatures/identity domains unchanged |
-| `CV-207.materialization-bounds` | Both original aggregate-bound failures reproduced; 10 ABI and all 16 source-package tests, strict Clippy pass | Integrated ABI owner and strict Clippy pass; metadata gates and seal pending; source bytes/order/digests unchanged |
-| `CV-209.test-floor` | Original 259-pass admission failure reproduced; all 35 focused recorder tests pass | All 35 integrated recorder tests pass; metadata gates and seal pending. Workspace recorder selects a 260 actual-pass minimum; certification wiring remains pending |
+| `CV-205.catalog-generation` | Original failures reproduced on Memory/file-backed SQLite; 12 new and six existing regressions pass | Integrated dependency-inclusive Clippy and 12 catalog regressions pass; metadata gates and seal pass. Adapter reopen is not process-crash proof |
+| `CV-204.generation-selection` | Seven original failures/two positive controls; all 24 package tests and owned-package Clippy pass | Integrated dependency-inclusive Clippy and all 24 installer tests pass; metadata gates and seal pass; signatures/identity domains unchanged |
+| `CV-207.materialization-bounds` | Both original aggregate-bound failures reproduced; 10 ABI and all 16 source-package tests, strict Clippy pass | Integrated ABI owner and strict Clippy pass; metadata gates and seal pass; source bytes/order/digests unchanged |
+| `CV-209.test-floor` | Original 259-pass admission failure reproduced; all 35 focused recorder tests pass | All 35 integrated recorder tests pass; metadata gates and seal pass. Workspace recorder selects a 260 actual-pass minimum; certification wiring remains pending |
 
 Bounded slice acceptance records below identify completed repairs. Whole-phase
 acceptance remains pending. Installer recovery
@@ -280,3 +280,12 @@ Status: **Complete (bounded slice only)**. All 35 integrated recorder tests pass
 Formatting, frozen dependency policy, module, documentation/changelog/subsystem
 and diff checks pass for the reviewed integrated scope. The unavailable CICS
 source freshness gate and full Foundation exit remain pending.
+
+## Next executable work
+
+Continue the recorded public Foundation repairs in dependency order: reproduce
+and decide package identity framing compatibility, then close bounded package
+codecs and signed publication preflight/fencing. The existing audits also identify
+schema mappings, production scanning, controller root validation and journey/client
+closure. All remain pending; no new discovery round, licensed campaign, private
+implementation or source refresh is authorized by these scoped seals.
