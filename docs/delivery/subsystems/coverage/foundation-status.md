@@ -514,3 +514,14 @@ Preparation adds no runtime admission, alternate snapshot guarantee or public
 DTO; tests must distinguish structural schema checks from current trust,
 reference, topology and publication validation. Dependencies and private-owner
 test bindings require manager review before compilation or production edits.
+
+### CICS operation context decision
+
+[ADR-0052](../../../decisions/0052-cics-operation-contexts.md) approves borrowed
+BTS replay and partition-input grouping in `CV-209.cics-contract-lint`. Extend
+that slice to the inventoried direct server test callers and the exact facade
+exports for the existing receipt-pruning operation. Preserve every expression,
+authority check, durable codec and retention algorithm; no automatic cleanup or
+private command activation is authorized. Strict CICS lint, affected owner tests
+and server caller compilation must pass before acceptance. The accepted design
+does not complete this slice or change any official coverage gate.

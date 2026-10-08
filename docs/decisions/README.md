@@ -61,6 +61,7 @@ CardDemo participant ownership and batch completion boundary.
 | [0050](0050-host-effect-envelope-layout.md) | exclusive boxed outer MQI host payloads with unchanged canonical encoding | Accepted; scoped compatibility passed |
 
 | [0051](0051-package-identity-framing.md) | framed current package domain and finite trusted legacy recovery | Accepted design; implementation pending |
+| [0052](0052-cics-operation-contexts.md) | borrowed CICS operation inputs and existing explicit receipt retention export | Accepted design; implementation pending |
 
 Parallel subsystem work allocated the same 0028 and 0029 numeric prefixes.
 Their distinct full filenames and subsystem-qualified labels identify each

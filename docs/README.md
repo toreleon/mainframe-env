@@ -189,6 +189,7 @@ explicitly names that authority as superseded.
 - [ADR-0030: Common CICS source condition authority](decisions/0030-cics-source-condition-authority.md)
 - [ADR-0050: Boxed shared host-effect payloads](decisions/0050-host-effect-envelope-layout.md)
 - [ADR-0051: Framed package identity and retained compatibility](decisions/0051-package-identity-framing.md)
+- [ADR-0052: Borrowed CICS operation inputs](decisions/0052-cics-operation-contexts.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.
 
