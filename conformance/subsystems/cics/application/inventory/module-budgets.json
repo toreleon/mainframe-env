@@ -235,7 +235,7 @@
   "facade_exemptions": [
     {
       "path": "crates/contracts/mainframe-env-coverage/src/lib.rs",
-      "max_production_lines": 533,
+      "max_production_lines": 440,
       "responsibility": "The original coverage contract root still contains its small ledger model in addition to facade declarations.",
       "split_boundary": "Move the ledger records and implementation into a model module and leave only contract constants and public re-exports."
     }

@@ -146,7 +146,7 @@ This repair grants no ABI-equivalence, runtime or licensed credit.
 
 ### CV-202.snapshot-continuity integration
 
-Status: **Focused and integration gates pass; completion seal pending**. New snapshot
+Status: **Complete (snapshot continuity only)**. New snapshot
 generations preserve row/unit/applicability descriptors and append-only retained
 evidence histories. Missing failure observations and stale sequence appends
 refuse before state changes; historical immutable retries remain idempotent.
@@ -242,6 +242,13 @@ source freshness gate and full Foundation exit remain pending.
 ### CV-209.store-contract-lint acceptance
 
 Status: **Complete (bounded slice only)**. Integrated strict store/dependency Clippy, 124 root-terminal tests and 97 store unit tests pass. Three PostgreSQL unit tests were ignored and are not credited; the mechanical aliases and conditions do not alter durable contracts.
+Formatting, frozen dependency policy, module, documentation/changelog/subsystem
+and diff checks pass for the reviewed integrated scope. The unavailable CICS
+source freshness gate and full Foundation exit remain pending.
+
+### CV-202.snapshot-continuity acceptance
+
+Status: **Complete (bounded slice only)**. All 28 coverage tests, integrated strict Clippy, spec/coverage and module gates pass. The private store-module extraction preserves the public API and lowers the facade ceiling from 533 to 440; all other ceilings remain unchanged.
 Formatting, frozen dependency policy, module, documentation/changelog/subsystem
 and diff checks pass for the reviewed integrated scope. The unavailable CICS
 source freshness gate and full Foundation exit remain pending.
