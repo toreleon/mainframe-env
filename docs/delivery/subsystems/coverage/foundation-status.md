@@ -328,3 +328,30 @@ The manager extends `CV-209.journey-closure` to read and bind the existing
 issue ledger or changed expectation is allowed. Unobserved required behaviors,
 including process restart rather than same-process reopen, must remain pending
 and cause full closure to refuse until real observations are implemented.
+
+### Serialized coverage compatibility decision
+
+The manager inspected only the structural layout of the former repository-owned
+`coverage-ledger@1` producer output in Git object
+`a53b9dbfa8c683f43d17e168b226338dbd499518`; no historical result is restored or
+credited. Its finite baseline summary is `id`, `catalog_sha256`, `mandatory_rows`,
+`complete_rows`, and `gates`, with all six gate names mapping to `numerator` and
+`denominator`. Evidence records are embedded records, not reference strings;
+row evidence references retain their existing separate form. The schema repair
+must preserve this valid shape and empty evidence arrays/explicit pending empty
+histories, while refusing impossible/unknown fields. Current catalog identity,
+row/evidence closure and derived counts are verified by the existing typed
+owners; schema shape alone cannot certify those relationships. The legacy
+wire identities remain unchanged and no ledger/evidence family is added.
+
+### Batch lint prerequisite
+
+Declare `CV-209.batch-contract-lint` under CV-209. Exact production owners are
+`mainframe-env-batch` service, `service/run_retirement.rs` and
+`service/running_step.rs`, plus private tests only if strict lint exposes them.
+The controller-root worker found 21 existing package-local diagnostics on these
+unchanged files. This mechanical prerequisite preserves borrow/evaluation order,
+awaits, errors, ownership, retirement/step fencing and durable bytes; no lint
+suppression, private behavior or expanded admission is allowed. Focused existing
+regressions, strict package Clippy and required gates precede its separate seal.
+The root-validation slice remains pending until this prerequisite passes.
