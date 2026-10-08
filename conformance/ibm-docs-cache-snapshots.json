@@ -1,7 +1,7 @@
 {
   "schema_version": "mainframe-env.ibm-docs-cache-snapshots@1",
   "repository": "https://github.com/toreleon/mainframe-env-ibm-docs-cache.git",
-  "revision": "d08efcb9849188abd2916aa9e7054eeefc159002",
+  "revision": "058ee688e8d7b6702dd5088d5cfdcb5651d64608",
   "snapshots": [
     {
       "archive": "snapshots/cics-retained-20261007.tar.gz",

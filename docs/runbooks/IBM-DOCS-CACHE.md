@@ -40,30 +40,27 @@ retain the legacy temporary-directory default when the variable is unset.
 
 ## Provision with Git LFS snapshot metadata
 
-The separate public repository
-`https://github.com/toreleon/mainframe-env-ibm-docs-cache` publishes snapshot
-metadata and a synthetic Git LFS transport example. IBM publication archives
-are not uploaded: redistribution authorization is unavailable. The locally
-prepared CICS snapshot remains external. The code repository commits its
-bounded identity in
-`conformance/ibm-docs-cache-snapshots.json`: an immutable Git revision, archive
-SHA-256/size, registered scope IDs and the fingerprint of their shared pins.
-A Git LFS client is required for LFS transport. The CICS archive identity
-does not imply public download availability. Provisioning is an explicit
-transport operation; ordinary source search/read and CI remain offline and do not clone or install tools.
+The configured cache repository
+`https://github.com/toreleon/mainframe-env-ibm-docs-cache` is private owner storage.
+Its pinned revision provides a real retained CICS `.tar.gz`, an equivalent ZIP
+for local inspection and a synthetic Git LFS transport fixture. Access requires
+an authorized GitHub account; the public framework does not grant access or
+redistribution rights to publication bodies. Developers may instead import their
+own authorized local cache through the shared importer above.
 
-CICS TS [publication terms](https://www.ibm.com/docs/en/cics-ts/6.x?topic=available-notices)
-require express IBM consent to distribute publications outside the enterprise.
-Developers must obtain source bytes they are authorized to use and import their
-existing cache with the shared importer above. A network/browser source refresh
-requires an explicit request and follows the Chrome workflow below.
+The code repository commits only bounded identities in
+`conformance/ibm-docs-cache-snapshots.json`: an immutable Git revision, canonical
+TAR archive SHA-256/size, registered scope IDs and the fingerprint of their shared
+pins. The uploaded TAR has unchanged archive/source pins; the storage revision
+changes its availability, not IBM source authority or coverage. Git LFS is
+required to obtain real archive bytes rather than pointer files. Ordinary source
+search/read and CI remain offline and do not clone or install tools.
 
-The public repository can be cloned by other developers. Its current LFS
-object is a small, project-created transport fixture, not IBM documentation.
-Read `revision` from the committed locator and fetch exactly that revision:
+To provision from this storage with an authorized account, read `revision` from
+the committed locator and fetch exactly that revision:
 
 ```bash
-export IBM_DOCS_SNAPSHOT_CLONE=/absolute/path/to/cache-metadata-clone
+export IBM_DOCS_SNAPSHOT_CLONE=/absolute/path/to/private-cache-clone
 export IBM_DOCS_SNAPSHOT_REVISION=PINNED_REVISION
 GIT_LFS_SKIP_SMUDGE=1 git clone --no-checkout \
   https://github.com/toreleon/mainframe-env-ibm-docs-cache.git \
@@ -72,19 +69,25 @@ git -C "$IBM_DOCS_SNAPSHOT_CLONE" lfs install --local
 git -C "$IBM_DOCS_SNAPSHOT_CLONE" fetch origin "$IBM_DOCS_SNAPSHOT_REVISION"
 GIT_LFS_SKIP_SMUDGE=1 git -C "$IBM_DOCS_SNAPSHOT_CLONE" checkout --detach \
   "$IBM_DOCS_SNAPSHOT_REVISION"
-git -C "$IBM_DOCS_SNAPSHOT_CLONE" lfs pull --include=snapshots/transport-smoke.tar.gz
-tar -tzf "$IBM_DOCS_SNAPSHOT_CLONE/snapshots/transport-smoke.tar.gz"
+git -C "$IBM_DOCS_SNAPSHOT_CLONE" lfs pull \
+  --include=snapshots/cics-retained-20261007.tar.gz
 ```
 
-Given an authorized local copy of the real archive, import it offline:
+Import the canonical TAR with the bounded offline importer:
 
 ```bash
 export MAINFRAME_ENV_IBM_DOCS_CACHE=/absolute/path/to/topic-cache
 python3 -B conformance/tools/ibm_docs_snapshot.py import \
   --snapshot cics-retained-20261007 \
-  --archive /absolute/path/to/local-snapshots/cics-retained-20261007.tar.gz \
+  --archive "$IBM_DOCS_SNAPSHOT_CLONE/snapshots/cics-retained-20261007.tar.gz" \
   --cache "$MAINFRAME_ENV_IBM_DOCS_CACHE"
 ```
+
+An existing authorized local TAR can be supplied through `--archive` without
+cloning the repository. The ZIP contains the same 849 entries but is an
+inspection format, not an accepted input to this TAR-only importer. Its identity
+is recorded in the storage repository's `snapshot-metadata.json`; it does not
+replace the framework's canonical TAR pin.
 
 Replace `PINNED_REVISION` with the exact `revision` from the committed locator.
 The importer checks the compressed archive SHA-256 and size, current registered
@@ -95,7 +98,7 @@ cache entry. Git LFS pointers left without downloaded objects fail verification.
 The snapshot remains a source transport artifact with
 `semantic_authority=false` and `coverage_credit=0`.
 
-The locally prepared snapshot covers all 18 currently registered CICS scopes,
+The pinned snapshot covers all 18 currently registered CICS scopes,
 including the SPI/FEPI command bodies and application command-body scopes: 848 unique
 topics and one shared TOC. It does not claim completeness for other IBM
 products or prove CICS behavior. Application review gates also consume separately
@@ -125,7 +128,7 @@ python3 -B conformance/tools/ibm_docs_snapshot.py pack \
 For an authorized transport repository, track the resulting archive with LFS
 and review the printed row and immutable revision in its locator. Upload bodies
 only where redistribution rights and recipient access permit it.
-The public metadata repository remains body-free.
+Keep storage access restricted according to the publication authorization.
 A source refresh still requires explicit authorization under the workflow
 below; packaging retained bytes does not authorize a refresh. Rollback selects
 a prior immutable locator and imports into a separate external cache.
