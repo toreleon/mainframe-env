@@ -130,6 +130,56 @@ remains qualified. Namespace admission and any future native requirements need
 their separately authorized existing launcher checks. No host filesystem
 widening or additional library is implied by this profile.
 
+## Finite public client command
+
+The optional Linux test launcher is `tools/ci_assurance.py public-client-command`.
+Supply `--development-profile public-client-linux-x86_64`, the same twelve
+explicit `--profile-file ROLE=/absolute/resolved/file` bindings and
+`--profile-tree` described above. Add a fresh `--run-dir` beneath a private owned
+parent, `--action`, the real fixture listener's `--port`, and
+`--timeout-seconds` greater than zero and at most ten. Selected inputs must match
+the existing lock. The optional global `--root` must name the executing source
+root; duplicate scalars, root options, abbreviations and surplus arguments refuse.
+
+| Action | Additional scalars |
+| --- | --- |
+| `submit`, `owner-list`, `bad-password`, `other-owner-list` | none |
+| `status`, `files`, `other-status`, `other-files` | `--job-id` |
+| `content`, `other-content` | `--job-id`, `--file-id` |
+
+Ports are canonical ASCII decimals 1..65535, file IDs 0..63, and job IDs use the
+batch owner's canonical `JOB` plus five to eight decimal digits for a nonzero
+value. No arbitrary command, credential, host, environment or mount configuration
+is accepted. The fixture owns the listener and semantic assertions; this command
+does not start a server or poll jobs. It uses fixed synthetic principals and JCL,
+fresh owned settings and an empty child environment.
+
+```mermaid
+flowchart LR
+    Inputs[Explicit locked inputs] --> Validate[Validate bytes and owned state]
+    Validate --> Launch[Run one fixed client action]
+    Launch --> Capture[Capture raw output and actual wait exit]
+    Capture --> Recheck[Revalidate inputs and owned state]
+    Recheck --> Fixture[Rust fixture checks HTTP and job semantics]
+```
+
+Each fresh run leaf retains `stdout.bin`, `stderr.bin`, `child-exit.txt` and
+`supervision-error.txt`. Transport exit zero means the command completed its
+capture and postchecks; the actual child can have a nonzero exit. A spawn/wait
+failure has no completed child exit. Never treat launcher exit alone, a vendor
+message or nonzero child exit as an authentication/job pass. Raw streams have
+65536-byte individual and 131072-byte combined ceilings; infrastructure
+diagnostics are separately bounded printable ASCII. Rust owns eventual cleanup.
+
+Admission requires Linux x86_64, uid/gid 1000, the reviewed supplementary groups
+and zero effective/permitted/ambient capabilities. The launcher mounts accepted
+inputs readonly and owns only its finite writable state. Loopback uses inherited
+network; it does not isolate egress or prove listener ownership. Bubblewrap's
+host bootstrap and unverified upstream signature/source-build trust remain
+qualified. Synchronous byte validation has no separate watchdog; bounded log
+inspection is not a hard filesystem quota. Missing inputs fail without fallback.
+The real public-client application/HTTP fixture remains a separate pending gate.
+
 ## Reviewed updates
 
 Every input update is a normal reviewed repository change:

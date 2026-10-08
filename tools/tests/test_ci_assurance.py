@@ -1057,4 +1057,712 @@ os._exit(0)
             self.assertEqual(libc.prctl(36,prior.value,0,0,0),0)
 
 
+
+# These literal expectations are independent of the command owner's builders.
+PUBLIC_OPERATIONS = {
+    'submit': ('zos-jobs submit local-file /input/public-client.jcl', 'IBMUSER', 'TESTPASS', None, None),
+    'owner-list': ('zos-jobs list jobs --owner IBMUSER --prefix PBCLNT01', 'IBMUSER', 'TESTPASS', None, None),
+    'status': ('zos-jobs view job-status-by-jobid JOB00001', 'IBMUSER', 'TESTPASS', 'JOB00001', None),
+    'files': ('zos-jobs list spool-files-by-jobid JOB00001', 'IBMUSER', 'TESTPASS', 'JOB00001', None),
+    'content': ('zos-jobs view spool-file-by-id JOB00001 0', 'IBMUSER', 'TESTPASS', 'JOB00001', '0'),
+    'bad-password': ('zos-jobs submit local-file /input/public-client.jcl', 'IBMUSER', 'WRONGPASS', None, None),
+    'other-status': ('zos-jobs view job-status-by-jobid JOB00001', 'OTHERUSR', 'OTHERPASS', 'JOB00001', None),
+    'other-files': ('zos-jobs list spool-files-by-jobid JOB00001', 'OTHERUSR', 'OTHERPASS', 'JOB00001', None),
+    'other-content': ('zos-jobs view spool-file-by-id JOB00001 0', 'OTHERUSR', 'OTHERPASS', 'JOB00001', '0'),
+    'other-owner-list': ('zos-jobs list jobs --owner IBMUSER --prefix PBCLNT01', 'OTHERUSR', 'OTHERPASS', None, None),
+}
+PUBLIC_SEEDS = {
+    'identity/passwd': b'agent:x:1000:1000:public-client:/client-home:/bin/false\n',
+    'identity/group': b'agent:x:1000:\n',
+    'identity/nsswitch.conf': b'passwd: files\ngroup: files\nhosts: files\n',
+    'client-home/.zowe.env.json': b'{}\n',
+    'plugins/plugins.json': b'{}\n',
+    'client-home/settings/imperative.json': b'{"overrides":{"CredentialManager":false},"credentialManagerOptions":{}}\n',
+    'input/public-client.jcl': b'//PBCLNT01 JOB CLASS=A\n//STEP1 EXEC PGM=IEFBR14\n',
+}
+PUBLIC_ROLES = ('node-archive', 'node', 'zowe-archive', 'bubblewrap', 'loader', 'libdl',
+                'libstdcxx', 'libm', 'libgcc', 'libpthread', 'libc', 'libnss_files')
+
+
+class PublicClientCommandTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix='public-command-')
+        self.addCleanup(self.temp.cleanup)
+        self.base = Path(self.temp.name).resolve()
+        self.parent = self.base / 'commands'; self.parent.mkdir(mode=0o700)
+        self.run = self.parent / 'action'
+        self.tree = self.base / 'tree'; (self.tree / 'package/lib').mkdir(parents=True)
+        (self.tree / 'package/lib/main.js').write_bytes(b'inert\n')
+        self.files = {}
+        for role in PUBLIC_ROLES:
+            path = self.base / role; path.write_bytes(b'inert\n'); path.chmod(0o600)
+            self.files[role] = path
+        self.bindings = [f'{role}={path}' for role, path in self.files.items()]
+
+    def arguments(self, **changes):
+        return dict(profile_files=self.bindings, profile_tree=self.tree, run_dir=self.run,
+                    action='submit', port='1234', timeout_seconds=1, **changes)
+
+    def command(self, **changes):
+        args = self.arguments(); args.update(changes)
+        return ci.public_client_command(ROOT, **args)
+
+    def cli(self, extra=(), prefix=()):
+        argv = ['ci_assurance.py', *prefix, 'public-client-command', '--development-profile',
+                'public-client-linux-x86_64', '--profile-tree', str(self.tree),
+                '--run-dir', str(self.run), '--action', 'submit', '--port', '1234',
+                '--timeout-seconds', '1']
+        for binding in self.bindings: argv += ['--profile-file', binding]
+        with patch.object(sys, 'argv', argv + list(extra)):
+            return ci.main()
+
+    def inert(self, launch=None):
+        from contextlib import ExitStack
+        stack = ExitStack(); self.addCleanup(stack.close)
+        supply = ci._public_client_supply_chain()
+        # Exercise the real lock, role grammar and development validator; only
+        # their external byte readers are inert. Never admit the retained client.
+        stack.enter_context(patch.object(supply, 'verify_profile_file', return_value={'sha256': 'a'*64, 'bytes': 6, 'mode': 0o600}))
+        stack.enter_context(patch.object(supply, 'validate_node_archive'))
+        stack.enter_context(patch.object(supply, 'zowe_archive_rows', return_value={}))
+        stack.enter_context(patch.object(supply, 'validate_zowe_tree', return_value={'sha256': 'b'*64, 'files': 1, 'bytes': 6}))
+        stack.enter_context(patch.object(ci, '_public_client_identity'))
+        def complete(command, root, output, **kwargs):
+            self.assertEqual(root, self.run / 'cwd')
+            self.assertEqual(kwargs['env'], {})
+            self.assertEqual(kwargs['max_output_bytes'], 131072)
+            self.assertTrue(kwargs['separate_stderr'])
+            output('stdout', b'\xff{partial\x00'); output('stderr', b'\x80warning\n')
+            kwargs['on_reaped'](1)
+            return 1, None
+        spawn = stack.enter_context(patch.object(ci, '_run_owned', side_effect=launch or complete))
+        return supply, spawn
+
+    def test_ten_handwritten_action_vectors(self):
+        for action, (operation, user, password, job, file) in PUBLIC_OPERATIONS.items():
+            with self.subTest(action=action):
+                self.assertEqual(ci._public_client_operation(action, '1234', job, file),
+                    operation.split() + ['--host', '127.0.0.1', '--port', '1234', '--protocol', 'http',
+                    '--user', user, '--password', password, '--completion-timeout', '5',
+                    '--establish-connection-timeout', '5', '--response-format-json'])
+
+    def test_unknown_and_surplus_actions_refuse(self):
+        for action in ('version', 'shell', 'unknown', 'submit --help', ''):
+            with self.subTest(action=action), self.assertRaises(ValueError):
+                ci._public_client_operation(action, '1234', None, None)
+        for action, (_, _, _, job, file) in PUBLIC_OPERATIONS.items():
+            for bad_job, bad_file in ((None, file), (job, None), ('JOB00001', '0')):
+                if (bad_job, bad_file) == (job, file): continue
+                with self.subTest(action=action, job=bad_job, file=bad_file), self.assertRaises(ValueError):
+                    ci._public_client_operation(action, '1234', bad_job, bad_file)
+
+    def test_scalar_refusals(self):
+        for port in ('0', '65536', '+1', '-1', '01', ' 1', '1\n', '١', '1.0', 1, True):
+            with self.subTest(port=port), self.assertRaises(ValueError):
+                ci._public_client_operation('submit', port, None, None)
+        for job in ('JOB00000', 'JOB1', 'JOB000001', 'JOB100000000', 'JOB0000١', '../JOB00001', 'JOB00001/x', '--help', 'JOB00001\n'):
+            with self.subTest(job=job), self.assertRaises(ValueError):
+                ci._public_client_operation('status', '1', job, None)
+        for file in ('-1', '64', '00', '+0', '٠', 'SP-1', '/tmp/a', '0\n'):
+            with self.subTest(file=file), self.assertRaises(ValueError):
+                ci._public_client_operation('content', '1', 'JOB00001', file)
+
+    def test_canonical_scalar_boundaries(self):
+        for port in ('1', '65535'):
+            for job in ('JOB00001', 'JOB99999999'):
+                for file in ('0', '63'):
+                    result = ci._public_client_operation('content', port, job, file)
+                    self.assertEqual(result[:5], ['zos-jobs', 'view', 'spool-file-by-id', job, file])
+                    self.assertEqual(result[result.index('--port')+1], port)
+
+    def test_timeout_refuses_before_allocation(self):
+        self.inert()
+        for timeout in (float('nan'), float('inf'), 0, -1, 10.01, True, '1', 10**400):
+            with self.subTest(timeout=timeout), self.assertRaises(ValueError):
+                self.command(timeout_seconds=timeout)
+            self.assertFalse(self.run.exists())
+
+    def test_cli_unknown_remainder_duplicate_and_profile_refuse(self):
+        self.inert()
+        for extra in (['--port', '1234'], ['--port=1234'], ['--action', 'status'],
+                      ['--timeout-seconds', '1'], ['--run-dir', str(self.run)],
+                      ['--profile-tree', str(self.tree)], ['--development-profile', 'other'],
+                      ['--env', 'PATH=x'], ['--', 'echo'], ['echo'], ['--po', '1234']):
+            with self.subTest(extra=extra), patch('sys.stderr', new=io.StringIO()), self.assertRaises(SystemExit):
+                self.cli(extra)
+            self.assertFalse(self.run.exists())
+
+    def test_cli_selected_surface_invokes_one_transport(self):
+        _, spawn = self.inert()
+        self.assertEqual(self.cli(), 0); spawn.assert_called_once()
+
+    def test_bindings_refuse_before_launch(self):
+        supply, spawn = self.inert()
+        for bindings in (self.bindings[:-1], self.bindings + [self.bindings[0]],
+                         self.bindings[:-1] + ['extra=/tmp/x'], self.bindings[:-1] + ['libnss_files=relative']):
+            with self.subTest(bindings=bindings), self.assertRaises((ValueError, supply.SupplyChainError)):
+                self.command(profile_files=bindings)
+            self.assertFalse(self.run.exists()); spawn.assert_not_called()
+
+    def test_alternate_root_refuses_without_loading_other_policy(self):
+        supply, spawn = self.inert()
+        with patch.object(supply, 'validate_ci_lock', wraps=supply.validate_ci_lock) as validator:
+            with self.assertRaises(ValueError): ci.public_client_command(self.base, **self.arguments())
+            validator.assert_not_called(); spawn.assert_not_called()
+        with patch('sys.stderr', new=io.StringIO()), self.assertRaises(SystemExit):
+            self.cli(prefix=['--root', str(ROOT), '--root', str(ROOT)])
+
+    def test_input_error_is_forwarded_from_actual_validator(self):
+        supply, spawn = self.inert()
+        with patch.object(supply, 'verify_profile_file', side_effect=supply.SupplyChainError('inert digest differs')):
+            with self.assertRaisesRegex(supply.SupplyChainError, 'digest differs'): self.command()
+        self.assertFalse(self.run.exists()); spawn.assert_not_called()
+
+    def test_run_leaf_ownership_and_overlap_refuse(self):
+        _, spawn = self.inert()
+        existing = self.parent / 'existing'; existing.mkdir()
+        linked = self.base / 'linked'; linked.symlink_to(self.parent, target_is_directory=True)
+        for run in (existing, linked / 'new', self.tree / 'new', ROOT / 'new',
+                    self.parent / '..' / 'new', Path('/'), Path.home(), self.parent / 'bad\nname'):
+            with self.subTest(run=run), self.assertRaises(ValueError): self.command(run_dir=run)
+        self.parent.chmod(0o777)
+        with self.assertRaises(ValueError): self.command()
+        self.parent.chmod(0o700); spawn.assert_not_called()
+
+    def test_fixed_mount_environment_and_node_vector(self):
+        _, spawn = self.inert(); self.assertEqual(self.command(), 0)
+        expected = [str(self.files['bubblewrap']), '--unshare-user', '--uid', '1000', '--gid', '1000',
+                    '--unshare-pid', '--die-with-parent', '--new-session', '--cap-drop', 'ALL', '--clearenv',
+                    '--proc', '/proc', '--dev', '/dev', '--tmpfs', '/tmp', '--dir', '/etc', '--dir', '/opt/node/bin',
+                    '--dir', '/lib64', '--dir', '/lib/x86_64-linux-gnu']
+        mounts = [('node', '/opt/node/bin/node'), ('loader', '/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2'),
+                  ('loader', '/lib64/ld-linux-x86-64.so.2'), ('libdl', '/lib/x86_64-linux-gnu/libdl.so.2'),
+                  ('libstdcxx', '/lib/x86_64-linux-gnu/libstdc++.so.6'), ('libm', '/lib/x86_64-linux-gnu/libm.so.6'),
+                  ('libgcc', '/lib/x86_64-linux-gnu/libgcc_s.so.1'), ('libpthread', '/lib/x86_64-linux-gnu/libpthread.so.0'),
+                  ('libc', '/lib/x86_64-linux-gnu/libc.so.6'), ('libnss_files', '/lib/x86_64-linux-gnu/libnss_files.so.2')]
+        for role, target in mounts: expected += ['--ro-bind', str(self.files[role]), target]
+        for source, target in [('identity/passwd', '/etc/passwd'), ('identity/group', '/etc/group'),
+                               ('identity/nsswitch.conf', '/etc/nsswitch.conf'), ('input', '/input')]:
+            expected += ['--ro-bind', str(self.run / source), target]
+        expected += ['--ro-bind', str(self.tree / 'package'), '/opt/client']
+        for source, target in [('client-home', '/client-home'), ('plugins', '/plugins'), ('cwd', '/work')]:
+            expected += ['--bind', str(self.run / source), target]
+        expected += ['--chdir', '/work', '--setenv', 'PATH', '/opt/node/bin', '--setenv', 'TMPDIR', '/tmp',
+                     '--setenv', 'ZOWE_CLI_HOME', '/client-home', '--setenv', 'ZOWE_CLI_PLUGINS_DIR', '/plugins',
+                     '/opt/node/bin/node', '--no-addons', '--no-global-search-paths', '/opt/client/lib/main.js',
+                     'zos-jobs', 'submit', 'local-file', '/input/public-client.jcl', '--host', '127.0.0.1',
+                     '--port', '1234', '--protocol', 'http', '--user', 'IBMUSER', '--password', 'TESTPASS',
+                     '--completion-timeout', '5', '--establish-connection-timeout', '5', '--response-format-json']
+        self.assertEqual(spawn.call_args.args[0], expected)
+
+    def test_exact_seeds_private_modes_and_fresh_capture(self):
+        self.inert(); self.assertEqual(self.command(), 0)
+        for name, data in PUBLIC_SEEDS.items():
+            self.assertEqual((self.run / name).read_bytes(), data)
+            self.assertEqual((self.run / name).stat().st_mode & 0o7777, 0o600)
+        for name in ('identity', 'client-home', 'plugins', 'cwd', 'input', 'client-home/settings', 'client-home/logs'):
+            self.assertEqual((self.run / name).stat().st_mode & 0o7777, 0o700)
+        self.assertEqual(self.run.stat().st_mode & 0o7777, 0o700)
+        for name in ('stdout.bin', 'stderr.bin', 'child-exit.txt', 'supervision-error.txt', 'input-lock.sha256'):
+            self.assertEqual((self.run / name).stat().st_mode & 0o7777, 0o600)
+        with self.assertRaises(ValueError): self.command()
+
+    def test_raw_binary_nonzero_exit_is_transport_complete(self):
+        self.inert(); self.assertEqual(self.command(), 0)
+        self.assertEqual((self.run / 'stdout.bin').read_bytes(), b'\xff{partial\x00')
+        self.assertEqual((self.run / 'stderr.bin').read_bytes(), b'\x80warning\n')
+        self.assertEqual((self.run / 'child-exit.txt').read_bytes(), b'1\n')
+        self.assertEqual((self.run / 'supervision-error.txt').read_bytes(), b'')
+
+    def test_each_stream_boundary_and_overflow_prefix(self):
+        for stream in ('stdout', 'stderr'):
+            for extra in (0, 1):
+                self.run = self.parent / f'{stream}-{extra}'
+                def launch(command, root, output, **kwargs):
+                    error = None
+                    try: output(stream, b'\xff'*65536 + b'x'*extra)
+                    except ValueError as problem: error = str(problem)
+                    kwargs['on_reaped'](-15 if extra else 0)
+                    return (-15 if extra else 0), error
+                self.inert(launch)
+                with self.subTest(stream=stream, extra=extra):
+                    self.assertEqual(self.command(), extra)
+                    self.assertEqual((self.run / (stream + '.bin')).read_bytes(), b'\xff'*65536)
+                    self.assertEqual((self.run / 'child-exit.txt').read_bytes(), b'-15\n' if extra else b'0\n')
+                    self.assertEqual(bool((self.run / 'supervision-error.txt').read_bytes()), bool(extra))
+
+    def test_both_full_streams_fit_shared_limit(self):
+        def launch(command, root, output, **kwargs):
+            output('stdout', b'a'*65536); output('stderr', b'b'*65536)
+            kwargs['on_reaped'](0); return 0, None
+        self.inert(launch); self.assertEqual(self.command(), 0)
+        self.assertEqual((self.run / 'stdout.bin').stat().st_size + (self.run / 'stderr.bin').stat().st_size, 131072)
+
+    def test_no_actual_reap_never_manufactures_exit(self):
+        for error in ('Popen failed', 'launcher wait failed'):
+            self.run = self.parent / error.replace(' ', '-')
+            self.inert(lambda *args, **kwargs: (127, error))
+            self.assertEqual(self.command(), 1)
+            self.assertEqual((self.run / 'child-exit.txt').read_bytes(), b'')
+            self.assertIn(error.encode(), (self.run / 'supervision-error.txt').read_bytes())
+
+    def test_actual_127_and_timeout_status_are_retained(self):
+        for code, error, outer in ((127, None, 0), (-15, 'command deadline exceeded', 1)):
+            self.run = self.parent / str(code)
+            def launch(*args, **kwargs): kwargs['on_reaped'](code); return code, error
+            self.inert(launch); self.assertEqual(self.command(), outer)
+            self.assertEqual((self.run / 'child-exit.txt').read_bytes(), f'{code}\n'.encode())
+
+    def test_postcheck_seed_membership_links_and_log_caps_fail(self):
+        mutations = []
+        for name in ('identity/passwd', 'input/public-client.jcl', 'client-home/settings/imperative.json', 'plugins/plugins.json'):
+            mutations.append(lambda name=name: (self.run / name).write_bytes(b'changed'))
+        mutations += [lambda: (self.run / 'client-home/team.json').write_bytes(b'{}'),
+                      lambda: (self.run / 'cwd/helper').write_bytes(b'native'),
+                      lambda: (self.run / 'plugins/link').symlink_to(self.files['node']),
+                      lambda: (self.run / 'client-home/logs/zowe.log').write_bytes(b'x'*(1048576+1))]
+        for index, mutate in enumerate(mutations):
+            self.run = self.parent / f'mutation-{index}'
+            def launch(*args, **kwargs):
+                args[2]('stdout', b'partial'); mutate(); kwargs['on_reaped'](1); return 1, None
+            self.inert(launch)
+            with self.subTest(index=index):
+                self.assertEqual(self.command(), 1)
+                self.assertEqual((self.run / 'stdout.bin').read_bytes(), b'partial')
+                self.assertTrue((self.run / 'supervision-error.txt').read_bytes())
+
+    def test_only_two_bounded_regular_logs_are_allowed(self):
+        def launch(*args, **kwargs):
+            for name in ('imperative.log', 'zowe.log'):
+                (self.run / 'client-home/logs' / name).write_bytes(b'x'*1048576)
+            kwargs['on_reaped'](0); return 0, None
+        self.inert(launch); self.assertEqual(self.command(), 0)
+
+    def test_fresh_validator_postcheck_changed_role_or_tree_fails(self):
+        supply, spawn = self.inert()
+        for owner in ('verify_profile_file', 'validate_zowe_tree'):
+            self.run = self.parent / owner
+            original = getattr(supply, owner).return_value
+            def launch(*args, **kwargs):
+                getattr(supply, owner).return_value = {**original, 'sha256': 'c'*64}
+                kwargs['on_reaped'](0); return 0, None
+            spawn.side_effect = launch
+            self.assertEqual(self.command(), 1)
+            getattr(supply, owner).return_value = original
+
+    def test_lock_hash_change_and_postvalidator_failure_fail(self):
+        supply, spawn = self.inert()
+        original = ci._public_client_lock_bytes
+        def read(root):
+            data = original(root)
+            if spawn.called: return data + b' '
+            return data
+        with patch.object(ci, '_public_client_lock_bytes', read): self.assertEqual(self.command(), 1)
+        self.run = self.parent / 'post-input-error'
+        def launch(*args, **kwargs):
+            supply.verify_profile_file.side_effect = supply.SupplyChainError('input changed')
+            kwargs['on_reaped'](0); return 0, None
+        spawn.side_effect = launch
+        self.assertEqual(self.command(), 1)
+
+    def test_precheck_and_capture_write_errors_refuse(self):
+        self.inert()
+        with patch.object(ci, '_public_client_check_state', side_effect=OSError('state unavailable')):
+            self.assertEqual(self.command(), 1)
+        self.run = self.parent / 'write-error'
+        original = ci.os.open
+        def opening(path, *args, **kwargs):
+            if path == self.run / 'stdout.bin': raise OSError('capture unavailable')
+            return original(path, *args, **kwargs)
+        with patch.object(ci.os, 'open', opening): self.assertEqual(self.command(), 1)
+
+    def test_supervision_diagnostics_are_bounded_ascii_and_no_response_summary(self):
+        def launch(*args, **kwargs):
+            args[2]('stdout', b'test result: ok. 999 passed;\n')
+            kwargs['on_reaped'](-15); return -15, '\u2603'*5000
+        self.inert(launch)
+        with patch('sys.stdout', new=io.StringIO()) as console:
+            self.assertEqual(self.command(), 1); self.assertEqual(console.getvalue(), '')
+        data = (self.run / 'supervision-error.txt').read_bytes()
+        self.assertLessEqual(len(data), 4096); data.decode('ascii')
+
+    def test_selected_empty_environment_ignores_poison_and_auxiliary_files(self):
+        _, spawn = self.inert()
+        (self.base / 'argv.json').write_bytes(b'["--bind","/","/"]')
+        (self.base / 'settings.json').write_bytes(b'{"CredentialManager":"native"}')
+        with patch.dict(os.environ, {'PATH': '/poison', 'LD_PRELOAD': '/poison', 'NODE_OPTIONS': '--require /poison',
+                                     'ZOWE_CLI_HOME': '/poison', 'HOME': '/poison', 'CODEX_HOME': '/poison'}):
+            self.assertEqual(self.command(), 0)
+        self.assertEqual(spawn.call_args.kwargs['env'], {})
+        self.assertNotIn(str(self.base / 'argv.json'), spawn.call_args.args[0])
+
+    def test_run_raw_noncanonical_paths_and_missing_parent_refuse(self):
+        _, spawn = self.inert()
+        for run in ('relative', str(self.parent) + '//new', str(self.parent) + '/./new',
+                    str(self.parent) + '/bad\x00name', str(self.parent) + '/bad\x7fname',
+                    str(self.parent) + '/' + 'a'*4097, str(self.base / 'missing/new')):
+            with self.subTest(run=run), self.assertRaises((ValueError, OSError)):
+                self.command(run_dir=run)
+        spawn.assert_not_called()
+
+    def test_seed_precheck_refuses_modified_bytes_before_launch(self):
+        _, spawn = self.inert()
+        original = ci._prepare_public_client_run
+        def prepare(run):
+            original(run); (run / 'identity/passwd').write_bytes(b'changed')
+        with patch.object(ci, '_prepare_public_client_run', prepare):
+            self.assertEqual(self.command(), 1)
+        spawn.assert_not_called()
+
+    def test_raw_and_exit_write_failure_preserve_transport_failure(self):
+        for name in ('stdout.bin', 'child-exit.txt'):
+            self.run = self.parent / name
+            _, spawn = self.inert()
+            original = ci._public_client_exclusive
+            def opening(path):
+                output = original(path)
+                if path.name == name:
+                    broken = Mock(wraps=output)
+                    broken.write.side_effect = OSError('write unavailable')
+                    return broken
+                return output
+            def launch(command, root, output, **kwargs):
+                error = None
+                try:
+                    output('stdout', b'partial')
+                    kwargs['on_reaped'](17)
+                except OSError:
+                    error = 'exit capture failed' if name == 'child-exit.txt' else 'raw capture failed'
+                return 17, error
+            spawn.side_effect = launch
+            with self.subTest(name=name), patch.object(ci, '_public_client_exclusive', opening):
+                self.assertEqual(self.command(), 1)
+            self.assertEqual((self.run / 'child-exit.txt').read_bytes(), b'')
+            self.assertTrue((self.run / 'supervision-error.txt').read_bytes())
+
+    def test_postcheck_all_seeds_modes_and_special_files_refuse(self):
+        mutations = [lambda name=name: (self.run / name).write_bytes(b'changed') for name in PUBLIC_SEEDS]
+        mutations += [lambda: (self.run / 'input/public-client.jcl').chmod(0o644),
+                      lambda: (self.run / 'client-home').chmod(0o777),
+                      lambda: os.mkfifo(self.run / 'client-home/logs/zowe.log'),
+                      lambda: (self.run / 'client-home/logs/other.log').write_bytes(b'x'),
+                      lambda: os.link(self.files['node'], self.run / 'client-home/logs/zowe.log')]
+        for index, mutate in enumerate(mutations):
+            self.run = self.parent / f'extra-state-{index}'
+            def launch(*args, **kwargs): mutate(); kwargs['on_reaped'](0); return 0, None
+            self.inert(launch)
+            with self.subTest(index=index): self.assertEqual(self.command(), 1)
+
+    def test_each_cli_scalar_duplicate_and_unknown_credential_surface_refuses(self):
+        _, spawn = self.inert()
+        for option, value in (('job-id', 'JOB00001'), ('file-id', '0'), ('development-profile', 'public-client-linux-x86_64')):
+            with self.subTest(option=option), patch('sys.stderr', new=io.StringIO()), self.assertRaises(SystemExit):
+                self.cli(['--' + option, value, '--' + option, value])
+        for option in ('host', 'user', 'password', 'mount', 'settings', 'command', 'output', 'environment'):
+            with self.subTest(option=option), patch('sys.stderr', new=io.StringIO()), self.assertRaises(SystemExit):
+                self.cli(['--' + option, 'anything'])
+        spawn.assert_not_called(); self.assertFalse(self.run.exists())
+
+    def test_duplicate_exit_callback_refuses_and_preserves_first_status(self):
+        def launch(*args, **kwargs):
+            kwargs['on_reaped'](1)
+            try: kwargs['on_reaped'](0)
+            except ValueError: return 1, 'exit capture failed'
+            return 0, None
+        self.inert(launch); self.assertEqual(self.command(), 1)
+        self.assertEqual((self.run / 'child-exit.txt').read_bytes(), b'1\n')
+
+
+class PublicClientAdmissionTests(unittest.TestCase):
+    def identity(self, **changes):
+        from contextlib import ExitStack
+        with ExitStack() as stack:
+            stack.enter_context(patch.object(ci.sys, 'platform', changes.get('platform', 'linux')))
+            stack.enter_context(patch.object(ci.platform, 'machine', return_value=changes.get('machine', 'x86_64')))
+            for name in ('getuid', 'geteuid', 'getgid', 'getegid'):
+                stack.enter_context(patch.object(ci.os, name, return_value=changes.get(name, 1000)))
+            stack.enter_context(patch.object(ci.os, 'getgroups', return_value=changes.get('groups', [1000])))
+            stack.enter_context(patch.object(Path, 'read_text', return_value=changes.get('status',
+                'CapEff:\t0000000000000000\nCapPrm:\t0000000000000000\nCapAmb:\t0000000000000000\n')))
+            return ci._public_client_identity()
+
+    def test_platform_identity_and_groups_are_refusals(self):
+        self.identity()
+        for key, value in (('platform', 'darwin'), ('machine', 'aarch64'), ('getuid', 0),
+                           ('geteuid', 0), ('getgid', 0), ('getegid', 0), ('groups', [1000, 0])):
+            with self.subTest(key=key), self.assertRaises(ValueError): self.identity(**{key: value})
+
+    def test_each_actual_capability_set_missing_or_nonzero_refuses(self):
+        base = 'CapEff:\t0000000000000000\nCapPrm:\t0000000000000000\nCapAmb:\t0000000000000000\n'
+        for name in ('CapEff', 'CapPrm', 'CapAmb'):
+            for status in (base.replace(name + ':\t0000000000000000', name + ':\t0000000000000001'),
+                           base.replace(name + ':\t0000000000000000\n', ''), base + name + ':\t0\n'):
+                with self.subTest(name=name, status=status), self.assertRaises(ValueError): self.identity(status=status)
+
+    def test_bounded_parent_diagnostic_escapes_controls_and_credentials(self):
+        data = ci._public_client_diagnostic('TESTPASS WRONGPASS OTHERPASS\x00\x1b\n\u2603')
+        self.assertEqual(data, b'[redacted] [redacted] [redacted]\\x00\\x1b\\n\\u2603\n')
+
+
+class PublicClientSupervisorKeywordTests(unittest.TestCase):
+    def supervise(self, *, env=None, callback=None, code=17, wait_error=None):
+        from types import SimpleNamespace
+        fd, writer = os.pipe(); os.close(writer)
+        process = Mock(pid=987654321, stdout=os.fdopen(fd, 'rb'), stderr=None)
+        events = []
+        def wait(**kwargs):
+            events.append('wait')
+            if wait_error: raise wait_error
+            return code
+        process.wait.side_effect = wait
+        def capture(value):
+            self.assertEqual(events[-1], 'wait'); events.append(('capture', value))
+            if callback: callback(value)
+        with patch.object(ci, '_validate_limits'), patch.object(ci.subprocess, 'Popen', return_value=process) as spawn, \
+                patch.object(ci.os, 'waitid', return_value=SimpleNamespace(si_pid=process.pid, si_code=os.CLD_EXITED, si_status=code)), \
+                patch.object(ci, '_linux_group_has_members', return_value=False), patch.object(ci.os, 'killpg') as kill:
+            result = ci._run_owned(['inert'], ROOT, lambda *args: None, timeout_seconds=1,
+                                   env=env, on_reaped=capture)
+        process.wait.assert_called_once_with(timeout=.5)
+        kill.assert_not_called()
+        return result, events, spawn
+
+    def test_empty_and_copied_environment_and_default_compatibility(self):
+        result, events, spawn = self.supervise(env={})
+        self.assertEqual(spawn.call_args.kwargs['env'], {})
+        env = {'PATH': '/fixed'}
+        _, _, spawn = self.supervise(env=env)
+        self.assertEqual(spawn.call_args.kwargs['env'], env)
+        self.assertIsNot(spawn.call_args.kwargs['env'], env)
+        _, _, spawn = self.supervise()
+        self.assertNotIn('env', spawn.call_args.kwargs)
+
+    def test_successful_wait_callback_exception_preserves_actual_code(self):
+        def broken(code): raise OSError('exit file unavailable')
+        (code, error), events, _ = self.supervise(callback=broken)
+        self.assertEqual(code, 17); self.assertIn('exit capture failed', error)
+        self.assertNotIn('wait failed', error); self.assertEqual(events, ['wait', ('capture', 17)])
+
+    def test_failed_wait_never_calls_capture(self):
+        (code, error), events, _ = self.supervise(wait_error=OSError('wait unavailable'))
+        self.assertEqual(code, 127); self.assertIn('wait failed', error); self.assertEqual(events, ['wait'])
+
+    def test_invalid_environment_refuses_before_popen(self):
+        for env in ({'a=b': 'x'}, {'': 'x'}, {'x': '\x00'}, {'x\x00': 'a'}, {'x': 1}, {1: 'x'}, []):
+            with self.subTest(env=env), patch.object(ci.subprocess, 'Popen') as spawn, self.assertRaises(ValueError):
+                ci._run_owned(['inert'], ROOT, lambda *args: None, timeout_seconds=1, env=env)
+            spawn.assert_not_called()
+
+    def test_popen_failure_never_calls_reaped_callback(self):
+        captured = Mock()
+        with patch.object(ci, '_validate_limits'), patch.object(ci.subprocess, 'Popen', side_effect=OSError('spawn unavailable')):
+            code, error = ci._run_owned(['inert'], ROOT, lambda *args: None, timeout_seconds=1,
+                                       env={}, on_reaped=captured)
+        self.assertEqual(code, 127); self.assertIn('spawn unavailable', error); captured.assert_not_called()
+
+
+class PublicClientNativeKeywordTests(unittest.TestCase):
+    def test_native_empty_environment_excludes_parent_poison(self):
+        output = []
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {
+                'PUBLIC_CLIENT_POISON': 'parent', 'NODE_OPTIONS': 'poison', 'PATH': '/poison',
+                'LD_PRELOAD': '/poison', 'ZOWE_CLI_HOME': '/poison', 'ZOWE_CLI_PLUGINS_DIR': '/poison'}):
+            result = ci._run_owned([sys.executable, '-B', '-c',
+                'import os,sys; sys.stdout.buffer.write(b"empty" if not set(os.environ) & '
+                '{"PUBLIC_CLIENT_POISON","NODE_OPTIONS","PATH","LD_PRELOAD","ZOWE_CLI_HOME","ZOWE_CLI_PLUGINS_DIR"} else b"poison")'],
+                Path(directory), lambda stream, data: output.append(data), timeout_seconds=2, env={})
+        self.assertEqual(result, (0, None)); self.assertEqual(b''.join(output), b'empty')
+
+    def test_native_postwait_callback_has_actual_status(self):
+        captured = []
+        with tempfile.TemporaryDirectory() as directory:
+            result = ci._run_owned([sys.executable, '-B', '-c', 'raise SystemExit(23)'], Path(directory),
+                lambda *args: None, timeout_seconds=2, on_reaped=captured.append)
+        self.assertEqual(result, (23, None)); self.assertEqual(captured, [23])
+
+
+
+class PublicClientParserDiagnosticTests(unittest.TestCase):
+    # Fixed expectations are independent of argparse's error text and production
+    # diagnostic helpers. Untrusted values never belong in selected diagnostics.
+    PARSE_REFUSAL = b'public client arguments refused\n'
+    VALUE_REFUSAL = b'public client refused\n'
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix='public-parser-controls-')
+        self.addCleanup(self.temp.cleanup)
+        self.base = Path(self.temp.name).resolve()
+        self.run = self.base / 'never-created'
+        self.required = ['public-client-command', '--development-profile', 'public-client-linux-x86_64',
+            '--profile-file', 'node=/inert/not-read', '--profile-tree', '/inert/not-read-tree',
+            '--run-dir', str(self.run), '--action', 'submit', '--port', '1', '--timeout-seconds', '1']
+
+    def invoke(self, arguments, *, expected=PARSE_REFUSAL, program='ci_assurance.py'):
+        from contextlib import ExitStack
+        supply = ci._public_client_supply_chain()
+        with ExitStack() as stack:
+            guards = [stack.enter_context(patch.object(owner, name, side_effect=AssertionError('refusal reached ' + name)))
+                for owner, name in ((supply, 'validate_ci_lock'), (supply, 'validate_development_inputs'),
+                                   (ci, '_public_client_identity'), (ci, '_prepare_public_client_run'),
+                                   (ci, '_run_owned'), (ci.subprocess, 'Popen'))]
+            stderr = stack.enter_context(patch('sys.stderr', new=io.StringIO()))
+            stdout = stack.enter_context(patch('sys.stdout', new=io.StringIO()))
+            stack.enter_context(patch.object(sys, 'argv', [program, *arguments]))
+            try:
+                status = ci.main()
+            except SystemExit as stopped:
+                status = stopped.code
+            self.assertIn(status, (1, 2))
+            for guard in guards: guard.assert_not_called()
+            self.assertFalse(self.run.exists())
+            self.assertEqual(list(self.base.iterdir()), [])
+            self.assertEqual(stdout.getvalue(), '')
+            diagnostic = stderr.getvalue().encode('utf-8')
+            self.assertLessEqual(len(diagnostic), 4096)
+            self.assertTrue(all(byte == 10 or 32 <= byte < 127 for byte in diagnostic))
+            self.assertEqual(diagnostic, expected)
+            return diagnostic
+
+    def replaced(self, option, value):
+        args = list(self.required)
+        args[args.index(option) + 1] = value
+        return args
+
+    def test_oversized_unknown_argument_and_remainder_are_fixed_refusals(self):
+        for suffix in (['UNTRUSTED-' + 'x'*8192], ['--unknown=' + 'x'*8192],
+                       ['--', 'UNTRUSTED-' + 'x'*8192]):
+            with self.subTest(shape=suffix[0][:20]): self.invoke(self.required + suffix)
+
+    def test_control_bytes_unicode_and_program_name_never_reach_stderr(self):
+        for token in ('UNTRUSTED-\x1b[31mRED', 'UNTRUSTED-\x00', 'UNTRUSTED-\n\r\t', 'UNTRUSTED-\x7f',
+                      'UNTRUSTED-\u2603', '--unknown=\x1b[2J\n'):
+            with self.subTest(token=repr(token)):
+                self.invoke(self.required + [token], program='untrusted-program-\x1b[2J')
+
+    def test_forbidden_password_values_are_never_echoed(self):
+        for value in ('TESTPASS', 'PRIVATE-PARSER-SENTINEL', 'PRIVATE-' + 'x'*8192, 'PRIVATE-\x1b[2J\n'):
+            for suffix in (['--password', value], ['--password=' + value]):
+                with self.subTest(shape=suffix[0][:30], value_length=len(value)):
+                    self.invoke(self.required + suffix)
+
+    def test_every_duplicate_scalar_has_one_fixed_error(self):
+        for option, value in (('--development-profile', 'public-client-linux-x86_64'), ('--profile-tree', '/inert'),
+                              ('--run-dir', str(self.run)), ('--action', 'submit'), ('--port', '1'),
+                              ('--timeout-seconds', '1'), ('--job-id', 'JOB00001'), ('--file-id', '0')):
+            suffix = [option, value]
+            if option in ('--job-id', '--file-id'): suffix *= 2
+            with self.subTest(option=option): self.invoke(self.required + suffix)
+
+    def test_malformed_typed_values_have_one_fixed_error(self):
+        for value in ('INVALID-FLOAT', 'PRIVATE-' + 'x'*8192, 'PRIVATE-\x1b[2J', '\u2603', 'TESTPASS'):
+            with self.subTest(value_length=len(value)):
+                self.invoke(self.replaced('--timeout-seconds', value))
+
+    def test_missing_option_values_and_required_fields_are_fixed(self):
+        for suffix in (['--timeout-seconds'], ['--action'], ['--profile-file'], ['--port']):
+            with self.subTest(option=suffix[0]): self.invoke(self.required + suffix)
+        for option in ('--port', '--timeout-seconds', '--run-dir'):
+            args = list(self.required); index = args.index(option); del args[index:index + 2]
+            with self.subTest(missing=option): self.invoke(args)
+
+    def test_parent_errors_before_and_after_selected_subparser_are_fixed(self):
+        for prefix in (['--unknown=' + 'x'*8192], ['--unknown=PRIVATE-\x1b[2J'],
+                       ['--password=PRIVATE-PARSER-SENTINEL'], ['--root', '--root', str(ROOT)],
+                       ['--root', str(ROOT), '--root', str(ROOT)]):
+            with self.subTest(prefix=prefix[0][:30]): self.invoke(prefix + self.required)
+
+    def test_public_value_refusals_are_generic_before_validator_or_state(self):
+        for option, value in (('--action', 'PRIVATE-\x1b[2J'), ('--port', 'PRIVATE-' + 'x'*8192),
+                              ('--port', '01'), ('--timeout-seconds', 'nan')):
+            with self.subTest(option=option):
+                self.invoke(self.replaced(option, value), expected=self.VALUE_REFUSAL)
+        self.invoke(['--root', str(self.base / ('PRIVATE-' + 'x'*8192)), *self.required], expected=self.VALUE_REFUSAL)
+        self.invoke(['--root', str(self.base), *self.required], expected=self.VALUE_REFUSAL)
+
+    def test_selected_help_keeps_fixed_useful_syntax(self):
+        with patch.object(sys, 'argv', ['untrusted-program-\x1b[2J', 'public-client-command', '--help']), \
+                patch('sys.stdout', new=io.StringIO()) as output, patch('sys.stderr', new=io.StringIO()) as error, \
+                patch.object(ci, 'public_client_command') as command, self.assertRaises(SystemExit) as stopped:
+            ci.main()
+        self.assertEqual(stopped.exception.code, 0); command.assert_not_called()
+        text = output.getvalue()
+        self.assertIn('usage: ci_assurance.py public-client-command', text)
+        for option in ('--profile-file', '--run-dir', '--action', '--port', '--timeout-seconds', '--job-id', '--file-id'):
+            self.assertIn(option, text)
+        self.assertNotIn('untrusted-program', text); self.assertNotIn('\x1b', text)
+        self.assertEqual(error.getvalue(), '')
+
+    def test_other_modes_keep_standard_parse_diagnostics_with_literal_public_mode(self):
+        cases = [
+            (['plan', '--output', '/inert', '--event', 'public-client-command'], "invalid choice: 'public-client-command'"),
+            (['record', '--output', '/inert', '--gate', 'inert', '--timeout-seconds', 'PRIVATE-FLOAT',
+              '--', 'public-client-command'], "invalid float value: 'PRIVATE-FLOAT'"),
+            (['summary', '--plan', '/inert', '--directory', '/inert', '--output', '/inert',
+              '--unknown', 'public-client-command', 'PRIVATE-\x1b[2J'], 'PRIVATE-\x1b[2J'),
+        ]
+        for args, expected in cases:
+            with self.subTest(mode=args[0]), patch.object(sys, 'argv', ['ci_assurance.py', *args]), \
+                    patch('sys.stderr', new=io.StringIO()) as error, self.assertRaises(SystemExit) as stopped:
+                ci.main()
+            self.assertEqual(stopped.exception.code, 2)
+            self.assertIn('usage:', error.getvalue()); self.assertIn(expected, error.getvalue())
+            self.assertFalse(self.run.exists())
+
+    def test_record_remainder_and_global_root_value_do_not_select_public_errors(self):
+        for prefix in ([], ['--root', 'public-client-command']):
+            args = [*prefix, 'record', '--output', '/inert', '--gate', 'inert', '--',
+                    'public-client-command', '--password', 'PRIVATE-PARSER-SENTINEL']
+            with self.subTest(prefix=prefix), patch.object(sys, 'argv', ['ci_assurance.py', *args]), \
+                    patch('sys.stderr', new=io.StringIO()) as error, patch.object(ci, 'record', return_value=0) as record:
+                self.assertEqual(ci.main(), 0)
+            self.assertEqual(record.call_args.args[3], ['public-client-command', '--password', 'PRIVATE-PARSER-SENTINEL'])
+            self.assertEqual(error.getvalue(), '')
+
+
+
+class PublicClientParentRootTests(unittest.TestCase):
+    def refuse_hidden_root(self, second_option):
+        from contextlib import ExitStack
+        supply = ci._public_client_supply_chain()
+        with tempfile.TemporaryDirectory(prefix='public-parent-root-') as directory:
+            parent = Path(directory).resolve()
+            tree = parent / 'tree'; tree.mkdir(mode=0o700)
+            run = parent / 'never-created'
+            args = ['ci_assurance.py', '--root', 'public-client-command', second_option, str(ROOT),
+                    'public-client-command', '--development-profile', 'public-client-linux-x86_64',
+                    '--profile-tree', str(tree), '--run-dir', str(run), '--action', 'submit',
+                    '--port', '1', '--timeout-seconds', '1']
+            for role in ('node-archive', 'node', 'zowe-archive', 'bubblewrap', 'loader', 'libdl',
+                         'libstdcxx', 'libm', 'libgcc', 'libpthread', 'libc', 'libnss_files'):
+                path = parent / role; path.write_bytes(b'inert\n'); path.chmod(0o600)
+                args += ['--profile-file', f'{role}={path}']
+            with ExitStack() as stack:
+                command = stack.enter_context(patch.object(ci, 'public_client_command', return_value=0))
+                guards = [stack.enter_context(patch.object(owner, name, side_effect=AssertionError('unexpected ' + name)))
+                    for owner, name in ((supply, 'validate_ci_lock'), (supply, 'validate_development_inputs'),
+                                       (ci, '_prepare_public_client_run'), (ci, '_run_owned'), (ci.subprocess, 'Popen'))]
+                error = stack.enter_context(patch('sys.stderr', new=io.StringIO()))
+                output = stack.enter_context(patch('sys.stdout', new=io.StringIO()))
+                stack.enter_context(patch.object(sys, 'argv', args))
+                try:
+                    status = ci.main()
+                except SystemExit as stopped:
+                    status = stopped.code
+                for guard in guards: guard.assert_not_called()
+                self.assertFalse(run.exists())
+                diagnostic = error.getvalue().encode('utf-8')
+                self.assertLessEqual(len(diagnostic), 4096)
+                self.assertTrue(all(byte == 10 or 32 <= byte < 127 for byte in diagnostic))
+                # The inert transport stub exposes actual parser admission on
+                # the initial candidate without any validator or native work.
+                self.assertEqual((status, command.call_count, diagnostic, output.getvalue()),
+                                 (2, 0, b'public client arguments refused\n', ''))
+
+    def test_mode_valued_root_cannot_hide_second_exact_root(self):
+        self.refuse_hidden_root('--root')
+
+    def test_mode_valued_root_cannot_hide_second_abbreviated_root(self):
+        self.refuse_hidden_root('--r')
+
+
 if __name__=='__main__':unittest.main()

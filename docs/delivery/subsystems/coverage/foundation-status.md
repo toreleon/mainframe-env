@@ -302,34 +302,32 @@ targets, runtime, legal inputs and containment are unchanged. No Docker build,
 current image size, speed, sandbox workload or application batch pass is implied;
 those remain final-candidate gates.
 
-### CV-209.public-client-command declaration
+### CV-209.public-client-command acceptance
 
-Manager accepts the source-only finite command packet and grants exactly the
-existing `tools/ci_assurance.py`, `tools/tests/test_ci_assurance.py` and one unique
-fragment. Reuse the accepted optional input validator and Linux supervisor; add
-only keyword-only `env=None` and `on_reaped=None`, preserving ordinary callers,
-receipt schemas and floors. Actual wait completion and infrastructure failure
-must remain distinct; callback failure cannot restore group authority or change
-an actual child exit into the fallback status.
+Status: **Complete (finite command transport only)**. Ten fixed action shapes
+reuse optional locked input validation and the existing Linux supervisor. Scalar
+applicability/duplicates, exact root admission, owned settings/JCL, fixed readonly
+mounts, empty child environment, bounded separate raw captures, actual successful
+wait exit and before/after identity/state validation are checked. Default callers
+and receipt/floor contracts remain unchanged. A reap callback cannot restore
+group authority or overwrite actual exit with a fallback status. Independent
+mocked controls and two tiny native keyword controls establish these boundaries;
+review-found unbounded diagnostics and hidden duplicate/abbreviated root admission
+have genuine retained REDs and focused passes.
 
-Freeze ten action shapes with scalar applicability, twelve explicit file roles,
-one tree and one fresh private run directory. No arbitrary argv, supplied
-credential/env/mount configuration, separate launcher module or profile reader.
-Build the fixed reviewed bwrap/Node vector with empty parent environment, own
-synthetic identity/settings/JCL, readonly accepted inputs and bounded separate
-raw streams. Revalidate lock/input identities and owned seeds after each command.
-This owner reports transport completion only; Rust later owns HTTP, job/spool,
-authentication, teardown and semantic assertions. Loopback requires inherited
-network; host bootstrap, synchronous byte checks and inspection quotas stay
-qualified, without claiming egress isolation or a hard filesystem quota.
+The final host 136-test suite failed one unchanged conservative census control
+when required procfs metadata disappeared; that failed producer remains intact.
+One separately granted changed-condition run in a private PID/proc namespace
+passes the same 136 tests with zero skips, actual waited bubblewrap exit zero,
+unchanged source/input hashes and exact owned temp cleanup. This is qualified
+tooling validation, not public-client containment or host group-absence proof.
+The original 123/134 passing and 136 failing receipts keep their own producers.
 
-First retain independent inert/mocked action, scalar, binding, capture and exit
-boundary reds; then run affected Python controls. Two tiny native Python controls
-may verify the new environment/callback paths; no Node, bwrap, version, server,
-job, network, extraction, source-cache or repeated actual-byte workload is granted.
-One full focused CI-assurance Python suite after the changed owner verifies
-existing compatibility. Manager owns runbook/status/generated files, integration
-and seal. No Cargo, product implementation or official/licensed credit.
+No Node/client version, server, HTTP route, job, spool or authentication workload
+is established by this slice. Rust still owns the actual application fixture,
+semantic refusal/state assertions, listener lifecycle and teardown. Host
+bootstrap/trust, inherited network, synchronous validation and inspection quotas
+stay qualified. No official/licensed or full Foundation acceptance credit.
 
 ### CV-209.cobol-figurative-comparisons acceptance
 

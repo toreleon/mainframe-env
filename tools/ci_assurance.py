@@ -2,6 +2,7 @@
 from __future__ import annotations
 import argparse
 import hashlib
+import importlib.util
 import json
 import math
 import os
@@ -11,6 +12,7 @@ from pathlib import Path, PurePosixPath
 import re
 import selectors
 import signal
+import stat
 import subprocess
 import sys
 import time
@@ -222,7 +224,8 @@ def _linux_group_has_members(pgid: int) -> bool:
 
 
 def _run_owned(command: list[str], root: Path, on_output, *, timeout_seconds,
-               max_output_bytes: int | None = None, separate_stderr: bool = False) -> tuple[int, str | None]:
+               max_output_bytes: int | None = None, separate_stderr: bool = False,
+               env=None, on_reaped=None) -> tuple[int, str | None]:
     """Run one Linux session; retain its leader until every group operation ends.
 
     The callback must return promptly. Merged output retains pipe byte order;
@@ -231,6 +234,14 @@ def _run_owned(command: list[str], root: Path, on_output, *, timeout_seconds,
     outside this primitive's containment boundary. An output ceiling is shared
     by both streams; admitted partial bytes survive failure and never imply pass.
     """
+    child_options = {}
+    if env is not None:
+        if not isinstance(env, dict) or any(
+                not isinstance(key, str) or not key or '=' in key or '\x00' in key
+                or not isinstance(value, str) or '\x00' in value
+                for key, value in env.items()):
+            raise ValueError('child environment must contain valid string keys and values')
+        child_options['env'] = dict(env)
     _validate_limits(timeout_seconds, max_output_bytes)
     if timeout_seconds is None:
         raise ValueError('owned commands require a deadline')
@@ -334,7 +345,7 @@ def _run_owned(command: list[str], root: Path, on_output, *, timeout_seconds,
         process = subprocess.Popen(
             command, cwd=root, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE if separate_stderr else subprocess.STDOUT,
-            start_new_session=True)
+            start_new_session=True, **child_options)
         fence = True
         pipes = [pipe for pipe in (process.stdout, process.stderr) if pipe is not None]
         owned_group()
@@ -401,11 +412,18 @@ def _run_owned(command: list[str], root: Path, on_output, *, timeout_seconds,
             # Release group authority BEFORE the sole reaping attempt, even if
             # wait raises after reaping. No fallback may resurrect this PGID.
             fence = False
+            reaped = False
             try:
                 code = process.wait(timeout=0.5)
+                reaped = True
             except BaseException as problem:
                 code = 127
                 fail('launcher wait failed: ' + (str(problem) or type(problem).__name__))
+            if reaped and on_reaped is not None:
+                try:
+                    on_reaped(code)
+                except BaseException as problem:
+                    fail('exit capture failed: ' + (str(problem) or type(problem).__name__))
         if cancelled is not None and error is None:
             fail(f'command cancelled by signal {cancelled}')
         try:
@@ -597,9 +615,390 @@ def jenkins_context(root: Path, environ: dict[str, str], requested_event: str = 
     return {'event': event, 'ref': ref, 'base': base, 'provider': provider}
 
 
+PUBLIC_CLIENT_PROFILE = 'public-client-linux-x86_64'
+_PUBLIC_CLIENT_SUPPLY = None
+_PUBLIC_CLIENT_SEEDS = {
+    'identity/passwd': b'agent:x:1000:1000:public-client:/client-home:/bin/false\n',
+    'identity/group': b'agent:x:1000:\n',
+    'identity/nsswitch.conf': b'passwd: files\ngroup: files\nhosts: files\n',
+    'client-home/.zowe.env.json': b'{}\n',
+    'plugins/plugins.json': b'{}\n',
+    'client-home/settings/imperative.json': b'{"overrides":{"CredentialManager":false},"credentialManagerOptions":{}}\n',
+    'input/public-client.jcl': b'//PBCLNT01 JOB CLASS=A\n//STEP1 EXEC PGM=IEFBR14\n',
+}
+_PUBLIC_CLIENT_DIRS = ('identity', 'client-home', 'plugins', 'cwd', 'input',
+                       'client-home/settings', 'client-home/logs')
+_PUBLIC_CLIENT_CAPTURES = ('stdout.bin', 'stderr.bin', 'child-exit.txt', 'supervision-error.txt')
+
+
+def _public_client_supply_chain():
+    """Load only the fixed sibling owner, also under importlib-based callers."""
+    global _PUBLIC_CLIENT_SUPPLY
+    if _PUBLIC_CLIENT_SUPPLY is None:
+        spec = importlib.util.spec_from_file_location(
+            '_ci_assurance_supply_chain', Path(__file__).resolve().with_name('supply_chain.py'))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _PUBLIC_CLIENT_SUPPLY = module
+    return _PUBLIC_CLIENT_SUPPLY
+
+
+def _public_client_decimal(value, maximum, *, minimum=0):
+    if (not isinstance(value, str) or not re.fullmatch(r'0|[1-9][0-9]{0,7}', value)
+            or not minimum <= int(value) <= maximum):
+        raise ValueError('noncanonical or out-of-range public client scalar')
+    return value
+
+
+def _public_client_operation(action, port, job_id, file_id) -> list[str]:
+    _public_client_decimal(port, 65535, minimum=1)
+    shapes = {
+        'submit': ('submit', 'local-file', '/input/public-client.jcl'),
+        'bad-password': ('submit', 'local-file', '/input/public-client.jcl'),
+        'owner-list': ('list', 'jobs', '--owner', 'IBMUSER', '--prefix', 'PBCLNT01'),
+        'other-owner-list': ('list', 'jobs', '--owner', 'IBMUSER', '--prefix', 'PBCLNT01'),
+        'status': ('view', 'job-status-by-jobid'),
+        'other-status': ('view', 'job-status-by-jobid'),
+        'files': ('list', 'spool-files-by-jobid'),
+        'other-files': ('list', 'spool-files-by-jobid'),
+        'content': ('view', 'spool-file-by-id'),
+        'other-content': ('view', 'spool-file-by-id'),
+    }
+    if action not in shapes:
+        raise ValueError('unknown public client action')
+    needs_job = action in {'status', 'other-status', 'files', 'other-files', 'content', 'other-content'}
+    needs_file = action in {'content', 'other-content'}
+    if (job_id is not None) != needs_job or (file_id is not None) != needs_file:
+        raise ValueError('public client action scalar applicability differs')
+    operation = ['zos-jobs', *shapes[action]]
+    if needs_job:
+        if (not isinstance(job_id, str) or not re.fullmatch(r'JOB[0-9]{5,8}', job_id)
+                or not 1 <= int(job_id[3:]) <= 99999999
+                or job_id != f'JOB{int(job_id[3:]):05}'):
+            raise ValueError('noncanonical public client job ID')
+        operation.append(job_id)
+    if needs_file:
+        operation.append(_public_client_decimal(file_id, 63))
+    user, password = ('OTHERUSR', 'OTHERPASS') if action.startswith('other-') else (
+        'IBMUSER', 'WRONGPASS' if action == 'bad-password' else 'TESTPASS')
+    return operation + ['--host', '127.0.0.1', '--port', port, '--protocol', 'http',
+                        '--user', user, '--password', password, '--completion-timeout', '5',
+                        '--establish-connection-timeout', '5', '--response-format-json']
+
+
+def _public_client_identity() -> None:
+    if (sys.platform != 'linux' or platform.machine() != 'x86_64'
+            or os.getuid() != 1000 or os.geteuid() != 1000
+            or os.getgid() != 1000 or os.getegid() != 1000
+            or any(group != 1000 for group in os.getgroups())):
+        raise ValueError('public client requires Linux x86_64 and reviewed uid/gid 1000')
+    status = Path('/proc/self/status').read_text(encoding='ascii')
+    for name in ('CapEff', 'CapPrm', 'CapAmb'):
+        values = re.findall(rf'^{name}:\s*([0-9a-fA-F]+)$', status, re.MULTILINE)
+        if len(values) != 1 or int(values[0], 16) != 0:
+            raise ValueError('public client requires zero effective/permitted/ambient capabilities')
+
+
+def _public_client_path(value) -> Path:
+    raw = str(value)
+    path = Path(raw)
+    if (not path.is_absolute() or str(path) != raw or len(raw.encode('utf-8')) > 4096
+            or '\\' in raw or any(ord(c) < 32 or 127 <= ord(c) <= 159 for c in raw)
+            or path.resolve() != path):
+        raise ValueError('public client path must be canonical, absolute and nonsymlink')
+    return path
+
+
+def _public_client_run_path(value, root: Path, files: dict, tree: Path) -> Path:
+    path = _public_client_path(value)
+    if path.exists() or path.is_symlink() or path in {Path('/'), Path.home().resolve()}:
+        raise ValueError('public client run leaf must be new and exclusive')
+    parent = path.parent
+    metadata = parent.lstat()
+    if (not stat.S_ISDIR(metadata.st_mode) or metadata.st_uid != os.getuid()
+            or stat.S_IMODE(metadata.st_mode) & 0o022):
+        raise ValueError('public client run parent must be private and owned')
+    for authority in (root, tree, *files.values()):
+        if path == authority or path in authority.parents or authority in path.parents:
+            raise ValueError('public client run leaf overlaps source or input authority')
+    return path
+
+
+def _public_client_exclusive(path: Path):
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    try:
+        os.fchmod(descriptor, 0o600)
+        return os.fdopen(descriptor, 'wb', buffering=0)
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _prepare_public_client_run(run_dir: Path) -> None:
+    for name in _PUBLIC_CLIENT_DIRS:
+        (run_dir / name).mkdir(mode=0o700)
+        (run_dir / name).chmod(0o700)
+    for name, data in _PUBLIC_CLIENT_SEEDS.items():
+        with _public_client_exclusive(run_dir / name) as output:
+            if output.write(data) != len(data):
+                raise OSError('public client seed write incomplete')
+
+
+def _public_client_check_state(run_dir: Path, lock_hash: str) -> None:
+    """Inspect a finite retained tree; these caps are not live filesystem quotas."""
+    regular = {**_PUBLIC_CLIENT_SEEDS, 'input-lock.sha256': (lock_hash + '\n').encode('ascii')}
+    caps = {'stdout.bin': 65536, 'stderr.bin': 65536, 'child-exit.txt': 32,
+            'supervision-error.txt': 4096,
+            'client-home/logs/imperative.log': 1048576, 'client-home/logs/zowe.log': 1048576}
+    expected = set(regular) | set(_PUBLIC_CLIENT_CAPTURES) | set(_PUBLIC_CLIENT_DIRS)
+    found = set()
+    pending = [run_dir]
+    log_total = 0
+    file_state = _public_client_supply_chain().file_state
+    while pending:
+        directory = pending.pop()
+        before = directory.lstat()
+        if (not stat.S_ISDIR(before.st_mode) or stat.S_IMODE(before.st_mode) != 0o700
+                or before.st_uid != os.getuid()):
+            raise ValueError('owned public client directory identity/mode differs')
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                path = Path(entry.path)
+                name = path.relative_to(run_dir).as_posix()
+                if (name not in expected and name not in caps) or name in found:
+                    raise ValueError('unexpected public client tree membership')
+                found.add(name)
+                metadata = entry.stat(follow_symlinks=False)
+                if name in _PUBLIC_CLIENT_DIRS:
+                    if not stat.S_ISDIR(metadata.st_mode):
+                        raise ValueError('public client directory type differs')
+                    pending.append(path)
+                    continue
+                if (not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != os.getuid()
+                        or metadata.st_nlink != 1):
+                    raise ValueError('public client file type/ownership differs')
+                is_log = name.startswith('client-home/logs/')
+                if (stat.S_IMODE(metadata.st_mode) & 0o7022 if is_log
+                        else stat.S_IMODE(metadata.st_mode) != 0o600):
+                    raise ValueError('public client file mode differs')
+                maximum = len(regular[name]) if name in regular else caps[name]
+                if metadata.st_size > maximum:
+                    raise ValueError('public client file exceeds inspection cap')
+                descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+                with os.fdopen(descriptor, 'rb') as source:
+                    if file_state(os.fstat(source.fileno())) != file_state(metadata):
+                        raise ValueError('public client file changed before read')
+                    data = source.read(maximum + 1)
+                    if len(data) > maximum or (name in regular and data != regular[name]):
+                        raise ValueError('public client seed bytes or capture cap differs')
+                    if (file_state(os.fstat(source.fileno())) != file_state(metadata)
+                            or file_state(path.lstat()) != file_state(metadata)):
+                        raise ValueError('public client file changed during inspection')
+                if is_log: log_total += len(data)
+        if file_state(directory.lstat()) != file_state(before):
+            raise ValueError('public client directory changed during inspection')
+    if not expected <= found or log_total > 2097152:
+        raise ValueError('public client required membership/log total differs')
+
+
+def _public_client_argv(validated: dict, run_dir: Path, suffix: list[str]) -> list[str]:
+    files = validated['files']
+    command = [str(files['bubblewrap']), '--unshare-user', '--uid', '1000', '--gid', '1000',
+               '--unshare-pid', '--die-with-parent', '--new-session', '--cap-drop', 'ALL', '--clearenv',
+               '--proc', '/proc', '--dev', '/dev', '--tmpfs', '/tmp', '--dir', '/etc',
+               '--dir', '/opt/node/bin', '--dir', '/lib64', '--dir', '/lib/x86_64-linux-gnu']
+    for role, destination in (
+            ('node', '/opt/node/bin/node'),
+            ('loader', '/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2'),
+            ('loader', '/lib64/ld-linux-x86-64.so.2'),
+            ('libdl', '/lib/x86_64-linux-gnu/libdl.so.2'),
+            ('libstdcxx', '/lib/x86_64-linux-gnu/libstdc++.so.6'),
+            ('libm', '/lib/x86_64-linux-gnu/libm.so.6'),
+            ('libgcc', '/lib/x86_64-linux-gnu/libgcc_s.so.1'),
+            ('libpthread', '/lib/x86_64-linux-gnu/libpthread.so.0'),
+            ('libc', '/lib/x86_64-linux-gnu/libc.so.6'),
+            ('libnss_files', '/lib/x86_64-linux-gnu/libnss_files.so.2')):
+        command += ['--ro-bind', str(files[role]), destination]
+    for name, destination in (('identity/passwd', '/etc/passwd'), ('identity/group', '/etc/group'),
+                              ('identity/nsswitch.conf', '/etc/nsswitch.conf'), ('input', '/input')):
+        command += ['--ro-bind', str(run_dir / name), destination]
+    command += ['--ro-bind', str(validated['tree'] / 'package'), '/opt/client']
+    for name, destination in (('client-home', '/client-home'), ('plugins', '/plugins'), ('cwd', '/work')):
+        command += ['--bind', str(run_dir / name), destination]
+    return command + ['--chdir', '/work', '--setenv', 'PATH', '/opt/node/bin',
+                      '--setenv', 'TMPDIR', '/tmp', '--setenv', 'ZOWE_CLI_HOME', '/client-home',
+                      '--setenv', 'ZOWE_CLI_PLUGINS_DIR', '/plugins', '/opt/node/bin/node',
+                      '--no-addons', '--no-global-search-paths', '/opt/client/lib/main.js', *suffix]
+
+
+def _public_client_diagnostic(message: str) -> bytes:
+    # Never include fixed credentials, raw output or a human child argv log.
+    for secret in ('TESTPASS', 'WRONGPASS', 'OTHERPASS', 'IBMUSER', 'OTHERUSR'):
+        message = message.replace(secret, '[redacted]')
+    escaped = ''.join(c if 32 <= ord(c) < 127 else ascii(c)[1:-1]
+                      for c in message).encode('ascii', errors='backslashreplace')
+    return escaped[:4095] + b'\n' if escaped else b''
+
+
+def _public_client_lock_bytes(root: Path) -> bytes:
+    supply = _public_client_supply_chain()
+    path = root / 'tools/ci-inputs.lock.json'
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(descriptor, 'rb') as source:
+        metadata = os.fstat(source.fileno())
+        if not stat.S_ISREG(metadata.st_mode) or not 0 < metadata.st_size <= supply.MAX_JSON_BYTES:
+            raise ValueError('public client lock size/type differs')
+        data = source.read(supply.MAX_JSON_BYTES + 1)
+        if (len(data) > supply.MAX_JSON_BYTES
+                or supply.file_state(os.fstat(source.fileno())) != supply.file_state(metadata)
+                or supply.file_state(path.lstat()) != supply.file_state(metadata)):
+            raise ValueError('public client lock changed during bounded read')
+        return data
+
+
+def public_client_command(root: Path, *, profile_files, profile_tree, run_dir,
+                          action, port, job_id=None, file_id=None, timeout_seconds) -> int:
+    """Report only transport completion; the caller owns semantic assertions."""
+    source_root = Path(__file__).resolve().parents[1]
+    if root.resolve() != source_root:
+        raise ValueError('public client root must match the executing source owner')
+    suffix = _public_client_operation(action, port, job_id, file_id)
+    try:
+        valid_timeout = (type(timeout_seconds) in (int, float) and math.isfinite(timeout_seconds)
+                         and 0 < timeout_seconds <= 10)
+    except OverflowError:
+        valid_timeout = False
+    if not valid_timeout:
+        raise ValueError('public client timeout must be finite, positive and at most 10 seconds')
+    _public_client_identity()
+    supply = _public_client_supply_chain()
+    files = supply.profile_bindings(profile_files)
+    tree = _public_client_path(profile_tree)
+    run = _public_client_run_path(run_dir, source_root, files, tree)
+
+    def inputs():
+        before = _public_client_lock_bytes(source_root)
+        lock = supply.validate_ci_lock(source_root)
+        if lock['schema_version'] != 'mainframe-env.ci-input-lock@2':
+            raise ValueError('public client requires the accepted optional @2 profile')
+        validated = supply.validate_development_inputs(lock, PUBLIC_CLIENT_PROFILE, files, tree)
+        after = _public_client_lock_bytes(source_root)
+        if before != after:
+            raise ValueError('public client lock changed during input validation')
+        return hashlib.sha256(before).hexdigest(), validated
+
+    lock_hash, validated = inputs()
+    # mkdir is the exclusive allocation boundary; never reuse or delete a leaf.
+    run.mkdir(mode=0o700)
+    handles = {}
+    failures = []
+    reaped = False
+    lengths = {'stdout': 0, 'stderr': 0}
+
+    def output(stream, data):
+        if stream not in lengths or not isinstance(data, bytes):
+            raise ValueError('invalid public client raw output stream')
+        remaining = min(65536 - lengths[stream], 131072 - sum(lengths.values()))
+        admitted = data[:remaining]
+        if admitted and handles[stream + '.bin'].write(admitted) != len(admitted):
+            raise OSError('public client raw capture write incomplete')
+        lengths[stream] += len(admitted)
+        if len(data) > remaining:
+            raise ValueError('public client ' + stream + ' output limit exceeded')
+
+    def capture_exit(code):
+        nonlocal reaped
+        if reaped or type(code) is not int:
+            raise ValueError('public client actual exit capture differs')
+        data = (str(code) + '\n').encode('ascii')
+        if len(data) > 32 or handles['child-exit.txt'].write(data) != len(data):
+            raise OSError('public client actual exit write incomplete')
+        reaped = True
+
+    try:
+        run.chmod(0o700)
+        for name in _PUBLIC_CLIENT_CAPTURES:
+            handles[name] = _public_client_exclusive(run / name)
+        with _public_client_exclusive(run / 'input-lock.sha256') as lock_file:
+            data = (lock_hash + '\n').encode('ascii')
+            if lock_file.write(data) != len(data): raise OSError('public client lock capture incomplete')
+        _prepare_public_client_run(run)
+        _public_client_check_state(run, lock_hash)
+        _, error = _run_owned(_public_client_argv(validated, run, suffix), run / 'cwd', output,
+                             timeout_seconds=timeout_seconds, max_output_bytes=131072,
+                             separate_stderr=True, env={}, on_reaped=capture_exit)
+        if error: failures.append(error)
+        if not reaped: failures.append('public client actual exit was not captured')
+    except BaseException as problem:
+        failures.append('public client setup/capture failed: ' + (str(problem) or type(problem).__name__))
+    finally:
+        try:
+            after_hash, after_inputs = inputs()
+            if after_hash != lock_hash or after_inputs != validated:
+                raise ValueError('public client lock/input identities changed')
+        except BaseException as problem:
+            failures.append('public client input postcheck failed: ' + (str(problem) or type(problem).__name__))
+        try:
+            _public_client_check_state(run, lock_hash)
+        except BaseException as problem:
+            failures.append('public client state postcheck failed: ' + (str(problem) or type(problem).__name__))
+        # Close captures before final diagnostics so close failures are retained.
+        for name in tuple(handles):
+            if name == 'supervision-error.txt': continue
+            try: handles.pop(name).close()
+            except OSError: failures.append('public client capture close failed')
+        diagnostic = _public_client_diagnostic('; '.join(failures))
+        try:
+            error_file = handles.pop('supervision-error.txt', None)
+            if error_file is None:
+                error_file = _public_client_exclusive(run / 'supervision-error.txt')
+            with error_file:
+                if error_file.write(diagnostic) != len(diagnostic):
+                    raise OSError('public client supervision diagnostic write incomplete')
+        except OSError:
+            failures.append('public client supervision diagnostic capture failed')
+            print('public client supervision diagnostic capture failed', file=sys.stderr)
+    return 1 if failures else 0
+
+
+class _PublicClientScalar(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        seen = getattr(namespace, '_public_client_seen', set())
+        if self.dest in seen:
+            parser.error('duplicate public client scalar option: ' + option_string)
+        namespace._public_client_seen = seen | {self.dest}
+        setattr(namespace, self.dest, values)
+
+
+class _PublicClientArgumentParser(argparse.ArgumentParser):
+    def __init__(self, *args, public_client_errors=False, **kwargs):
+        self.public_client_errors = public_client_errors
+        super().__init__(*args, **kwargs)
+
+    def error(self, message):
+        if self.public_client_errors:
+            self.exit(2, _public_client_diagnostic('public client arguments refused').decode('ascii'))
+        super().error(message)
+
+
+def _public_client_cli_selected(arguments: list[str]) -> bool:
+    # Argparse identifies only the mode after the existing global root option.
+    # Optional root arity permits diagnostic routing even for a missing value;
+    # the real parser still enforces its required value. Later tokens cannot
+    # replace the first positional mode, including a record command remainder.
+    selector = argparse.ArgumentParser(add_help=False, prog='ci_assurance.py')
+    selector.add_argument('--root', nargs='?')
+    selector.add_argument('mode', nargs='?')
+    return selector.parse_known_args(arguments)[0].mode == 'public-client-command'
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[1])
+    public_errors = _public_client_cli_selected(sys.argv[1:])
+    parser = _PublicClientArgumentParser(description=__doc__, public_client_errors=public_errors,
+        allow_abbrev=not public_errors,
+        **({'prog': 'ci_assurance.py'} if public_errors else {}))
+    parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[1],
+                        **({'action': _PublicClientScalar} if public_errors else {}))
     sub = parser.add_subparsers(dest='mode', required=True)
     p = sub.add_parser('plan'); p.add_argument('--output', type=Path, required=True)
     p.add_argument('--event', choices=['auto', *sorted(EVENTS)], default='auto')
@@ -611,7 +1010,33 @@ def main() -> int:
     p.add_argument('--max-output-bytes', type=int, help='Optional combined byte ceiling; requires --timeout-seconds')
     p.add_argument('command', nargs=argparse.REMAINDER)
     p = sub.add_parser('summary'); p.add_argument('--plan', type=Path, required=True); p.add_argument('--directory', type=Path, required=True); p.add_argument('--output', type=Path, required=True); p.add_argument('--gates', nargs='*')
-    args = parser.parse_args(); root = args.root.resolve()
+    p = sub.add_parser('public-client-command', allow_abbrev=False, public_client_errors=True,
+                       prog='ci_assurance.py public-client-command')
+    for name in ('development-profile', 'profile-tree', 'run-dir', 'action', 'port', 'timeout-seconds'):
+        p.add_argument('--' + name, action=_PublicClientScalar, required=True,
+                       **({'type': float} if name == 'timeout-seconds' else {}))
+    for name in ('job-id', 'file-id'):
+        p.add_argument('--' + name, action=_PublicClientScalar)
+    p.add_argument('--profile-file', action='append', required=True)
+    args = parser.parse_args()
+    if args.mode == 'public-client-command':
+        prefix = sys.argv[1:sys.argv.index('public-client-command')]
+        roots = [token for token in prefix if token == '--root' or token.startswith('--root=')]
+        if len(roots) > 1 or any(token.startswith('--') and token != '--root'
+                                 and not token.startswith('--root=') for token in prefix):
+            parser.error('unknown or duplicate public client root option')
+        if args.development_profile != PUBLIC_CLIENT_PROFILE:
+            parser.error('unknown public client development profile')
+        try:
+            root = args.root.resolve()
+            return public_client_command(root, profile_files=args.profile_file,
+                profile_tree=args.profile_tree, run_dir=args.run_dir, action=args.action,
+                port=args.port, job_id=args.job_id, file_id=args.file_id,
+                timeout_seconds=args.timeout_seconds)
+        except (ValueError, OSError, _public_client_supply_chain().SupplyChainError):
+            sys.stderr.write(_public_client_diagnostic('public client refused').decode('ascii'))
+            return 1
+    root = args.root.resolve()
     if args.mode == 'plan':
         context = jenkins_context(root, os.environ, args.event, args.ref, args.base)
         event = {'merge_commit': args.merge_commit}
