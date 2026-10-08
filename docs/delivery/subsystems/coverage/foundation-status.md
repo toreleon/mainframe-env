@@ -1068,3 +1068,14 @@ formatting, frozen dependency and diff gates pass; original receipts remain
 bound to their producing inputs. Only the two reviewed facade budgets ratchet
 down. No storage-snapshot authentication, nonrepudiation, global heap quota,
 licensed equivalence or whole Foundation completion is claimed.
+
+### CV-209.conformance-contract-lint acceptance
+
+Status: **Complete (four mechanical conformance owner diagnostics only)**.
+Equivalent let-chain short circuits and redundant borrows preserve original
+lookup, comparison, SAF revocation, error order, signatures, literals and tests.
+Fourteen existing nonempty controls pass on the joint root candidate; strict
+all-target application/server/conformance/tooling owner lint passes. Module,
+formatting, frozen dependency, metadata and documentation checks pass. No new
+route, backend, replay, marker, official-row or licensed credit is claimed;
+MQ dependency-inclusive lint and Foundation completion remain pending.

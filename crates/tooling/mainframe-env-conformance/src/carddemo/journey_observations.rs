@@ -102,17 +102,15 @@ impl RouteObservations {
                 if let Some((_, previous)) = destination
                     .iter()
                     .find(|(previous_id, _)| previous_id == id)
-                {
-                    if previous.len() + requirements.len() > MAX_REQUIREMENTS
+                    && (previous.len() + requirements.len() > MAX_REQUIREMENTS
                         || requirements
                             .iter()
-                            .any(|requirement| previous.contains(requirement))
-                    {
-                        return Err(CorpusProblem::new(
-                            "carddemo.full.observation_invalid",
-                            "duplicate merged observation",
-                        ));
-                    }
+                            .any(|requirement| previous.contains(requirement)))
+                {
+                    return Err(CorpusProblem::new(
+                        "carddemo.full.observation_invalid",
+                        "duplicate merged observation",
+                    ));
                 }
             }
         }
