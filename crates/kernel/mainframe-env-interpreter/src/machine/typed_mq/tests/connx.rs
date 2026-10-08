@@ -256,7 +256,7 @@ fn compiled_cobol_executes_original_connx_commit_back_disconnect_with_issued_tok
             }
             resume = MachineResume::HostResult(EffectResult {
                 sequence: effect.sequence,
-                outcome: Ok(HostResult::MqMqi(MqMqiHostResult {
+                outcome: Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
                     limits: req.envelope.limits,
                     result: MqMqiResult {
                         call: expected,
@@ -265,7 +265,7 @@ fn compiled_cobol_executes_original_connx_commit_back_disconnect_with_issued_tok
                             output,
                         },
                     },
-                })),
+                }))),
             });
         }
         assert!(matches!(

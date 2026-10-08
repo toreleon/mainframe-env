@@ -178,7 +178,7 @@
       "normative": false,
       "path": "crates/contracts/mainframe-env-host-api/README.md",
       "relative_links": 5,
-      "sha256": "sha256:6f715444b2c08fa30dd04b327fd5d6e3030b8babf6099d2a2ad7ec68f02b1342",
+      "sha256": "sha256:08a842fe78750b6985badd884dcb0db53e3b0d1a59adca0483df82c8331d1c16",
       "title": "mainframe-env-host-api",
       "xtask_commands": 1
     },
@@ -1441,8 +1441,8 @@
       "path": "docs/decisions/0050-host-effect-envelope-layout.md",
       "relative_links": 1,
       "scope": "In-process HostRequest and HostResult representation",
-      "sha256": "sha256:c25551477cd152c59bdce9ab0b43f279cb0d34860787b0519f5346c90955a25e",
-      "status": "Proposed implementation; compatibility validation pending",
+      "sha256": "sha256:7d581459f18808111ab7f6871073eebf83e47945e24c6dca652affe87453c05d",
+      "status": "Accepted implementation; scoped compatibility validation passed",
       "title": "ADR-0050: Box the largest shared host-effect payloads",
       "xtask_commands": 0
     },
@@ -1698,7 +1698,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/coverage/foundation-status.md",
       "relative_links": 2,
-      "sha256": "sha256:27487bd02a09e1c3b62293a32963f68cdaa79acc6c6aa406a34dbaf204b0162a",
+      "sha256": "sha256:b75f43259e017ea3690e6129edbca6708a13be959f3b749ddc9c6100dd95bf14",
       "title": "Coverage and conformance — Coverage authority progress",
       "xtask_commands": 6
     },

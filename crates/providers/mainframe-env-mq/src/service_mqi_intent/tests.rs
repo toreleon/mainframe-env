@@ -67,7 +67,7 @@ impl Fixture {
             sequence: 7,
             deadline_tick: 90,
             idempotency_key: Some(mutation.idempotency_key.clone()),
-            request: HostRequest::MqMqi(MqMqiHostRequest {
+            request: HostRequest::MqMqi(Box::new(MqMqiHostRequest {
                 mutation,
                 envelope: MqMqiRequestEnvelope {
                     context: MqMqiContext {
@@ -81,7 +81,7 @@ impl Fixture {
                         options: MqMqiOptions::ContractDefault,
                     }),
                 },
-            }),
+            })),
         };
         let provider = CapabilityDescriptor {
             capability: CapabilityId::new("host.mq.write", l).unwrap(),

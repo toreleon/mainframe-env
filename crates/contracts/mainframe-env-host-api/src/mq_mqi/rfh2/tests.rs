@@ -151,10 +151,10 @@ fn new_observation_has_independent_full_host_canonical_framing() {
             }),
         },
     };
-    let actual: Result<_, HostProblem> = Ok(HostResult::MqMqi(MqMqiHostResult {
+    let actual: Result<_, HostProblem> = Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
         result: value,
         limits,
-    }));
+    })));
     let expected: Result<_, HostProblem> = Ok(Reference { limits, status });
     let mut bytes = Vec::new();
     let size = encode(

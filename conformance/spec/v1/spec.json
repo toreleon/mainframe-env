@@ -66024,11 +66024,11 @@
         "id": "jcl.fixture.output-parameters.0076.valid"
       },
       {
-        "digest": "sha256:5192745771cc2b8cf242a57e01fdf0aadeda1c00f44794f603b1c368e2b21c8b",
+        "digest": "sha256:34fd727e5792a7ca3d22a7095e519d6240873f830c2210b58e0264e1b3b0d387",
         "id": "mq.memory.local-v1"
       },
       {
-        "digest": "sha256:5192745771cc2b8cf242a57e01fdf0aadeda1c00f44794f603b1c368e2b21c8b",
+        "digest": "sha256:34fd727e5792a7ca3d22a7095e519d6240873f830c2210b58e0264e1b3b0d387",
         "id": "mq.sqlite.local-v1"
       },
       {

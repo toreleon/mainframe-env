@@ -18,10 +18,10 @@ fn every_descriptor_field_and_profile_changes_full_request_and_host_result_ident
             },
         );
         let host = |r| {
-            Ok(HostResult::MqMqi(MqMqiHostResult {
+            Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
                 result: r,
                 limits: MqMqiLimits::default(),
-            }))
+            })))
         };
         let request_digest = mq_mqi_request_digest(&original).unwrap();
         let result_digest = canonical_result_digest(&host(observed.clone())).unwrap();
@@ -92,10 +92,10 @@ fn body_properties_controls_limits_and_data_length_are_identity_not_hidden_metad
         ),
     );
     let host = |r| {
-        Ok(HostResult::MqMqi(MqMqiHostResult {
+        Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
             result: r,
             limits: MqMqiLimits::default(),
-        }))
+        })))
     };
     let digest = canonical_result_digest(&host(base.clone())).unwrap();
     for case in 0..4 {

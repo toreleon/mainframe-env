@@ -149,13 +149,13 @@ pub(super) fn reply(
     };
     machine.resume_host(EffectResult {
         sequence: effect.sequence,
-        outcome: Ok(HostResult::MqMqi(MqMqiHostResult {
+        outcome: Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
             limits: request.envelope.limits,
             result: MqMqiResult {
                 call: request.envelope.request.call(),
                 outcome,
             },
-        })),
+        }))),
     })
 }
 pub(super) fn issued() -> MqHconn {

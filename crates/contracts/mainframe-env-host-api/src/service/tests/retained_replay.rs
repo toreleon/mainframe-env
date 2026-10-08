@@ -27,7 +27,7 @@ fn inquiry(i: &Invocation, pending: bool) -> EffectRequest {
         sequence: 1,
         deadline_tick: 100,
         idempotency_key: Some(k.clone()),
-        request: HostRequest::MqMqi(crate::MqMqiHostRequest {
+        request: HostRequest::MqMqi(Box::new(crate::MqMqiHostRequest {
             envelope: MqMqiRequestEnvelope {
                 context: MqMqiContext {
                     owner,
@@ -41,7 +41,7 @@ fn inquiry(i: &Invocation, pending: bool) -> EffectRequest {
                 idempotency_key: k,
                 transaction: None,
             },
-        }),
+        })),
     }
 }
 fn active() -> Invocation {

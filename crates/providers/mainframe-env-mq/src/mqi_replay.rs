@@ -239,7 +239,7 @@ fn validate_and_digest(
     // Callback notifications are private stored values only: the frozen
     // standalone validator allows them; public host-effect validation rejects
     // them. Counting/hashing does not admit them as executable host effects.
-    let full = Ok(HostResult::MqMqi(wrapper));
+    let full = Ok(HostResult::MqMqi(Box::new(wrapper)));
     canonical_result_size(&full, mqi.canonical_bytes).map_err(ReplayError::Host)?;
     canonical_result_digest(&full).map_err(ReplayError::Host)
 }

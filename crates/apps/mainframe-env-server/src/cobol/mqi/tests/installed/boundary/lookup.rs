@@ -56,7 +56,7 @@ impl HostProvider for SyncProvider {
         self.unit.store(unit + 1, Ordering::SeqCst);
         EffectResult {
             sequence: effect.sequence,
-            outcome: Ok(HostResult::MqMqi(MqMqiHostResult {
+            outcome: Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
                 limits: envelope.limits,
                 result: MqMqiResult {
                     call: envelope.request.call(),
@@ -65,7 +65,7 @@ impl HostProvider for SyncProvider {
                         output: MqMqiOutput::UnitOfWork { unit },
                     },
                 },
-            })),
+            }))),
         }
     }
 }

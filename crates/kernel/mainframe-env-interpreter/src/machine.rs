@@ -1954,7 +1954,7 @@ impl ReferenceMachine {
                 }
             }
             (PendingKind::MqMqi(targets), HostResult::MqMqi(result)) => {
-                self.finish_typed_mq(targets, result)
+                self.finish_typed_mq(targets, *result)
                     .map_err(|_| MachineProblem::Host(HostProblem::UnknownOutcome))?;
             }
             (PendingKind::MqMqi(_), _) => {

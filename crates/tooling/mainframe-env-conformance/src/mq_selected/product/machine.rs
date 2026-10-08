@@ -170,7 +170,7 @@ impl Consumer {
             sequence,
             deadline_tick: self.port.invocation.deadline_tick - 1,
             idempotency_key: Some(key.clone()),
-            request: HostRequest::MqMqi(MqMqiHostRequest {
+            request: HostRequest::MqMqi(Box::new(MqMqiHostRequest {
                 mutation: Mutation {
                     sequence,
                     idempotency_key: key,
@@ -181,7 +181,7 @@ impl Consumer {
                     limits: frame.limits(),
                     request,
                 },
-            }),
+            })),
         }))
     }
 }

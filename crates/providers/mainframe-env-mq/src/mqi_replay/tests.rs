@@ -12,10 +12,10 @@ mod rfh2;
 
 const BYTES: usize = 8 << 20;
 fn host(value: &MqMqiResult, limits: MqMqiLimits) -> Result<HostResult, HostProblem> {
-    Ok(HostResult::MqMqi(MqMqiHostResult {
+    Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
         result: value.clone(),
         limits,
-    }))
+    })))
 }
 fn stored(value: &MqMqiResult) -> Vec<u8> {
     encode(value, HostLimits::default(), MqMqiLimits::default(), BYTES).unwrap()

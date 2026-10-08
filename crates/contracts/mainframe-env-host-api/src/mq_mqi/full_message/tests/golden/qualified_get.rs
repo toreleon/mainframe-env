@@ -104,10 +104,10 @@ fn qualified_get_independent_request_and_full_host_result_preimage() {
                 ),
             )],
         ));
-        let host = Ok(HostResult::MqMqi(MqMqiHostResult {
+        let host = Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
             result: r,
             limits: MqMqiLimits::default(),
-        }));
+        })));
         assert_eq!(
             canonical_result_digest(&host).unwrap(),
             <[u8; 32]>::from(Sha256::digest(&core))

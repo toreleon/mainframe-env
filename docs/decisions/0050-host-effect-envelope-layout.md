@@ -1,6 +1,6 @@
 # ADR-0050: Box the largest shared host-effect payloads
 
-Status: Proposed implementation; compatibility validation pending
+Status: Accepted implementation; scoped compatibility validation passed
 Owner: Shared host-contract maintainers
 Scope: In-process HostRequest and HostResult representation
 Applies from: mainframe-env current shared host contracts
@@ -22,6 +22,16 @@ field ordering and bytes. Replay readers retain their existing versions; there
 is no codec or storage migration from boxing. Independent byte/digest vectors
 and retained replay tests must establish that compatibility before acceptance.
 No new MQI dispatch, participant behavior or conformance credit follows.
+
+```mermaid
+flowchart LR
+    Agent[Agent or executor] --> Request[HostRequest envelope]
+    Request --> Box[Owned Box of MQI DTO]
+    Box --> Provider[Existing provider]
+    Box --> Encoder[Existing canonical encoder]
+    Provider --> Result[HostResult envelope]
+    Result --> Replay[Existing durable replay codec]
+```
 
 ## Resource tradeoff
 
@@ -45,3 +55,11 @@ validation, independent canonical vectors, retained replay and owned unboxing.
 Target-specific size observations remain external execution output, not a new
 portable ABI promise. Formatting, module, dependency, documentation and changelog
 checks apply to the final integrated diff.
+
+The integrated candidate passed all five consumer-package compile checks, strict
+host Clippy, 355 host tests, typed MQI and replay regressions, and the three local
+MQ conformance source-binding checks. Independent canonical vectors and retained
+codec readers remain unchanged. The pinned Linux x86_64 measurement reduced
+HostRequest from 864 to 352 bytes and HostResult from 656 to 264 bytes; MQI DTO
+sizes stayed 864 and 656 bytes. These observations do not promise a native ABI
+or lower total heap usage. Full Foundation acceptance remains pending.

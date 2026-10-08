@@ -64,10 +64,10 @@ fn qualified_profile_shape_call_binding_and_fields_affect_full_digest() {
             )
             .unwrap();
             let host = |r| {
-                Ok(HostResult::MqMqi(MqMqiHostResult {
+                Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
                     result: r,
                     limits: request.limits,
-                }))
+                })))
             };
             let digest = canonical_result_digest(&host(result.clone())).unwrap();
             for i in 0..48 {

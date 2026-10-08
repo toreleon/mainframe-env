@@ -878,7 +878,7 @@ fn every_generated_md_pmo_member_layout_drift_is_captured_and_status_envelopes_a
             } else {
                 e.sequence
             },
-            outcome: Ok(HostResult::MqMqi(MqMqiHostResult {
+            outcome: Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
                 limits,
                 result: MqMqiResult {
                     call: if defect == 1 {
@@ -888,7 +888,7 @@ fn every_generated_md_pmo_member_layout_drift_is_captured_and_status_envelopes_a
                     },
                     outcome: ok(MqMqiOutput::Produced(out)),
                 },
-            })),
+            }))),
         };
         let before = m.bases.clone();
         assert!(m.resume_host(result).is_err());

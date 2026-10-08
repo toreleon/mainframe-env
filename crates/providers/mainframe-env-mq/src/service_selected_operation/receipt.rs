@@ -189,10 +189,10 @@ impl OccurrenceReceipt {
                 let result = crate::mqi_replay::decode(bytes, host, mqi, mqi.canonical_bytes)
                     .map_err(codec_error)?;
                 if result.call.label() != self.call
-                    || canonical_result_digest(&Ok(HostResult::MqMqi(MqMqiHostResult {
+                    || canonical_result_digest(&Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
                         limits: mqi,
                         result,
-                    })))?
+                    }))))?
                         != self.result_digest
                 {
                     return Err(HostProblem::Malformed);
@@ -248,10 +248,10 @@ impl OccurrenceReceipt {
                     .map_err(codec_error)?;
                 Ok(EffectResult {
                     sequence: self.sequence,
-                    outcome: Ok(HostResult::MqMqi(MqMqiHostResult {
+                    outcome: Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
                         limits: mqi,
                         result,
-                    })),
+                    }))),
                 })
             }
             _ => Err(HostProblem::IdempotencyConflict),

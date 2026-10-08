@@ -38,7 +38,7 @@ pub enum HostResult {
     /// Legacy MQ request or observation; typed MQI uses its separate contract.
     Mq(MqResult),
     /// Source-bound result shape with explicit limits, not execution authority.
-    MqMqi(MqMqiHostResult),
+    MqMqi(Box<MqMqiHostResult>),
 }
 
 impl HostResult {

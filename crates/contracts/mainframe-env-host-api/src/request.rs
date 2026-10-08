@@ -322,7 +322,7 @@ pub enum HostRequest {
     /// Legacy MQ request or observation; typed MQI uses its separate contract.
     Mq(MqRequest),
     /// Additive journal/replay boundary; public MQI dispatch remains pending.
-    MqMqi(MqMqiHostRequest),
+    MqMqi(Box<MqMqiHostRequest>),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

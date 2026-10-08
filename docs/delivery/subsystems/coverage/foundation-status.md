@@ -83,10 +83,11 @@ dependency order. Licensed and private-only implementation and the three unready
 CICS rows are excluded from task scope, retaining their identities and pending
 credit. Source cache availability does not establish product acceptance.
 
-Six isolated English CLI audits inspect existing owners. Initial current checks
-pass spec, coverage, application packages and dehardcoding; semantic identities
-and ABI inventory fail as stale. These checks do not replace executable product
-regressions. Audit findings must be reproduced by focused negatives before repair.
+Six isolated English CLI audits inspected existing owners. The initial checks
+found stale semantic-identity and ABI bindings; their bounded repairs are sealed
+below. All six checks now pass on the integrated candidate. These checks do not
+replace executable product regressions. Remaining audit findings must be
+reproduced by focused negatives before repair.
 
 | Slice | Parent, boundary and owners | Dependencies and acceptance |
 |---|---|---|
@@ -142,3 +143,91 @@ Normal owner regeneration updates those three fields to the unchanged provider
 source bytes. The owner check and deterministic second generation, formatting,
 dependency policy, module/documentation/changelog/subsystem and diff checks pass.
 This repair grants no ABI-equivalence, runtime or licensed credit.
+
+### CV-202.snapshot-continuity integration
+
+Status: **Focused and integration gates pass; completion seal pending**. New snapshot
+generations preserve row/unit/applicability descriptors and append-only retained
+evidence histories. Missing failure observations and stale sequence appends
+refuse before state changes; historical immutable retries remain idempotent.
+The tests-only candidate reproduced six failures with two passing controls. The
+reviewed repair passes all 28 coverage-package tests and strict package Clippy.
+Public methods, error vocabulary and persisted representation are unchanged.
+First-snapshot official membership still comes from the catalog/compiler owner.
+Current integrated spec/coverage, strict lint, formatting and dependency checks
+pass. The module extraction below resolves the facade gate without raising a
+ceiling. Required documentation/changelog/subsystem checks precede sealing;
+this closes no Foundation exit or licensed gate.
+
+### CV-209.store-contract-lint
+
+Parent: CV-209. Status: **In progress**. This mechanical prerequisite owns only
+four nested-condition diagnostics in the existing Memory/SQLite root-terminal
+guards and provider-mutation dependency check, plus nine private test snapshot
+tuple aliases revealed after those dependency errors were removed. Evaluation order, awaits, errors,
+CAS/fencing and durable bytes remain unchanged. No lint suppression or new
+storage authority is permitted. Acceptance is strict affected-store Clippy,
+existing focused root-terminal regressions, module/format/required repository
+gates and diff review after the host lint/layout prerequisites are integrated.
+
+### Reviewed public repair integration
+
+The manager integrated only reviewed owned files and isolated fragments from the
+worker checkouts. Source-file hashes and producing-base identities remain in
+external handoffs; those results are not relabeled as integrated receipts.
+
+| Slice | Executed focused result | Remaining integration requirement |
+|---|---|---|
+| `CV-205.catalog-generation` | Original failures reproduced on Memory/file-backed SQLite; 12 new and six existing regressions pass | Integrated dependency-inclusive Clippy and 12 catalog regressions pass; metadata gates and seal pending. Adapter reopen is not process-crash proof |
+| `CV-204.generation-selection` | Seven original failures/two positive controls; all 24 package tests and owned-package Clippy pass | Integrated dependency-inclusive Clippy and all 24 installer tests pass; metadata gates and seal pending; signatures/identity domains unchanged |
+| `CV-207.materialization-bounds` | Both original aggregate-bound failures reproduced; 10 ABI and all 16 source-package tests, strict Clippy pass | Integrated ABI owner and strict Clippy pass; metadata gates and seal pending; source bytes/order/digests unchanged |
+| `CV-209.test-floor` | Original 259-pass admission failure reproduced; all 35 focused recorder tests pass | All 35 integrated recorder tests pass; metadata gates and seal pending. Workspace recorder selects a 260 actual-pass minimum; certification wiring remains pending |
+
+Bounded slice acceptance records below identify completed repairs. Whole-phase
+acceptance remains pending. Installer recovery
+preserves an explicit null selection with retained Ready generations, rejects
+malformed topology before verifier calls, and separates ready commit retries
+from explicit rollback. ABI materialization bounds all member/library byte and
+file counts before source-buffer copies; bounded path metadata can allocate.
+
+Host layout validation reproduced an invalidated owned-source fixture binding.
+The manager extends `CV-209.host-effect-layout` to refresh only the two existing
+MQ local fixture digests in the shared spec from the changed transcript adapter.
+The existing independent binder validates that input source; expected fixture
+bytes, official rows/obligations, IBM publication pins and gates are unchanged.
+This source-identity update cannot reuse old candidate verdicts or oracle credit.
+
+The integrated module gate found that the new continuity checks exceed the
+coverage facade's frozen non-growing ceiling. The manager extends this slice
+to move the existing CoverageStore implementation into its private `store`
+module without changing its public methods, fields, evaluation order or tests.
+The reviewed facade inventory ceiling is lowered from 533 to 440 production
+lines; all other exemptions remain unchanged. Focused tests and strict lint
+must be rerun.
+
+The current integrated candidate passes all six Foundation owner checks,
+formatting, frozen dependency policy, strict Clippy for the five affected
+coverage/source/application/Db2/store packages with dependencies, 355 host
+tests, 24 installer tests, 12 catalog-generation tests and three local MQ
+source-binding tests. Store regressions pass 124 root-terminal tests and
+97 unit tests; three PostgreSQL unit tests remain ignored and receive no
+acceptance credit. No workspace test-floor, PostgreSQL parity, process-crash,
+CardDemo or live Zowe exit result follows from these scoped runs.
+
+### Foundation exit remains pending
+
+The broad `architecture-fast --check` stops at the existing CICS sources-a
+freshness guard because retained topic
+`SSNAQ8_11.1.0/reference-api/r_dump.html` is unavailable in the configured cache.
+All preceding execution-route, participant, canonical-effect, persistence,
+retention and CICS descriptor/source-map guards passed. This is an unavailable
+source gate, not a pass or a reason to refresh or re-pin sources. Scoped module
+and shared-contract repairs can be reviewed independently; full Foundation
+acceptance remains pending with this gate and the other exit requirements.
+
+### CV-209.host-effect-layout acceptance
+
+Status: **Complete (bounded slice only)**. Scoped compatibility acceptance passed: outer MQI boxing and migrated consumers preserve canonical vectors and retained replay codecs. Rust constructor/pattern migration is explicit in ADR-0050. The two changed local source bindings pass their independent binder; no IBM pin or expected bytes changed.
+Formatting, frozen dependency policy, module, documentation/changelog/subsystem
+and diff checks pass for the reviewed integrated scope. The unavailable CICS
+source freshness gate and full Foundation exit remain pending.

@@ -193,13 +193,13 @@ fn unusable_sequence_and_unknown_reply_fence_shared_aliases_without_provider_cle
             outcome: if unknown {
                 Err(HostProblem::UnknownOutcome)
             } else {
-                Ok(HostResult::MqMqi(MqMqiHostResult {
+                Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
                     limits: Default::default(),
                     result: mainframe_env_host_api::mq_mqi::MqMqiResult {
                         call: MqMqiCall::Connect,
                         outcome: success(token),
                     },
-                }))
+                })))
             },
         };
         assert!(machine.resume_host(result).is_err());

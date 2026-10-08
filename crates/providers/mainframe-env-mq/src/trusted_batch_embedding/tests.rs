@@ -240,7 +240,7 @@ fn effect(frame: &MqTrustedBatchFrame, sequence: u64, request: MqMqiRequest) -> 
         sequence,
         deadline_tick: 900,
         idempotency_key: Some(key.clone()),
-        request: HostRequest::MqMqi(MqMqiHostRequest {
+        request: HostRequest::MqMqi(Box::new(MqMqiHostRequest {
             mutation: Mutation {
                 sequence,
                 idempotency_key: key,
@@ -251,7 +251,7 @@ fn effect(frame: &MqTrustedBatchFrame, sequence: u64, request: MqMqiRequest) -> 
                 limits: frame.limits(),
                 request,
             },
-        }),
+        })),
     }
 }
 fn seed(store: &dyn PlatformStore, inv: &Invocation, e: &EffectRequest) {
