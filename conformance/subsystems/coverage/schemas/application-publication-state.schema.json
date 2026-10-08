@@ -8,11 +8,12 @@
   "properties": {
     "schema_version": {"const": "mainframe-env.application-publication@1"},
     "package": {"type": "string", "minLength": 1, "maxLength": 256},
-    "generation": {"type": "integer", "minimum": 1},
+    "generation": {"type": "integer", "minimum": 1, "maximum": 18446744073709551615},
     "identity": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "action": {"enum": ["install", "rollback"]},
     "controllers": {"enum": ["not-applicable", "pending", "applying", "applied", "failed"]},
     "db2": {"enum": ["not-applicable", "pending", "applying", "applied", "failed"]},
+    "ims": {"enum": ["not-applicable", "pending", "applying", "applied", "failed"]},
     "complete": {"type": "boolean"}
   },
   "allOf": [
@@ -21,7 +22,8 @@
       "then": {
         "properties": {
           "controllers": {"enum": ["not-applicable", "applied"]},
-          "db2": {"enum": ["not-applicable", "applied"]}
+          "db2": {"enum": ["not-applicable", "applied"]},
+          "ims": {"enum": ["not-applicable", "applied"]}
         }
       }
     }

@@ -5655,6 +5655,8 @@ fn install_publication_state(
 
 #[cfg(test)]
 mod tests {
+    #[path = "package_state_schema_tests.rs"]
+    mod package_state_schema_tests;
     include!("product/bts_browse.rs");
     use super::*;
     #[path = "ims_package_tests.rs"]

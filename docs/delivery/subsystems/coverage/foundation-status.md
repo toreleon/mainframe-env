@@ -836,3 +836,96 @@ coverage/program-registry, module, formatting, frozen dependency policy, docs
 and diff gates pass. Strict tooling-owner lint passes; dependency-inclusive MQ
 and separate server lint remain pending. This grants no official/generated
 execution, licensed or Foundation/public exit credit. Source skips remain zero.
+
+### Native installer reference and owned-name binding
+
+Manager extends only `CV-202.package-state-schema` to the existing xtask native
+compiler's local installer/package/IMS resource binding and direct structural
+controls. Review found the historical ASCII-only installer application pattern
+can reject names admitted and serialized by the owned kernel, whose text rule
+permits non-control UTF-8 and spaces. Reproduce using actual owned export before
+changing the schema; if confirmed, remove only that projection-only pattern,
+keeping existing length/type limits and typed owner/name/topology checks.
+Synthetic injected trust in this structural control is not signature evidence.
+The shared u64 maximum is tested directly at maximum and overflow. Offline
+unregistered references must refuse, without a parallel DTO/validator.
+
+The owned-name regression uses one xtask dev dependency on the existing
+application workspace crate and its direct lock edge. This introduces no new
+package/version/feature and does not add a production adapter or trust service.
+The structural test's explicitly injected synthetic verifier grants no crypto
+or workload credit. Manager owns this narrow test edge and its frozen check.
+
+### Server contract lint focused execution
+
+Manager approves the reviewed mechanical candidate and the exact direct private
+`native_call.rs` migration from `claim.clone()` to `claim.as_ref().clone()` as
+one inseparable retained-claim representation repair. The initial receipt has
+22 unique diagnostics (four production and eighteen test diagnostics), not 26.
+One checkout-local Cargo sequence may run the server all-targets check, strict
+owner-only all-targets lint, the eleven nonempty existing test selectors,
+formatting, frozen dependency policy and diff checks. Preserve any actual
+baseline/native-connect failure and all original expectations; no private route
+activation, suppression or fixture weakening. Retain fresh input/output and
+exact test counts before cleaning only this worker target. Dependency-inclusive
+MQ lint and Foundation acceptance remain separate and pending.
+
+### CardDemo transaction harness registration
+
+Manager approves only the reviewed private source selection/extraction owners:
+`carddemo/source_input.rs`, `online_definition.rs`, `bms.rs`,
+`online_authorities.rs`, new `transaction_harness.rs`, new `transaction_tests.rs`
+and their private registration in `carddemo.rs`. Select the four pinned actual
+programs and three maps before compilation; keep all existing complete corpus
+paths and expectations unchanged. Register the twelve independent date/collision
+controls and two missing-observation negatives through the real ProductServer
+route. Initial transport must preserve the existing missing date/duplicate
+tokens; no green binding yet. No Cargo or runtime edits are authorized in this
+preparation step. No date/parser/decimal/provider semantics, dependencies,
+source pins, requirements or official gates may change to make the harness pass.
+Report a full patch, private API shape and exact setup/control expectations for
+the separate real-run grant.
+
+### Publication fencing focused execution
+
+Manager approves the prepared publication candidate for one local Cargo sequence.
+Preserve its complete source first and execute the independent current-@3
+tests-only reproducer on its untouched production base; record actual Memory
+assertion failures separately from compile/hook/setup failures. Then restore the
+reviewed candidate and run the eleven preserved Memory cases, eight interleaving
+and prevalidation cases, compatibility/router/standalone controls and affected
+existing controller, IMS and Db2 publication regressions. All original signed
+inputs, tuple/terminal checks and before-effect refusal expectations remain.
+Strict affected-owner lint may use --no-deps; retained dependency-inclusive MQ
+failures are explicit. Do not suppress or silently repair outside-owner behavior.
+Read-only prevalidation and ordinary utility behavior need scoped checks; all
+applicable selected package sections must be Applied before admission, with
+NotApplicable accepted only for actually absent obligations. Report any missing
+applicability binding before claiming completion. The 22 fresh-process SQLite
+cuts remain a separate future gate. Preserve receipts and fresh binaries, then
+clean only this worker's resolved task target. Manager owns exact downward
+ratchets, schemas, status, final integration and sealing.
+
+### CV-202.package-state-schema acceptance
+
+Status: **Complete (owned durable-state schema projection only)**. The native
+validator accepts real installer and publication DTOs, frozen @2 and current
+@3 retained domains, explicit null selection, and historical absent IMS. Finite
+package references use the existing local package/IMS resources; external
+unregistered references refuse offline. The shared positive-u64 generation
+maximum rejects overflow without duplicating package grammar. Thirteen owner
+tests pass on the integrated candidate; five native compiler test families pass
+with seventeen package fixture cases, six installer cases, two actual owned-name
+exports and one external-reference refusal. Initial owner results of seven pass
+and six fail, then twelve pass and one fail, remain separately retained. The
+actual spaces/UTF-8 name regression also failed on the historical ASCII pattern
+and passes after removing only that incompatible projection restriction.
+
+Schemas remain structural projections. They do not replace typed topology/name
+reconstruction, verify package signatures, or authenticate arbitrary snapshots.
+The synthetic structural trust control grants no crypto or workload credit.
+Joint schema/package/spec/coverage/registry, module, formatting, frozen dependency
+policy, docs and diff gates pass; strict tooling-owner lint passes. The separate
+server lint and dependency-inclusive MQ gate remain pending. No official,
+licensed, Foundation or public exit credit is added. Supplemental source skips
+remain unavailable and earn zero credit.

@@ -10,6 +10,7 @@ use mainframe_env_coverage::{
 const EVIDENCE_SCHEMA_ID: &str = "https://mainframe-env.invalid/schemas/coverage-evidence@1";
 const LEDGER_SCHEMA_ID: &str = "https://mainframe-env.invalid/schemas/coverage-ledger@1";
 const PACKAGE_SCHEMA_ID: &str = "https://mainframe-env.invalid/schemas/application-package@2";
+const INSTALLER_SCHEMA_ID: &str = "https://mainframe-env.invalid/schemas/application-installer@1";
 const IMS_SCHEMA_ID: &str = "https://mainframe-env.invalid/schemas/ims-metadata@1";
 
 struct RefuseSchemaRetrieval;
@@ -36,6 +37,16 @@ pub(super) fn compile_schema(schema: &Value, path: &Path) -> TaskResult<jsonsche
             IMS_SCHEMA_ID,
             "conformance/subsystems/ims/schemas/ims-metadata.schema.json",
         )],
+        Some(INSTALLER_SCHEMA_ID) => &[
+            (
+                PACKAGE_SCHEMA_ID,
+                "conformance/subsystems/coverage/schemas/application-package-v2.schema.json",
+            ),
+            (
+                IMS_SCHEMA_ID,
+                "conformance/subsystems/ims/schemas/ims-metadata.schema.json",
+            ),
+        ],
         _ => &[],
     };
     if !resources.is_empty() {
