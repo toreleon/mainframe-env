@@ -110,7 +110,8 @@
     "docs/guides/MAINFRAME-SANDBOX.md",
     "docs/decisions/0053-selected-controller-publication-fence.md",
     "docs/decisions/0054-focused-conformance-output.md",
-    "docs/decisions/0055-standard-package-mac-envelope.md"
+    "docs/decisions/0055-standard-package-mac-envelope.md",
+    "docs/decisions/0056-cics-first-reverse-position.md"
   ],
   "navigation": [
     {
@@ -570,6 +571,10 @@
         {
           "label": "ADR-0055: Standard package MAC envelope",
           "path": "docs/decisions/0055-standard-package-mac-envelope.md"
+        },
+        {
+          "label": "ADR-0056: CICS first reverse read at a retained position",
+          "path": "docs/decisions/0056-cics-first-reverse-position.md"
         }
       ],
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."

@@ -36,7 +36,7 @@
     },
     {
       "path": "crates/apps/mainframe-env-server/src/product.rs",
-      "max_production_lines": 5540,
+      "max_production_lines": 5368,
       "responsibility": "Product construction, dependency assembly, application publication, JES control, and HTTP route behavior converge here.",
       "split_boundary": "Extract bootstrap/construction, publication, JES operations, and route-family adapters around the Product state owner."
     },
@@ -48,7 +48,7 @@
     },
     {
       "path": "crates/contracts/mainframe-env-host-api/src/canonical/generated.rs",
-      "max_production_lines": 2668,
+      "max_production_lines": 2634,
       "responsibility": "This frozen exhaustive host wire encoder keeps every request and result field explicit for protocol review.",
       "split_boundary": "Partition exhaustive encoders by dataset, CICS, security, Db2, IMS, and MQ families under one canonical codec facade."
     },
@@ -96,13 +96,13 @@
     },
     {
       "path": "crates/providers/mainframe-env-cics/src/service.rs",
-      "max_production_lines": 3361,
+      "max_production_lines": 3308,
       "responsibility": "The CICS pilot service owns session, BMS, file, queue, program, and unit-of-work semantics and persistence.",
       "split_boundary": "Freeze this pilot and route future catalog descriptors through generated modules and semantics through handler-family modules."
     },
     {
       "path": "crates/providers/mainframe-env-dataset/src/service.rs",
-      "max_production_lines": 9411,
+      "max_production_lines": 9392,
       "responsibility": "Dataset allocation, catalog state, sequential and VSAM I/O, AMS behavior, transactions, and replay meet here.",
       "split_boundary": "Split catalog/allocation, record I/O, VSAM access, AMS commands, and persistence/recovery command families."
     },
@@ -370,6 +370,8 @@
       "crates/providers/mainframe-env-cics/src/handlers/event_control/state_validation.rs",
       "crates/providers/mainframe-env-cics/src/handlers/event_control/timer.rs",
       "crates/providers/mainframe-env-cics/src/handlers/file_control.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/file_control/first_reverse.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/file_control/first_reverse/tests.rs",
       "crates/providers/mainframe-env-cics/src/handlers/file_tokens.rs",
       "crates/providers/mainframe-env-cics/src/handlers/file_unlock.rs",
       "crates/providers/mainframe-env-cics/src/handlers/handle_state.rs",

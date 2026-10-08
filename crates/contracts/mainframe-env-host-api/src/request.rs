@@ -732,6 +732,7 @@ fn validate_dataset(request: &DatasetRequest, limits: HostLimits) -> Result<(), 
         DatasetRequest::StartBrowse { .. }
         | DatasetRequest::ResetBrowse { .. }
         | DatasetRequest::ReadNext { .. }
+        | DatasetRequest::ReadBrowsePosition { .. }
         | DatasetRequest::EndBrowse { .. } => browse::validate(request, limits),
         DatasetRequest::Close {
             cursor, control, ..

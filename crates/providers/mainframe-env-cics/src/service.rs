@@ -198,6 +198,8 @@ struct Run {
     undo: Vec<DatasetUndo>,
     undo_version: Option<u64>,
     browses: BTreeMap<String, String>,
+    /// Provisional full-key anchors, bounded by the active owned browse map.
+    initial_browse_positions: BTreeMap<String, (String, Vec<u8>)>,
     trace: Vec<CicsTraceEntry>,
 }
 
@@ -1489,61 +1491,6 @@ impl CicsService {
             .continuations
             .get(session.as_str())
             .is_some_and(|continuation| continuation.claimed_by.is_none()))
-    }
-
-    fn invoke_run(
-        &self,
-        run: &mut Run,
-        request: CicsRequest,
-        retention_tick: u64,
-    ) -> Result<CicsResponse, HostProblem> {
-        if let Some(mutation) = &request.mutation
-            && mutation.transaction.as_deref() != Some(run.transaction.as_str())
-        {
-            return Err(HostProblem::IdempotencyConflict);
-        }
-        let descriptor = handlers::authorize_and_describe(self, run, &request)?;
-        let family = descriptor.family;
-        handlers::preflight_conversation(self, run, family)?;
-        match family {
-            CicsCommandFamily::TaskControl | CicsCommandFamily::StorageControl => {
-                handlers::invoke_task_control(self, run, &request, retention_tick)
-            }
-            CicsCommandFamily::Time => handlers::invoke_time(self, run, &request),
-            CicsCommandFamily::OperatorControl => handlers::invoke_operator(self, run, &request),
-            CicsCommandFamily::NetworkControl => handlers::invoke_network(self, run, &request),
-            CicsCommandFamily::ProgramControl => program(self, run, &request),
-            CicsCommandFamily::TerminalControl => terminal(self, run, &request),
-            CicsCommandFamily::FileControl => handlers::invoke_file_control(self, run, &request),
-            CicsCommandFamily::QueueControl => handlers::invoke_queue_control(self, run, &request),
-            CicsCommandFamily::CounterControl => handlers::invoke_counter(self, run, &request),
-            CicsCommandFamily::Recovery => {
-                handlers::invoke_recovery(self, run, &request, retention_tick)
-            }
-            CicsCommandFamily::IntervalControl | CicsCommandFamily::SpoolControl => {
-                handlers::invoke_interval_or_spool_control(self, run, &request, family)
-            }
-            CicsCommandFamily::DocumentControl => {
-                handlers::invoke_document_control(self, run, &request, retention_tick)
-            }
-            CicsCommandFamily::TransformControl
-            | CicsCommandFamily::JournalControl
-            | CicsCommandFamily::WebServiceControl
-            | CicsCommandFamily::WebControl
-            | CicsCommandFamily::BtsControl
-            | CicsCommandFamily::EventControl
-            | CicsCommandFamily::Diagnostics
-            | CicsCommandFamily::SecurityControl
-            | CicsCommandFamily::BuiltinFunctionControl
-            | CicsCommandFamily::ConversationControl => handlers::invoke_extended_control(
-                self,
-                run,
-                &request,
-                descriptor.family,
-                retention_tick,
-            ),
-        }
-        .or_else(|problem| handlers::condition_for_request(self, run, &request, problem))
     }
 
     pub fn reconcile_unit_of_work(

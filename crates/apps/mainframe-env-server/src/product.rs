@@ -2,9 +2,7 @@ mod package_authentication;
 pub use package_authentication::HmacSha256PackageTrust;
 
 mod dataset_helpers;
-use dataset_helpers::{
-    dataset_attributes, dataset_mutation, join_records, member_name, records_for_write,
-};
+use dataset_helpers::{dataset_attributes, join_records, member_name, records_for_write};
 mod batch_controller;
 mod system_providers;
 use system_providers::*;
@@ -4202,176 +4200,6 @@ impl ProductServer {
             .ok_or(HostProblem::NotFound)
     }
 
-    fn dataset_call(
-        &self,
-        principal: &str,
-        request: DatasetRequest,
-    ) -> Result<DatasetResult, GatewayProblem> {
-        if let DatasetRequest::ReadConcatenation { datasets, .. } = &request {
-            for dataset in datasets {
-                self.authorize_resource(
-                    principal,
-                    "DATASET",
-                    dataset.as_str(),
-                    AccessIntent::Read,
-                )?;
-            }
-        }
-        if let DatasetRequest::DefineAlias { target, .. } = &request {
-            self.authorize_resource(principal, "DATASET", target.as_str(), AccessIntent::Read)?;
-        }
-        if let DatasetRequest::BuildAlternateIndex { base, .. } = &request {
-            self.authorize_resource(principal, "DATASET", base.as_str(), AccessIntent::Read)?;
-        }
-        if let DatasetRequest::TvsStatus { owner, .. }
-        | DatasetRequest::AcquireLock { owner, .. }
-        | DatasetRequest::ReleaseLock { owner, .. }
-        | DatasetRequest::BeginTvs { owner, .. }
-        | DatasetRequest::StageTvs { owner, .. }
-        | DatasetRequest::CompleteTvs { owner, .. }
-        | DatasetRequest::ReconcileTvs { owner, .. } = &request
-            && owner.as_str() != principal
-        {
-            return Err(gateway_problem(HostProblem::Unauthorized));
-        }
-        let dataset = match &request {
-            DatasetRequest::Capabilities
-            | DatasetRequest::List { .. }
-            | DatasetRequest::TvsStatus { .. }
-            | DatasetRequest::BeginTvs { .. }
-            | DatasetRequest::CompleteTvs { .. }
-            | DatasetRequest::ReconcileTvs { .. } => None,
-            DatasetRequest::ListCatalog { pattern, .. } => Some(pattern.as_str()),
-            DatasetRequest::ListVolumes { .. } => Some("VOLUME.**"),
-            DatasetRequest::ReadConcatenation { .. } => None,
-            DatasetRequest::Rename { from, .. } => Some(from.as_str()),
-            DatasetRequest::ResolveCatalog { name } => Some(name.as_str()),
-            DatasetRequest::DefineCatalog { catalog, .. }
-            | DatasetRequest::SetCatalogConnection { catalog, .. } => Some(catalog.as_str()),
-            DatasetRequest::DefineAlias { alias, .. } => Some(alias.as_str()),
-            DatasetRequest::Attributes { dataset }
-            | DatasetRequest::Describe { dataset }
-            | DatasetRequest::Diagnose { dataset }
-            | DatasetRequest::ListLocks { dataset, .. }
-            | DatasetRequest::ListMembers { dataset, .. }
-            | DatasetRequest::Read { dataset, .. }
-            | DatasetRequest::ReadGeneric { dataset, .. }
-            | DatasetRequest::ReadRelative { dataset, .. }
-            | DatasetRequest::ReadRba { dataset, .. }
-            | DatasetRequest::ReadSequential { dataset, .. }
-            | DatasetRequest::Snapshot { dataset, .. }
-            | DatasetRequest::ReadMemberGeneration { dataset, .. }
-            | DatasetRequest::Create { dataset, .. }
-            | DatasetRequest::Define { dataset, .. }
-            | DatasetRequest::Alter { dataset, .. }
-            | DatasetRequest::SetLifecycle { dataset, .. }
-            | DatasetRequest::RecordBackup { dataset, .. }
-            | DatasetRequest::Restore { dataset, .. }
-            | DatasetRequest::DefineMemberAlias { dataset, .. }
-            | DatasetRequest::WriteMemberGeneration { dataset, .. }
-            | DatasetRequest::DeleteMemberGeneration { dataset, .. }
-            | DatasetRequest::AcquireLock { dataset, .. }
-            | DatasetRequest::ReleaseLock { dataset, .. }
-            | DatasetRequest::Write { dataset, .. }
-            | DatasetRequest::Append { dataset, .. }
-            | DatasetRequest::Truncate { dataset, .. }
-            | DatasetRequest::RewriteRecord { dataset, .. }
-            | DatasetRequest::DeleteRecord { dataset, .. }
-            | DatasetRequest::WriteRelative { dataset, .. }
-            | DatasetRequest::DeleteRelative { dataset, .. }
-            | DatasetRequest::WriteRba { dataset, .. }
-            | DatasetRequest::Delete { dataset, .. }
-            | DatasetRequest::StartBrowse { dataset, .. }
-            | DatasetRequest::ResetBrowse { dataset, .. }
-            | DatasetRequest::ReadNext { dataset, .. }
-            | DatasetRequest::EndBrowse { dataset, .. }
-            | DatasetRequest::Close { dataset, .. } => Some(dataset.as_str()),
-            DatasetRequest::DefinePath { path, .. } => Some(path.as_str()),
-            DatasetRequest::BuildAlternateIndex { index, .. } => Some(index.as_str()),
-            DatasetRequest::StageTvs { operation, .. } => Some(match operation {
-                mainframe_env_host_api::TvsRecordOperation::Insert { dataset, .. }
-                | mainframe_env_host_api::TvsRecordOperation::Rewrite { dataset, .. }
-                | mainframe_env_host_api::TvsRecordOperation::Delete { dataset, .. } => {
-                    dataset.as_str()
-                }
-            }),
-            DatasetRequest::DefineAlternateIndex { base, .. }
-            | DatasetRequest::DefineGenerationGroup { base, .. }
-            | DatasetRequest::CreateGeneration { base, .. }
-            | DatasetRequest::ResolveGeneration { base, .. } => Some(base.as_str()),
-        };
-        if let Some(dataset) = dataset {
-            self.authorize_resource(
-                principal,
-                "DATASET",
-                dataset,
-                if matches!(
-                    request,
-                    DatasetRequest::Attributes { .. }
-                        | DatasetRequest::Describe { .. }
-                        | DatasetRequest::Diagnose { .. }
-                        | DatasetRequest::ListLocks { .. }
-                        | DatasetRequest::TvsStatus { .. }
-                        | DatasetRequest::ListMembers { .. }
-                        | DatasetRequest::Read { .. }
-                        | DatasetRequest::ReadGeneric { .. }
-                        | DatasetRequest::ReadRelative { .. }
-                        | DatasetRequest::ReadRba { .. }
-                        | DatasetRequest::ReadSequential { .. }
-                        | DatasetRequest::Snapshot { .. }
-                        | DatasetRequest::ReadMemberGeneration { .. }
-                        | DatasetRequest::ResolveCatalog { .. }
-                        | DatasetRequest::ResolveGeneration { .. }
-                        | DatasetRequest::ListCatalog { .. }
-                        | DatasetRequest::ListVolumes { .. }
-                        | DatasetRequest::StartBrowse { .. }
-                        | DatasetRequest::ResetBrowse { .. }
-                        | DatasetRequest::ReadNext { .. }
-                        | DatasetRequest::EndBrowse { .. }
-                ) {
-                    AccessIntent::Read
-                } else {
-                    AccessIntent::Update
-                },
-            )?;
-        }
-        let capability = if dataset_mutation(&request).is_some() {
-            "host.dataset.write"
-        } else {
-            "host.dataset.read"
-        };
-        let invocation = self
-            .invocation(
-                principal,
-                "zosmf:dataset",
-                ServiceClass::System,
-                &[capability],
-            )
-            .map_err(gateway_problem)?;
-        let sequence = self.next_sequence().map_err(gateway_problem)?;
-        let mutation = dataset_mutation(&request);
-        let idempotency_key = mutation.map(|mutation| mutation.idempotency_key.clone());
-        let result = self
-            .host
-            .invoke(
-                &invocation,
-                self.jes_tick().map_err(gateway_problem)?,
-                invocation.cancellation_requested(),
-                EffectRequest {
-                    run_unit: invocation.run_unit_id.clone(),
-                    sequence: mutation.map_or(sequence, |mutation| mutation.sequence),
-                    deadline_tick: invocation.deadline_tick,
-                    idempotency_key,
-                    request: HostRequest::Dataset(request),
-                },
-            )
-            .persist_with(|audit| self.store.record_audit(audit).map_err(store_error));
-        match result.outcome.map_err(gateway_problem)? {
-            HostResult::Dataset(result) => Ok(result),
-            _ => Err(gateway_problem(HostProblem::ProviderFailure)),
-        }
-    }
-
     fn jcl_bundle(&self, principal: &str, jcl: Vec<u8>) -> Result<JclBundle, GatewayProblem> {
         let primary =
             String::from_utf8(jcl).map_err(|_| gateway_problem(HostProblem::Malformed))?;
@@ -5543,6 +5371,7 @@ mod tests {
     #[path = "package_state_schema_tests.rs"]
     mod package_state_schema_tests;
     include!("product/bts_browse.rs");
+    include!("product/cics_first_reverse_tests.rs");
     use super::*;
     #[path = "ims_package_tests.rs"]
     mod ims_package_tests;

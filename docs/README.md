@@ -193,6 +193,7 @@ explicitly names that authority as superseded.
 - [ADR-0053: Selected controller publication fence](decisions/0053-selected-controller-publication-fence.md)
 - [ADR-0054: Canonical focused conformance output](decisions/0054-focused-conformance-output.md)
 - [ADR-0055: Standard package MAC envelope](decisions/0055-standard-package-mac-envelope.md)
+- [ADR-0056: CICS first reverse read at a retained position](decisions/0056-cics-first-reverse-position.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.
 

@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 242,
+    "markdown_documents": 243,
     "navigation_groups": 8,
-    "normative_documents": 103,
+    "normative_documents": 104,
     "xtask_commands": 164
   },
   "documents": [
@@ -341,8 +341,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 184,
-      "sha256": "sha256:4854e1c3f06bdea3c84ea181af7114b4980a88624d952592fb80e3828e3d3620",
+      "relative_links": 185,
+      "sha256": "sha256:e5ffaa12d83b41891d4816a07d52d2e202a605d8667322709d0e57f493649546",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -1507,10 +1507,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env current public source checkout",
+      "normative": true,
+      "owner": "CICS, Dataset and shared host-contract maintainers",
+      "path": "docs/decisions/0056-cics-first-reverse-position.md",
+      "relative_links": 0,
+      "scope": "ordinary full-key first reverse read in an implicit owned browse",
+      "sha256": "sha256:1339126c04979c1dd148c61b2213e6ebe99aedf4d52cb785c6581b6d31908bbc",
+      "status": "Accepted bounded design; scoped implementation verified.",
+      "title": "ADR-0056: CICS first reverse read at a retained browse position",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 58,
-      "sha256": "sha256:e98755decdab37ec2476cab1b5be08b75fba4368d470bef44a64c2839005c8ce",
+      "relative_links": 59,
+      "sha256": "sha256:f961ab57a4472f9bb5c333e55104916bc4012bee7709957035c87f466d7f33aa",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1758,7 +1770,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/coverage/foundation-status.md",
       "relative_links": 0,
-      "sha256": "sha256:33fcbce7b4ecc1b6bb58502696fa44e697897145e217ba931531ad4f7e8754b9",
+      "sha256": "sha256:5cbf3b386b547c16809a6b35bb349e4cf2f098698acf481efda5a4f5e9b17b24",
       "title": "Coverage and conformance — Coverage authority progress",
       "xtask_commands": 7
     },
@@ -2818,6 +2830,10 @@
         {
           "label": "ADR-0055: Standard package MAC envelope",
           "path": "docs/decisions/0055-standard-package-mac-envelope.md"
+        },
+        {
+          "label": "ADR-0056: CICS first reverse read at a retained position",
+          "path": "docs/decisions/0056-cics-first-reverse-position.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -3040,7 +3056,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:96cfd1b2f138876808c0b1adb7ca4dd2717109b5e8e28caf9b1d1160d533cc81",
+  "registry_sha256": "sha256:5b20d0b4dae429dbc36e44d4f80807d1b7dd97b1317ec90e35b37aa38037e20c",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

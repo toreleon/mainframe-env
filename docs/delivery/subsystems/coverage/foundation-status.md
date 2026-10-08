@@ -60,7 +60,9 @@ flowchart LR
 | `CV-209.public-client-validation-cost` | Command-local optimization complete; 106 combined controls pass | Every POST byte remains hashed; one byte-only timing diagnostic does not prove the full action meets its allowance |
 | `CV-209.public-client-tree-directory-authority` | Command-local descriptor traversal complete; 112 affected controls pass | Fresh bytes and all closing fences remain; repeated member ancestor resolution is removed. Changed-tree timing and real-client acceptance remain pending |
 | `CV-209.cics-bms-input-storage` | Supported symbolic input storage complete; eight final controls and seventeen regression methods pass | Preserve raw/non-BMS behavior and fixed-group checks; provider/official/full-layout acceptance remains separate |
+| `CV-209.cics-first-reverse-position` | Bounded positioned-read path verified; 37 distinct scoped controls and affected lint pass | Preserve gap traversal and compatibility limits; real navigation, nested clock and implicit browse retirement remain pending |
 | `CV-209.carddemo-transaction-navigation` | Latest changed-runtime run: eleven passes, five failures, nineteen completed shutdowns | Preserve all four actual failed producers. Resolve CICS first reverse-read positioning and separately reviewed private oracle errors; navigation token and full closure remain pending |
+| Batch-controller assurance | Current gate fails on an obsolete source-location/API assumption | Verify guard-owned installation and linked implementation without weakening production or negative checks; full public exit remains blocked |
 | `CV-209.test-floor` and integrated exit | Minimum 260-pass recorder wiring implemented; full exit pending | Count actually executed passing tests on the selected unchanged candidate; preserve every affected architecture/profile/schema/package/source/backend gate |
 | `CV-209.public-status-docs` | Current subsystem status and documentation reconciled | Preserve active preparation scope, exact pending gates and implemented sealer; retain raw outputs externally |
 | `CV-209.command-supervision` | Optional Linux deadline/output ownership complete | Current-invocation logs and retained-leader fencing prevent stale output/PGID reuse; exclusive wait and conservative procfs limitations remain explicit |
@@ -600,30 +602,40 @@ ten-second action pass. Both real-client failures remain unchanged. A separately
 bounded changed-source timing diagnostic and real fixture continuation remain
 pending under manager sequencing. Full client/Foundation acceptance is pending.
 
-### CICS first reverse position prerequisite
+### CICS first reverse position acceptance
 
-Manager accepts the bounded additive Dataset positioned-read design for the
-ordinary full-key first READPREV after successful STARTBR/RESETBR. Retain the
-existing gap-cursor contract, reverse assertions and canonical request bytes.
-The new read observes the retained logical-key/base-identity tuple and live body
-under one existing Dataset state lock, without advancing or creating a cursor.
-The CICS adapter consumes its bounded pending seed only on a validated completed
-response; one real browse delegate replaces the existing one. End-sentinel,
-generic, update/token and unsupported reposition cases retain their old paths.
+Status: **Complete within the bounded implicit first-reverse path**. An additive
+Dataset positioned read observes the retained logical key, base identity and live
+body under the existing state lock. It leaves the gap cursor unchanged. Ordinary
+full-key first READPREV after a successful STARTBR or RESETBR uses that observation
+when the implicit owned cursor and supplied key match. Other traversal paths and
+all old wire vectors retain their existing behavior.
 
-The reviewed twenty-one-owner design is the exact proposed implementation scope,
-including ADR-0056; no unrelated owner or cleanup behavior is implied. First
-prepare and freeze its eight existing-CICS-API composed controls and exact old
-baseline sources in the isolated first-reverse checkout. Only the new server
-test owner and its test registration may change during this preparation. No
-Cargo/native execution or production semantic repair occurs until the manager
-checks the frozen packet and grants one bounded initial execution.
+The CICS adapter commits a bounded provisional anchor only after a validated
+complete response and the existing condition routing. Refused, malformed or
+unknown replies and failed output construction retain the anchor. Known END
+retirement clears the matching ownership even if later response construction
+fails; such a failure remains a reported partial effect. Neither retained metadata
+nor condition handling rolls back a physically advanced cursor.
 
-Task-drop browse retirement is a concrete separate acceptance gap. Neither the
-positioned read nor explicit ENDBR tests prove cancellation-independent task
-cleanup. Preserve that pending gate and its real ownership requirements; do not
-discard refused retirement, fabricate cleanup authority or claim full CICS,
-CardDemo or Foundation acceptance from the narrower repair.
+Thirty-seven distinct scoped controls pass across separately retained native
+producers. The final two changed guard bodies pass on their corresponding native producer;
+thirty-five unchanged controls retain explicit producing-input equivalence.
+Removing an unused parent import preserves every helper caller and all 37 guard
+bodies; strict lint verifies the resulting source.
+Strict lint passes for Host API, Dataset, CICS and Server. Original assertion
+failures, compile failures, the earlier resource stop and strict lint failure
+remain separate external results. Explicit ENDBR, task completion and server
+shutdown pass in all eight composed ProductServer controls. New Rust enum variants
+require downstream exhaustive matches to add an arm; old encoded variants remain
+stable. ADR-0056 records the compatibility and completion boundaries.
+
+This does not establish trusted real-clock expiry at the inherited nested CICS
+boundary, implicit task-drop or replacement-cursor retirement, unknown-effect
+reconciliation, or atomicity across later replay, audit and serialization.
+Construction-failure checks exercise the production-local completion owner rather
+than a whole-command transport failure. CardDemo navigation must still run on this
+accepted runtime; full application, IBM and Foundation acceptance remain pending.
 
 ### MQ original-request size consistency acceptance
 
