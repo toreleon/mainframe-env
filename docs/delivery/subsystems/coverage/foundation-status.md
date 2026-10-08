@@ -500,3 +500,17 @@ Both slices remain pending; no test-only scoping of production migrations,
 readers, provenance or retention responsibility is authorized. The manager will
 review public parameter grouping and existing operational reachability before
 implementation. These lint failures do not become passed tooling gates.
+
+### Retained package-state schema preparation
+
+Declare `CV-202.package-state-schema` under CV-202, consuming the separately
+accepted identity framing implementation. The existing installer-state and
+publication-state schemas must describe the actual serialized DTOs, including
+finite retained packages and historical absent IMS publication state. Prepare
+native offline Draft 2020-12 validation and typed DTO projection regressions
+through existing owners, with positive retained forms and malformed/mismatched
+negative cases. Package schema/framing remains owned by its existing slice.
+Preparation adds no runtime admission, alternate snapshot guarantee or public
+DTO; tests must distinguish structural schema checks from current trust,
+reference, topology and publication validation. Dependencies and private-owner
+test bindings require manager review before compilation or production edits.
