@@ -56,46 +56,9 @@ pub(super) fn carddemo_base_online_definition(
                 format!("{name} source closure is missing"),
             )
         })?;
-        let analysis = compiler.analyze(bundle);
-        semantic_models.push(analysis.semantic.ok_or_else(|| {
-            CorpusProblem::new(
-                "carddemo.online.compile_failed",
-                format!("{primary}: semantic model is missing"),
-            )
-        })?);
-        let result = compiler
-            .compile(CompilerRequest {
-                source: bundle.clone(),
-                mode: CompilationMode::Executable,
-                target: CompileTarget::new("reference").map_err(|error| {
-                    CorpusProblem::new("carddemo.online.target_invalid", error.to_string())
-                })?,
-                options: CompileOptions::new(BTreeMap::new()).map_err(|error| {
-                    CorpusProblem::new("carddemo.online.options_invalid", error.to_string())
-                })?,
-            })
-            .map_err(|error| {
-                CorpusProblem::new(
-                    "carddemo.online.compile_failed",
-                    format!("{primary}: {error}"),
-                )
-            })?;
-        let artifact = match result {
-            CompilerResult::Published { artifact, .. } => artifact,
-            CompilerResult::Analysis { diagnostics, .. }
-            | CompilerResult::Failed { diagnostics, .. } => {
-                return Err(CorpusProblem::new(
-                    "carddemo.online.compile_failed",
-                    format!(
-                        "{primary}: {}",
-                        diagnostics.first().map_or("no diagnostic", |diagnostic| {
-                            diagnostic.public_message()
-                        })
-                    ),
-                ));
-            }
-        };
-        programs.push(OnlineProgramDefinition::current(name.clone(), &artifact));
+        let (program, semantic) = compile_online_program(&compiler, name, primary, bundle)?;
+        semantic_models.push(semantic);
+        programs.push(program);
     }
     if programs.len() != 18 || transactions.len() != 17 {
         return Err(CorpusProblem::new(
@@ -107,5 +70,115 @@ pub(super) fn carddemo_base_online_definition(
         programs,
         transactions,
         maps: carddemo_base_maps(corpus_dir, &semantic_models)?,
+    })
+}
+
+fn compile_online_program(
+    compiler: &CobolCompiler,
+    name: &str,
+    primary: &str,
+    bundle: &SourceBundle,
+) -> Result<(OnlineProgramDefinition, SemanticModel), CorpusProblem> {
+    let analysis = compiler.analyze(bundle);
+    let semantic = analysis.semantic.ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.online.compile_failed",
+            format!("{primary}: semantic model is missing"),
+        )
+    })?;
+    let result = compiler
+        .compile(CompilerRequest {
+            source: bundle.clone(),
+            mode: CompilationMode::Executable,
+            target: CompileTarget::new("reference").map_err(|error| {
+                CorpusProblem::new("carddemo.online.target_invalid", error.to_string())
+            })?,
+            options: CompileOptions::new(BTreeMap::new()).map_err(|error| {
+                CorpusProblem::new("carddemo.online.options_invalid", error.to_string())
+            })?,
+        })
+        .map_err(|error| {
+            CorpusProblem::new(
+                "carddemo.online.compile_failed",
+                format!("{primary}: {error}"),
+            )
+        })?;
+    let artifact = match result {
+        CompilerResult::Published { artifact, .. } => artifact,
+        CompilerResult::Analysis { diagnostics, .. }
+        | CompilerResult::Failed { diagnostics, .. } => {
+            return Err(CorpusProblem::new(
+                "carddemo.online.compile_failed",
+                format!(
+                    "{primary}: {}",
+                    diagnostics.first().map_or("no diagnostic", |diagnostic| {
+                        diagnostic.public_message()
+                    })
+                ),
+            ));
+        }
+    };
+    Ok((
+        OnlineProgramDefinition::current(name.to_string(), &artifact),
+        semantic,
+    ))
+}
+
+pub(super) fn transaction_online_definition(
+    corpus_dir: &Path,
+) -> Result<OnlineApplicationDefinition, CorpusProblem> {
+    // Select source closure before invoking the compiler or loading any map.
+    let map_paths = [
+        "app/bms/COSGN00.bms",
+        "app/bms/COMEN01.bms",
+        "app/bms/COTRN02.bms",
+    ];
+    let bundles = source_input::transaction_bundles(corpus_dir)?;
+    let csd = String::from_utf8(read_corpus_file(
+        corpus_dir,
+        &corpus_dir.join("app/csd/CARDDEMO.CSD"),
+    )?)
+    .map_err(|_| CorpusProblem::new("carddemo.online.csd_invalid", "base CSD is not UTF-8"))?;
+    let resources = parse_csd(&csd).map_err(package_problem)?;
+    let mut transactions = BTreeMap::new();
+    for (transaction, expected_program) in [
+        ("CC00", "COSGN00C"),
+        ("CM00", "COMEN01C"),
+        ("CT02", "COTRN02C"),
+    ] {
+        let matching = resources
+            .iter()
+            .filter(|resource| resource.kind == "TRANSACTION" && resource.name == transaction)
+            .collect::<Vec<_>>();
+        if matching.len() != 1
+            || matching[0].properties.get("PROGRAM").map(String::as_str) != Some(expected_program)
+        {
+            return Err(CorpusProblem::new(
+                "carddemo.transaction.csd_drift",
+                transaction,
+            ));
+        }
+        transactions.insert(transaction.into(), expected_program.into());
+    }
+    let compiler = CobolCompiler::default();
+    let mut programs = Vec::new();
+    let mut semantic_models = Vec::new();
+    for (primary, bundle) in bundles {
+        let name = Path::new(&primary)
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .ok_or_else(|| CorpusProblem::new("carddemo.online.program_invalid", "invalid name"))?;
+        let (program, semantic) = compile_online_program(&compiler, name, &primary, &bundle)?;
+        programs.push(program);
+        semantic_models.push(semantic);
+    }
+    let maps = map_paths
+        .into_iter()
+        .map(|path| bms::carddemo_map(corpus_dir, path, &semantic_models))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(OnlineApplicationDefinition {
+        programs,
+        transactions,
+        maps,
     })
 }

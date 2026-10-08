@@ -40,13 +40,18 @@ pub(super) fn verify_carddemo_base_online_observed(
         .map_err(|error| CorpusProblem::new("carddemo.online.runtime", error.to_string()))?;
     let store = Arc::new(MemoryStore::new(Default::default()));
     let secrets = Arc::new(MemorySecretResolver::default());
-    let result = runtime.block_on(exercise_base_online_smoke(
-        config,
-        store,
-        secrets,
-        Path::new(&corpus_dir).to_path_buf(),
-        definition,
-    ));
+    let result = runtime.block_on(async {
+        let mut exercise = exercise_base_online_smoke(
+            config,
+            store,
+            secrets,
+            Path::new(&corpus_dir).to_path_buf(),
+            definition,
+        )
+        .await?;
+        exercise_transaction_observations(&mut exercise.route_observations).await?;
+        Ok::<_, CorpusProblem>(exercise)
+    });
     let _ = fs::remove_dir_all(&artifact_root);
     let exercise = result?;
     if exercise.screen_paths != maps
@@ -118,4 +123,12 @@ pub(super) fn verify_carddemo_base_online_observed(
         },
         route_observations,
     ))
+}
+
+/// Selected real transaction comparisons add only their two owned requirements.
+pub(super) async fn exercise_transaction_observations(
+    observations: &mut RouteObservations,
+) -> Result<(), CorpusProblem> {
+    transaction_harness::exercise_transaction_dates(observations).await?;
+    transaction_harness::exercise_transaction_duplicate(observations).await
 }

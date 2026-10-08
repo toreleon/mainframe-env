@@ -1,7 +1,7 @@
 //! Fail-closed verification for the externally supplied CardDemo corpus.
 
 mod source_input;
-use source_input::{collect_paths, source_file};
+use source_input::{collect_paths, source_file, subsystem_abi_libraries};
 
 mod corpus_validation;
 use corpus_validation::*;
@@ -22,6 +22,9 @@ mod mq_receipt;
 pub use mq_receipt::verify_carddemo_mq_authorization_from_env;
 #[cfg(test)]
 mod journey_closure_tests;
+mod transaction_harness;
+#[cfg(test)]
+mod transaction_tests;
 
 mod authorization_context;
 mod bms;
@@ -11918,17 +11921,6 @@ const LEGACY_COMPATIBILITY_COPYBOOK_CONTRACT: &str =
 
 fn subsystem_abi_definitions() -> [HostAbiLibraryDefinition; 3] {
     [cics_abi_library(), db2_abi_library(), mq_abi_library()]
-}
-
-fn subsystem_abi_libraries(
-    limits: SourceLimits,
-) -> Result<MaterializedHostAbiLibraries, CorpusProblem> {
-    materialize_host_abi_libraries(&subsystem_abi_definitions(), limits).map_err(|error| {
-        CorpusProblem::new(
-            "carddemo.abi.invalid",
-            format!("subsystem ABI source libraries are invalid: {error}"),
-        )
-    })
 }
 
 fn explicit_carddemo_bundles(

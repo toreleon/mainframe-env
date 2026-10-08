@@ -1195,3 +1195,102 @@ list pass; the original missing-selector assertion is retained separately.
 Database lifecycle/reset/cleanup, independent native expectations and summary
 ownership remain unchanged. No PostgreSQL control was executed by this wiring
 slice; all twelve actual backend controls remain required for acceptance.
+
+### MQ mechanical layout focused execution
+
+Manager advances the preserved reviewed mechanical patch onto the eighteen
+sealed slices and grants one checkout-local Cargo sequence. Run the full
+existing MQ package tests once, retaining every negative/golden/ownership/
+lifecycle result and any failure unchanged. Run strict MQ owner lint once and
+separately classify genuine retained private/future responsibilities versus
+unexpected mechanical diagnostics. Expected strict failure remains a failure;
+full MQ contract-lint stays pending. No suppression, fake read, private behavior
+activation, public unsafe export, schema/identity change or assertion weakening.
+Repair only owned mechanical compilation/lint defects and preserve initial
+receipts. Formatting, frozen dependency, diff and scoped source/budget checks
+are allowed; no full workspace/CardDemo/backend/cache campaign. Preserve fresh
+binaries and exact source/result hashes outside Git before exact target cleanup.
+Manager owns final integration, metadata, status and bounded-slice seal.
+
+### Optional public client input provisioning and startup
+
+Manager accepts @zowe/cli 8.39.0 as an optional external development test input,
+using the verified official archive/SRI and reviewed bundled source/legal
+closure. It stays outside the production sandbox image. Use the verified
+official Node 24.19.0 executable; available npm has byte transformations and
+is not accepted as the pristine published tool. No npm invocation, package
+resolution, lifecycle script, plugin/native installation or ambient profile.
+
+The minimal bubblewrap filesystem/home design passed a real native Node probe
+under uid/gid 1000: OS fallback resolves the owned /client-home, HOME/CODEX_HOME
+are unset and an exclusive write lands only in that owned directory. The first
+probe had a retained JavaScript literal syntax setup failure, not a namespace
+denial. This is containment setup proof, not live Zowe acceptance.
+
+Manager grants external verified CLI archive extraction with safe path/link/
+size validation and exact bundled-tree comparison, then one bounded startup
+inside that reviewed containment with fixed empty settings/plugins/env. Keep
+all source/runtime/library pins and actual failures externally. Refuse unknown
+native/plugin/helper requirements; no host filesystem widening or scripts.
+Only archive/setup/startup review is granted now, no Cargo, server, actual
+job/authentication workload or repository code/input-lock mutation. Preserve
+all initial attempts; exact installed tree/size and cleanup readiness are
+reviewable prerequisites for the later finite route-owner implementation.
+
+The first-party selected STEP1/SYSPRINT seven-byte IEFBR14 expectation is
+accepted for the future bounded route test. Complete DD inventory and official
+z/OSMF profile parity remain separate pending obligations; query status is
+not named-status-route coverage, and lookup refusal is not direct spool 403
+coverage. No missing-source refresh or new official/licensed credit.
+
+### MQ observed fixture diagnostic owner extension
+
+The first actual strict run exposes fourteen additional test-owner diagnostics.
+Manager extends the same mechanical slice only to their exact observed fixture
+paths below. Equivalent initializers, borrows, private aliases and short circuits
+must preserve evaluation/refusal order, every test declaration and literal/
+canonical expectation. An unused test-only helper may be removed only after
+proving no actual caller; production future/private responsibilities stay intact.
+No suppression, hidden tests or expectation changes. Existing full-package
+results retain their producing inputs; run only affected nonempty selectors
+after fixture-only repairs, preserving the original strict failure.
+
+- `crates/providers/mainframe-env-mq/src/service_rich_state/upgrade/tests.rs`
+- `crates/providers/mainframe-env-mq/src/mqi_replay/tests/full_message.rs`
+- `crates/providers/mainframe-env-mq/src/mqi_replay/tests/historical_handles.rs`
+- `crates/providers/mainframe-env-mq/src/object/native_attributes/tests.rs`
+- `crates/providers/mainframe-env-mq/src/service_legacy_delivery_import/tests.rs`
+- `crates/providers/mainframe-env-mq/src/service_rich_state/tests.rs`
+- `crates/providers/mainframe-env-mq/src/service_selected_operation/tests/full_put/atomic.rs`
+- `crates/providers/mainframe-env-mq/src/service_selected_operation/tests/full_put/qualified_get.rs`
+- `crates/providers/mainframe-env-mq/src/service_selected_operation/tests/property.rs`
+- `crates/providers/mainframe-env-mq/src/service_selected_operation/tests/retention_dependencies.rs`
+- `crates/providers/mainframe-env-mq/src/service_selected_operation/tests.rs`
+- `crates/providers/mainframe-env-mq/src/service_mqi_intent/tests/controls.rs`
+
+### CV-209.carddemo-transactions acceptance
+
+Status: **Complete (selected transaction comparisons and receipt binding)**.
+The actual installed CardDemo route validates eight invalid date formats/calendar
+values, three valid boundaries, and a duplicate after maximum PIC 9 wraps onto an
+occupied key. Comparisons retain independent screen, 350-byte record, dataset and
+trace expectations. Only the J06 date-validation and duplicate-condition tokens
+are emitted after those comparisons and actual graceful fixture shutdown.
+Wrong-screen and setup failures retain their original errors, emit no token and
+stop the fixture; successful teardown makes readiness false and refuses another
+route. Optional external synthetic debug files retain actual observations.
+
+The producing worker passed eighteen selected controls; the integrated candidate
+with publication fencing also passes eighteen controls (zero failed or ignored),
+and strict all-target conformance owner lint passes. Current schema, package,
+specification, coverage, registry, module, formatting, frozen dependency and diff
+gates pass. The facade budget lowers only to its measured 12,061 lines. A manager
+binary-retention helper failed after the successful test/lint run; its original
+output remains unchanged. A fresh compile-only reconstruction retained the new
+binary before exact target cleanup, without claiming to recover the earlier
+executed binary or relabel its hash.
+
+Full CardDemo closure still refuses: J06 AIX browse/navigation and all 105 issue
+acceptances remain unbound. This slice does not establish 20/20 journeys, 26/26
+transactions, full application acceptance, backend parity or official/licensed
+credit. Those independent pending obligations are unchanged.
