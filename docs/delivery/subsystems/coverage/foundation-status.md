@@ -459,46 +459,32 @@ with parser opens 2/0 and identical accepted tree/role identities. This is neith
 a workload benchmark nor proof a full client action meets its allowance. Original
 failed live receipts remain unchanged; finite application acceptance is pending.
 
-### CV-209.cics-bms-input-storage declaration
+### CV-209.cics-bms-input-storage acceptance
 
-The latest changed-runtime navigation run executes six passes and ten failures
-with all seventeen actual shutdowns. LOW-VALUES and keyed READ prerequisites
-are cleared. The next boundaries are a source-derived TAMT001..010 fixture-name
-correction and RECEIVE MAP transport frames entering symbolic storage. The
-missing-key thirteen-target MOVE succeeds; the fresh empty branch skips it.
-This is not evidence for a MOVE repair, PF7 result or navigation observation.
+Status: **Complete (supported symbolic RECEIVE MAP input storage)**. The existing
+response owner checks decoded I/L fields within the selected fixed group before
+mapped writes. Transport frames never enter that symbolic storage. Omitted bits,
+flags and adjacent bytes remain unchanged, while present empty data follows the
+existing byte-write owner. Qualified targets prevent duplicate simple names from
+redirecting writes. Invalid widths/lengths and ambiguous/unknown members refuse.
+Non-symbolic/non-BMS raw behavior remains; Legacy representation preservation
+has static guard proof, with no separately executed variant claim. No provider,
+ABI, encoder, source/copybook, shared reference or MOVE owner changes.
 
-Manager grants only interpreter `machine.rs`, `machine/typed_cics.rs` for minimal
-private helper registration, existing `machine/typed_cics/response.rs`, conformance
-`cobol_runtime.rs` and one isolated fragment. At the operation-specific response
-boundary, a supported symbolic RECEIVE MAP INTO group receives checked decoded
-named fields/lengths within that group; its transport frame is not a storage
-image. Omitted fields preserve raw bits. Present empty data follows the existing
-byte-write owner. Duplicate simple names cannot redirect writes to another
-group. Preserve non-symbolic/legacy and non-BMS raw INTO behavior; do not globally
-suppress payloads or route unrelated operations through a broad prefix test.
-No host ABI, packet encoder, copybook, provider, public source or alias change.
+The initial eight controls have three passes and five genuine failures. The final
+checked source passes those eight and seventeen existing regression methods,
+including the forty-four-fixture baseline counted as one method. Strict affected
+owner lint and formatting pass. The facade decreases from 11,498 to 11,453
+production lines; the response owner has 417. Original failures, intermediate and
+final actual executables retain separate producing inputs. All frozen literals,
+compiled fixture bytes and twenty-five old methods are preserved. Exact target
+cleanup succeeds after retention. Native source equivalence supports integration
+without relabeling these dirty development receipts as clean-candidate CI.
 
-Freeze eight independent native controls before production: framed sentinel
-neighbors/present I+L; explicit empty versus omitted data; omitted zero/sentinel
-preservation; duplicate-name INTO qualification; non-symbolic RECEIVE raw buffer;
-non-BMS raw INTO; unchanged thirteen-qualified-target MOVE baseline; malformed
-projected length/oversize refusal preserving mapped storage. Compile and execute
-through the real machine, with independent literal fields and controlled typed
-host replies, retaining genuine initial failures and shared baselines. Only
-then repair and repeat those controls. This is internal first-party/native
-ownership proof, not actual IBM/BMS wire or application execution credit.
-Facade must decrease and private owners remain bounded; strict lint, ratchet,
-integration and seal stay manager-owned. Cargo awaits the external exclusive
-slot grant after the finite public-client workload and target cleanup.
-
-Pinned COTRN01 source initializes LOW-VALUES; all thirteen result fields are
-protected without FSET, and fresh empty validation skips their clear/READ. Under
-the frozen absent-field preservation contract, their literal zero bytes remain.
-Manager accepts only this future fresh-empty oracle correction at exact pinned
-widths; missing-key/PF4-cleared spaces and all successful record expectations
-remain unchanged. No global change to every blank-detail expectation. The TAMT
-exception likewise changes only three-digit amount names. Neither correction
-or navigation rerun is granted before this generic native repair is accepted.
-All prior producers/errors remain; missing bodies retain user-skipped zero
-credit with no lookup/refresh retry, and private/unready CICS work is excluded.
+This is bounded internal first-party ownership proof, not complete BMS layout,
+provider/application, IBM wire, official or licensed acceptance. Missing bodies
+retain user-skipped zero credit. CardDemo must still execute its changed-runtime
+continuation with only the previously source-supported three-digit amount-name
+and fresh-empty zero-byte oracle corrections. Missing-key/PF4-cleared spaces,
+successful records, raw rows/state/READ counts and all previous producers remain.
+PF7/token/full journey and Foundation acceptance stay pending.

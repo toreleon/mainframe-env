@@ -2060,59 +2060,14 @@ impl ReferenceMachine {
                     &outputs,
                     &response,
                 )?;
-                if let Some(target) = into
-                    && matches!(
-                        typed_cics::into_payload_schema(operation, &response),
-                        Some("mainframe-env.cics.into@1" | "mainframe-env.cics.payload@1")
-                    )
-                {
-                    typed_cics::write_target(
-                        self,
-                        &target,
-                        &CobolValue::Bytes(response.payload.bytes().to_vec()),
-                    )?;
-                }
-                let mut container_set_base = None;
-                for (name, value) in &response.outputs {
-                    if typed_cics::write_runtime_output(self, operation, name, value)? {
-                        continue;
-                    }
-                    if let Some(field) = name.strip_prefix("BMS.") {
-                        if let Some(field) = field.strip_suffix(".LENGTH") {
-                            let target = format!("{field}L");
-                            if self.layout(&target).is_some() {
-                                let coefficient = String::from_utf8_lossy(value.bytes())
-                                    .parse::<i128>()
-                                    .map_err(|_| MachineProblem::UnexpectedHostResult)?;
-                                self.write_decimal(
-                                    &target,
-                                    Decimal {
-                                        coefficient,
-                                        scale: 0,
-                                    },
-                                )?;
-                            }
-                        } else {
-                            let target = format!("{field}I");
-                            if self.layout(&target).is_some() {
-                                self.write(&target, value.bytes())?;
-                            }
-                        }
-                        continue;
-                    }
-                    let Some(target) = outputs.get(name) else {
-                        continue;
-                    };
-                    let base = self.bases.len();
-                    typed_cics::write_output(self, operation, name, target, value, load_base)?;
-                    if operation == CicsOperation::GetContainer
-                        && name == "SET"
-                        && value.schema() == "mainframe-env.cics.payload@1"
-                        && self.bases.len() == base + 1
-                    {
-                        container_set_base = Some(base);
-                    }
-                }
+                let container_set_base = typed_cics::apply_payload_outputs(
+                    self,
+                    operation,
+                    into.as_ref(),
+                    &outputs,
+                    &response,
+                    load_base,
+                )?;
                 typed_cics::finish(
                     self,
                     operation,

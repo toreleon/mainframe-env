@@ -418,6 +418,489 @@ fn hex(bytes: &[u8]) -> String {
 mod tests {
     use super::*;
 
+    // Controlled first-party replies exercise response ownership, not a provider or IBM oracle.
+    fn check_cics_bms_reply(
+        source: &str,
+        operation: mainframe_env_host_api::CicsOperation,
+        frame: &[u8],
+        named: &[(&str, &str, &[u8])],
+        fields: &[(&str, &[u8], &[u8])],
+        refused: bool,
+    ) {
+        use mainframe_env_host_api::{CicsDisposition, CicsResponse};
+
+        retain_execution_bytes(source, "cbl", source.as_bytes()).unwrap();
+        retain_execution_bytes(source, "reply-payload", frame).unwrap();
+        let reply = serde_json::json!({
+            "operation": format!("{operation:?}"),
+            "disposition": "Complete", "condition": "NORMAL", "response": 0, "response2": 0,
+            "applid": "", "sysid": "", "transaction": "", "aid": 0,
+            "target": null, "next_transaction": null, "unit_of_work": null,
+            "payload_schema": "mainframe-env.cics.payload@1", "payload_bytes": frame,
+            "outputs": named.iter().map(|(name, schema, bytes)| {
+                serde_json::json!({"name": name, "schema": schema, "bytes": bytes})
+            }).collect::<Vec<_>>(),
+        });
+        retain_execution_bytes(
+            source,
+            "reply.json",
+            &serde_json::to_vec_pretty(&reply).unwrap(),
+        )
+        .unwrap();
+        for (name, before, after) in fields {
+            retain_execution_bytes(source, &format!("{name}.before-expected"), before).unwrap();
+            retain_execution_bytes(source, &format!("{name}.expected"), after).unwrap();
+        }
+        retain_execution_bytes(
+            source,
+            "expected-terminal",
+            if refused {
+                b"Failed"
+            } else {
+                b"Completed:0:DONE\n"
+            },
+        )
+        .unwrap();
+        let artifact = crate::compile(source).expect("controlled CICS source compiles");
+        retain_execution_bytes(source, "bin", artifact.payload()).unwrap();
+        let invocation = crate::invocation(&artifact, 4096);
+        let mut machine =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .expect("controlled CICS machine");
+        let quantum = Quantum::new(512, 64 * 1024).unwrap();
+        let mut effect = None;
+        for _ in 0..32 {
+            match machine.drive(MachineResume::Start, quantum) {
+                MachineDrive::Continue => {}
+                MachineDrive::HostCall(request) => {
+                    effect = Some(request);
+                    break;
+                }
+                other => panic!("expected one typed CICS request, got {other:?}"),
+            }
+        }
+        let effect = effect.expect("bounded source reaches a host request");
+        retain_execution_bytes(source, "request", format!("{effect:?}").as_bytes()).unwrap();
+        let HostRequest::Cics(request) = &effect.request else {
+            panic!("expected typed CICS host request");
+        };
+        assert_eq!(request.operation, operation);
+        let initial = fields
+            .iter()
+            .map(|(name, before, _)| {
+                let actual = machine
+                    .variable(name)
+                    .expect("initial storage")
+                    .bytes()
+                    .to_vec();
+                retain_execution_bytes(source, &format!("{name}.before-actual"), &actual).unwrap();
+                (name, before, actual)
+            })
+            .collect::<Vec<_>>();
+        for (name, expected, actual) in initial {
+            assert_eq!(actual, *expected, "independent initial storage {name}");
+        }
+        let payload = |schema: &str, bytes: &[u8]| {
+            BoundedPayload::new(schema, bytes.to_vec(), InvocationLimits::default()).unwrap()
+        };
+        let response = CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: String::new(),
+            sysid: String::new(),
+            transaction: String::new(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: payload("mainframe-env.cics.payload@1", frame),
+            outputs: named
+                .iter()
+                .map(|(name, schema, bytes)| ((*name).into(), payload(schema, bytes)))
+                .collect(),
+            unit_of_work: None,
+        };
+        let mut terminal = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: effect.sequence,
+                outcome: Ok(HostResult::Cics(response)),
+            }),
+            quantum,
+        );
+        for _ in 0..32 {
+            if !matches!(terminal, MachineDrive::Continue) {
+                break;
+            }
+            terminal = machine.drive(MachineResume::Start, quantum);
+        }
+        retain_execution_bytes(source, "terminal", format!("{terminal:?}").as_bytes()).unwrap();
+        let observations = fields
+            .iter()
+            .map(|(name, _, expected)| {
+                let actual = machine
+                    .variable(name)
+                    .expect("observed storage")
+                    .bytes()
+                    .to_vec();
+                retain_execution_bytes(source, &format!("{name}.actual"), &actual).unwrap();
+                eprintln!("field={name}; expected={expected:?}; actual={actual:?}");
+                (name, expected, actual)
+            })
+            .collect::<Vec<_>>();
+        eprintln!("refused={refused}; terminal={terminal:?}");
+        for (name, expected, actual) in observations {
+            assert_eq!(actual, *expected, "literal response-owned storage {name}");
+        }
+        if refused {
+            assert!(matches!(terminal, MachineDrive::Failed(_)), "{terminal:?}");
+        } else {
+            let MachineDrive::Completed(completion) = terminal else {
+                panic!("expected completion, got {terminal:?}");
+            };
+            assert_eq!(completion.return_code, 0);
+            assert_eq!(completion.output.bytes(), b"DONE\n");
+        }
+    }
+
+    const BMS_INPUT_STORAGE_DATA: &str = r#"
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 LEFT-EDGE PIC X(4) VALUE 'LEFT'.
+01 INPUT-MAP.
+   05 GUARD-L PIC X(2) VALUE '<<'.
+   05 ALPHAL PIC S9(4) COMP VALUE 258.
+   05 ALPHAF PIC X VALUE 'a'.
+   05 ALPHAI PIC X(4) VALUE 'old!'.
+   05 GUARD-M PIC X(2) VALUE '||'.
+   05 BETAL PIC S9(4) COMP VALUE 772.
+   05 BETAF PIC X VALUE 'b'.
+   05 BETAI PIC X(5) VALUE 'stay?'.
+   05 GUARD-R PIC X(2) VALUE '>>'.
+01 RIGHT-EDGE PIC X(4) VALUE 'RITE'.
+"#;
+
+    #[test]
+    fn cics_bms_input_storage_present_fields_exclude_transport_frame() {
+        let source = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BMS-PRESENT. {BMS_INPUT_STORAGE_DATA}\n\
+             PROCEDURE DIVISION.\n\
+             EXEC CICS RECEIVE MAP('SYNMAP') INTO(INPUT-MAP) END-EXEC.\n\
+             DISPLAY 'DONE'. STOP RUN."
+        );
+        check_cics_bms_reply(
+            &source,
+            mainframe_env_host_api::CicsOperation::ReceiveMap,
+            b"FRAME!TITLE-NAME!\x00\x00\x00\x09TRANSPORT",
+            &[
+                ("BMS.ALPHA", "mainframe-env.cics.payload@1", b"HI"),
+                ("BMS.ALPHA.LENGTH", "mainframe-env.cics.decimal@1", b"2"),
+                ("BMS.BETA", "mainframe-env.cics.payload@1", b"XYZ"),
+                ("BMS.BETA.LENGTH", "mainframe-env.cics.decimal@1", b"3"),
+            ],
+            &[
+                ("LEFT-EDGE", b"LEFT", b"LEFT"),
+                (
+                    "INPUT-MAP",
+                    b"<<\x01\x02aold!||\x03\x04bstay?>>",
+                    b"<<\x00\x02aHI  ||\x00\x03bXYZ  >>",
+                ),
+                ("RIGHT-EDGE", b"RITE", b"RITE"),
+            ],
+            false,
+        );
+    }
+
+    #[test]
+    fn cics_bms_input_storage_present_empty_differs_from_omitted() {
+        let empty = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BMS-EMPTY. {BMS_INPUT_STORAGE_DATA}\n\
+             PROCEDURE DIVISION.\n\
+             EXEC CICS RECEIVE MAP('SYNMAP') INTO(INPUT-MAP) END-EXEC.\n\
+             DISPLAY 'DONE'. STOP RUN."
+        );
+        let empty_result = std::panic::catch_unwind(|| {
+            check_cics_bms_reply(
+                &empty,
+                mainframe_env_host_api::CicsOperation::ReceiveMap,
+                b"EMPTY-FRAME!",
+                &[
+                    ("BMS.ALPHA", "mainframe-env.cics.payload@1", b""),
+                    ("BMS.ALPHA.LENGTH", "mainframe-env.cics.decimal@1", b"0"),
+                ],
+                &[(
+                    "INPUT-MAP",
+                    b"<<\x01\x02aold!||\x03\x04bstay?>>",
+                    b"<<\x00\x00a    ||\x03\x04bstay?>>",
+                )],
+                false,
+            );
+        });
+        let omitted = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BMS-OMITTED. {BMS_INPUT_STORAGE_DATA}\n\
+             PROCEDURE DIVISION.\n\
+             EXEC CICS RECEIVE MAP('SYNMAP') INTO(INPUT-MAP) END-EXEC.\n\
+             DISPLAY 'DONE'. STOP RUN."
+        );
+        let omitted_result = std::panic::catch_unwind(|| {
+            check_cics_bms_reply(
+                &omitted,
+                mainframe_env_host_api::CicsOperation::ReceiveMap,
+                b"OMITTED-FRAME!",
+                &[],
+                &[(
+                    "INPUT-MAP",
+                    b"<<\x01\x02aold!||\x03\x04bstay?>>",
+                    b"<<\x01\x02aold!||\x03\x04bstay?>>",
+                )],
+                false,
+            );
+        });
+        assert!(
+            empty_result.is_ok() && omitted_result.is_ok(),
+            "empty/omitted controls"
+        );
+    }
+
+    #[test]
+    fn cics_bms_input_storage_absent_zero_and_sentinel_bits_survive() {
+        let source = r#"
+IDENTIFICATION DIVISION. PROGRAM-ID. BMS-ABSENT.
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 INPUT-MAP.
+   05 ALPHAL PIC S9(4) COMP VALUE 258.
+   05 ALPHAF PIC X VALUE 'a'.
+   05 ALPHAI PIC X(4) VALUE 'old!'.
+   05 ZEROL PIC S9(4) COMP.
+   05 ZEROF PIC X.
+   05 ZEROI PIC X(4).
+   05 SENTL PIC S9(4) COMP VALUE 1286.
+   05 SENTF PIC X VALUE '!'.
+   05 SENTI PIC X(4) VALUE 'KEEP'.
+PROCEDURE DIVISION.
+    MOVE LOW-VALUES TO ZEROL ZEROF ZEROI.
+    EXEC CICS RECEIVE MAP('SYNMAP') INTO(INPUT-MAP) END-EXEC.
+    DISPLAY 'DONE'. STOP RUN.
+"#;
+        check_cics_bms_reply(
+            source,
+            mainframe_env_host_api::CicsOperation::ReceiveMap,
+            b"ABSENT!DESCRIPTOR!\x00\x00\x00\x06TITLE!",
+            &[
+                ("BMS.ALPHA", "mainframe-env.cics.payload@1", b"NEW!"),
+                ("BMS.ALPHA.LENGTH", "mainframe-env.cics.decimal@1", b"4"),
+            ],
+            &[(
+                "INPUT-MAP",
+                b"\x01\x02aold!\x00\x00\x00\x00\x00\x00\x00\x05\x06!KEEP",
+                b"\x00\x04aNEW!\x00\x00\x00\x00\x00\x00\x00\x05\x06!KEEP",
+            )],
+            false,
+        );
+    }
+
+    #[test]
+    fn cics_bms_input_storage_duplicate_names_stay_in_selected_into_group() {
+        let source = r#"
+IDENTIFICATION DIVISION. PROGRAM-ID. BMS-QUALIFIED.
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 OTHER-MAP.
+   05 ALPHAL PIC S9(4) COMP VALUE 258.
+   05 ALPHAF PIC X VALUE 'x'.
+   05 ALPHAI PIC X(4) VALUE 'KEEP'.
+01 SELECTED-MAP.
+   05 ALPHAL PIC S9(4) COMP VALUE 772.
+   05 ALPHAF PIC X VALUE 'y'.
+   05 ALPHAI PIC X(4) VALUE 'old!'.
+01 ADJACENT-X PIC X(4) VALUE 'EDGE'.
+PROCEDURE DIVISION.
+    EXEC CICS RECEIVE MAP('SYNMAP') INTO(SELECTED-MAP) END-EXEC.
+    DISPLAY 'DONE'. STOP RUN.
+"#;
+        check_cics_bms_reply(
+            source,
+            mainframe_env_host_api::CicsOperation::ReceiveMap,
+            b"QUALIFIED-FRAME!",
+            &[
+                ("BMS.ALPHA", "mainframe-env.cics.payload@1", b"OK"),
+                ("BMS.ALPHA.LENGTH", "mainframe-env.cics.decimal@1", b"2"),
+            ],
+            &[
+                ("OTHER-MAP", b"\x01\x02xKEEP", b"\x01\x02xKEEP"),
+                ("SELECTED-MAP", b"\x03\x04yold!", b"\x00\x02yOK  "),
+                ("ADJACENT-X", b"EDGE", b"EDGE"),
+            ],
+            false,
+        );
+    }
+
+    #[test]
+    fn cics_bms_input_storage_non_symbolic_receive_keeps_raw_payload() {
+        let source = r#"
+IDENTIFICATION DIVISION. PROGRAM-ID. BMS-RAW.
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 RAW-BUFFER PIC X(8) VALUE 'oldbytes'.
+01 ADJACENT-X PIC X(4) VALUE 'EDGE'.
+PROCEDURE DIVISION.
+    EXEC CICS RECEIVE MAP('SYNMAP') INTO(RAW-BUFFER) END-EXEC.
+    DISPLAY 'DONE'. STOP RUN.
+"#;
+        check_cics_bms_reply(
+            source,
+            mainframe_env_host_api::CicsOperation::ReceiveMap,
+            b"RAW12345EXTRA",
+            &[],
+            &[
+                ("RAW-BUFFER", b"oldbytes", b"RAW12345"),
+                ("ADJACENT-X", b"EDGE", b"EDGE"),
+            ],
+            false,
+        );
+    }
+
+    #[test]
+    fn cics_bms_input_storage_non_bms_into_keeps_raw_payload() {
+        let source = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BMS-NONMAP. {BMS_INPUT_STORAGE_DATA}\n\
+             01 WS-LENGTH PIC S9(4) COMP VALUE 21.\n\
+             PROCEDURE DIVISION.\n\
+             EXEC CICS READQ TD QUEUE('SYNQ') INTO(INPUT-MAP) LENGTH(WS-LENGTH) END-EXEC.\n\
+             DISPLAY 'DONE'. STOP RUN."
+        );
+        check_cics_bms_reply(
+            &source,
+            mainframe_env_host_api::CicsOperation::ReadTransientData,
+            b"NONMAP-RAW-IMAGE-1234",
+            &[],
+            &[
+                ("LEFT-EDGE", b"LEFT", b"LEFT"),
+                (
+                    "INPUT-MAP",
+                    b"<<\x01\x02aold!||\x03\x04bstay?>>",
+                    b"NONMAP-RAW-IMAGE-1234",
+                ),
+                ("WS-LENGTH", b"\x00\x15", b"\x00\x15"),
+                ("RIGHT-EDGE", b"RITE", b"RITE"),
+            ],
+            false,
+        );
+    }
+
+    #[test]
+    fn cics_bms_input_storage_thirteen_qualified_move_spaces_baseline() {
+        let source = r#"
+IDENTIFICATION DIVISION. PROGRAM-ID. BMS-MOVE-BASELINE.
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 RESULT-MAP.
+   05 FIELD-01 PIC X(16) VALUE 'AAAAAAAAAAAAAAAA'.
+   05 FIELD-02 PIC X(16) VALUE 'BBBBBBBBBBBBBBBB'.
+   05 FIELD-03 PIC X(2) VALUE 'CC'.
+   05 FIELD-04 PIC X(4) VALUE 'DDDD'.
+   05 FIELD-05 PIC X(10) VALUE 'EEEEEEEEEE'.
+   05 FIELD-06 PIC X(60) VALUE
+       'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF'.
+   05 FIELD-07 PIC X(12) VALUE 'GGGGGGGGGGGG'.
+   05 FIELD-08 PIC X(10) VALUE 'HHHHHHHHHH'.
+   05 FIELD-09 PIC X(10) VALUE 'IIIIIIIIII'.
+   05 FIELD-10 PIC X(9) VALUE 'JJJJJJJJJ'.
+   05 FIELD-11 PIC X(30) VALUE 'KKKKKKKKKKKKKKKKKKKKKKKKKKKKKK'.
+   05 FIELD-12 PIC X(25) VALUE 'LLLLLLLLLLLLLLLLLLLLLLLLL'.
+   05 FIELD-13 PIC X(10) VALUE 'MMMMMMMMMM'.
+01 SHADOW-MAP.
+   05 FIELD-01 PIC X VALUE 'a'.
+   05 FIELD-02 PIC X VALUE 'b'.
+   05 FIELD-03 PIC X VALUE 'c'.
+   05 FIELD-04 PIC X VALUE 'd'.
+   05 FIELD-05 PIC X VALUE 'e'.
+   05 FIELD-06 PIC X VALUE 'f'.
+   05 FIELD-07 PIC X VALUE 'g'.
+   05 FIELD-08 PIC X VALUE 'h'.
+   05 FIELD-09 PIC X VALUE 'i'.
+   05 FIELD-10 PIC X VALUE 'j'.
+   05 FIELD-11 PIC X VALUE 'k'.
+   05 FIELD-12 PIC X VALUE 'l'.
+   05 FIELD-13 PIC X VALUE 'm'.
+PROCEDURE DIVISION.
+    MOVE SPACES TO FIELD-01 OF RESULT-MAP FIELD-02 OF RESULT-MAP
+        FIELD-03 OF RESULT-MAP FIELD-04 OF RESULT-MAP FIELD-05 OF RESULT-MAP
+        FIELD-06 OF RESULT-MAP FIELD-07 OF RESULT-MAP FIELD-08 OF RESULT-MAP
+        FIELD-09 OF RESULT-MAP FIELD-10 OF RESULT-MAP FIELD-11 OF RESULT-MAP
+        FIELD-12 OF RESULT-MAP FIELD-13 OF RESULT-MAP.
+    DISPLAY 'DONE'. STOP RUN.
+"#;
+        let expected = &[0x20; 214];
+        retain_execution_bytes(source, "cbl", source.as_bytes()).unwrap();
+        retain_execution_bytes(source, "expected-output", b"DONE\n").unwrap();
+        retain_execution_bytes(source, "expected-terminal", b"Completed:0:DONE\n").unwrap();
+        retain_execution_bytes(source, "RESULT-MAP.expected", expected).unwrap();
+        retain_execution_bytes(source, "SHADOW-MAP.expected", b"abcdefghijklm").unwrap();
+        let (output, machine) = execute_without_effects(source).expect("qualified MOVE baseline");
+        let result = machine.variable("RESULT-MAP").unwrap();
+        let shadow = machine.variable("SHADOW-MAP").unwrap();
+        retain_execution_bytes(source, "RESULT-MAP.actual", result.bytes()).unwrap();
+        retain_execution_bytes(source, "SHADOW-MAP.actual", shadow.bytes()).unwrap();
+        assert_eq!(result.bytes(), expected);
+        assert_eq!(shadow.bytes(), b"abcdefghijklm");
+        assert_eq!(output, b"DONE\n");
+    }
+
+    #[test]
+    fn cics_bms_input_storage_malformed_projection_refuses_before_mapped_writes() {
+        let malformed = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BMS-BAD-LENGTH. {BMS_INPUT_STORAGE_DATA}\n\
+             PROCEDURE DIVISION.\n\
+             EXEC CICS RECEIVE MAP('SYNMAP') INTO(INPUT-MAP) END-EXEC.\n\
+             DISPLAY 'DONE'. STOP RUN."
+        );
+        let malformed_result = std::panic::catch_unwind(|| {
+            check_cics_bms_reply(
+                &malformed,
+                mainframe_env_host_api::CicsOperation::ReceiveMap,
+                b"BAD-LENGTH-FRAME!",
+                &[
+                    ("BMS.ALPHA", "mainframe-env.cics.payload@1", b"OK"),
+                    ("BMS.ALPHA.LENGTH", "mainframe-env.cics.decimal@1", b"2"),
+                    ("BMS.BETA", "mainframe-env.cics.payload@1", b"XYZ"),
+                    ("BMS.BETA.LENGTH", "mainframe-env.cics.decimal@1", b"bad"),
+                ],
+                &[(
+                    "INPUT-MAP",
+                    b"<<\x01\x02aold!||\x03\x04bstay?>>",
+                    b"<<\x01\x02aold!||\x03\x04bstay?>>",
+                )],
+                true,
+            );
+        });
+        let oversized = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BMS-OVERSIZED. {BMS_INPUT_STORAGE_DATA}\n\
+             PROCEDURE DIVISION.\n\
+             EXEC CICS RECEIVE MAP('SYNMAP') INTO(INPUT-MAP) END-EXEC.\n\
+             DISPLAY 'DONE'. STOP RUN."
+        );
+        let oversized_result = std::panic::catch_unwind(|| {
+            check_cics_bms_reply(
+                &oversized,
+                mainframe_env_host_api::CicsOperation::ReceiveMap,
+                b"OVERSIZED-FRAME!",
+                &[
+                    ("BMS.ALPHA", "mainframe-env.cics.payload@1", b"OK"),
+                    ("BMS.ALPHA.LENGTH", "mainframe-env.cics.decimal@1", b"2"),
+                    ("BMS.BETA", "mainframe-env.cics.payload@1", b"TOOLONG"),
+                    ("BMS.BETA.LENGTH", "mainframe-env.cics.decimal@1", b"7"),
+                ],
+                &[(
+                    "INPUT-MAP",
+                    b"<<\x01\x02aold!||\x03\x04bstay?>>",
+                    b"<<\x01\x02aold!||\x03\x04bstay?>>",
+                )],
+                true,
+            );
+        });
+        assert!(
+            malformed_result.is_ok() && oversized_result.is_ok(),
+            "malformed/oversized controls"
+        );
+    }
+
     fn execute_without_effects(source: &str) -> Result<(Vec<u8>, ReferenceMachine), String> {
         let artifact = crate::compile(source)?;
         retain_execution_bytes(source, "cbl", source.as_bytes())?;
