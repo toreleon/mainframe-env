@@ -363,3 +363,10 @@ implementation must preserve the declared finite writer/reader, trusted recovery
 and exact legacy-retry boundary. The unchanged installer-state shape is retained;
 no silent legacy hash/signature migration or new snapshot-authentication guarantee
 is claimed. Standards-envelope adoption remains a separate pending slice.
+
+### CV-204.package-bounds acceptance
+
+Status: **Complete (bounded package admission and codec only)**. The independently reproduced allocation/codec refusals are repaired. All 33 focused package tests and dependency-inclusive strict Clippy pass in the producing checkout; integrated application-package/spec/coverage, module, formatting and frozen dependency gates pass. Streaming preflight checks counts, text and checked footprint before typed decoding; capped export borrows retained packages and stops before full encoding. Duplicate JSON members refuse. Serde scratch and bounded metadata sets still allocate; this is not a process-wide heap quota. Identity framing and publication fencing remain pending.
+Documentation/changelog/subsystem and diff checks pass for this reviewed scope.
+Missing supplemental source checks are `skipped/unavailable` by user direction,
+with zero credit. Foundation acceptance and other public exit gates remain pending.
