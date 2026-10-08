@@ -1758,7 +1758,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/coverage/foundation-status.md",
       "relative_links": 0,
-      "sha256": "sha256:7d716db27aae7f1c5422a5e5663e2c0242dc0ae8acabebc66eafa79995e643cd",
+      "sha256": "sha256:132b9532f42fb20a861fbca23b1336e09e4e8d0e5a8900b2fd859be8b12f2acf",
       "title": "Coverage and conformance — Coverage authority progress",
       "xtask_commands": 7
     },
@@ -2334,7 +2334,7 @@
       "normative": false,
       "path": "docs/runbooks/VERIFICATION-WORKFLOW.md",
       "relative_links": 1,
-      "sha256": "sha256:1b61368633ce19812455b1d0701cab4adf62dc1127becddf6d71b30a88f13dbf",
+      "sha256": "sha256:9e4d1b59e244b6a049a7efd6ed1992802ee9dd1deb418f47782b3bcc84875644",
       "title": "Verification workflow",
       "xtask_commands": 1
     },

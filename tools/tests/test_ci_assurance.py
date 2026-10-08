@@ -1,10 +1,13 @@
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
+import signal
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import Mock, patch
 
@@ -445,6 +448,613 @@ class TestFloorTests(unittest.TestCase):
         self.assertIn('--gate tests --expect-tests --min-tests 260 -- cargo test '
                       '--workspace --all-features --locked --no-fail-fast', pipeline)
         self.assertEqual(pipeline.count('--min-tests'), 1)
+
+
+LINUX_FENCE_AVAILABLE = (sys.platform == 'linux' and callable(getattr(os,'waitid',None))
+                         and all(hasattr(os,name) for name in ['P_PID','WEXITED','WNOHANG','WNOWAIT'])
+                         and Path('/proc/self/stat').is_file())
+
+
+@unittest.skipUnless(LINUX_FENCE_AVAILABLE,'Linux non-reaping wait/procfs controls unavailable; zero credit')
+class CommandSupervisionTests(unittest.TestCase):
+    def setUp(self):
+        try:
+            ci._validate_limits(1,None)
+        except ValueError as problem:
+            self.skipTest(f'Linux native fence unavailable: {problem}; zero credit')
+
+    def owned(self, script, *, timeout=0.3, limit=4096, separate=False, callback=None):
+        chunks = []
+        def observe(stream, data):
+            chunks.append((stream, data))
+            if callback:
+                callback(stream, data)
+        started = time.monotonic()
+        code, error = ci._run_owned(
+            [sys.executable, '-B', '-c', script], ROOT, observe,
+            timeout_seconds=timeout, max_output_bytes=limit, separate_stderr=separate)
+        self.assertLess(time.monotonic() - started, 5)
+        return code, error, chunks
+
+    def recorded(self, script, *, timeout=0.3, limit=4096, minimum=None, via_cli=False):
+        with tempfile.TemporaryDirectory() as directory, \
+                patch.object(ci, 'identity', return_value={'candidate':'a'*40, 'tree':'b'*40}), \
+                patch.object(ci.subprocess, 'check_output', return_value=b''), \
+                patch.object(ci.shutil, 'which', return_value=None), \
+                patch.object(ci.sys, 'stdout', Mock(buffer=io.BytesIO())):
+            output = Path(directory)
+            command = [sys.executable, '-B', '-c', script]
+            if via_cli:
+                argv = ['ci_assurance.py', '--root', str(ROOT), 'record', '--output', directory,
+                        '--gate', 'bounded', '--timeout-seconds', str(timeout),
+                        '--max-output-bytes', str(limit), '--', *command]
+                with patch.object(ci.sys, 'argv', argv):
+                    code = ci.main()
+            else:
+                code = ci.record(ROOT, output, 'bounded', command, minimum is not None, minimum,
+                                 timeout_seconds=timeout, max_output_bytes=limit)
+            return code, json.loads((output/'bounded.json').read_bytes()), (output/'bounded.log').read_bytes()
+
+    def test_native_positive_closed_stdin_and_exact_merged_bytes(self):
+        code, error, chunks = self.owned(
+            "import os; assert os.read(0,1)==b''; os.write(1,b'A'); os.write(2,b'B'); os.write(1,b'C')",
+            timeout=1)
+        self.assertEqual(code, 0)
+        self.assertIsNone(error)
+        self.assertTrue(all(stream=='stdout' for stream,data in chunks))
+        self.assertEqual(b''.join(data for _, data in chunks), b'ABC')
+
+    def test_native_separate_streams_keep_labels_and_per_stream_bytes(self):
+        code, error, chunks = self.owned(
+            "import os; os.write(2,b'error'); os.write(1,b'output')", timeout=1, separate=True)
+        self.assertEqual(code, 0)
+        self.assertIsNone(error)
+        self.assertEqual(b''.join(data for stream,data in chunks if stream=='stdout'), b'output')
+        self.assertEqual(b''.join(data for stream,data in chunks if stream=='stderr'), b'error')
+
+    def test_native_silent_process_cannot_outlive_deadline(self):
+        code, error, chunks = self.owned('import time; time.sleep(1.5)')
+        self.assertNotEqual(code, 0)
+        self.assertIn('deadline', error)
+        self.assertEqual(chunks, [])
+
+    def test_native_no_newline_partial_bytes_survive_timeout(self):
+        code, error, chunks = self.owned("import os,time; os.write(1,b'partial'); time.sleep(1.5)")
+        self.assertNotEqual(code, 0)
+        self.assertIn('deadline', error)
+        self.assertEqual(b''.join(data for _,data in chunks), b'partial')
+
+    def test_native_closed_pipes_do_not_skip_exit_deadline(self):
+        code, error, chunks = self.owned('import os,time; os.close(1); os.close(2); time.sleep(1.5)')
+        self.assertNotEqual(code, 0)
+        self.assertIn('deadline', error)
+        self.assertEqual(chunks, [])
+
+    def test_native_exact_byte_boundary_passes_but_one_more_fails(self):
+        for length in [64,65]:
+            with self.subTest(length=length):
+                code, error, chunks = self.owned(f"import os; os.write(1,b'x'*{length})", limit=64, timeout=1)
+                self.assertEqual(b''.join(data for _,data in chunks), b'x'*64)
+                if length==64:
+                    self.assertEqual(code, 0); self.assertIsNone(error)
+                else:
+                    self.assertIn('output limit', error)
+
+    def test_native_both_streams_share_ceiling_without_newlines(self):
+        code, error, chunks = self.owned(
+            "import os; os.write(1,b'x'*40); os.write(2,b'y'*40)", limit=64, timeout=1)
+        self.assertIn('output limit', error)
+        self.assertEqual(b''.join(data for _,data in chunks), b'x'*40+b'y'*24)
+
+    def test_native_ignored_term_requires_kill_and_launcher_wait(self):
+        code, error, chunks = self.owned(
+            "import os,signal,time; signal.signal(signal.SIGTERM,signal.SIG_IGN); "
+            "os.write(1,str(os.getpid()).encode()); time.sleep(1.5)")
+        self.assertEqual(code, -signal.SIGKILL)
+        self.assertIn('deadline', error)
+        pid = int(b''.join(data for _,data in chunks))
+        with self.assertRaises(ProcessLookupError): os.kill(pid,0)
+
+    def test_native_forked_child_is_terminated_and_reaped_by_launcher(self):
+        script = """import os,signal,time
+child=os.fork()
+if child==0:
+    time.sleep(1.5)
+    os._exit(0)
+def stop(signum,frame):
+    os.waitpid(child,0)
+    raise SystemExit(0)
+signal.signal(signal.SIGTERM,stop)
+os.write(1,str(child).encode())
+time.sleep(1.5)
+"""
+        code, error, chunks = self.owned(script)
+        self.assertEqual(code, 0)
+        self.assertIn('deadline', error)
+        child = int(b''.join(data for _,data in chunks))
+        with self.assertRaises(ProcessLookupError): os.kill(child,0)
+
+    def test_native_observer_failure_and_cancellation_retain_partial_bytes(self):
+        for problem in [OSError('log failed'), KeyboardInterrupt()]:
+            with self.subTest(problem=type(problem).__name__):
+                def fail(stream,data): raise problem
+                code, error, chunks = self.owned(
+                    "import os,time; os.write(1,b'saved'); time.sleep(1.5)", callback=fail)
+                self.assertNotEqual(code,0)
+                self.assertIsNotNone(error)
+                self.assertEqual(b''.join(data for _,data in chunks), b'saved')
+
+    def test_native_bounded_mode_restores_signal_handlers(self):
+        previous = {sig:signal.getsignal(sig) for sig in [signal.SIGINT,signal.SIGTERM]}
+        self.owned('pass', timeout=1)
+        self.assertEqual({sig:signal.getsignal(sig) for sig in previous}, previous)
+
+    def test_invalid_limits_refuse_before_popen(self):
+        for timeout in [0,-1,True,float('nan'),float('inf'),1e300,10**1000,'1']:
+            with self.subTest(timeout=str(timeout)[:40]), patch.object(ci.subprocess,'Popen') as spawn:
+                with self.assertRaises(ValueError):
+                    ci.record(ROOT, Path('.'), 'bounded', ['never'], timeout_seconds=timeout)
+                spawn.assert_not_called()
+        for limit in [0,-1,True,1.5,float('inf'),sys.maxsize+1,'10']:
+            with self.subTest(limit=limit), patch.object(ci.subprocess,'Popen') as spawn:
+                with self.assertRaises(ValueError):
+                    ci.record(ROOT, Path('.'), 'bounded', ['never'], timeout_seconds=1, max_output_bytes=limit)
+                spawn.assert_not_called()
+
+    def test_output_option_requires_deadline_before_popen(self):
+        with patch.object(ci.subprocess,'Popen') as spawn:
+            with self.assertRaises(ValueError):
+                ci.record(ROOT,Path('.'),'bounded',['never'],max_output_bytes=64)
+            spawn.assert_not_called()
+
+    def test_native_cli_options_and_unchanged_receipt_shape(self):
+        code, receipt, log = self.recorded("import os; os.write(1,b'raw\\x00bytes')", timeout=1, via_cli=True)
+        self.assertEqual(code,0)
+        self.assertEqual(log,b'raw\x00bytes')
+        self.assertEqual(receipt['schema_version'],'mainframe-env.ci-command@1')
+        self.assertFalse(receipt['full_assurance_credit'])
+        self.assertEqual(receipt['licensed_credit'],0)
+        self.assertNotIn('timeout_seconds', receipt)
+        self.assertNotIn('max_output_bytes', receipt)
+
+    def test_native_summary_prefix_cannot_pass_after_overflow(self):
+        summary=b'test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n'
+        code, receipt, log = self.recorded(
+            f'import os; os.write(1,{summary!r}); os.write(2,b"x"*5000)', timeout=1, limit=256, minimum=1)
+        self.assertNotEqual(code,0)
+        self.assertEqual(receipt['status'],'failed')
+        self.assertEqual(receipt['observed_passed_tests'],1)
+        self.assertIn('output limit',receipt['error'])
+        self.assertEqual(log,summary+b'x'*(256-len(summary)))
+
+    def test_native_bounded_floor_counts_complete_summaries_and_no_skips(self):
+        summary=b'tooling test result: ok. 2 executed; 1 skipped;\n'
+        for minimum in [1,2]:
+            with self.subTest(minimum=minimum):
+                code, receipt, log = self.recorded(f'import os; os.write(1,{summary!r})', timeout=1, minimum=minimum)
+                self.assertEqual(receipt['observed_passed_tests'],1)
+                self.assertEqual(code,0 if minimum==1 else 1)
+                self.assertEqual(log,summary)
+
+    def test_native_partial_raw_record_is_not_replaced_by_timeout_error(self):
+        code, receipt, log = self.recorded("import os,time; os.write(2,b'raw partial'); time.sleep(1.5)")
+        self.assertNotEqual(code,0)
+        self.assertEqual(log,b'raw partial')
+        self.assertIn('deadline',receipt['error'])
+
+    def test_nonposix_bounded_mode_refuses_before_launch(self):
+        with patch.object(ci.os,'name','nt'), patch.object(ci.subprocess,'Popen') as spawn:
+            with self.assertRaises(ValueError):
+                ci._run_owned(['never'],ROOT,lambda stream,data:None,timeout_seconds=1)
+            spawn.assert_not_called()
+
+    def test_zero_exit_with_remaining_group_is_failure_and_only_owned_group_is_signalled(self):
+        read_fd, write_fd = os.pipe()
+        os.close(write_fd)
+        process = Mock(pid=987654321, stdout=os.fdopen(read_fd,'rb'), stderr=None)
+        process.wait.return_value = 0
+        live = True
+        signals = []
+        def killpg(group,sig):
+            nonlocal live
+            self.assertEqual(group,process.pid)
+            if not live: raise ProcessLookupError()
+            if sig:
+                signals.append(sig)
+                live=False
+        state=Mock(si_pid=process.pid,si_code=os.CLD_EXITED,si_status=0)
+        def observe(kind,pid,flags):
+            if pid==os.getpid(): raise ChildProcessError()
+            return state
+        with patch.object(ci.subprocess,'Popen',return_value=process), \
+                patch.object(ci.os,'waitid',side_effect=observe), \
+                patch.object(ci,'_linux_group_has_members',side_effect=lambda group:live), \
+                patch.object(ci.os,'killpg',side_effect=killpg):
+            code,error=ci._run_owned(['fixture'],ROOT,lambda stream,data:None,timeout_seconds=1)
+        self.assertEqual(code,0)
+        self.assertIn('group',error)
+        self.assertEqual(signals,[signal.SIGTERM])
+        process.wait.assert_called()
+        self.assertTrue(process.stdout.closed)
+
+    def test_wait_failure_cannot_be_relabelled_zero_exit(self):
+        read_fd,write_fd=os.pipe(); os.close(write_fd)
+        process=Mock(pid=987654321,stdout=os.fdopen(read_fd,'rb'),stderr=None)
+        process.wait.side_effect=OSError('wait failed')
+        state=Mock(si_pid=process.pid,si_code=os.CLD_EXITED,si_status=0)
+        def observe(kind,pid,flags):
+            if pid==os.getpid(): raise ChildProcessError()
+            return state
+        with patch.object(ci.subprocess,'Popen',return_value=process), \
+                patch.object(ci.os,'waitid',side_effect=observe), \
+                patch.object(ci,'_linux_group_has_members',return_value=False), \
+                patch.object(ci.os,'killpg',side_effect=ProcessLookupError()):
+            code,error=ci._run_owned(['fixture'],ROOT,lambda stream,data:None,timeout_seconds=1)
+        self.assertNotEqual(code,0)
+        self.assertIn('wait',error)
+        self.assertTrue(process.stdout.closed)
+
+    def test_popen_failure_is_failed_record_with_no_test_credit(self):
+        with tempfile.TemporaryDirectory() as directory, \
+                patch.object(ci,'identity',return_value={'candidate':'a'*40,'tree':'b'*40}), \
+                patch.object(ci.subprocess,'check_output',return_value=b''), \
+                patch.object(ci.shutil,'which',return_value=None), \
+                patch.object(ci.subprocess,'Popen',side_effect=OSError('missing executable')):
+            code=ci.record(ROOT,Path(directory),'bounded',['absent'],True,1,timeout_seconds=1)
+            receipt=json.loads((Path(directory)/'bounded.json').read_bytes())
+        self.assertNotEqual(code,0)
+        self.assertIn('missing executable',receipt['error'])
+        self.assertEqual(receipt['observed_passed_tests'],0)
+
+    def test_native_launcher_zero_exit_with_inherited_pipe_cannot_pass(self):
+        # Linux test-only adoption lets the test reap the orphan it deliberately
+        # creates. Production owns POSIX groups, not a global child subreaper.
+        import ctypes
+        libc = ctypes.CDLL(None, use_errno=True)
+        prior = ctypes.c_int()
+        if not hasattr(libc,'prctl') or libc.prctl(37,ctypes.byref(prior),0,0,0)!=0:
+            self.skipTest('Linux subreaper query unavailable; zero native orphan credit')
+        if libc.prctl(36,1,0,0,0)!=0:
+            self.skipTest('Linux subreaper adoption unavailable; zero native orphan credit')
+        child = None
+        try:
+            code,error,chunks = self.owned("""import os,time
+child=os.fork()
+if child==0:
+    time.sleep(1.5)
+    os._exit(0)
+os.write(1,str(child).encode())
+os._exit(0)
+""", timeout=1)
+            child = int(b''.join(data for _,data in chunks))
+            self.assertEqual(code,0)
+            self.assertIn('group',error)
+            waited,status = os.waitpid(child,0)
+            self.assertEqual(waited,child)
+            self.assertTrue(os.WIFSIGNALED(status))
+            self.assertIn(os.WTERMSIG(status),[signal.SIGTERM,signal.SIGKILL])
+            with self.assertRaises(ProcessLookupError): os.kill(child,0)
+            child=None
+        finally:
+            if child is not None:
+                os.waitpid(child,0)
+            self.assertEqual(libc.prctl(36,prior.value,0,0,0),0)
+
+    def test_native_signal_cancellation_keeps_receipt_partial_bytes_and_reaps(self):
+        previous=signal.getsignal(signal.SIGTERM)
+        script="import os,signal,time; os.write(1,str(os.getpid()).encode()); os.kill(os.getppid(),signal.SIGTERM); time.sleep(1.5)"
+        code,receipt,log=self.recorded(script,timeout=1)
+        self.assertNotEqual(code,0)
+        self.assertEqual(receipt['status'],'failed')
+        self.assertIn('cancelled',receipt['error'])
+        with self.assertRaises(ProcessLookupError): os.kill(int(log),0)
+        self.assertIs(signal.getsignal(signal.SIGTERM),previous)
+
+    def test_native_continuous_no_newline_saturation_is_bounded(self):
+        code,error,chunks=self.owned("import os\nwhile True: os.write(2,b'x'*4096)",limit=512,timeout=1)
+        self.assertNotEqual(code,0)
+        self.assertIn('output limit',error)
+        self.assertLess(len(error),500)
+        self.assertEqual(b''.join(data for _,data in chunks),b'x'*512)
+
+    def test_native_fragmented_and_final_no_newline_summaries_keep_floor(self):
+        summary=b'tooling test result: ok. 3 executed; 1 skipped;'
+        script=f"import os,time; os.write(1,{summary[:9]!r}); time.sleep(.02); os.write(1,{summary[9:]!r})"
+        code,receipt,log=self.recorded(script,timeout=1,minimum=2)
+        self.assertEqual(code,0)
+        self.assertEqual(receipt['observed_passed_tests'],2)
+        self.assertEqual(log,summary)
+
+    def test_native_truncated_no_newline_summary_has_zero_credit(self):
+        summary=b'tooling test result: ok. 3 executed; 1 skipped;'
+        code,receipt,log=self.recorded(f'import os; os.write(1,{summary!r})',timeout=1,limit=20,minimum=1)
+        self.assertNotEqual(code,0)
+        self.assertEqual(receipt['observed_passed_tests'],0)
+        self.assertEqual(log,summary[:20])
+
+    def test_native_oversized_line_after_valid_summary_does_not_weaken_floor(self):
+        summary=b'tooling test result: ok. 1 executed; 0 skipped;\n'
+        script=f'import os; os.write(1,{summary!r}); os.write(1,b"test result:"+b"x"*66000+b"\\n")'
+        code,receipt,log=self.recorded(script,timeout=1,limit=70000,minimum=1)
+        self.assertNotEqual(code,0)
+        self.assertEqual(receipt['status'],'failed')
+        self.assertEqual(receipt['observed_passed_tests'],1)
+        self.assertIsNotNone(receipt['error'])
+        self.assertEqual(log,summary+b'test result:'+b'x'*66000+b'\n')
+
+    def test_caller_or_broadcast_group_is_never_probed_or_signalled(self):
+        for pid in [0,-1,1,os.getpid(),os.getpgrp()]:
+            with self.subTest(pid=pid):
+                read_fd,write_fd=os.pipe(); os.close(write_fd)
+                process=Mock(pid=pid,stdout=os.fdopen(read_fd,'rb'),stderr=None)
+                process.wait.return_value=0
+                with patch.object(ci.subprocess,'Popen',return_value=process), patch.object(ci.os,'killpg') as kill:
+                    code,error=ci._run_owned(['fixture'],ROOT,lambda stream,data:None,timeout_seconds=1)
+                self.assertIsNotNone(error)
+                self.assertIn('unsafe',error)
+                kill.assert_not_called()
+                process.wait.assert_called()
+                self.assertTrue(process.stdout.closed)
+
+    def test_native_separate_streams_still_share_one_output_ceiling(self):
+        code,error,chunks=self.owned("import os; os.write(1,b'x'*50); os.write(2,b'y'*50)",
+                                     limit=64,timeout=1,separate=True)
+        self.assertIn('output limit',error)
+        self.assertEqual(sum(len(data) for _,data in chunks),64)
+        self.assertTrue(all(data == (b'x' if stream=='stdout' else b'y')*len(data) for stream,data in chunks))
+
+
+class CommandSupervisionReviewTests(unittest.TestCase):
+    def setUp(self):
+        if not LINUX_FENCE_AVAILABLE and self._testMethodName != 'test_unsupported_platform_or_missing_waitnowait_refuses_before_launch':
+            self.skipTest('Linux lifetime/native controls unavailable; zero credit')
+        if self._testMethodName != 'test_unsupported_platform_or_missing_waitnowait_refuses_before_launch':
+            try:
+                ci._validate_limits(1,None)
+            except ValueError as problem:
+                self.skipTest(f'Linux lifetime fence unavailable: {problem}; zero credit')
+
+    def test_dirty_real_candidate_replaces_old_success_log_before_any_launch(self):
+        import hashlib
+        old=b'tooling test result: ok. 260 executed; 0 skipped;\n'
+        with tempfile.TemporaryDirectory() as directory:
+            workspace=Path(directory)
+            root=workspace/'repo'; root.mkdir()
+            subprocess.run(['git','init','-q',str(root)],check=True)
+            subprocess.run(['git','-C',str(root),'config','user.name','Fixture'],check=True)
+            subprocess.run(['git','-C',str(root),'config','user.email','fixture@example.test'],check=True)
+            (root/'tracked').write_text('clean\n')
+            subprocess.run(['git','-C',str(root),'add','.'],check=True)
+            subprocess.run(['git','-C',str(root),'commit','-qm','fixture'],check=True)
+            for dirty in ['tracked','untracked']:
+                with self.subTest(dirty=dirty):
+                    (root/dirty).write_text('dirty\n')
+                    output=workspace/'output'; output.mkdir(exist_ok=True)
+                    log=output/'bounded.log'; log.write_bytes(old)
+                    launches=[]
+                    original_spawn=subprocess.Popen
+                    def spawn(command,**kwargs):
+                        if command[0]!='git':
+                            launches.append(command)
+                            raise AssertionError('dirty candidate must not launch a command')
+                        return original_spawn(command,**kwargs)
+                    with patch.object(ci.subprocess,'Popen',side_effect=spawn), \
+                            patch.object(ci.shutil,'which',return_value=None):
+                        code=ci.record(root,output,'bounded',['never'],True,1,timeout_seconds=1)
+                    receipt=json.loads((output/'bounded.json').read_bytes())
+                    self.assertEqual(launches,[])
+                    self.assertNotEqual(code,0)
+                    self.assertEqual(receipt['status'],'failed')
+                    self.assertEqual(receipt['observed_passed_tests'],0)
+                    self.assertEqual(log.read_bytes(),(receipt['error']+'\n').encode())
+                    self.assertEqual(receipt['log_sha256'],hashlib.sha256(log.read_bytes()).hexdigest())
+                    (root/'tracked').write_text('clean\n')
+                    if dirty=='untracked': (root/'untracked').unlink()
+
+    def test_log_open_failure_replaces_prior_bytes_without_launch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output=Path(directory); log=output/'bounded.log'
+            log.write_bytes(b'old successful command\n')
+            original_open=Path.open
+            def open_file(path,mode='r',*args,**kwargs):
+                if path==log and mode=='wb': raise OSError('current log open failed')
+                return original_open(path,mode,*args,**kwargs)
+            with patch.object(ci,'identity',return_value={'candidate':'a'*40,'tree':'b'*40}), \
+                    patch.object(ci.subprocess,'check_output',return_value=b''), \
+                    patch.object(ci.shutil,'which',return_value=None), \
+                    patch.object(Path,'open',open_file), patch.object(ci.subprocess,'Popen') as spawn:
+                code=ci.record(ROOT,output,'bounded',['never'],timeout_seconds=1)
+                spawn.assert_not_called()
+            receipt=json.loads((output/'bounded.json').read_bytes())
+            self.assertNotEqual(code,0)
+            self.assertEqual(log.read_bytes(),b'current log open failed\n')
+            self.assertEqual(receipt['status'],'failed')
+
+    def lifetime(self, *, members=False, wait_error=None, observation_error=None,
+                 callback_error=False, membership_error=None, inherited_pipe=False):
+        from types import SimpleNamespace
+        read_fd,write_fd=os.pipe()
+        os.write(write_fd,b'actual partial')
+        if not inherited_pipe: os.close(write_fd)
+        process=Mock(pid=987654321,stdout=os.fdopen(read_fd,'rb'),stderr=None)
+        events=[]
+        reaped=False
+        live=members
+        def poll():
+            nonlocal reaped
+            events.append('poll-reap'); reaped=True
+            return 0
+        def observe(kind,pid,flags):
+            if pid==os.getpid():
+                events.append('capability-probe')
+                raise ChildProcessError()
+            events.append('observe')
+            self.assertEqual(kind,os.P_PID); self.assertEqual(pid,process.pid)
+            self.assertTrue(flags & os.WNOWAIT)
+            self.assertFalse(reaped)
+            if observation_error: raise observation_error
+            return SimpleNamespace(si_pid=pid,si_code=os.CLD_EXITED,si_status=0)
+        def group(pgid):
+            events.append('group-probe')
+            self.assertEqual(pgid,process.pid); self.assertFalse(reaped)
+            if membership_error: raise membership_error
+            return live
+        def kill(pgid,sig):
+            nonlocal live
+            events.append('group-probe' if sig==0 else 'group-signal')
+            self.assertEqual(pgid,process.pid)
+            # Model immediate reuse after any reaping operation. Looking up the
+            # same numeric PGID cannot restore ownership of this unrelated group.
+            if reaped: raise OSError('unrelated reused group must not be touched')
+            if sig: live=False
+        def wait(**kwargs):
+            nonlocal reaped
+            events.append('wait'); reaped=True
+            if wait_error: raise wait_error
+            return 0
+        process.poll.side_effect=poll
+        process.wait.side_effect=wait
+        chunks=[]
+        def output(stream,data):
+            chunks.append(data)
+            if callback_error: raise OSError('observer failed')
+        try:
+            with patch.object(ci.subprocess,'Popen',return_value=process), \
+                    patch.object(ci.os,'waitid',side_effect=observe), \
+                    patch.object(ci,'_linux_group_has_members',side_effect=group,create=True), \
+                    patch.object(ci.os,'killpg',side_effect=kill):
+                result=ci._run_owned(['fixture'],ROOT,output,timeout_seconds=.15)
+        finally:
+            process.stdout.close()
+            if inherited_pipe: os.close(write_fd)
+        self.assertNotIn('poll-reap',events)
+        self.assertEqual(events.count('wait'),1)
+        self.assertTrue(all(event not in ['observe','group-probe','group-signal'] for event in events[events.index('wait')+1:]),events)
+        return result,events,chunks
+
+    def test_retained_leader_alone_is_success_and_wait_is_last_group_operation(self):
+        (code,error),events,chunks=self.lifetime()
+        self.assertEqual(code,0); self.assertIsNone(error)
+        self.assertIn('observe',events)
+        self.assertEqual(b''.join(chunks),b'actual partial')
+
+    def test_actual_remaining_members_fail_and_signals_precede_only_wait(self):
+        (code,error),events,chunks=self.lifetime(members=True)
+        self.assertEqual(code,0)
+        self.assertIn('group',error)
+        self.assertIn('group-signal',events)
+        self.assertEqual(b''.join(chunks),b'actual partial')
+
+    def test_failed_wait_never_uses_released_numeric_group(self):
+        for problem in [OSError('wait failed'),subprocess.TimeoutExpired('fixture',.5),KeyboardInterrupt()]:
+            with self.subTest(problem=type(problem).__name__):
+                (code,error),events,chunks=self.lifetime(wait_error=problem)
+                self.assertNotEqual(code,0)
+                self.assertIn('wait',error)
+
+    def test_callback_failure_finishes_signalling_before_wait(self):
+        (code,error),events,chunks=self.lifetime(callback_error=True)
+        self.assertIn('observer failed',error)
+        self.assertEqual(b''.join(chunks),b'actual partial')
+
+    def test_lost_child_fence_refuses_all_further_group_access(self):
+        (code,error),events,chunks=self.lifetime(observation_error=ChildProcessError('lost child fence'))
+        self.assertIn('lost child fence',error)
+        self.assertNotIn('group-probe',events)
+        self.assertNotIn('group-signal',events)
+
+    def test_unsupported_platform_or_missing_waitnowait_refuses_before_launch(self):
+        for platform,waitid in [('darwin',getattr(os,'waitid',None)),('linux',None)]:
+            with self.subTest(platform=platform), patch.object(ci.sys,'platform',platform), \
+                    patch.object(ci.os,'waitid',waitid,create=True), patch.object(ci.subprocess,'Popen') as spawn:
+                with self.assertRaises(ValueError):
+                    ci._run_owned(['never'],ROOT,lambda stream,data:None,timeout_seconds=1)
+                spawn.assert_not_called()
+
+    def test_inherited_pipe_deadline_retains_leader_until_all_group_work_finishes(self):
+        (code,error),events,chunks=self.lifetime(inherited_pipe=True)
+        self.assertEqual(code,0)
+        self.assertIn('deadline',error)
+        self.assertIn('group-signal',events)
+        self.assertEqual(b''.join(chunks),b'actual partial')
+
+    def test_uncertain_membership_fails_before_single_wait(self):
+        (code,error),events,chunks=self.lifetime(membership_error=OSError('incomplete membership census'))
+        self.assertIn('incomplete membership census',error)
+        self.assertIn('group-signal',events)
+
+    def test_linux_census_excludes_only_retained_leader_and_detects_zombie_member(self):
+        from contextlib import contextmanager
+        from types import SimpleNamespace
+        @contextmanager
+        def scan(root):
+            self.assertEqual(root,'/proc')
+            yield iter([SimpleNamespace(name='987654321',path='/proc/987654321'),
+                        SimpleNamespace(name='42',path='/proc/42'),SimpleNamespace(name='self')])
+        for group,expected in [(987654321,True),(1,False)]:
+            with self.subTest(group=group), patch.object(ci.os,'scandir',scan), \
+                    patch.object(Path,'read_bytes',return_value=f'42 (a ) name) Z 1 {group} 0'.encode()) as read:
+                self.assertEqual(ci._linux_group_has_members(987654321),expected)
+                self.assertEqual(read.call_count,1)
+
+    def test_missing_membership_stat_is_unavailable_not_empty(self):
+        from contextlib import contextmanager
+        from types import SimpleNamespace
+        @contextmanager
+        def scan(root): yield iter([SimpleNamespace(name='42',path='/proc/42')])
+        with patch.object(ci.os,'scandir',scan),patch.object(Path,'read_bytes',side_effect=FileNotFoundError('vanished')):
+            with self.assertRaises(OSError): ci._linux_group_has_members(987654321)
+
+    def test_autoreaping_sigchld_refuses_before_launch(self):
+        with patch.object(ci.signal,'getsignal',return_value=signal.SIG_IGN),patch.object(ci.subprocess,'Popen') as spawn:
+            with self.assertRaises(ValueError):
+                ci._run_owned(['never'],ROOT,lambda stream,data:None,timeout_seconds=1)
+            spawn.assert_not_called()
+
+    def test_native_escaped_session_survives_deadline_without_group_signal(self):
+        import ctypes
+        libc=ctypes.CDLL(None,use_errno=True)
+        prior=ctypes.c_int()
+        if not hasattr(libc,'prctl') or libc.prctl(37,ctypes.byref(prior),0,0,0)!=0:
+            self.skipTest('Linux subreaper query unavailable; zero native escape credit')
+        if libc.prctl(36,1,0,0,0)!=0:
+            self.skipTest('Linux subreaper adoption unavailable; zero native escape credit')
+        child=None
+        signals=[]
+        original=ci.os.killpg
+        def kill(group,sig):
+            signals.append((group,sig))
+            return original(group,sig)
+        try:
+            with patch.object(ci.os,'killpg',side_effect=kill):
+                code,error,chunks=CommandSupervisionTests().owned("""import os,time
+read,write=os.pipe()
+child=os.fork()
+if child==0:
+    os.close(read)
+    os.setsid()
+    os.write(1,str(os.getpid()).encode())
+    os.write(write,b'ready')
+    os.close(write)
+    time.sleep(.8)
+    os._exit(0)
+os.close(write)
+os.read(read,1)
+os._exit(0)
+""",timeout=.15)
+            child=int(b''.join(data for _,data in chunks))
+            self.assertEqual(code,0)
+            self.assertIn('deadline',error)
+            self.assertEqual(os.getpgid(child),child)
+            self.assertTrue(all(group!=child for group,sig in signals))
+            waited,status=os.waitpid(child,0)
+            self.assertEqual(waited,child)
+            self.assertEqual(os.waitstatus_to_exitcode(status),0)
+            with self.assertRaises(ProcessLookupError): os.kill(child,0)
+            child=None
+        finally:
+            if child is not None: os.waitpid(child,0)
+            self.assertEqual(libc.prctl(36,prior.value,0,0,0),0)
 
 
 if __name__=='__main__':unittest.main()

@@ -60,6 +60,23 @@ measurements first.
 
 See the [IBM cache guide](IBM-DOCS-CACHE.md).
 
+## Optional finite command recording
+
+For commands needing a deadline, `record --timeout-seconds SECONDS` uses an
+owned Linux process group and closed stdin. `--max-output-bytes BYTES` adds a
+shared output ceiling and requires that deadline. Unsupported Linux wait/procfs
+prerequisites refuse before launch; ordinary no-option callers keep their
+existing streaming behavior. Keep exclusive child-wait ownership and prompt
+output callbacks for the entire invocation.
+
+The bounded owner retains the leader until all group operations finish, then
+waits once. Current partial bytes/exits remain diagnostic on failure; pre-launch
+refusal replaces stale log bytes. Timeout, overflow, cancellation, uncertain
+membership or failed cleanup cannot pass even after a successful summary. The
+conservative procfs census can refuse under process churn. Escaped sessions,
+blocking callbacks and kernel/process-creation delays prevent a universal
+containment or hard wall-clock guarantee; no production subreaper is installed.
+
 ## Effective Conformance IR inspection
 
 `cargo xtask conformance-spec-export` emits a JSON tooling bundle containing the

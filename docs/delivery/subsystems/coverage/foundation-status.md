@@ -54,9 +54,10 @@ flowchart LR
 | `CV-209.journey-closure` | Closure authority and observation transport implemented | Full CardDemo refuses incomplete observations; do not infer workload acceptance from harness tests |
 | `CV-209.carddemo-transactions` | Selected date/duplicate comparisons and binding implemented | J06 AIX browse/navigation and all 105 issue acceptance requirements remain unbound; 20/20 journeys and 26/26 transaction closure remain pending |
 | `CV-209.postgres-parity-selection` / `CV-209.postgres-loopback-owner` | All twelve existing live controls passed on the qualified source-equivalent producer | TCP-only startup removes an unused Unix socket path limit. Host loader/timezone differences, retained cleanup failures and one defunct PID-1 child remain qualified; this is no global backend or full CardDemo closure |
-| `CV-209.public-client-compatibility` | External input/startup feasibility only; fixture plan prepared and command supervision active | `--version` feasibility is not a job workload pass. Submit/query/files/content, authentication/ownership refusals and actual method/URI/status capture remain pending |
+| `CV-209.public-client-compatibility` | External input/startup feasibility only; fixture plan prepared; Linux command supervision accepted | `--version` feasibility is not a job workload pass. Submit/query/files/content, authentication/ownership refusals and actual method/URI/status capture remain pending |
 | `CV-209.test-floor` and integrated exit | Minimum 260-pass recorder wiring implemented; full exit pending | Count actually executed passing tests on the selected unchanged candidate; preserve every affected architecture/profile/schema/package/source/backend gate |
 | `CV-209.public-status-docs` | Current subsystem status and documentation reconciled | Preserve active preparation scope, exact pending gates and implemented sealer; retain raw outputs externally |
+| `CV-209.command-supervision` | Optional Linux deadline/output ownership complete | Current-invocation logs and retained-leader fencing prevent stale output/PGID reuse; exclusive wait and conservative procfs limitations remain explicit |
 | `CV-209.candidate-cleanliness` | Recorded command boundary validation complete | Existing recorder rejects tracked/untracked source changes before launching and at completion; ignored builds/external logs remain valid. This does not provide continuous source attestation |
 
 ## Source and coverage boundaries
@@ -120,7 +121,7 @@ implemented `cargo xtask work-package-seal` owner for exact changed-path
 allowlists and generated commit trailers/digests; its `--check` validates the
 seal. A seal does not create product execution credit. Raw results stay outside
 Git; do not hand-hash a replacement seal or create another controller ledger.
-The next dependencies are reviewed command supervision, bounded navigation and
+The next dependencies are bounded navigation and
 the finite public client fixture under their explicit manager grants below.
 
 ### CV-209.public-client-compatibility preparation declaration
@@ -147,24 +148,6 @@ server/job/client execution, new pins/downloads, CI input mutation or acceptance
 status. Hand off the smallest exact owner plan, source-independent assertions,
 regressions and supervisor lifecycle to the manager for implementation grant.
 
-### CV-209.command-supervision declaration
-
-Manager freezes the next dependency as bounded command supervision in the
-existing CI owner, before the live fixture. Exact implementation owners are
-`tools/ci_assurance.py`, `tools/tests/test_ci_assurance.py` and one unique
-`changes/unreleased/cv-209-command-supervision.toml` fragment. Preserve current
-clean-candidate boundaries, receipt schemas, test floors and ordinary callers.
-Add optional positive finite timeout/output limits and one reusable owned-process
-primitive for later client execution; no client launcher/input profile yet.
-
-Independently demonstrate silent/no-newline hangs, output saturation and owned
-descendant cleanup with small local Python controls before repair. Deadline,
-wait or teardown failure cannot pass or signal an unrelated process group.
-Bound both streams, retain actual partial bytes/exits and always reap the owned
-launcher; closed stdin and process ownership are explicit. No external client,
-server, job, Cargo, backend, whole campaign, pin/cache mutation or new ledger.
-Run the affected CI Python tests only; manager owns docs/generated/status/seal.
-
 ### CV-209.carddemo-transaction-navigation preparation declaration
 
 Manager authorizes source-only preparation of the next J06 transaction AIX
@@ -181,19 +164,6 @@ lookup; unavailable bodies remain skipped/zero without repeat requests. Exclude
 all private/licensed work and the three unready CICS rows. Hand off the smallest
 exact owner allowlist and independently failing control plan before a later
 implementation grant. Preserve prior eighteen-control producing receipts.
-
-### Command-supervision review correction declaration
-
-Before sealing, manager grants correction of two reviewed defects under the same
-three-path allowlist: pre-launch refusal must not bind a previous invocation's
-log, and process-group authority must not outlive its launched leader's identity.
-Retain the leader without reaping until all owned-group signalling is finished;
-fail before launch where the required non-reaping observation is unavailable.
-Never probe or signal a numeric PGID after the ownership fence is released.
-Preserve actual partial output and prior sixty-eight-control receipts. Add genuine
-focused red controls for stale logs and ownership lifetime, then affected Python
-validation only. Disposition Linux-native orphan controls honestly; unavailable
-platform controls earn no credit. No client/Cargo/backend or schema change.
 
 ### CV-209.carddemo-transaction-navigation implementation declaration
 
@@ -247,3 +217,40 @@ wire/spec versions, source identities, six-gate obligations and licensed pending
 requirements are unchanged. The documentation/changelog/subsystem validators
 and frozen dependency policy passed; no product behavior or execution credit
 is established by this wording repair.
+
+### CV-209.public-client-inputs declaration
+
+Manager accepts the external optional-input design and grants its exact existing
+lock, supply-chain validator/tests, CI supply-chain runbook and one unique fragment.
+Use the same input lock with deliberate `ci-input-lock@2` dispatch and a finite
+strict retained @1 reader. One optional `public-client-linux-x86_64` development
+profile records reviewed immutable bytes, with no host paths or new lock/ledger.
+The exact eight required tools and existing CI/all runtime scopes remain unchanged.
+
+Validate explicit role bindings, archive/SRI/tree bytes and fixed profile grammar
+without native execution, downloading, extraction or package resolution. Share
+the existing validator with the later supervised launcher; no dynamic mount/argv
+interpreter is granted. Keep upstream-signature and bwrap host-bootstrap limits
+explicit. First retain independent malformed/drift/compatibility reds, then run
+affected supply-chain Python controls only. Manager owns status, generated docs,
+sealing and final affected integration gates. No Cargo, startup, live job, fixture,
+source-cache, product behavior or licensed/official execution credit is granted.
+
+### CV-209.command-supervision acceptance
+
+Status: **Complete (qualified optional Linux supervision)**. Silent/non-newline
+commands, combined output saturation, cancellation and remaining same-group
+descendants refuse under the finite owner. Pre-launch refusal binds current error
+bytes; leader identity remains reserved through every group operation before the
+sole wait. Default callers, receipt schemas, candidate checks and test floors
+remain unchanged. All eighty-two unique controls have observed passes across
+the preserved suite and one focused external-observer repair; the original
+suite exit 1 is not relabeled as a single green run. All thirty-nine prior
+controls passed, and twenty-six observed native launchers completed their waits.
+
+Independent initial reds and final source review address stale-log binding and
+early reaping. Lifetime ordering is source/mock proof; the native escaped-session
+control is not a PGID-reuse experiment. Bounded mode requires matching Linux
+procfs/non-reaping wait and exclusive child-wait ownership; conservative census,
+callback/kernel/escape and prior PID-1 zombie limitations remain qualified.
+No live client, whole campaign, portable sandbox or official/licensed credit.
