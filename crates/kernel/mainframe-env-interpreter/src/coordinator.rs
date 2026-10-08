@@ -19,6 +19,8 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+type NativePreparation<'a, M> = dyn FnMut(&mut M) -> Result<(), HostProblem> + 'a;
+
 mod checked_replay;
 mod original_dispatch;
 pub use checked_replay::{CheckedReplayAuditCapture, CheckedReplayObservations};
@@ -254,7 +256,7 @@ impl ExecutionCoordinator {
         mut observe: F,
         resumable: bool,
         native: Option<&mut NativeProgress<'_>>,
-        prepare_native: Option<&mut dyn FnMut(&mut M) -> Result<(), HostProblem>>,
+        prepare_native: Option<&mut NativePreparation<'_, M>>,
         child: Option<&root_terminal::NativeChildEnrollment>,
     ) -> ExecutionOutcome
     where
@@ -298,13 +300,13 @@ impl ExecutionCoordinator {
             Ok(None) => (None, None),
             Err(_) => return infrastructure_failure("execution admission persistence failed"),
         };
-        if let Some(prepare) = prepare_native {
-            if !journal.as_ref().is_some_and(|j| j.native.is_some()) || prepare(machine).is_err() {
-                return failed_outcome(problem(
-                    FailureCategory::UnknownOutcome,
-                    "native compiled machine preparation refused",
-                ));
-            }
+        if let Some(prepare) = prepare_native
+            && (!journal.as_ref().is_some_and(|j| j.native.is_some()) || prepare(machine).is_err())
+        {
+            return failed_outcome(problem(
+                FailureCategory::UnknownOutcome,
+                "native compiled machine preparation refused",
+            ));
         }
         if journal.as_ref().is_some_and(|j| j.native.is_some()) {
             control = match observe_checked(

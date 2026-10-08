@@ -223,15 +223,14 @@ pub(super) fn operands(
     ] {
         if let Some(tokens) = clauses.get(clause) {
             let value = cics_integer_value(tokens, semantic)?;
-            if let HirCicsValue::Data(reference) = &value {
-                if reference.usage != CobolUsage::Binary
+            if let HirCicsValue::Data(reference) = &value
+                && (reference.usage != CobolUsage::Binary
                     || reference.length != 2
-                    || reference.scale != 0
-                {
-                    return Err(ResolutionFailure::Invalid(format!(
-                        "CICS ISSUE {clause} requires halfword binary storage"
-                    )));
-                }
+                    || reference.scale != 0)
+            {
+                return Err(ResolutionFailure::Invalid(format!(
+                    "CICS ISSUE {clause} requires halfword binary storage"
+                )));
             }
             result.push(HirCicsNamedOperand { name, value });
         }

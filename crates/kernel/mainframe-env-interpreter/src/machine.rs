@@ -371,7 +371,7 @@ enum PendingKind {
         completion_code: Option<String>,
         reason_code: Option<String>,
     },
-    MqMqi(typed_mq::Targets),
+    MqMqi(Box<typed_mq::Targets>),
     Cics {
         operation: CicsOperation,
         storage64_intent: Option<typed_cics::Storage64Intent>,
@@ -762,7 +762,7 @@ impl ReferenceMachine {
             }
             for (formal, value) in formals.iter().zip(values) {
                 let layout = layouts
-                    .get(&normalize(&formal))
+                    .get(&normalize(formal))
                     .ok_or(MachineProblem::UnknownStorage)?;
                 if !layout.linkage || layout.parent.is_some() || layout.length == 0 {
                     return Err(MachineProblem::InvalidArtifact(
@@ -1954,7 +1954,7 @@ impl ReferenceMachine {
                 }
             }
             (PendingKind::MqMqi(targets), HostResult::MqMqi(result)) => {
-                self.finish_typed_mq(targets, *result)
+                self.finish_typed_mq(*targets, *result)
                     .map_err(|_| MachineProblem::Host(HostProblem::UnknownOutcome))?;
             }
             (PendingKind::MqMqi(_), _) => {
@@ -12266,7 +12266,10 @@ mod tests {
             })
             .unwrap();
         assert_eq!(machine.last_file_status, "00");
-        let Step::Effect(read) = machine.dataset_effect("read", &[file.clone()]).unwrap() else {
+        let Step::Effect(read) = machine
+            .dataset_effect("read", std::slice::from_ref(&file))
+            .unwrap()
+        else {
             panic!("READ did not call the dataset provider");
         };
         assert!(matches!(

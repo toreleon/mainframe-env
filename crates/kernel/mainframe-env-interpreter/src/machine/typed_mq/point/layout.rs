@@ -57,7 +57,7 @@ impl ReferenceMachine {
         let descriptor = mq_raw_layout(kind);
         if group.layout.category != LayoutCategory::Group
             || group.view.length < descriptor.prefix_bytes
-            || group.view.offset % 4 != 0
+            || !group.view.offset.is_multiple_of(4)
         {
             return Err(MachineProblem::UnsupportedForm);
         }

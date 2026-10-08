@@ -449,3 +449,16 @@ Status: **Complete (controller admission and root validation only)**. Integrated
 Documentation/changelog/subsystem and diff checks pass for this reviewed scope.
 Missing supplemental source checks are `skipped/unavailable` by user direction,
 with zero credit. Foundation acceptance and other public exit gates remain pending.
+
+### CV-209.execution-contract-lint acceptance
+
+Status: **Complete (mechanical compiler/interpreter slice only)**. Dependency-inclusive
+strict Clippy for both owning packages and 157 focused test results pass. The three
+newly exposed test-only diagnostics were repaired without changing assertions.
+The unused private arithmetic wrapper has no callers and was removed. Private
+MQI target boxing preserves DTO ownership; pending effects/bound MQI frames still
+refuse checkpoint serialization, and codecs remain unchanged. Integrated compile,
+module, formatting, frozen dependency, documentation/changelog/subsystem and diff
+checks pass. The broader xtask dependency lint now exposes unchanged MQ and CICS
+diagnostics; those owners remain separate pending work, with no suppression or
+full-build acceptance claim. Foundation and public exit acceptance remain pending.
