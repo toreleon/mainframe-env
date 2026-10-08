@@ -479,3 +479,24 @@ separate manager decision. Test-only helpers may be scoped to tests only after
 proving all callers are test-only; never hide a production reader or migration.
 Focused affected behavior/serialization regressions and strict package lint
 precede separate seals. Other dependency owners remain pending if later exposed.
+
+### Identity writer resource policy
+
+The framing slice may add a bounded `package_generation_identity_with_limits`
+entry point using the existing `PackageLimits` for hosts with explicitly selected
+budgets above the default writer limits. The default entry points stay bounded;
+the frozen @2 byte grammar and installer recovery's caller-selected limits stay
+unchanged. Test both finite domains with a valid package above the defaults and
+an explicit fitting budget, including refusal under an insufficient budget.
+This is an additive owned API, not an unbounded signer or semantic admission.
+The six producer/schema bindings declared above are approved for implementation.
+
+### Provider lint review disposition
+
+The CICS candidate passes 148 focused tests but retains four public signature
+diagnostics and one unreachable production receipt-pruning operation. The MQ
+candidate retains 30 production responsibility diagnostics and is not compiled.
+Both slices remain pending; no test-only scoping of production migrations,
+readers, provenance or retention responsibility is authorized. The manager will
+review public parameter grouping and existing operational reachability before
+implementation. These lint failures do not become passed tooling gates.
