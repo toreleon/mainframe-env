@@ -37,7 +37,11 @@ repair or new evidence justifies retrying. Required gates must not be waived.
 ## CI ownership
 
 The root `Jenkinsfile` owns candidate-bound CI, full assurance gates.
-It refuses dirty or untracked source, records each selected command, and grants no
+The existing command recorder refuses tracked or untracked source changes before
+execution and at command completion. Keep logs outside Git or under an ignored
+build directory; an untracked output directory cannot be credited as a clean
+candidate. These are boundary checks, not continuous source attestation. It
+records each selected command and grants no
 licensed credit without the corresponding protected execution evidence. A later
 prose commit cannot hide an intervening failed code change.
 

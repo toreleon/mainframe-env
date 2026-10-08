@@ -234,6 +234,68 @@ class SelectionTests(unittest.TestCase):
             self.assertEqual(code,0);self.assertEqual(runner['ci'],'jenkins')
             self.assertEqual((runner['job_name'],runner['build_number']),('mainframe-env','7'))
 
+class CandidateCleanlinessTests(unittest.TestCase):
+    def exercise(self, *, before=None, during=None, ignored=False):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            root = workspace / 'repo'
+            root.mkdir()
+            subprocess.run(['git', 'init', '-q', str(root)], check=True)
+            subprocess.run(['git', '-C', str(root), 'config', 'user.name', 'Fixture'], check=True)
+            subprocess.run(['git', '-C', str(root), 'config', 'user.email', 'fixture@example.test'], check=True)
+            (root / 'tracked.rs').write_text('initial\n')
+            (root / '.gitignore').write_text('target/\n')
+            subprocess.run(['git', '-C', str(root), 'add', '.'], check=True)
+            subprocess.run(['git', '-C', str(root), 'commit', '-qm', 'fixture'], check=True)
+            if before == 'tracked':
+                (root / 'tracked.rs').write_text('dirty\n')
+            elif before == 'untracked':
+                (root / 'untracked.rs').write_text('unreviewed\n')
+            if ignored:
+                (root / 'target').mkdir()
+                (root / 'target/cache').write_text('generated\n')
+            marker = workspace / 'executed'
+            # Restoring a tracked file during the command cannot legitimize dirty input.
+            script = "from pathlib import Path; import sys; Path(sys.argv[1]).write_text('yes'); "
+            if before == 'tracked':
+                script += "Path('tracked.rs').write_text('initial\\n'); "
+            if during == 'untracked':
+                script += "Path('new-source.rs').write_text('unreviewed'); "
+            script += "print('test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s')"
+            output = workspace / 'output'
+            with patch.object(ci.sys, 'stdout', Mock(buffer=io.BytesIO())), \
+                    patch.object(ci.shutil, 'which', return_value=None):
+                code = ci.record(root, output, 'candidate', [sys.executable, '-c', script, str(marker)], True, 1)
+            return code, marker.exists(), json.loads((output / 'candidate.json').read_text())
+
+    def test_dirty_tracked_input_refuses_before_a_command_can_restore_it(self):
+        code, executed, receipt = self.exercise(before='tracked')
+        self.assertNotEqual(code, 0)
+        self.assertFalse(executed)
+        self.assertFalse(receipt['candidate_unchanged'])
+        self.assertEqual(receipt['observed_passed_tests'], 0)
+
+    def test_untracked_input_refuses_before_execution(self):
+        code, executed, receipt = self.exercise(before='untracked')
+        self.assertNotEqual(code, 0)
+        self.assertFalse(executed)
+        self.assertEqual(receipt['status'], 'failed')
+
+    def test_command_that_adds_untracked_source_cannot_pass(self):
+        code, executed, receipt = self.exercise(during='untracked')
+        self.assertNotEqual(code, 0)
+        self.assertTrue(executed)
+        self.assertEqual(receipt['observed_passed_tests'], 1)
+        self.assertFalse(receipt['candidate_unchanged'])
+
+    def test_clean_candidate_allows_ignored_build_artifacts_and_external_output(self):
+        code, executed, receipt = self.exercise(ignored=True)
+        self.assertEqual(code, 0)
+        self.assertTrue(executed)
+        self.assertTrue(receipt['candidate_unchanged'])
+        self.assertEqual(receipt['observed_passed_tests'], 1)
+
+
 class TestFloorTests(unittest.TestCase):
     def record_log(self, log, *, exit_code=0, min_tests=260, expect_tests=False,
                    candidate_changed=False, candidate_dirty=False, via_cli=False):

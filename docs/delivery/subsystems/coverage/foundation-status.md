@@ -1346,3 +1346,42 @@ failure receipts remain external and the exact worker target is clean. Existing
 Memory/same-process SQLite results do not establish process-crash, official or
 licensed parity. No schema, identity, denominator, source pin or private gate
 changes. Current manager metadata checks pass on the integrated candidate.
+
+### CV-209.postgres-parity runtime preparation declaration
+
+Manager authorizes external-only preparation of the exact PostgreSQL 18.6 input
+for the existing twelve-gate parity owner. Inspect retained image/native inputs
+and existing tools/jenkins/postgres_parity.sh; reuse its lifecycle/reset/cleanup.
+No repository edits, database/server/test campaign, new lifecycle manager, Cargo,
+package install/download or input-lock changes. The retained image may be inspected
+and safely copied from an owned stopped container into external scratch, with
+container cleanup; no daemon/host security changes. Verify exact version and
+relocated support files/individual dynamic libraries needed by pg_config/initdb/
+pg_ctl/postgres. Keep review/provenance failures and scoped source pins intact.
+Prepare the exact clean-candidate plan/command and finite supervisor/receipt/target
+retention for a later actual twelve-control gate; backend acceptance stays pending.
+
+### CV-209.candidate-cleanliness declaration
+
+Manager owns the existing CI command recorder and its regression fixtures.
+Require a clean committed candidate before executing a recorded command and at
+its completion, including untracked source paths. Dirty input may not be made
+clean by the command and then retrospectively credited. Preserve receipt schemas,
+identity/test-floor semantics and ignored external/build outputs; this is boundary
+validation, not continuous adversarial source attestation. Existing recorder/tests,
+verification runbook and one change fragment are the exact implementation owners.
+Add independent real temporary-repository refusal controls before repair, then
+run the affected CI tooling tests and metadata gates; no Cargo/campaign/private
+activation or new ledger/gate model. Raw failures remain external.
+
+### CV-209.candidate-cleanliness acceptance
+
+Status: **Complete (recorded command boundary validation)**. The existing CI
+recorder now refuses tracked/untracked source changes before launching a command
+and at its completion. A command cannot clean dirty input and retrospectively
+obtain acceptance. Ignored build artifacts and external logs remain valid;
+receipt identities, schemas, independent test floors and zero-credit defaults
+are unchanged. Three independent real temporary-Git controls failed before the
+repair; all thirty-nine CI tooling controls now pass, including the clean/ignored
+positive and actual execution-marker checks. No Cargo/campaign or backend result
+is implied. These are boundary checks, not continuous adversarial attestation.

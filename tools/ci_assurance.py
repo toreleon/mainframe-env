@@ -154,12 +154,16 @@ def record(root: Path, output: Path, gate: str, command: list[str], expect_tests
         raise ValueError('minimum passed-test count must be a positive integer')
     output.mkdir(parents=True, exist_ok=True)
     before = identity(root)
+    clean_before = not subprocess.check_output(
+        ['git', 'status', '--porcelain', '--untracked-files=all'], cwd=root).strip()
     started = time.monotonic()
     tests = 0
     log = output / (gate + '.log')
     code = 127
     error = None
     try:
+        if not clean_before:
+            raise ValueError('CI candidate must be clean before execution, including untracked source')
         with log.open('wb') as file:
             process = subprocess.Popen(command, cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             assert process.stdout is not None
@@ -181,10 +185,13 @@ def record(root: Path, output: Path, gate: str, command: list[str], expect_tests
                     if match: tests = int(match.group(1))
             process.stdout.close()
             code = process.wait()
-    except OSError as problem:
+    except (OSError, ValueError) as problem:
         error = str(problem)
+        if isinstance(problem, ValueError):
+            code = 2
         log.write_text(error + '\n')
-    unchanged = identity(root) == before and not subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=no'], cwd=root).strip()
+    unchanged = identity(root) == before and clean_before and not subprocess.check_output(
+        ['git', 'status', '--porcelain', '--untracked-files=all'], cwd=root).strip()
     floor_met = min_tests is None or (error is None and tests >= min_tests)
     passed = code == 0 and unchanged and (not expect_tests or tests > 0) and floor_met
     receipt = {'schema_version': 'mainframe-env.ci-command@1', **before, 'gate': gate, 'command': command,
