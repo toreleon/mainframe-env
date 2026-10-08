@@ -586,6 +586,18 @@ behavior. Manager must decide source-catalog compatibility before any schema
 change; no second registry, new parser framework, product hardcode exception or
 IBM command semantics is authorized. Preserve all current grammar/refusal tests.
 
+### Framing native schema binding
+
+Extend `CV-204.identity-framing` to the existing local schema compiler in
+`xtask/src/coverage_projection.rs`, a private native schema regression module
+and synthetic serialized DTO fixtures under xtask tests. Resolve the existing
+package schema's IMS reference from its current local owner, refusing external
+retrieval. Validate all six actual retained/current omitted/null/present controls
+and nine structural negatives before sealing. Fixtures describe DTO shape, not
+cryptographic or licensed truth. Keep the actual package discriminator in
+`sections`; no second version field or alternative application schema is added.
+Installer/publication schema changes remain in their separate declared slice.
+
 ### CV-202.serialized-schema-bindings acceptance
 
 Status: **Complete (serialized coverage authority only)**. The frozen @1 row/evidence/ledger bindings now validate actual serialized shapes through native offline Draft 2020-12 and existing typed evidence/history/catalog owners. All 30 focused tests pass on the joint candidate, preserving valid failure histories, null oracle and empty pending controls. Unknown refs/fields, stale standalone projections and forged derived claims refuse. This does not provide a generic pre-allocation JSON reader.
@@ -612,3 +624,59 @@ diff checks pass. Strict tooling-owner lint passes with `--no-deps`; the unchang
 dependency-inclusive MQ/CICS lint failures remain separately pending and are not
 waived or described as passed. Foundation/public exit acceptance remains pending.
 Missing supplemental cache checks remain `skipped/unavailable`, zero credit.
+
+### Common program policy implementation decision
+
+Manager selects option A for `CV-208.common-program-policy`: derive the finite
+generated control declaration from existing typed builtin/execution/action
+bindings, preserving the frozen source catalog @1 and all existing control
+tokens, admission order and delegated grammars. No new catalog fields, policy
+registry, parser DSL, source credit or IBM behavior is authorized. The existing
+generator may decode finite role strings; runtime policy must use generated
+typed declarations rather than program-name cases. The IEFBR14 bypass is an
+explicit typed IgnoreInput declaration. Manager authorizes the reviewed additive
+route/generator tests, owner generator/runtime changes and deterministic existing
+program-registry regeneration in the isolated checkout, subject to unchanged
+source input. One focused Cargo sequence is authorized; retain actual initial
+assertion failures and final hashes, compile all affected targets, run owner lint,
+focused tests, formatting, dependency policy and exact-target cleanup. Strict
+dependency-inclusive failures remain pending. Manager owns integration/sealing
+and shared metadata; no source-schema compatibility change is authorized.
+
+### Focused conformance output implementation decision
+
+Manager accepts ADR-0054 and the prepared writer policy for
+`CV-209.conformance-output`: the existing canonical report owners remain the
+sole event/ledger authority; default focused stdout becomes JSONL, human
+diagnostics move to stderr, and explicit --output selects one external file.
+The conservative 512 MiB record projection and exact 64 MiB staging bound are
+CLI limits, not heap quotas. The reviewed six owner paths and additive tests
+are authorized in the isolated checkout. Retain six actual old-CLI output
+failures/four refusal controls. Production/tests may be prepared now without
+Cargo; a later manager grant is required for its one focused build sequence.
+No schema/dependency/new ledger/source semantics or private activation is
+authorized. Manager owns current CLI documentation and sealing.
+
+### Selected controller publication decision
+
+Manager accepts ADR-0053 for `CV-204.publication-fencing`, including the shared
+try-read/try-write busy policy, borrowed owner-created write context, unchanged
+publication DTO relocation, one direct Batch application dependency, narrow
+read-only Db2 prospective-install validation, existing pure IMS validation and
+actual router registered-name refusal for ProgramCall controllers. Supported
+composition is one publishing server per store. Existing pre-framing initial
+red remains historical; implementation must consume the identity-framing seal
+before green validation. Exact production/test owner scope follows the reviewed
+publication inventory plus server/cobol.rs's narrow private registered-name
+query and affected additive producer/interleaving controls. No distributed
+transaction, new signature/state format or private subsystem is authorized.
+The worker is awaiting the prerequisite seal and a separate execution grant.
+
+### Journey closure module ratchet
+
+The existing module gate requires exact recorded counts even after extraction.
+Manager reviewed the same-function extraction and lowers only carddemo.rs's
+legacy production ratchet from 12,796 to 12,077 as part of
+`CV-209.journey-closure`. No ceiling is raised, no exemption is added, and all
+new production modules remain below 1,200 lines. The initial joint module
+failure is preserved; the corrected lower ratchet must pass before sealing.

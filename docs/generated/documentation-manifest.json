@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 239,
+    "markdown_documents": 241,
     "navigation_groups": 8,
-    "normative_documents": 100,
+    "normative_documents": 102,
     "xtask_commands": 163
   },
   "documents": [
@@ -233,8 +233,8 @@
     {
       "normative": false,
       "path": "crates/kernel/mainframe-env-application/README.md",
-      "relative_links": 4,
-      "sha256": "sha256:4cd0d64c1ddbb1984491fd47dd50b30423e1bc0f0ddffae1b146a31a0d61aea6",
+      "relative_links": 5,
+      "sha256": "sha256:00e4f845a9d3de4f61c1d635733dbb6c014f1a0aaf05c352cd415d88dd8c9957",
       "title": "mainframe-env-application",
       "xtask_commands": 1
     },
@@ -341,8 +341,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 181,
-      "sha256": "sha256:3e28ea1a9fa02ed1e6f23fd9ec529acae6e4c836452fbb1d7888d95cc5273983",
+      "relative_links": 183,
+      "sha256": "sha256:20342bba15729db0a8f723bc71e4cea8544c10a7a29782849795ddcfb0e20fb0",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -351,9 +351,9 @@
       "normative": true,
       "owner": "application-package maintainers",
       "path": "docs/architecture/APPLICATION-PACKAGES.md",
-      "relative_links": 0,
+      "relative_links": 1,
       "scope": "application package generation and installation contract",
-      "sha256": "sha256:837c3d7abb312eedaadfc4f412052d91a6ea490b634704fd5dbddf6b660fd6cc",
+      "sha256": "sha256:cbeb68d3caa83a3cf61182f3b85ab350251660d604f073aeda8fe7a1905f1e47",
       "status": "Frozen for mainframe-env coverage.foundation",
       "title": "Application package generation contract",
       "xtask_commands": 0
@@ -1471,10 +1471,34 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env current public provider hardening",
+      "normative": true,
+      "owner": "application publication and batch maintainers",
+      "path": "docs/decisions/0053-selected-controller-publication-fence.md",
+      "relative_links": 0,
+      "scope": "same-process selected controller admission and publication prevalidation",
+      "sha256": "sha256:0627d171504febe1db0b5588fe318700f0096e887e6fddb9d012c51f9594bcf9",
+      "status": "Accepted design; implementation pending",
+      "title": "ADR-0053: Fence selected controller execution against publication",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current public tooling hardening",
+      "normative": true,
+      "owner": "conformance tooling maintainers",
+      "path": "docs/decisions/0054-focused-conformance-output.md",
+      "relative_links": 0,
+      "scope": "focused xtask output transport",
+      "sha256": "sha256:5718f4b3530405a3737eade1585342521d31835967e2820e44706cfce02e57d5",
+      "status": "Accepted design; implementation pending",
+      "title": "ADR-0054: Emit focused conformance through the canonical report owners",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 55,
-      "sha256": "sha256:877a8b782bbcef1524d4e50405432614f99c1aaf577c7868d1d0eeb4e085c6a8",
+      "relative_links": 57,
+      "sha256": "sha256:34a958bbb77b2f28dea97520d7c143307ba9b44e1c177c808d453e4e01c6f89b",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1722,7 +1746,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/coverage/foundation-status.md",
       "relative_links": 5,
-      "sha256": "sha256:2937945130fcc94cd02550221e8264ce35acdf95b97595f8ad4410a74fe911ae",
+      "sha256": "sha256:6bab76dd4905e99429607136e2c4e944f7ca9a88eea8b4cd05da357659a91ce5",
       "title": "Coverage and conformance — Coverage authority progress",
       "xtask_commands": 6
     },
@@ -2770,6 +2794,14 @@
         {
           "label": "ADR-0052: Borrowed CICS operation inputs",
           "path": "docs/decisions/0052-cics-operation-contexts.md"
+        },
+        {
+          "label": "ADR-0053: Selected controller publication fence",
+          "path": "docs/decisions/0053-selected-controller-publication-fence.md"
+        },
+        {
+          "label": "ADR-0054: Canonical focused conformance output",
+          "path": "docs/decisions/0054-focused-conformance-output.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -2992,7 +3024,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:9179caa258594ec611351b708f7301ac8517e7b939d6bf426ab645e8dbb28437",
+  "registry_sha256": "sha256:1e6220a725d51aec71f6184f31de97b7db1be049ec8349b028a00079affe79c5",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

@@ -5,11 +5,28 @@ Owner: **application-package maintainers**
 Scope: **application package generation and installation contract**
 Applies from: **mainframe-env current subsystem contracts**
 
-Version 2 of the application-package envelope is additive to the accepted profile.carddemo
-reader. It binds the version 1 content-addressed manifest, a positive monotonic
+Current writers emit `mainframe-env.application-package@3`, using the framed
+identity defined in [ADR 0051](../decisions/0051-package-identity-framing.md).
+The typed envelope is additive to the accepted profile.carddemo reader. It binds
+the version 1 content-addressed manifest, a positive monotonic
 generation, the typed subsystem section contract, and a signature verified by
 an injected trust authority. Signature bytes and key IDs are carried by the
-package; trust keys and secrets are not.
+package; trust keys and secrets are not. The Rust DTO remains
+`ApplicationPackageV2`; its section tag selects the finite @2 or @3 identity
+domain. The schema describes the actual `base`, `generation`, `sections`, and
+`signature` fields, including omitted or explicit-null optional IMS sections.
+
+Fresh admission requires @3. Trusted retained @2 packages keep their original
+identities and signatures; recovery verifies them under current trust. A legacy
+retry must equal the complete retained package. Neither recovery nor retry
+relabels a signature. Standalone @1 remains available. Back up retained state
+before upgrading: an older binary cannot read current @3 generations.
+
+Identity writers enforce default `PackageLimits` before materializing hash
+inputs. Embedders with a larger approved budget use
+`package_generation_identity_with_limits` and configure the installer with the
+same limits. Native schema validation checks structure; it does not authenticate
+signatures, establish cross-reference closure, or measure process heap usage.
 
 The typed sections are host ABI libraries, SQL tables and seed rows, IMS
 definitions and seed rows, optional versioned IMS DBD/PSB metadata, MQ

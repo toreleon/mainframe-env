@@ -107,7 +107,9 @@
     "docs/delivery/VERIFICATION-STRATEGY.md",
     "docs/delivery/ZOSMF-API.md",
     "docs/delivery/subsystems/mq/inquiry-source-boundary.md",
-    "docs/guides/MAINFRAME-SANDBOX.md"
+    "docs/guides/MAINFRAME-SANDBOX.md",
+    "docs/decisions/0053-selected-controller-publication-fence.md",
+    "docs/decisions/0054-focused-conformance-output.md"
   ],
   "navigation": [
     {
@@ -555,6 +557,14 @@
         {
           "label": "ADR-0052: Borrowed CICS operation inputs",
           "path": "docs/decisions/0052-cics-operation-contexts.md"
+        },
+        {
+          "label": "ADR-0053: Selected controller publication fence",
+          "path": "docs/decisions/0053-selected-controller-publication-fence.md"
+        },
+        {
+          "label": "ADR-0054: Canonical focused conformance output",
+          "path": "docs/decisions/0054-focused-conformance-output.md"
         }
       ],
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."
