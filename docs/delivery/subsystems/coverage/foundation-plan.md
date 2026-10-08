@@ -3,7 +3,7 @@
 Subsystem: **coverage**
 Phase: **foundation**
 
-Status: **Proposed**
+Status: **Implementation acceptance pending**
 Start gate: preserve the pinned CardDemo source and compatibility contracts
 Completion dependencies: none
 Estimate: 6–9 engineer-months
