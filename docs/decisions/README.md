@@ -52,16 +52,17 @@ CardDemo participant ownership and batch completion boundary.
 | [0043](0043-batch-contained-all-effect-loan.md) | explicit contained all-effect occurrence transport with external audit ownership; enclosing controller activation pending | Accepted (bounded transport) |
 | [0045](0045-batch-prepared-selection-plan.md) | private bounded exact selection observation with complete Job/configuration revalidation; atomic joined admission pending | Accepted (bounded prerequisite) |
 | [0046](0046-batch-bounded-provider-prefetch.md) | bounded provider namespace byte/shape preflight before payload materialization; joined admission pending | Accepted (bounded prerequisite) |
-
-Parallel subsystem work allocated the same 0028 and 0029 numeric prefixes.
-Their distinct full filenames and subsystem-qualified labels identify each
-proposal; no historical decision body or reference has been replaced.
 | [0034](0034-gsam-logical-address.md) | bounded public GSAM logical addresses using existing engine, PCB and row authorities | Proposed |
 | [0031](0031-ims-tm-recovery-publication.md) | shared work/effect-fenced IMS TM recovery publication and settlement | Proposed |
 | [0035](0035-selected-pcb-feedback.md) | versioned owned selected PCB feedback retained in the existing proposal and receipt | Proposed |
 | [0033](0033-cobol-dli-call-boundary.md) | owned raw COBOL DL/I CALL frame, PCB entry binding and feedback contract proposal | Proposed |
 | [0030](0030-gsam-application-record-formats.md) | explicit GSAM application formats, owned U length and checkpoint format identity | Proposed |
 | [0032](0032-selected-secondary-checkpoint-position.md) | selected secondary checkpoint occurrence witnesses composed with existing local backout | Proposed |
+| [0050](0050-host-effect-envelope-layout.md) | exclusive boxed outer MQI host payloads with unchanged canonical encoding | Proposed; compatibility validation pending |
+
+Parallel subsystem work allocated the same 0028 and 0029 numeric prefixes.
+Their distinct full filenames and subsystem-qualified labels identify each
+proposal; no historical decision body or reference has been replaced.
 
 An accepted ADR is immutable. A material change creates a superseding ADR and
 links to the previous decision.
