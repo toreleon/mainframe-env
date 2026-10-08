@@ -462,3 +462,20 @@ module, formatting, frozen dependency, documentation/changelog/subsystem and dif
 checks pass. The broader xtask dependency lint now exposes unchanged MQ and CICS
 diagnostics; those owners remain separate pending work, with no suppression or
 full-build acceptance claim. Foundation and public exit acceptance remain pending.
+
+### Provider lint prerequisites
+
+Declare two separate CV-209 mechanical slices: `CV-209.mq-contract-lint` owns
+the reported existing diagnostics in `mainframe-env-mq` and its direct private
+consumers/tests; `CV-209.cics-contract-lint` owns the reported existing diagnostics
+in `mainframe-env-cics` and its direct private consumers/tests. The integrated
+strict xtask run reports 46 MQ and 41 CICS diagnostics after consuming the sealed
+execution lint repair. Public/provider APIs, SAF order, controls/fencing, effect
+identities, canonical durable/replay bytes and finite readers must remain intact.
+No lint suppression, changed expectation, new private behavior or unready command
+implementation is allowed. Private allocation/layout or helper-argument grouping
+must remain within existing owners; any public constructor change requires a
+separate manager decision. Test-only helpers may be scoped to tests only after
+proving all callers are test-only; never hide a production reader or migration.
+Focused affected behavior/serialization regressions and strict package lint
+precede separate seals. Other dependency owners remain pending if later exposed.
