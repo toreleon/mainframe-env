@@ -266,3 +266,10 @@ Status: **Complete (bounded slice only)**. The 12 new Memory/file-backed SQLite 
 Formatting, frozen dependency policy, module, documentation/changelog/subsystem
 and diff checks pass for the reviewed integrated scope. The unavailable CICS
 source freshness gate and full Foundation exit remain pending.
+
+### CV-207.materialization-bounds acceptance
+
+Status: **Complete (bounded slice only)**. All 16 source-package tests, including 10 ABI tests, strict Clippy and the current ABI inventory check pass. Aggregate/file/count preflight precedes source copies and hashing; bounded path metadata can still allocate. Source bytes and identities remain unchanged.
+Formatting, frozen dependency policy, module, documentation/changelog/subsystem
+and diff checks pass for the reviewed integrated scope. The unavailable CICS
+source freshness gate and full Foundation exit remain pending.
