@@ -3,7 +3,7 @@
     "markdown_documents": 243,
     "navigation_groups": 8,
     "normative_documents": 104,
-    "xtask_commands": 164
+    "xtask_commands": 158
   },
   "documents": [
     {
@@ -1554,7 +1554,7 @@
       "normative": false,
       "path": "docs/delivery/IMPLEMENTATION-STATUS.md",
       "relative_links": 20,
-      "sha256": "sha256:97682531fc04d54e83ad4fbaa52f9aea058a6b774bc2780774d57f76633640d4",
+      "sha256": "sha256:ddca4b785a16af52146b48f0f64e96d5539a1fe1bbccb1149d1241432513c39c",
       "title": "Subsystem implementation status",
       "xtask_commands": 1
     },
@@ -1770,9 +1770,9 @@
       "normative": false,
       "path": "docs/delivery/subsystems/coverage/foundation-status.md",
       "relative_links": 0,
-      "sha256": "sha256:5cbf3b386b547c16809a6b35bb349e4cf2f098698acf481efda5a4f5e9b17b24",
+      "sha256": "sha256:c3de15020c3af637e4eda56c37d8b4fa4763e315a53baa3693151291eb6d8708",
       "title": "Coverage and conformance — Coverage authority progress",
-      "xtask_commands": 7
+      "xtask_commands": 1
     },
     {
       "normative": false,
