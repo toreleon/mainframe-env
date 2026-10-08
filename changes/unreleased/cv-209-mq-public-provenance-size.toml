@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Reject substituted MQ admission byte counts against the immutable original canonical request before retained intent lookup or publication."

@@ -50,11 +50,16 @@ flowchart LR
 |---|---|---|
 | `CV-204.standard-envelope` | Bounded production authentication implemented | Fresh production requires canonical `cose-mac0-hmac256@1`; retained recovery/retry preserves original identities and signatures. MAC authentication does not provide nonrepudiation or arbitrary snapshot authentication |
 | `CV-204.publication-fencing` | One-publisher process admission and file-SQLite crash/recovery controls implemented | Actual retained selection joins the complete publication tuple; preserve the process-local limitation and separate cross-process/backend obligations |
-| `CV-209.mq-mechanical-layout` | Bounded mechanical layout complete; full MQ contract-lint pending | Final affected tests pass; strict lint fails with exactly 26 retained production diagnostics. Keep legacy import, decoder/initializer, provenance/lifecycle and fence/upgrade responsibilities pending under their owners |
+| `CV-209.mq-mechanical-layout` | Bounded mechanical layout complete; full MQ contract-lint pending | After the size-consistency repair, strict lint retains 25 original production diagnostics and no new diagnostics. Keep legacy import, decoder/initializer, pending provenance/lifecycle and fence/upgrade responsibilities pending under their owners |
+| `CV-209.mq-public-provenance-size` | Original-request byte-count consistency complete; all 31 selected controls pass | Size-only substitutions refuse before retained intent lookup; memory/SQLite state and all old controls remain intact. Full MQ strict lint remains pending |
 | `CV-209.journey-closure` | Closure authority and observation transport implemented | Full CardDemo refuses incomplete observations; do not infer workload acceptance from harness tests |
 | `CV-209.carddemo-transactions` | Selected date/duplicate comparisons and binding implemented | J06 AIX browse/navigation and all 105 issue acceptance requirements remain unbound; 20/20 journeys and 26/26 transaction closure remain pending |
 | `CV-209.postgres-parity-selection` / `CV-209.postgres-loopback-owner` | All twelve existing live controls passed on the qualified source-equivalent producer | TCP-only startup removes an unused Unix socket path limit. Host loader/timezone differences, retained cleanup failures and one defunct PID-1 child remain qualified; this is no global backend or full CardDemo closure |
-| `CV-209.public-client-compatibility` | Seven frozen fixture controls pass; first real client submit fails before HTTP | Repair finite launcher module resolution and exact generated-log membership; retain the elapsed-allowance failure. Submit/query/files/content and authentication/ownership refusals remain pending |
+| `CV-209.public-client-compatibility` | Seven frozen fixture controls pass; second real run reaches files then exceeds the ten-second action allowance | Four commands make five real HTTP observations: submit 201 and list/query/files 200. Further validation-cost repair, content and authentication/ownership acceptance remain pending |
+| `CV-209.public-client-action-layout` | Finite layout/log repair complete; 146 qualified private-PID controls pass | Real client workload acceptance remains separate; preserve exact readonly mounts and byte/type/mode/link bounds |
+| `CV-209.public-client-validation-cost` | Command-local optimization complete; 106 combined controls pass | Every POST byte remains hashed; one byte-only timing diagnostic does not prove the full action meets its allowance |
+| `CV-209.cics-bms-input-storage` | Supported symbolic input storage complete; eight final controls and seventeen regression methods pass | Preserve raw/non-BMS behavior and fixed-group checks; provider/official/full-layout acceptance remains separate |
+| `CV-209.carddemo-transaction-navigation` | Latest changed-runtime run: eleven passes, five failures, nineteen completed shutdowns | Preserve all four actual failed producers. Resolve CICS first reverse-read positioning and separately reviewed private oracle errors; navigation token and full closure remain pending |
 | `CV-209.test-floor` and integrated exit | Minimum 260-pass recorder wiring implemented; full exit pending | Count actually executed passing tests on the selected unchanged candidate; preserve every affected architecture/profile/schema/package/source/backend gate |
 | `CV-209.public-status-docs` | Current subsystem status and documentation reconciled | Preserve active preparation scope, exact pending gates and implemented sealer; retain raw outputs externally |
 | `CV-209.command-supervision` | Optional Linux deadline/output ownership complete | Current-invocation logs and retained-leader fencing prevent stale output/PGID reuse; exclusive wait and conservative procfs limitations remain explicit |
@@ -488,3 +493,151 @@ continuation with only the previously source-supported three-digit amount-name
 and fresh-empty zero-byte oracle corrections. Missing-key/PF4-cleared spaces,
 successful records, raw rows/state/READ counts and all previous producers remain.
 PF7/token/full journey and Foundation acceptance stay pending.
+
+### CardDemo navigation after symbolic input repair
+
+The generic input-storage dependency is sealed. The preserved seven-owner
+navigation candidate advances onto that accepted runtime with the prior NOTFND
+13/80 correction intact. Manager grants exactly two additional source-supported
+oracle corrections in its private comparator and independent test owner: only
+amount names use TAMT001..010, and only fresh empty-detail result fields retain
+literal zero bytes at their thirteen pinned widths. Missing-key/PF4 spaces and
+every successful value, raw row, trace/count, state/version and source pin remain.
+Add the corresponding independent fresh-empty raw-field assertions; never infer
+them from an observed handler response. ENDFILE primary 20 retains its frozen
+scope; secondary 90 remains qualified without adding an assertion or credit.
+
+Run one changed-runtime sixteen-control continuation under the existing finite
+execution owner, frozen/offline jobs two and a new exact checkout target. Stop on
+any real runtime/source/application prerequisite, including PF7, retaining actual
+errors, executables, inputs and teardown. Only if all comparisons and shutdowns
+succeed and the missing-observation control reaches its intended receipt-only
+failure may the already granted observation transport bind screen navigation;
+then validate the same selector once. No issue token, native-AIX application
+claim, source/CSD/alias/provider/kernel repair or full journey closure is inferred.
+Manager owns shared ratchets, strict owner lint, generated status, integration
+and seal; private/licensed work and the three unready CICS rows remain excluded.
+
+The changed-runtime continuation is complete with eleven passes, five failures
+and nineteen completed fixture shutdowns. Its actual executable, compiler
+libraries, source/input identities and raw results are retained before successful
+exact target cleanup. No navigation observation was added. PF7 leaves an
+incomplete page numbered two; keep the full page-one and raw-row/state assertions.
+The existing Dataset gap-cursor contract remains authoritative. A CICS
+first-read/reposition adapter needs its own bounded repair and controls.
+
+Independent source review also distinguishes initial-display zero bytes from
+spaces initialized for the next task after RETURN, source-driven PF5 discard
+from ordinary first-page entry, and lexical first-mismatch diagnostics. These
+private oracle corrections require a separate exact grant; the failed producer
+and its earlier zero-byte rationale remain unchanged, with no acceptance credit.
+
+### Finite public client after launcher repairs
+
+The preserved three-owner fixture advances to the sealed layout, validation-cost
+and input-storage candidate with exact source bytes/modes unchanged. Reuse the
+original seven pure-control passes only as source-equivalent prior results.
+Compile one new current executable and execute the same finite real fixture once,
+under its existing 180-second execution owner and unchanged ten-second action,
+120-second phase, literal HTTP/JSON/content/state/refusal and cleanup checks.
+Require the exclusive target and idle unrelated workers before native launch.
+Stop at any real prerequisite without product repair, retry or oracle adjustment;
+retain every partial observation and actual wait/cleanup before exact Cargo clean.
+This remains development evidence; integration, strict owner lint, seal and final
+clean-candidate acceptance are separate manager responsibilities.
+
+The second actual fixture stops after four waited commands and five HTTP
+observations. Submit, owner-list and query-status comparisons pass; files routes
+return 200 but the whole files invocation exceeds its ten-second allowance.
+Content and negative cases are unreached. Keep the limit and both failed
+producers; diagnose further current-byte validation cost before another run.
+
+### Navigation oracle corrections before the CICS positioning repair
+
+Manager grants source-only correction in the preserved private comparator/test
+owners: spaces for the reentered empty-detail result fields, while independently
+asserting the initial display's thirteen zero fields; PF5-only full rows 42..51;
+and the lexical first-mismatch TDESC01 diagnostic with refusal/no-observation
+unchanged. Other first-page, source, successful record, NOTFND and state oracles
+remain intact. Preserve the superseded zero rationale and all actual producers.
+
+For the first PF7, pinned source independently requires discard of 51, ten rows
+50..41, then one mandatory lookbehind reaching ENDFILE. Freeze the complete page
+41..50, page one and reached-top message, with twelve READPREV results: eleven
+NORMAL and one primary 20. The next PF7 retains already-at-top and zero browse
+reads. This strengthens positioning checks; it cannot accept the current partial
+page two. Secondary response qualification and all raw-row/state bounds remain.
+No Cargo or native repeat, transport/token binding or fragment is granted during
+this preparation. The CICS positioning repair and actual validation remain
+separate pending dependencies owned by the manager.
+
+### Command-local tree directory authority
+
+The sole unchanged-source byte diagnostic completes PRE and POST successfully,
+with 10,216 member canonical-path resolutions in each phase. Its instrumented
+PRE/POST totals are 6.571/2.865 seconds; overlapping attribution timers are not
+additive and do not predict the live ten-second action result.
+
+Manager grants implementation in the new isolated tree-authority checkout only:
+`tools/supply_chain.py`, its existing supply-chain and CI assurance test owners,
+and one unique tree-directory-authority fragment. Freeze an independent tiny
+three-file fixture and genuine original-owner duplicate-work failure first.
+Private command PRE/POST may use a depth-bounded held directory-descriptor walk,
+preserving every current-byte hash, exact member/manifest identity, metadata and
+namespace closing fence. Default standalone validation and both held POST
+archives remain intact. No persistent admission, deadline expansion, Rust,
+production CI owner, input lock or schema change is granted.
+
+Run bounded selected Python correctness controls and static checks only; retain
+original failures and exact producer inputs outside Git. Changed-source timing,
+native client repetition and acceptance require separate manager sequencing.
+The two failed real-client producers remain unchanged and unreleased acceptance
+stays pending. Any extra owner or weakened fence requires a new exact declaration.
+
+### CICS first reverse position prerequisite
+
+Manager accepts the bounded additive Dataset positioned-read design for the
+ordinary full-key first READPREV after successful STARTBR/RESETBR. Retain the
+existing gap-cursor contract, reverse assertions and canonical request bytes.
+The new read observes the retained logical-key/base-identity tuple and live body
+under one existing Dataset state lock, without advancing or creating a cursor.
+The CICS adapter consumes its bounded pending seed only on a validated completed
+response; one real browse delegate replaces the existing one. End-sentinel,
+generic, update/token and unsupported reposition cases retain their old paths.
+
+The reviewed twenty-one-owner design is the exact proposed implementation scope,
+including ADR-0056; no unrelated owner or cleanup behavior is implied. First
+prepare and freeze its eight existing-CICS-API composed controls and exact old
+baseline sources in the isolated first-reverse checkout. Only the new server
+test owner and its test registration may change during this preparation. No
+Cargo/native execution or production semantic repair occurs until the manager
+checks the frozen packet and grants one bounded initial execution.
+
+Task-drop browse retirement is a concrete separate acceptance gap. Neither the
+positioned read nor explicit ENDBR tests prove cancellation-independent task
+cleanup. Preserve that pending gate and its real ownership requirements; do not
+discard refused retirement, fabricate cleanup authority or claim full CICS,
+CardDemo or Foundation acceptance from the narrower repair.
+
+### MQ original-request size consistency acceptance
+
+Status: **Complete (bounded original-request provenance consistency only)**.
+Core-intent binding recomputes the privately borrowed original request's canonical
+byte count under the existing hard bound and compares the admission summary
+before retained intent lookup. Valid request behavior, provider/envelope limits,
+original digest/owner/context checks and physical publication remain unchanged.
+
+Four independent memory/SQLite below/above controls genuinely fail on the old
+binding, then pass with unchanged effect, execution, queue, audit and retention.
+All four separate absent-intent ordering probes also pass on the repaired source;
+they were unreached during the original failures. The three affected selectors
+pass nineteen, three and nine actual methods. Existing test bodies/literals
+remain byte-preserved; new-control formatting preserves every nonwhitespace
+token. Both actual executables and their producing inputs remain external.
+
+Strict affected-owner lint still fails with twenty-five original dormant
+responsibilities, zero new or changed-owner diagnostics; only the repaired size
+summary diagnostic is absent. No dormant import, decoder, lifecycle, fence or
+profile operation is activated or hidden. Exact target cleanup passes after
+retention. Integration uses matching native inputs, not a new clean CI result;
+full MQ lint and Foundation acceptance remain pending.

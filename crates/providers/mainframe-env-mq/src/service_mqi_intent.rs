@@ -17,7 +17,7 @@ use mainframe_env_execution_api::{
 };
 use mainframe_env_host_api::{
     HostProblem, HostRequest, MAX_CANONICAL_EFFECT_BYTES, canonical_audit_resource_digest,
-    canonical_request_digest,
+    canonical_request_digest, canonical_request_size,
 };
 use mainframe_env_store_api::{
     AuditedProviderPublication, EffectDigestFormat, EffectRecord, EffectState, ExecutionState,
@@ -81,12 +81,14 @@ pub(crate) fn bind_core_intent<'a>(
         return Err(HostProblem::Malformed.into());
     };
     let request_digest = canonical_request_digest(&effect.request)?;
+    let request_bytes = canonical_request_size(&effect.request, MAX_CANONICAL_EFFECT_BYTES)?;
     let capability = effect
         .request
         .required_capability(InvocationLimits::default());
     // Public-within-crate admission summaries are not a replacement source.
     // Recompute expectations from its privately borrowed immutable original.
     if admitted.host_request_digest != request_digest
+        || admitted.host_request_bytes != request_bytes
         || admitted.capability != capability
         || admitted.origin != origin
         || admitted.outer_effect_key != outer
