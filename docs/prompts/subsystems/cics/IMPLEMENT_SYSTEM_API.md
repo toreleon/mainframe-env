@@ -45,9 +45,10 @@ these local requirements.
 Use existing matching local cache bytes through offline pinned search/read.
 Missing bodies or TOCs are unavailable, including supplements outside a
 snapshot's registered scopes. Do not refresh sources or change pins without an
-explicit refresh request. The cache repository's public metadata and synthetic
-transport fixture are not the real publication archive. Follow the shared
-cache runbook and keep publication bodies and execution receipts outside Git.
+explicit refresh request. The configured private cache storage provides the
+retained TAR at its pinned revision; import and verify its bytes through the
+shared cache runbook. Metadata and a synthetic transport fixture alone cannot
+supply publication bodies. Keep those bodies and execution receipts outside Git.
 
 ## Implement in this order
 
