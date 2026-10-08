@@ -9,8 +9,8 @@ impl BatchService {
         outcome: Result<i32, HostProblem>,
     ) -> Result<JobSnapshot, HostProblem> {
         invocation.check()?;
-        if let Err(problem) = &outcome {
-            if matches!(
+        if let Err(problem) = &outcome
+            && matches!(
                 problem,
                 HostProblem::UnknownOutcome
                     | HostProblem::Cancelled
@@ -18,9 +18,9 @@ impl BatchService {
                     | HostProblem::InfrastructureFailure
                     | HostProblem::IdempotencyConflict
                     | HostProblem::ResourceExhausted
-            ) {
-                return Err(invocation.poison(problem.clone()));
-            }
+            )
+        {
+            return Err(invocation.poison(problem.clone()));
         }
         let cleanup = self.cleanup_job_temporary_datasets(invocation, job);
         invocation.check()?;
@@ -60,7 +60,7 @@ impl BatchService {
     pub(super) fn retire_job(
         &self,
         invocation: &(impl RunInput + ?Sized),
-        mut job: &mut Job,
+        job: &mut Job,
         current: Job,
         outcome: Result<i32, HostProblem>,
         mut publish: impl FnMut(&Job, u64) -> Result<(), HostProblem>,
@@ -73,7 +73,7 @@ impl BatchService {
             return Err(HostProblem::UnknownOutcome);
         }
         ensure_job_event_capacity(
-            &job,
+            job,
             self.limits.max_events,
             if outcome.is_ok() { 2 } else { 1 },
         )?;
@@ -89,26 +89,26 @@ impl BatchService {
             Ok(return_code) => {
                 job.return_code = Some(return_code);
                 job.state = JobState::Output;
-                push_job_event(&mut job, self.limits.max_events, "output")?;
+                push_job_event(job, self.limits.max_events, "output")?;
                 self.append_spool_records(
                     invocation,
-                    &mut job,
+                    job,
                     None,
                     None,
                     "JESMSGLG",
                     vec![format!("ENDED RC={return_code:04}").into_bytes()],
                 )?;
-                self.complete_output(invocation, &mut job)?;
-                publish(&job, current.version)?;
+                self.complete_output(invocation, job)?;
+                publish(job, current.version)?;
                 let output_version = job.version;
                 job.version = completed_version.ok_or(HostProblem::InfrastructureFailure)?;
                 job.state = JobState::Completed;
                 job.initiator = None;
-                push_job_event(&mut job, self.limits.max_events, "completed")?;
-                publish(&job, output_version)?;
-                let result = snapshot(&job);
+                push_job_event(job, self.limits.max_events, "completed")?;
+                publish(job, output_version)?;
+                let result = snapshot(job);
                 invocation.check()?;
-                self.persist_checkpoint(&job, job.effect_sequence)?;
+                self.persist_checkpoint(job, job.effect_sequence)?;
                 invocation.check()?;
                 return Ok(result);
             }
@@ -137,7 +137,7 @@ impl BatchService {
                     });
                 }
                 push_job_event(
-                    &mut job,
+                    job,
                     self.limits.max_events,
                     if cancelled {
                         String::from("cancelled:execution")
@@ -148,7 +148,7 @@ impl BatchService {
                 if let Some(step) = terminal_step {
                     self.append_spool_records(
                         invocation,
-                        &mut job,
+                        job,
                         Some(&step),
                         None,
                         "JOBLOG",
@@ -163,7 +163,7 @@ impl BatchService {
                 }
                 self.append_spool_records(
                     invocation,
-                    &mut job,
+                    job,
                     None,
                     None,
                     "JESMSGLG",
@@ -176,16 +176,16 @@ impl BatchService {
                     ],
                 )?;
                 if cancelled {
-                    self.cancel_output(invocation, &mut job)?;
+                    self.cancel_output(invocation, job)?;
                 } else {
-                    self.complete_output(invocation, &mut job)?;
+                    self.complete_output(invocation, job)?;
                 }
             }
         }
-        publish(&job, current.version)?;
-        let result = snapshot(&job);
+        publish(job, current.version)?;
+        let result = snapshot(job);
         invocation.check()?;
-        self.persist_checkpoint(&job, job.effect_sequence)?;
+        self.persist_checkpoint(job, job.effect_sequence)?;
         invocation.check()?;
         Ok(result)
     }

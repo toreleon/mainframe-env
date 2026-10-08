@@ -370,3 +370,10 @@ Status: **Complete (bounded package admission and codec only)**. The independent
 Documentation/changelog/subsystem and diff checks pass for this reviewed scope.
 Missing supplemental source checks are `skipped/unavailable` by user direction,
 with zero credit. Foundation acceptance and other public exit gates remain pending.
+
+### CV-209.batch-contract-lint acceptance
+
+Status: **Complete (mechanical batch lint only)**. The 21 existing package-local diagnostics are repaired without suppression or changed assertions. Integrated dependency-inclusive strict batch Clippy passes, with 10 running-step and 56 contained-run tests passing. Borrow/evaluation order, awaits, errors and fencing remain unchanged; module ceilings are unchanged.
+Documentation/changelog/subsystem and diff checks pass for this reviewed scope.
+Missing supplemental source checks are `skipped/unavailable` by user direction,
+with zero credit. Foundation acceptance and other public exit gates remain pending.

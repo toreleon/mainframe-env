@@ -119,10 +119,10 @@ impl Observation {
         let current = match current {
             Ok(current) => current,
             Err(problem) => {
-                if self.active.load(Ordering::SeqCst) {
-                    if let Some(run) = &self.run {
-                        return Err(run.poison(problem));
-                    }
+                if self.active.load(Ordering::SeqCst)
+                    && let Some(run) = &self.run
+                {
+                    return Err(run.poison(problem));
                 }
                 return Err(problem);
             }
@@ -131,10 +131,11 @@ impl Observation {
             || !self.active.load(Ordering::SeqCst)
             || self.run.as_ref().is_some_and(|run| !run.active())
         {
-            if self.active.load(Ordering::SeqCst) && current.as_ref() != Some(&self.row) {
-                if let Some(run) = &self.run {
-                    return Err(run.poison(HostProblem::Unauthorized));
-                }
+            if self.active.load(Ordering::SeqCst)
+                && current.as_ref() != Some(&self.row)
+                && let Some(run) = &self.run
+            {
+                return Err(run.poison(HostProblem::Unauthorized));
             }
             return Err(HostProblem::Unauthorized);
         }

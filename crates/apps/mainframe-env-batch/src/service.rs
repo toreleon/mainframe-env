@@ -1524,10 +1524,10 @@ impl BatchService {
                 }
                 Ok(output)
             });
-            if let Err(problem) = &step_result {
-                if run_stop::fence_step_error(invocation.contained(), problem) {
-                    return Err(invocation.poison(problem.clone()));
-                }
+            if let Err(problem) = &step_result
+                && run_stop::fence_step_error(invocation.contained(), problem)
+            {
+                return Err(invocation.poison(problem.clone()));
             }
             invocation.check()?;
             let output = match step_result {
