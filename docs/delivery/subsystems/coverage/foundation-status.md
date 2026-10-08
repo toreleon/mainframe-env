@@ -254,3 +254,45 @@ control is not a PGID-reuse experiment. Bounded mode requires matching Linux
 procfs/non-reaping wait and exclusive child-wait ownership; conservative census,
 callback/kernel/escape and prior PID-1 zombie limitations remain qualified.
 No live client, whole campaign, portable sandbox or official/licensed credit.
+
+### Navigation prerequisite disposition
+
+The first sixteen-control navigation run executed four passing physical-index/
+source-gap controls and twelve terminal prerequisite failures. Actual menu fields
+contained occurrence-one text, parentheses and binary index bytes instead of the
+independent option labels. All seventeen fixtures shut down and the exact target
+was cleaned after retention. No CT navigation, PF7 or missing-token assertion was
+reached; no application observation was bound. Preserve these results and the
+original expectations while repairing the generic prerequisite below.
+
+### CV-209.cobol-string-references declaration
+
+Manager grants the four-path generic runtime repair packet: interpreter
+`machine.rs` registration/extraction, private `machine/string_ops.rs`, conformance
+`cobol_runtime.rs` controls and one unique fragment. Consume complete STRING
+sender/delimiter references through the existing checked reference owner; retain
+literal/figurative, SIZE, target, pointer and overflow behavior. Extract only
+STRING so the legacy facade decreases; manager owns its exact lowered ratchet.
+No UNSTRING, allocation API, parser/IR/layout or application-source rewrite.
+
+First run the frozen native reference baseline and independent byte-literal
+controls on unchanged runtime. A shared-layout prerequisite failure needs a new
+scope; only a genuine STRING red permits this repair. Run the same focused
+selector and the existing pointer/UNSTRING control after correction, with jobs=2,
+an exclusive checkout-local target, artifact retention and exact cleanup. No
+navigation rerun until manager accepts this dependency; no full campaign.
+
+The offline Enterprise COBOL 6.5 bodies are unavailable under the retained cache
+and remain skipped/zero; no refresh, repin or repeated request is granted. This
+repairs the existing generic data-reference boundary using independent public
+application/native controls, without asserting an IBM semantic or licensed pass.
+
+### CV-209.sandbox-build-parallelism acceptance
+
+Status: **Complete (build-owner resource bound only)**. Docker RUN now passes
+two jobs explicitly to Rust and Git builds; it no longer relies on a host
+environment variable to reach the image builder. Repository input policy,
+frozen dependency policy and docs/fragment/subsystem validation passed. Pins,
+targets, runtime, legal inputs and containment are unchanged. No Docker build,
+current image size, speed, sandbox workload or application batch pass is implied;
+those remain final-candidate gates.
