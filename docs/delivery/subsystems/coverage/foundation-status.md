@@ -289,3 +289,27 @@ codecs and signed publication preflight/fencing. The existing audits also identi
 schema mappings, production scanning, controller root validation and journey/client
 closure. All remain pending; no new discovery round, licensed campaign, private
 implementation or source refresh is authorized by these scoped seals.
+
+## Next declared public repair slices
+
+Consumed candidate: `d0cce85e`; the preceding bounded repairs are sealed, while
+Foundation remains in progress. No licensed/private-only implementation or
+unready CICS command is included.
+
+| Slice | Parent and exact owners | Focused acceptance and compatibility |
+|---|---|---|
+| `CV-204.identity-framing` | CV-204; existing package identity/trust owner. First assignment is an independent reproducer and compatibility proposal only | Reproduce distinct valid IMS graphs sharing the existing identity; inventory every variable collection. Manager must approve an explicit identity-domain/writer/finite-reader migration before production edits; preserve retained v1/legacy selection and signatures without relabeling |
+| `CV-204.package-bounds` | CV-204; existing application package preflight and installer state codec, private bounded codec module and tests | Reject counts/text/checked aggregate excess before allocating validators/hash/owned decoding; bounded export stops before full clone/encoding. Preserve admitted wire bytes, finite retained forms, topology and verifier behavior; focused boundary/refusal/no-mutation tests |
+| `CV-202.serialized-schema-bindings` | CV-202; existing coverage row/evidence/ledger schemas, typed projection and xtask schema mapping/tests | Reviewed Draft 2020-12 validation rejects invalid oracle-on-pass, gate keys, incomplete evidence and malformed ledger items; valid historical forms and differential failure stay accepted. Typed owner validates cross-reference/denominator relationships; no new ledger |
+| `CV-208.production-scanner` | CV-208; existing xtask dehardcoding guards and shared Rust item scanner/tests | Test-only items are excluded without dropping later production; markers in comments/strings cannot truncate a scan. Independently constructed negative fixture must fail; current zero-H1 result is reevaluated, with no product semantic change |
+| `CV-206.controller-root-validation` | CV-206; installed IMS controller admission and loader/tests | Duplicate roots, including identical duplicates, refuse before any participant effect. Root-key width beyond root-record width fails admission and preserves selection; successful/rejected-load/commit regressions remain. No new IMS operation or semantics |
+| `CV-209.journey-closure` | CV-209; existing CardDemo manifest and conformance runner/receipt/tests | Bind existing CD.J01–CD.J20 to actual route observations and derive counts from exact closure; omitted/duplicate/unknown journey or missing mandatory observations fail. Focused harness tests first; full workload remains a separate current-candidate gate, without new evidence family |
+
+Workers use isolated checkouts at this candidate and English prompts. The first
+Cargo grants are package-bounds and controller-root-validation, at most two
+build sequences at once. Other workers prepare independent regressions and
+report the required command; they do not execute Cargo until the manager grants
+it. Each completed sequence saves output externally and cleans its own target.
+The manager reviews compatibility, integrates exact owned diffs, runs affected
+gates, seals each slice separately and opens a scoped PR. Parent acceptance and
+all unavailable source/backend/client gates remain pending.
