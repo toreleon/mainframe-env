@@ -279,22 +279,75 @@ struct InstalledApplication {
 }
 
 #[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 struct ApplicationInstallerState {
     schema_version: String,
     applications: Vec<RetainedApplication>,
 }
 
 #[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 struct RetainedApplication {
     application: String,
+    // Require an explicit selection or null; omission is a malformed retained state.
+    #[serde(deserialize_with = "Option::deserialize")]
     selected: Option<u64>,
     generations: Vec<RetainedPackage>,
 }
 
 #[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 struct RetainedPackage {
     package: ApplicationPackageV2,
     state: InstallState,
+}
+
+fn validate_retained_state(
+    state: &ApplicationInstallerState,
+    limits: PackageLimits,
+) -> Result<(), InstallProblem> {
+    if state.schema_version != APPLICATION_INSTALLER_STATE_CONTRACT {
+        return Err(InstallProblem::InvalidIdentity);
+    }
+    if state.applications.len() > limits.max_applications {
+        return Err(InstallProblem::LimitExceeded);
+    }
+    let mut names = BTreeSet::new();
+    for application in &state.applications {
+        validate_text(&application.application)?;
+        if application.application.to_ascii_uppercase() != application.application {
+            return Err(InstallProblem::InvalidIdentity);
+        }
+        if !names.insert(application.application.as_str()) {
+            return Err(InstallProblem::DuplicateEntry);
+        }
+        if application.generations.len() > limits.max_retained_generations {
+            return Err(InstallProblem::LimitExceeded);
+        }
+        let mut generations = BTreeMap::new();
+        for retained in &application.generations {
+            if retained.package.generation == 0
+                || retained.package.base.manifest.name.to_ascii_uppercase()
+                    != application.application
+            {
+                return Err(InstallProblem::InvalidIdentity);
+            }
+            if generations
+                .insert(retained.package.generation, retained.state)
+                .is_some()
+            {
+                return Err(InstallProblem::DuplicateEntry);
+            }
+        }
+        // Null is a valid retained selection, including when Ready generations exist.
+        if application
+            .selected
+            .is_some_and(|selected| generations.get(&selected) != Some(&InstallState::Ready))
+        {
+            return Err(InstallProblem::InvalidIdentity);
+        }
+    }
+    Ok(())
 }
 
 #[derive(Clone)]
@@ -415,11 +468,24 @@ impl ApplicationInstallerV2 {
             .ok_or(InstallProblem::UnknownStage)?;
         let record = installed
             .generations
-            .get_mut(&package.generation)
+            .get(&package.generation)
             .ok_or(InstallProblem::UnknownStage)?;
         if record.identity != identity {
             return Err(InstallProblem::IdentityConflict);
         }
+        if record.state == InstallState::Ready {
+            return Ok(record.clone());
+        }
+        // Explicit rollback does not make staged work older than a Ready generation current.
+        if installed.generations.iter().any(|(generation, record)| {
+            *generation > package.generation && record.state == InstallState::Ready
+        }) {
+            return Err(InstallProblem::StaleGeneration);
+        }
+        let record = installed
+            .generations
+            .get_mut(&package.generation)
+            .ok_or(InstallProblem::UnknownStage)?;
         record.state = InstallState::Ready;
         installed.selected = Some(package.generation);
         Ok(record.clone())
@@ -632,33 +698,28 @@ impl ApplicationInstallerV2 {
         }
         let state: ApplicationInstallerState =
             serde_json::from_slice(payload).map_err(|_| InstallProblem::InvalidIdentity)?;
-        if state.schema_version != APPLICATION_INSTALLER_STATE_CONTRACT
-            || state.applications.len() > limits.max_applications
-        {
-            return Err(InstallProblem::InvalidIdentity);
-        }
+        validate_retained_state(&state, limits)?;
         let installer = Self::new(product, limits, verifier);
-        let mut names = BTreeSet::new();
-        for application in state.applications {
-            let normalized = application.application.to_ascii_uppercase();
-            if application.generations.len() > limits.max_retained_generations
-                || normalized != application.application
-                || !names.insert(normalized.clone())
-            {
-                return Err(InstallProblem::LimitExceeded);
-            }
-            for retained in application.generations {
-                if retained.package.base.manifest.name.to_ascii_uppercase() != normalized {
-                    return Err(InstallProblem::InvalidIdentity);
-                }
+        for mut application in state.applications {
+            application
+                .generations
+                .sort_by_key(|retained| retained.package.generation);
+            for retained in &application.generations {
                 installer.stage(&retained.package)?;
-                if retained.state == InstallState::Ready {
-                    installer.commit(&retained.package)?;
-                }
             }
-            if let Some(selected) = application.selected {
-                installer.rollback(&normalized, selected)?;
+            let mut applications = installer
+                .applications
+                .lock()
+                .map_err(|_| InstallProblem::Poisoned)?;
+            let installed = applications.entry(application.application).or_default();
+            for retained in application.generations {
+                installed
+                    .generations
+                    .get_mut(&retained.package.generation)
+                    .ok_or(InstallProblem::UnknownStage)?
+                    .state = retained.state;
             }
+            installed.selected = application.selected;
         }
         Ok(installer)
     }
@@ -1134,6 +1195,301 @@ mod tests {
     }
 
     #[test]
+    fn generation_selection_ready_commit_retry_is_side_effect_free_after_rollback_and_reopen() {
+        let installer =
+            ApplicationInstallerV2::new("0.2.0", PackageLimits::default(), Arc::new(TestVerifier));
+        let first = package(1);
+        let second = package(2);
+        installer.install(&first).unwrap();
+        let before = installer.state_payload().unwrap();
+        assert_eq!(installer.commit(&first).unwrap().state, InstallState::Ready);
+        assert_eq!(installer.state_payload().unwrap(), before);
+
+        installer.install(&second).unwrap();
+        let before = installer.state_payload().unwrap();
+        assert_eq!(installer.commit(&first).unwrap().state, InstallState::Ready);
+        assert_eq!(installer.state_payload().unwrap(), before);
+        assert_eq!(installer.selected("DEMO").unwrap().unwrap().generation, 2);
+
+        installer.rollback("DEMO", 1).unwrap();
+        let before = installer.state_payload().unwrap();
+        let reopened = ApplicationInstallerV2::from_state_payload(
+            "0.2.0",
+            PackageLimits::default(),
+            Arc::new(TestVerifier),
+            &before,
+        )
+        .unwrap();
+        assert_eq!(reopened.state_payload().unwrap(), before);
+        assert_eq!(reopened.commit(&second).unwrap().state, InstallState::Ready);
+        assert_eq!(
+            reopened.install(&second).unwrap().state,
+            InstallState::Ready
+        );
+        assert_eq!(reopened.state_payload().unwrap(), before);
+        assert_eq!(reopened.selected("DEMO").unwrap().unwrap().generation, 1);
+        reopened.rollback("DEMO", 2).unwrap();
+        assert_eq!(reopened.selected("DEMO").unwrap().unwrap().generation, 2);
+    }
+
+    #[test]
+    fn generation_selection_stale_staged_commit_refuses_without_mutation() {
+        let installer =
+            ApplicationInstallerV2::new("0.2.0", PackageLimits::default(), Arc::new(TestVerifier));
+        let first = package(1);
+        installer.stage(&first).unwrap();
+        installer.install(&package(2)).unwrap();
+        let before = installer.state_payload().unwrap();
+        assert_eq!(
+            installer.commit(&first),
+            Err(InstallProblem::StaleGeneration)
+        );
+        assert_eq!(installer.state_payload().unwrap(), before);
+        assert_eq!(installer.selected("DEMO").unwrap().unwrap().generation, 2);
+
+        let reopened = ApplicationInstallerV2::from_state_payload(
+            "0.2.0",
+            PackageLimits::default(),
+            Arc::new(TestVerifier),
+            &before,
+        )
+        .unwrap();
+        assert_eq!(
+            reopened.commit(&first),
+            Err(InstallProblem::StaleGeneration)
+        );
+        assert_eq!(reopened.state_payload().unwrap(), before);
+    }
+
+    #[test]
+    fn generation_selection_stale_staged_commit_stays_stale_after_explicit_rollback() {
+        let installer =
+            ApplicationInstallerV2::new("0.2.0", PackageLimits::default(), Arc::new(TestVerifier));
+        installer.install(&package(1)).unwrap();
+        let second = package(2);
+        installer.stage(&second).unwrap();
+        installer.install(&package(3)).unwrap();
+        installer.rollback("DEMO", 1).unwrap();
+        let before = installer.state_payload().unwrap();
+        assert_eq!(
+            installer.commit(&second),
+            Err(InstallProblem::StaleGeneration)
+        );
+        assert_eq!(installer.state_payload().unwrap(), before);
+        installer.rollback("DEMO", 3).unwrap();
+        assert_eq!(installer.selected("DEMO").unwrap().unwrap().generation, 3);
+    }
+
+    #[test]
+    fn generation_selection_conflicting_ready_commit_retry_refuses_without_mutation() {
+        let installer =
+            ApplicationInstallerV2::new("0.2.0", PackageLimits::default(), Arc::new(TestVerifier));
+        installer.install(&package(1)).unwrap();
+        installer.install(&package(2)).unwrap();
+        let before = installer.state_payload().unwrap();
+        let mut conflicting = package(1);
+        conflicting.sections.sql_rows[0]
+            .values
+            .insert("VALUE".into(), "conflicting-generation".into());
+        resign(&mut conflicting);
+        assert_eq!(
+            installer.commit(&conflicting),
+            Err(InstallProblem::IdentityConflict)
+        );
+        assert_eq!(installer.state_payload().unwrap(), before);
+        let mut corrupt = package(1);
+        corrupt.signature.value = "invalid-signature".into();
+        assert_eq!(
+            installer.commit(&corrupt),
+            Err(InstallProblem::InvalidSignature)
+        );
+        assert_eq!(installer.state_payload().unwrap(), before);
+    }
+
+    #[test]
+    fn generation_selection_null_with_ready_generations_preserves_retained_rollback() {
+        let installer =
+            ApplicationInstallerV2::new("0.2.0", PackageLimits::default(), Arc::new(TestVerifier));
+        installer.install(&package(1)).unwrap();
+        installer.install(&package(2)).unwrap();
+        let mut state: serde_json::Value =
+            serde_json::from_slice(&installer.state_payload().unwrap()).unwrap();
+        state["applications"][0]["selected"] = serde_json::Value::Null;
+        let reopened = ApplicationInstallerV2::from_state_payload(
+            "0.2.0",
+            PackageLimits::default(),
+            Arc::new(TestVerifier),
+            &serde_json::to_vec(&state).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(reopened.selected("DEMO").unwrap(), None);
+        assert!(reopened.selected_generation("DEMO").unwrap().is_none());
+        let before = reopened.state_payload().unwrap();
+        assert_eq!(
+            reopened.commit(&package(2)).unwrap().state,
+            InstallState::Ready
+        );
+        assert_eq!(reopened.state_payload().unwrap(), before);
+        reopened.rollback("DEMO", 1).unwrap();
+        assert_eq!(reopened.selected("DEMO").unwrap().unwrap().generation, 1);
+    }
+
+    #[test]
+    fn generation_selection_all_staged_null_round_trips_before_first_commit() {
+        let installer =
+            ApplicationInstallerV2::new("0.2.0", PackageLimits::default(), Arc::new(TestVerifier));
+        installer.stage(&package(1)).unwrap();
+        let second = package(2);
+        installer.stage(&second).unwrap();
+        let before = installer.state_payload().unwrap();
+        let reopened = ApplicationInstallerV2::from_state_payload(
+            "0.2.0",
+            PackageLimits::default(),
+            Arc::new(TestVerifier),
+            &before,
+        )
+        .unwrap();
+        assert_eq!(reopened.state_payload().unwrap(), before);
+        assert_eq!(reopened.selected("DEMO").unwrap(), None);
+        assert_eq!(
+            reopened.rollback("DEMO", 1),
+            Err(InstallProblem::UnknownStage)
+        );
+        assert_eq!(reopened.state_payload().unwrap(), before);
+        assert_eq!(reopened.commit(&second).unwrap().state, InstallState::Ready);
+        assert_eq!(reopened.selected("DEMO").unwrap().unwrap().generation, 2);
+    }
+
+    #[test]
+    fn generation_selection_unordered_retained_generations_and_empty_application_reopen() {
+        let installer =
+            ApplicationInstallerV2::new("0.2.0", PackageLimits::default(), Arc::new(TestVerifier));
+        installer.install(&package(1)).unwrap();
+        installer.install(&package(2)).unwrap();
+        installer.rollback("DEMO", 1).unwrap();
+        let mut state: serde_json::Value =
+            serde_json::from_slice(&installer.state_payload().unwrap()).unwrap();
+        state["applications"][0]["generations"]
+            .as_array_mut()
+            .unwrap()
+            .reverse();
+        state["applications"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({
+                "application": "EMPTY",
+                "selected": null,
+                "generations": [],
+            }));
+        let reopened = ApplicationInstallerV2::from_state_payload(
+            "0.2.0",
+            PackageLimits::default(),
+            Arc::new(TestVerifier),
+            &serde_json::to_vec(&state).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(reopened.selected("DEMO").unwrap().unwrap().generation, 1);
+        assert_eq!(reopened.selected("EMPTY").unwrap(), None);
+        let recovered: serde_json::Value =
+            serde_json::from_slice(&reopened.state_payload().unwrap()).unwrap();
+        assert_eq!(recovered["applications"][1], state["applications"][1]);
+        reopened.rollback("DEMO", 2).unwrap();
+        assert_eq!(reopened.selected("DEMO").unwrap().unwrap().generation, 2);
+    }
+
+    struct RecoveryVerifier(std::sync::atomic::AtomicUsize);
+
+    impl PackageSignatureVerifier for RecoveryVerifier {
+        fn verify(&self, key_id: &str, algorithm: &str, identity: &str, signature: &str) -> bool {
+            self.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            TestVerifier.verify(key_id, algorithm, identity, signature)
+        }
+    }
+
+    fn assert_invalid_retained_topology(payload: &[u8], expected: InstallProblem) {
+        let verifier = Arc::new(RecoveryVerifier(std::sync::atomic::AtomicUsize::new(0)));
+        let result = ApplicationInstallerV2::from_state_payload(
+            "0.2.0",
+            PackageLimits::default(),
+            verifier.clone(),
+            payload,
+        );
+        assert!(matches!(result, Err(problem) if problem == expected));
+        assert_eq!(verifier.0.load(std::sync::atomic::Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn generation_selection_malformed_retained_topology_fails_before_verification() {
+        let installer =
+            ApplicationInstallerV2::new("0.2.0", PackageLimits::default(), Arc::new(TestVerifier));
+        installer.install(&package(1)).unwrap();
+        installer.stage(&package(2)).unwrap();
+        let before = installer.state_payload().unwrap();
+        let state: serde_json::Value = serde_json::from_slice(&before).unwrap();
+        for selected in [0, 2, 99] {
+            let mut invalid = state.clone();
+            invalid["applications"][0]["selected"] = serde_json::json!(selected);
+            assert_invalid_retained_topology(
+                &serde_json::to_vec(&invalid).unwrap(),
+                InstallProblem::InvalidIdentity,
+            );
+        }
+        for duplicate_index in [0, 1] {
+            let mut invalid = state.clone();
+            let duplicate = invalid["applications"][0]["generations"][duplicate_index].clone();
+            invalid["applications"][0]["generations"]
+                .as_array_mut()
+                .unwrap()
+                .push(duplicate);
+            assert_invalid_retained_topology(
+                &serde_json::to_vec(&invalid).unwrap(),
+                InstallProblem::DuplicateEntry,
+            );
+        }
+        let mut later_invalid = state.clone();
+        later_invalid["applications"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({
+                "application": "OTHER",
+                "selected": 1,
+                "generations": [],
+            }));
+        assert_invalid_retained_topology(
+            &serde_json::to_vec(&later_invalid).unwrap(),
+            InstallProblem::InvalidIdentity,
+        );
+        assert_eq!(installer.state_payload().unwrap(), before);
+    }
+
+    #[test]
+    fn generation_selection_unknown_retained_fields_and_missing_selection_fail_closed() {
+        let installer =
+            ApplicationInstallerV2::new("0.2.0", PackageLimits::default(), Arc::new(TestVerifier));
+        installer.install(&package(1)).unwrap();
+        let before = installer.state_payload().unwrap();
+        let state: serde_json::Value = serde_json::from_slice(&before).unwrap();
+        let mut root = state.clone();
+        root["unknown"] = serde_json::json!(1);
+        let mut application = state.clone();
+        application["applications"][0]["unknown"] = serde_json::json!(1);
+        let mut generation = state.clone();
+        generation["applications"][0]["generations"][0]["unknown"] = serde_json::json!(1);
+        let mut missing = state;
+        missing["applications"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("selected");
+        for invalid in [root, application, generation, missing] {
+            assert_invalid_retained_topology(
+                &serde_json::to_vec(&invalid).unwrap(),
+                InstallProblem::InvalidIdentity,
+            );
+        }
+        assert_eq!(installer.state_payload().unwrap(), before);
+    }
+
+    #[test]
     fn package_identity_is_order_independent_but_section_content_sensitive() {
         let mut package = package(1);
         package.sections.sql_rows.push(SqlSeedRow {
@@ -1156,10 +1512,48 @@ mod tests {
         let legacy_identity = package_v2_identity(&package).unwrap();
         let mut value = serde_json::to_value(&package).unwrap();
         assert!(value["sections"].get("ims_metadata").is_none());
+        assert!(value["sections"].get("ims_tm").is_none());
         value["sections"]["ims_metadata"] = serde_json::Value::Null;
+        value["sections"]["ims_tm"] = serde_json::Value::Null;
         let decoded: ApplicationPackageV2 = serde_json::from_value(value).unwrap();
         assert_eq!(decoded.sections.ims_metadata, None);
+        assert_eq!(decoded.sections.ims_tm, None);
         assert_eq!(package_v2_identity(&decoded).unwrap(), legacy_identity);
+
+        let installer =
+            ApplicationInstallerV2::new("0.2.0", PackageLimits::default(), Arc::new(TestVerifier));
+        installer.install(&package).unwrap();
+        installer.install(&self::package(2)).unwrap();
+        installer.rollback("DEMO", 1).unwrap();
+        let before = installer.state_payload().unwrap();
+        for explicit_null in [false, true] {
+            let mut state: serde_json::Value = serde_json::from_slice(&before).unwrap();
+            for retained in state["applications"][0]["generations"]
+                .as_array_mut()
+                .unwrap()
+            {
+                let sections = &mut retained["package"]["sections"];
+                for optional in ["ims_metadata", "ims_tm"] {
+                    assert!(sections.get(optional).is_none());
+                    if explicit_null {
+                        sections[optional] = serde_json::Value::Null;
+                    }
+                }
+            }
+            let reopened = ApplicationInstallerV2::from_state_payload(
+                "0.2.0",
+                PackageLimits::default(),
+                Arc::new(TestVerifier),
+                &serde_json::to_vec(&state).unwrap(),
+            )
+            .unwrap();
+            let selected = reopened.selected("DEMO").unwrap().unwrap();
+            assert_eq!(selected.generation, 1);
+            assert_eq!(selected.identity, legacy_identity);
+            assert_eq!(reopened.state_payload().unwrap(), before);
+            reopened.rollback("DEMO", 2).unwrap();
+            assert_eq!(reopened.selected("DEMO").unwrap().unwrap().generation, 2);
+        }
     }
 
     #[test]

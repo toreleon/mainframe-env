@@ -252,3 +252,10 @@ Status: **Complete (bounded slice only)**. All 28 coverage tests, integrated str
 Formatting, frozen dependency policy, module, documentation/changelog/subsystem
 and diff checks pass for the reviewed integrated scope. The unavailable CICS
 source freshness gate and full Foundation exit remain pending.
+
+### CV-204.generation-selection acceptance
+
+Status: **Complete (bounded slice only)**. All 24 integrated application-package tests and dependency-inclusive strict Clippy pass. Ready retries, stale staged refusal and retained topology/null selection are covered; identity framing, bounds and publication fencing remain separate pending work.
+Formatting, frozen dependency policy, module, documentation/changelog/subsystem
+and diff checks pass for the reviewed integrated scope. The unavailable CICS
+source freshness gate and full Foundation exit remain pending.
