@@ -343,17 +343,20 @@ impl Db2Service {
             });
         }
         let application = catalog.application.to_ascii_uppercase();
-        if let Some(existing) = durable.state.installations.get(&application) {
-            if existing.generation == catalog.generation {
-                return if existing.identity == catalog.identity {
-                    Ok(())
-                } else {
-                    Err(HostProblem::IdempotencyConflict)
-                };
-            }
-            if existing.generation > catalog.generation {
-                return Err(HostProblem::IdempotencyConflict);
-            }
+        let generations = durable.state.catalog_generations.get(&application);
+        let retained = generations.and_then(|generations| generations.get(&catalog.generation));
+        let selected = durable.state.installations.get(&application);
+        if retained.is_some_and(|retained| retained.identity != catalog.identity)
+            || selected.is_some_and(|selected| {
+                selected.generation > catalog.generation
+                    || selected.generation == catalog.generation
+                        && selected.identity != catalog.identity
+            })
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        if selected.is_some_and(|selected| selected.generation == catalog.generation) {
+            return Ok(());
         }
         let mut next = durable.state.scoped_snapshot();
         apply_catalog_generation(&mut next, catalog, self.limits)?;
@@ -1375,17 +1378,14 @@ fn apply_catalog_generation(
             .get_mut(&table_name)
             .ok_or(HostProblem::Malformed)?;
         let table = Arc::make_mut(table);
-        if table.rows.len() >= limits.max_rows_per_table {
-            return Err(HostProblem::ResourceExhausted);
-        }
-        match table.rows.get(&key) {
-            Some(existing) if existing != &values => {
+        if let Some(existing) = table.rows.get(&key) {
+            if existing != &values {
                 return Err(HostProblem::IdempotencyConflict);
             }
-            Some(_) => {}
-            None => {
-                table.rows.insert(key, values);
-            }
+        } else if table.rows.len() >= limits.max_rows_per_table {
+            return Err(HostProblem::ResourceExhausted);
+        } else {
+            table.rows.insert(key, values);
         }
     }
     validate_foreign_keys(state)?;
@@ -3279,6 +3279,8 @@ pub fn db2_providers(
 
 #[cfg(test)]
 mod tests {
+    mod catalog_generation;
+
     use super::*;
     use mainframe_env_execution_api::{
         ArtifactRef, CapabilityId, ExecutionId, IdempotencyKey, Principal, PrincipalId, RequestId,

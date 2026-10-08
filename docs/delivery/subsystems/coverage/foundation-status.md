@@ -259,3 +259,10 @@ Status: **Complete (bounded slice only)**. All 24 integrated application-package
 Formatting, frozen dependency policy, module, documentation/changelog/subsystem
 and diff checks pass for the reviewed integrated scope. The unavailable CICS
 source freshness gate and full Foundation exit remain pending.
+
+### CV-205.catalog-generation acceptance
+
+Status: **Complete (bounded slice only)**. The 12 new Memory/file-backed SQLite regressions and six existing catalog regressions pass, with integrated strict Clippy. Identical seeds at capacity and conflicting retained identities are covered; same-process adapter reopen is not process-crash proof.
+Formatting, frozen dependency policy, module, documentation/changelog/subsystem
+and diff checks pass for the reviewed integrated scope. The unavailable CICS
+source freshness gate and full Foundation exit remain pending.
