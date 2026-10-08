@@ -60,10 +60,10 @@ CardDemo participant ownership and batch completion boundary.
 | [0032](0032-selected-secondary-checkpoint-position.md) | selected secondary checkpoint occurrence witnesses composed with existing local backout | Proposed |
 | [0050](0050-host-effect-envelope-layout.md) | exclusive boxed outer MQI host payloads with unchanged canonical encoding | Accepted; scoped compatibility passed |
 
-| [0051](0051-package-identity-framing.md) | framed current package domain and finite trusted legacy recovery | Accepted design; implementation pending |
-| [0052](0052-cics-operation-contexts.md) | borrowed CICS operation inputs and existing explicit receipt retention export | Accepted design; implementation pending |
+| [0051](0051-package-identity-framing.md) | framed current package domain and finite trusted legacy recovery | Accepted; scoped compatibility passed |
+| [0052](0052-cics-operation-contexts.md) | borrowed CICS operation inputs and existing explicit receipt retention export | Accepted; scoped compatibility passed |
 | [0053](0053-selected-controller-publication-fence.md) | local shared admission fence and publication prevalidation | Accepted design; implementation pending |
-| [0054](0054-focused-conformance-output.md) | canonical focused JSONL output and bounded sink publication | Accepted design; implementation pending |
+| [0054](0054-focused-conformance-output.md) | canonical focused JSONL output and bounded sink publication | Accepted; scoped compatibility passed |
 | [0055](0055-standard-package-mac-envelope.md) | bounded COSE_Mac0 profile and exact retained verification | Accepted design; acceptance pending |
 
 Parallel subsystem work allocated the same 0028 and 0029 numeric prefixes.

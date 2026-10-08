@@ -423,9 +423,9 @@
       "normative": true,
       "owner": "conformance maintainers",
       "path": "docs/architecture/CONFORMANCE-IR.md",
-      "relative_links": 0,
+      "relative_links": 1,
       "scope": "conformance catalog, binding, execution, and evidence authority",
-      "sha256": "sha256:312aba6e4f0d4dc977a4f6d9550ce6e26b427472618ad6d4b0e3c37e1ac57c77",
+      "sha256": "sha256:0bb4df0298bc6373bdd27fabc39fda9d1453ef0d9526da83bd34a17c1bbe01cf",
       "status": "Normative from cobol.structure",
       "title": "Conformance IR and executable coverage",
       "xtask_commands": 4
@@ -1510,7 +1510,7 @@
       "normative": false,
       "path": "docs/decisions/README.md",
       "relative_links": 58,
-      "sha256": "sha256:54e3b783a1e8d275761ae6547ed582190fb27718c5ed574d67df0e2342c0cc2f",
+      "sha256": "sha256:2a766b39c833feb9267adb1b48c6f4bb3c0345450594876f7ab674e393fcaf38",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1758,7 +1758,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/coverage/foundation-status.md",
       "relative_links": 5,
-      "sha256": "sha256:a6870216f8b1ef281710c92668c28a9dde1a0838a9f38276509d72664c2bf960",
+      "sha256": "sha256:bb431fa217899bf0eeb84b7d746697ba5fae57f4bec675d99ee78cf3f18714d5",
       "title": "Coverage and conformance — Coverage authority progress",
       "xtask_commands": 6
     },

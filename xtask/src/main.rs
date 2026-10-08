@@ -14,6 +14,7 @@ mod cics_system_families;
 mod cobol_differential;
 mod common_program_policy;
 mod conformance_catalog;
+mod conformance_output;
 mod conformance_spec_export;
 mod coverage_projection;
 mod db2_statement_catalog;
@@ -140,6 +141,12 @@ struct ConformanceArgs {
     shard: Option<u16>,
     #[arg(long)]
     replay: Option<String>,
+    #[arg(
+        long,
+        value_name = "PATH",
+        help = "Write focused canonical JSONL to one file instead of stdout"
+    )]
+    output: Option<PathBuf>,
     #[arg(
         long,
         help = "Run noncredit candidate preparation; never emit official verdicts"
@@ -300,10 +307,16 @@ fn run() -> TaskResult {
         println!();
         return Ok(());
     };
+    let focused = matches!(&command, XtaskCommand::Conformance(args) if
+        args.subsystem.is_some() || args.replay.is_some() || args.gate.is_some() || args.shard.is_some());
     let (name, check, result) = execute_command(&root, command);
     result?;
     if check {
-        println!("{name}: pass");
+        if focused {
+            conformance_output::diagnostic(format_args!("{name}: pass"))?;
+        } else {
+            println!("{name}: pass");
+        }
     }
     Ok(())
 }
@@ -552,11 +565,18 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             (
                 "conformance",
                 args.check,
-                if focused {
-                    check_focused_conformance_interface(root, &args)
-                } else {
-                    check_conformance(root)
-                },
+                conformance_output::validate_selection(
+                    args.output.as_deref(),
+                    args.subsystem.is_some() || args.replay.is_some(),
+                    args.prepare_candidates,
+                )
+                .and_then(|()| {
+                    if focused {
+                        check_focused_conformance_interface(root, &args)
+                    } else {
+                        check_conformance(root)
+                    }
+                }),
             )
         }
         XtaskCommand::Certification(args) => {
@@ -5270,6 +5290,11 @@ fn augment_cobol_arithmetic_pilot_spec(root: &Path, spec: &mut Value) -> TaskRes
 }
 
 fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> TaskResult {
+    conformance_output::validate_selection(
+        args.output.as_deref(),
+        args.subsystem.is_some() || args.replay.is_some(),
+        args.prepare_candidates,
+    )?;
     require(
         args.replay.is_none() || args.subsystem.is_none(),
         "--replay and --subsystem are mutually exclusive",
@@ -5363,32 +5388,13 @@ fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> T
     let report = ConformanceRunner::new(&spec, runtime, limits)
         .run(&selection, &context)
         .map_err(|problem| problem.to_string())?;
-    let mut passed = 0usize;
-    let mut failed = 0usize;
-    for event in report.batches.iter().flat_map(|batch| batch.events.iter()) {
-        println!(
-            "{}",
-            String::from_utf8(
-                event
-                    .canonical_json()
-                    .map_err(|problem| problem.to_string())?
-            )
-            .map_err(|error| error.to_string())?
-        );
-        match event.verdict {
-            Verdict::Pass => passed += 1,
-            Verdict::Fail => failed += 1,
-        }
-    }
-    println!(
-        "conformance-ledger spec-digest={} batches={} verdicts={} pass={} fail={}",
+    finish_focused_report(
+        &report,
+        args.output.as_deref(),
         spec.spec_digest(),
-        report.batches.len(),
-        passed + failed,
-        passed,
-        failed
-    );
-    require(failed == 0, "focused conformance produced failing verdicts")
+        "conformance-ledger",
+        "focused conformance produced failing verdicts",
+    )
 }
 
 fn run_focused_cics(root: &Path, args: &ConformanceArgs) -> TaskResult {
@@ -5444,32 +5450,40 @@ fn run_focused_cics(root: &Path, args: &ConformanceArgs) -> TaskResult {
     let report = ConformanceRunner::new(&spec, runtime, limits)
         .run(&selection, &context)
         .map_err(|problem| problem.to_string())?;
+    finish_focused_report(
+        &report,
+        args.output.as_deref(),
+        spec.spec_digest(),
+        "cics-pilot-ledger",
+        "CICS pilot produced failing verdicts",
+    )
+}
+
+fn finish_focused_report(
+    report: &mainframe_env_coverage::ConformanceRunReport,
+    output: Option<&Path>,
+    spec_digest: &str,
+    summary: &str,
+    failure: &str,
+) -> TaskResult {
+    conformance_output::emit_report(report, output)?;
     let mut passed = 0usize;
     let mut failed = 0usize;
     for event in report.batches.iter().flat_map(|batch| batch.events.iter()) {
-        println!(
-            "{}",
-            String::from_utf8(
-                event
-                    .canonical_json()
-                    .map_err(|problem| problem.to_string())?,
-            )
-            .map_err(|error| error.to_string())?
-        );
         match event.verdict {
             Verdict::Pass => passed += 1,
             Verdict::Fail => failed += 1,
         }
     }
-    println!(
-        "cics-pilot-ledger spec-digest={} batches={} verdicts={} pass={} fail={}",
-        spec.spec_digest(),
+    conformance_output::diagnostic(format_args!(
+        "{summary} spec-digest={} batches={} verdicts={} pass={} fail={}",
+        spec_digest,
         report.batches.len(),
         passed + failed,
         passed,
         failed
-    );
-    require(failed == 0, "CICS pilot produced failing verdicts")
+    ))?;
+    require(failed == 0, failure)
 }
 
 fn check_cobol_exit(root: &Path) -> TaskResult {
@@ -5716,6 +5730,7 @@ fn check_focused_dataset_or_jcl_conformance_interface(
         let report = ConformanceRunner::new(&spec, runtime, ConformanceLimits::default())
             .run(&selection, &context)
             .map_err(|problem| problem.to_string())?;
+        conformance_output::emit_report(&report, args.output.as_deref())?;
         let simulation = run_dataset_reference_simulation()?;
         let failures = report
             .batches
@@ -5733,7 +5748,7 @@ fn check_focused_dataset_or_jcl_conformance_interface(
             .iter()
             .map(|batch| batch.events.len())
             .sum::<usize>();
-        println!(
+        conformance_output::diagnostic(format_args!(
             "dataset-conformance bindings={selected} events={events} batches={} reference-organizations={} reference-commands={} reference-properties={} observation-perturbations-rejected={} differential-credit={}",
             report.batches.len(),
             simulation.organization_rows,
@@ -5741,7 +5756,7 @@ fn check_focused_dataset_or_jcl_conformance_interface(
             simulation.property_cases,
             simulation.observation_perturbations_rejected,
             simulation.differential_credit,
-        );
+        ))?;
         return Ok(());
     }
     let jcl_selected = args.subsystem.as_deref() == Some("jcl-jes2")
@@ -5792,6 +5807,7 @@ fn run_focused_racf(
     let report = ConformanceRunner::new(spec, runtime, limits)
         .run(&selection, &context)
         .map_err(|problem| problem.to_string())?;
+    conformance_output::emit_report(&report, args.output.as_deref())?;
     if let Some(failure) = report
         .batches
         .iter()
@@ -5821,7 +5837,7 @@ fn run_focused_racf(
         })
         .collect::<Vec<_>>()
         .join(" ");
-    println!("bindings={selected} {counts}");
+    conformance_output::diagnostic(format_args!("bindings={selected} {counts}"))?;
     Ok(())
 }
 
@@ -5864,6 +5880,7 @@ fn run_focused_jcl(
     let report = ConformanceRunner::new(spec, runtime, limits)
         .run(&selection, &context)
         .map_err(|problem| problem.to_string())?;
+    conformance_output::emit_report(&report, args.output.as_deref())?;
     require(
         report
             .batches
@@ -5872,35 +5889,11 @@ fn run_focused_jcl(
             .all(|event| event.verdict == Verdict::Pass),
         "focused JCL conformance emitted one or more failing verdicts",
     )?;
-    let artifact_directory = root.join("target/conformance/jcl-jes2");
-    fs::create_dir_all(&artifact_directory).map_err(|error| error.to_string())?;
     let events = report
         .batches
         .iter()
         .flat_map(|batch| batch.events.iter())
-        .map(|event| {
-            let bytes = event
-                .canonical_json()
-                .map_err(|problem| problem.to_string())?;
-            serde_json::from_slice::<Value>(&bytes).map_err(|error| error.to_string())
-        })
-        .collect::<TaskResult<Vec<_>>>()?;
-    let ledger_bytes = report
-        .ledger
-        .canonical_json()
-        .map_err(|problem| problem.to_string())?;
-    fs::write(
-        artifact_directory.join("verdicts.json"),
-        pretty_json(&json!({
-            "schema_version": "mainframe-env.conformance-verdict-stream@1",
-            "spec_digest": spec.spec_digest(),
-            "selected_bindings": selected,
-            "events": events,
-        }))?,
-    )
-    .map_err(|error| error.to_string())?;
-    fs::write(artifact_directory.join("ledger.json"), &ledger_bytes)
-        .map_err(|error| error.to_string())?;
+        .count();
     let counts = CoverageGate::ALL
         .into_iter()
         .map(|gate| {
@@ -5924,13 +5917,13 @@ fn run_focused_jcl(
             (gate.slug(), pass, fail, pending, not_applicable)
         })
         .collect::<Vec<_>>();
-    println!(
+    conformance_output::diagnostic(format_args!(
         "jcl-conformance spec={} bindings={} verdicts={} shards={} counts={counts:?}",
         spec.spec_digest(),
         selected,
-        events.len(),
+        events,
         report.batches.len(),
-    );
+    ))?;
     Ok(())
 }
 

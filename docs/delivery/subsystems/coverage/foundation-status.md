@@ -906,6 +906,22 @@ cuts remain a separate future gate. Preserve receipts and fresh binaries, then
 clean only this worker's resolved task target. Manager owns exact downward
 ratchets, schemas, status, final integration and sealing.
 
+### Finite public client prerequisite review
+
+Manager declares the remaining public-check client prerequisite review under
+CV-203. Reuse existing preparation and the actual public z/OSMF fixture; correct
+the preparation's claim that the current seal workflow is stale: the implemented
+`work-package-seal` remains authoritative, while removed `evidence seal` was a
+different historical wrapper. Targets must remain checkout-local per AGENTS.
+Review only an exact dev-tool client pin and its finite authenticated route
+contract; no public-check implementation or product semantics yet. The reviewed
+candidate is @zowe/cli 8.39.0, Node 24.19.0, npm 11.9.0; verify exact registry
+integrity/archive/source, feature/plugin/credential compatibility, license and
+transitive lock proposal before installing or claiming execution. Keep optional
+client dependencies outside the sandbox image and Git; no Cargo, npm install,
+live server, IBM refresh, new dependency acceptance or new gate credit here.
+Use available pinned z/OSMF references only; unavailable bodies remain skipped.
+
 ### CV-202.package-state-schema acceptance
 
 Status: **Complete (owned durable-state schema projection only)**. The native
@@ -929,3 +945,23 @@ policy, docs and diff gates pass; strict tooling-owner lint passes. The separate
 server lint and dependency-inclusive MQ gate remain pending. No official,
 licensed, Foundation or public exit credit is added. Supplemental source skips
 remain unavailable and earn zero credit.
+
+### CV-209.conformance-output acceptance
+
+Status: **Complete (focused canonical report transport only)**. The single
+private adapter borrows the existing event/ledger owners, emits JSONL in original
+order and retains actual failure reports before nonzero refusal. Human output
+moves to stderr; explicit output publishes one bounded file, and JCL consumers
+migrate from implicit target files. Selection, pending gates and all canonical
+identities remain unchanged. Eighteen unit and fourteen real CLI tests pass on
+the integrated candidate, including actual selected-Fail ledger output, broken
+stdout and file/refusal controls. The old six failing output regressions and
+four refusal controls remain separate. Strict tooling-owner lint, module,
+formatting, frozen dependency policy, docs/changelog/subsystem and diff gates
+pass. This is transport acceptance, not product closure or Foundation credit.
+
+Exact staging is capped at 64 MiB after checked conservative borrowed projection;
+serializer scratch is not a global heap quota. File output adds no parent-directory
+durability, concurrent-writer or hostile-path guarantee, and stdout prefixes
+cannot be rolled back. Supplemental source skips and all unready/private gates
+remain unchanged and receive zero new credit.
