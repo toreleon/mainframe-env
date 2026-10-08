@@ -749,7 +749,8 @@ def _public_client_check_state(run_dir: Path, lock_hash: str) -> None:
     regular = {**_PUBLIC_CLIENT_SEEDS, 'input-lock.sha256': (lock_hash + '\n').encode('ascii')}
     caps = {'stdout.bin': 65536, 'stderr.bin': 65536, 'child-exit.txt': 32,
             'supervision-error.txt': 4096,
-            'client-home/logs/imperative.log': 1048576, 'client-home/logs/zowe.log': 1048576}
+            'client-home/logs/imperative.log': 1048576, 'client-home/logs/zowe.log': 1048576,
+            'client-home/logs/imperative_debug.log': 1048576}
     expected = set(regular) | set(_PUBLIC_CLIENT_CAPTURES) | set(_PUBLIC_CLIENT_DIRS)
     found = set()
     pending = [run_dir]
@@ -822,13 +823,15 @@ def _public_client_argv(validated: dict, run_dir: Path, suffix: list[str]) -> li
     for name, destination in (('identity/passwd', '/etc/passwd'), ('identity/group', '/etc/group'),
                               ('identity/nsswitch.conf', '/etc/nsswitch.conf'), ('input', '/input')):
         command += ['--ro-bind', str(run_dir / name), destination]
-    command += ['--ro-bind', str(validated['tree'] / 'package'), '/opt/client']
+    command += ['--dir', '/opt/client/node_modules/@zowe', '--ro-bind',
+                str(validated['tree'] / 'package'), '/opt/client/node_modules/@zowe/cli']
     for name, destination in (('client-home', '/client-home'), ('plugins', '/plugins'), ('cwd', '/work')):
         command += ['--bind', str(run_dir / name), destination]
     return command + ['--chdir', '/work', '--setenv', 'PATH', '/opt/node/bin',
                       '--setenv', 'TMPDIR', '/tmp', '--setenv', 'ZOWE_CLI_HOME', '/client-home',
                       '--setenv', 'ZOWE_CLI_PLUGINS_DIR', '/plugins', '/opt/node/bin/node',
-                      '--no-addons', '--no-global-search-paths', '/opt/client/lib/main.js', *suffix]
+                      '--no-addons', '--no-global-search-paths',
+                      '/opt/client/node_modules/@zowe/cli/lib/main.js', *suffix]
 
 
 def _public_client_diagnostic(message: str) -> bytes:

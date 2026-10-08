@@ -163,6 +163,14 @@ flowchart LR
     Recheck --> Fixture[Rust fixture checks HTTP and job semantics]
 ```
 
+The accepted package has one readonly bind at
+`/opt/client/node_modules/@zowe/cli`, with its fixed `lib/main.js` entry. This local
+installation layout supports ordinary package self-resolution; the child still
+disables global module lookup and native addons. Owned logs may contain only
+`imperative.log`, `zowe.log` and `imperative_debug.log`, each at most 1MiB and
+at most 2MiB combined. The latter is a source-proven startup-error log; its
+presence never turns a failed client command into semantic success.
+
 Each fresh run leaf retains `stdout.bin`, `stderr.bin`, `child-exit.txt` and
 `supervision-error.txt`. Transport exit zero means the command completed its
 capture and postchecks; the actual child can have a nonzero exit. A spawn/wait

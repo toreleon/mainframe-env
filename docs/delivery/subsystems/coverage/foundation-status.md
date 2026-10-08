@@ -54,7 +54,7 @@ flowchart LR
 | `CV-209.journey-closure` | Closure authority and observation transport implemented | Full CardDemo refuses incomplete observations; do not infer workload acceptance from harness tests |
 | `CV-209.carddemo-transactions` | Selected date/duplicate comparisons and binding implemented | J06 AIX browse/navigation and all 105 issue acceptance requirements remain unbound; 20/20 journeys and 26/26 transaction closure remain pending |
 | `CV-209.postgres-parity-selection` / `CV-209.postgres-loopback-owner` | All twelve existing live controls passed on the qualified source-equivalent producer | TCP-only startup removes an unused Unix socket path limit. Host loader/timezone differences, retained cleanup failures and one defunct PID-1 child remain qualified; this is no global backend or full CardDemo closure |
-| `CV-209.public-client-compatibility` | External input/startup feasibility only; fixture plan prepared; Linux command supervision accepted | `--version` feasibility is not a job workload pass. Submit/query/files/content, authentication/ownership refusals and actual method/URI/status capture remain pending |
+| `CV-209.public-client-compatibility` | Seven frozen fixture controls pass; first real client submit fails before HTTP | Repair finite launcher module resolution and exact generated-log membership; retain the elapsed-allowance failure. Submit/query/files/content and authentication/ownership refusals remain pending |
 | `CV-209.test-floor` and integrated exit | Minimum 260-pass recorder wiring implemented; full exit pending | Count actually executed passing tests on the selected unchanged candidate; preserve every affected architecture/profile/schema/package/source/backend gate |
 | `CV-209.public-status-docs` | Current subsystem status and documentation reconciled | Preserve active preparation scope, exact pending gates and implemented sealer; retain raw outputs externally |
 | `CV-209.command-supervision` | Optional Linux deadline/output ownership complete | Current-invocation logs and retained-leader fencing prevent stale output/PGID reuse; exclusive wait and conservative procfs limitations remain explicit |
@@ -260,17 +260,21 @@ No live client, whole campaign, portable sandbox or official/licensed credit.
 
 ### Navigation prerequisite disposition
 
-The STRING repair clears the actual menu-label prerequisite. The changed-runtime
-sixteen-control continuation executes six passes and ten failures, including the
-four uncredited physical-index/source-gap controls. List entry now refuses the
-independent blank error-field comparison with `Tran ID must be Numeric ...`;
-missing detail also fails the exact keyed READ comparison. PF7 and the aggregate
-receipt seam remain unreached. No navigation/AIX application observation is bound.
+STRING and figurative-comparison repairs clear the menu-label and LOW-VALUES
+prerequisites. The latest sixteen-control continuation executes six passes and
+ten failures, including four uncredited physical-index/source-gap controls.
+The independently supported missing keyed READ 13/80 comparison now passes.
+The remaining boundaries are three-digit amount field names and RECEIVE MAP
+transport frames entering symbolic storage. Fresh empty validation skips the
+thirteen-target clear; the missing-key clear already succeeds. PF7 and the
+aggregate receipt seam remain unreached. No navigation/AIX application
+observation is bound.
 
-Original menu failures and changed-runtime observations retain separate external
-producers and unchanged expected bytes. Preserve every actual error and shutdown
-while classifying the next generic runtime versus fixture/source boundary; no
-provider fix, expectation adjustment or unchanged retry is granted here.
+All three failed producers retain their executable, source, raw observations
+and successful shutdowns. The keyed READ correction retains the original 13/0
+failure separately. The bounded generic RECEIVE MAP declaration below precedes
+the separately source-supported amount-name and fresh-empty oracle corrections.
+No unchanged retry or provider/source change is granted.
 
 ### CV-209.cobol-string-references acceptance
 
@@ -348,3 +352,166 @@ grants no IBM differential, licensed, full grammar or CardDemo navigation credit
 One changed-runtime navigation continuation may now examine the unchanged
 expectations; the separate NOTFND secondary-code oracle remains unresolved.
 Original runtime failures and qualified source/reference boundaries are retained.
+
+### Navigation changed-runtime and keyed READ oracle declaration
+
+Manager accepts the independent checked-in `cics.read.notfound-80` rule in
+`pilot-compile-rules.json` and the exact missing-record 13/80 expectation in
+`pilot-fixtures.json`. These precede this navigation helper and do not derive
+from the provider implementation or its observed output. Their source locators
+and generated candidate pins provide reference context, not fresh body or
+official/licensed execution credit. The application's primary RESP check alone
+does not establish RESP2. Retain the original frozen 13/0 failure separately.
+
+In the already granted navigation owner only, make `require_read` accept explicit
+expected RESP2: both NORMAL call sites retain 0/0 and 350 payload bytes; only the
+missing keyed READ requires 13/80. Preserve every other raw row, field/message,
+page, state/version, one-READ, empty-input and successful payload expectation.
+Do not add a new failure-payload golden from the observed zero bytes. No provider,
+source, CSD, token identity or denominator change is granted.
+
+After the byte-preserved navigation patch advances onto the sealed STRING and
+figurative-comparison runtime, one sixteen-control continuation is granted with
+this independently supported oracle correction. New prerequisites, including a
+PF7 failure, stop for source/trace diagnosis. Only if all actual comparisons and
+shutdowns pass and the intended missing-observation control fails at its receipt
+seam may the already granted transport owner bind navigation, followed by one
+same-selector validation. Keep all previous failed producers, source/ELF/raw
+observations and teardown results; no unchanged retry or broader campaign.
+
+### CV-209.public-client-compatibility declaration
+
+Manager grants only conformance `lib.rs` test-only registration, a new private
+`public_client_compatibility.rs` fixture and one isolated fragment. Reuse the
+accepted input lock/validator and finite Python command without modifying them.
+Freeze independent literal JSON, request-vector, content, mutation and cleanup
+assertions before helpers. This is a new conformance harness; do not invent a
+product RED using missing symbols or a deliberately failing implementation stub.
+
+Use real ProductServer/MemoryStore/Local artifacts, a held loopback listener's
+actual nonzero port, administrator bootstrap/full readiness and a separate valid
+read-only identity. Observe and forward real HTTP, never fake routes. Execute
+the accepted nine fixed calls plus at most twelve status polls; require independent
+ACTIVE/null, OUTPUT/CC 0000, selected STEP1:SYSPRINT seven-byte content, actual
+401/403 and filtered-empty lookup refusals. Before each negative, require both
+job completion and queue completion, then compare bounded exact job/provider
+rows and every owned local artifact byte. No production principal-name branches.
+
+Keep five-second readiness, 120-second phase, per-command maximum ten seconds,
+joined serve/shutdown/listener release and exact owned directory cleanup on every
+body result. An explicitly selected ignored live test must fail missing inputs,
+not skip. Retain raw command exits/errors/HTTP/source/actual compiled executable.
+Run affected independent assertion controls first; one actual finite live fixture
+then stops on any product/infrastructure prerequisite, without broadening owners
+or modifying its oracle. Strict lint, clean-candidate final recorder, integration
+and sealing remain manager-owned. Initial compilation awaits the explicit
+external Cargo-slot grant after navigation releases its target. No new version
+workload, source refresh, full workspace/backend/CardDemo, private or licensed
+implementation and no official acceptance credit.
+
+The first native client continuation passes all seven frozen assertion controls.
+Its one real submit attempt fails before any HTTP request: the accepted client
+cannot resolve `@zowe/cli`, and state inspection rejects `imperative_debug.log`.
+The fixture also reports its ten-second invocation allowance exceeded; no
+child-only timing breakdown was measured. Preserve these distinct errors and the
+actual failed producer. Server shutdown, listener release and owned scratch
+cleanup succeed, and the exact Cargo target is cleaned after artifact retention.
+No job, spool, authentication refusal or live-route acceptance is established.
+A separate finite command-owner prerequisite must pass before another
+changed-input run.
+
+### CV-209.public-client-action-layout acceptance
+
+Status: **Complete (finite command layout and log inspection only)**. The single
+readonly accepted package mounts as local `node_modules/@zowe/cli`, allowing
+ordinary nested module resolution without aliases, global lookup, NODE_PATH or
+extra host mounts. Only the source-proven `imperative_debug.log` name is added;
+existing per-file/aggregate caps, ownership, type, mode, link and stable-byte
+checks remain unchanged. Version feasibility retains its original limited scope.
+
+Independent layout/log controls have genuine initial failures. The full affected
+146-test suite passes with zero skips in the qualified private PID/proc test
+namespace, actual waited exit zero and owned temp cleanup. A final new-test
+identifier-only correction has exact body/AST equivalence; the suite's original
+producer is retained. The unsupported owner-execute refusal expectation and its
+failed receipt remain disqualified; production mode policy was not changed.
+No actual client/server workload or live route/containment/official credit is
+established. Validation-cost and finite fixture gates remain separate pending
+dependencies, with original failed live observations retained.
+
+### CV-209.public-client-validation-cost declaration
+
+The existing native fixture retains an inclusive ten-second allowance failure.
+One separately granted read-only full input validation measures about 6.27
+seconds for the accepted 10,216-file tree; nested stage timings overlap and are
+not a child-only breakdown or a performance acceptance result. Full archive
+decompression/parsing repeats within each action's pre/post admission.
+
+Manager grants only `tools/supply_chain.py`, its existing test module,
+`tools/ci_assurance.py`, its existing test module and one isolated fragment.
+Reuse archive semantic conclusions only within the same command's POST, after
+the existing full PRE archive/tree admission has succeeded. A private in-memory
+proof must bind the selected profile, canonical paths, exact lock and parsed
+rows; it cannot come from CLI, a file, an arbitrary row dictionary or another
+command. POST still fully reads and hashes current archives, checks required
+SRI, and revalidates every role, file state, capability, mode, ownership, path,
+tree membership/file bytes and manifest. Changed or unavailable inputs fail.
+Hold both POST archive checked-input descriptors and state fences through all
+POST role/tree/manifest checks; final descriptor/path state must still match.
+No child inherits these proof descriptors or receives admission authority.
+Only redundant POST archive decompression may be omitted. No persistent/global
+cache, metadata-only admission, input/lock/schema change, SHA policy relaxation,
+Rust oracle edit or longer ten/120-second allowance.
+
+Retain the actual cost/allowance failure and independently freeze proof lifecycle,
+rebind/mutation and byte/postcheck refusal controls before production. Do not
+invent an initial failure from a missing helper. Validate the affected supply
+chain and mocked command controls, then one full actual PRE/POST byte-validation
+diagnostic on the changed candidate without a client/server workload. Report
+measured scope honestly; runtime client acceptance still requires its own changed
+input continuation. Manager owns integration, documentation, shared gates and
+sealing after the action-layout dependency. No Cargo, version or source refresh.
+
+### CV-209.cics-bms-input-storage declaration
+
+The latest changed-runtime navigation run executes six passes and ten failures
+with all seventeen actual shutdowns. LOW-VALUES and keyed READ prerequisites
+are cleared. The next boundaries are a source-derived TAMT001..010 fixture-name
+correction and RECEIVE MAP transport frames entering symbolic storage. The
+missing-key thirteen-target MOVE succeeds; the fresh empty branch skips it.
+This is not evidence for a MOVE repair, PF7 result or navigation observation.
+
+Manager grants only interpreter `machine.rs`, `machine/typed_cics.rs` for minimal
+private helper registration, existing `machine/typed_cics/response.rs`, conformance
+`cobol_runtime.rs` and one isolated fragment. At the operation-specific response
+boundary, a supported symbolic RECEIVE MAP INTO group receives checked decoded
+named fields/lengths within that group; its transport frame is not a storage
+image. Omitted fields preserve raw bits. Present empty data follows the existing
+byte-write owner. Duplicate simple names cannot redirect writes to another
+group. Preserve non-symbolic/legacy and non-BMS raw INTO behavior; do not globally
+suppress payloads or route unrelated operations through a broad prefix test.
+No host ABI, packet encoder, copybook, provider, public source or alias change.
+
+Freeze eight independent native controls before production: framed sentinel
+neighbors/present I+L; explicit empty versus omitted data; omitted zero/sentinel
+preservation; duplicate-name INTO qualification; non-symbolic RECEIVE raw buffer;
+non-BMS raw INTO; unchanged thirteen-qualified-target MOVE baseline; malformed
+projected length/oversize refusal preserving mapped storage. Compile and execute
+through the real machine, with independent literal fields and controlled typed
+host replies, retaining genuine initial failures and shared baselines. Only
+then repair and repeat those controls. This is internal first-party/native
+ownership proof, not actual IBM/BMS wire or application execution credit.
+Facade must decrease and private owners remain bounded; strict lint, ratchet,
+integration and seal stay manager-owned. Cargo awaits the external exclusive
+slot grant after the finite public-client workload and target cleanup.
+
+Pinned COTRN01 source initializes LOW-VALUES; all thirteen result fields are
+protected without FSET, and fresh empty validation skips their clear/READ. Under
+the frozen absent-field preservation contract, their literal zero bytes remain.
+Manager accepts only this future fresh-empty oracle correction at exact pinned
+widths; missing-key/PF4-cleared spaces and all successful record expectations
+remain unchanged. No global change to every blank-detail expectation. The TAMT
+exception likewise changes only three-digit amount names. Neither correction
+or navigation rerun is granted before this generic native repair is accepted.
+All prior producers/errors remain; missing bodies retain user-skipped zero
+credit with no lookup/refresh retry, and private/unready CICS work is excluded.

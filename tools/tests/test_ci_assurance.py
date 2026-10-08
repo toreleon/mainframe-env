@@ -1244,12 +1244,14 @@ class PublicClientCommandTests(unittest.TestCase):
         for source, target in [('identity/passwd', '/etc/passwd'), ('identity/group', '/etc/group'),
                                ('identity/nsswitch.conf', '/etc/nsswitch.conf'), ('input', '/input')]:
             expected += ['--ro-bind', str(self.run / source), target]
-        expected += ['--ro-bind', str(self.tree / 'package'), '/opt/client']
+        expected += ['--dir', '/opt/client/node_modules/@zowe', '--ro-bind',
+                     str(self.tree / 'package'), '/opt/client/node_modules/@zowe/cli']
         for source, target in [('client-home', '/client-home'), ('plugins', '/plugins'), ('cwd', '/work')]:
             expected += ['--bind', str(self.run / source), target]
         expected += ['--chdir', '/work', '--setenv', 'PATH', '/opt/node/bin', '--setenv', 'TMPDIR', '/tmp',
                      '--setenv', 'ZOWE_CLI_HOME', '/client-home', '--setenv', 'ZOWE_CLI_PLUGINS_DIR', '/plugins',
-                     '/opt/node/bin/node', '--no-addons', '--no-global-search-paths', '/opt/client/lib/main.js',
+                     '/opt/node/bin/node', '--no-addons', '--no-global-search-paths',
+                     '/opt/client/node_modules/@zowe/cli/lib/main.js',
                      'zos-jobs', 'submit', 'local-file', '/input/public-client.jcl', '--host', '127.0.0.1',
                      '--port', '1234', '--protocol', 'http', '--user', 'IBMUSER', '--password', 'TESTPASS',
                      '--completion-timeout', '5', '--establish-connection-timeout', '5', '--response-format-json']
@@ -1331,7 +1333,7 @@ class PublicClientCommandTests(unittest.TestCase):
                 self.assertEqual((self.run / 'stdout.bin').read_bytes(), b'partial')
                 self.assertTrue((self.run / 'supervision-error.txt').read_bytes())
 
-    def test_only_two_bounded_regular_logs_are_allowed(self):
+    def test_two_normal_bounded_regular_logs_are_allowed(self):
         def launch(*args, **kwargs):
             for name in ('imperative.log', 'zowe.log'):
                 (self.run / 'client-home/logs' / name).write_bytes(b'x'*1048576)
@@ -1471,6 +1473,112 @@ class PublicClientCommandTests(unittest.TestCase):
             return 0, None
         self.inert(launch); self.assertEqual(self.command(), 1)
         self.assertEqual((self.run / 'child-exit.txt').read_bytes(), b'1\n')
+
+
+class PublicClientActionLayoutTests(unittest.TestCase):
+    # Reuse only inert fixture setup/transport; expectations below are handwritten.
+    setUp = PublicClientCommandTests.setUp
+    arguments = PublicClientCommandTests.arguments
+    command = PublicClientCommandTests.command
+    inert = PublicClientCommandTests.inert
+
+    def launch_mutation(self, mutate, expected):
+        def launch(command, root, output, **kwargs):
+            output('stdout', b'partial\x00'); output('stderr', b'MODULE_NOT_FOUND\xff')
+            mutate(); kwargs['on_reaped'](1); return 1, None
+        self.inert(launch)
+        self.assertEqual(self.command(), expected)
+        self.assertEqual((self.run / 'child-exit.txt').read_bytes(), b'1\n')
+        self.assertEqual((self.run / 'stdout.bin').read_bytes(), b'partial\x00')
+        self.assertEqual((self.run / 'stderr.bin').read_bytes(), b'MODULE_NOT_FOUND\xff')
+        self.assertEqual(bool((self.run / 'supervision-error.txt').read_bytes()), bool(expected))
+
+    def write_log(self, name, count, mode=0o600):
+        path = self.run / 'client-home/logs' / name
+        path.write_bytes(b'x' * count); path.chmod(mode)
+
+    def test_exact_single_local_install_full_vector(self):
+        _, spawn = self.inert(); self.assertEqual(self.command(), 0)
+        expected = [str(self.files['bubblewrap']), '--unshare-user', '--uid', '1000', '--gid', '1000',
+                    '--unshare-pid', '--die-with-parent', '--new-session', '--cap-drop', 'ALL', '--clearenv',
+                    '--proc', '/proc', '--dev', '/dev', '--tmpfs', '/tmp', '--dir', '/etc', '--dir', '/opt/node/bin',
+                    '--dir', '/lib64', '--dir', '/lib/x86_64-linux-gnu']
+        for role, target in [('node', '/opt/node/bin/node'), ('loader', '/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2'),
+                             ('loader', '/lib64/ld-linux-x86-64.so.2'), ('libdl', '/lib/x86_64-linux-gnu/libdl.so.2'),
+                             ('libstdcxx', '/lib/x86_64-linux-gnu/libstdc++.so.6'), ('libm', '/lib/x86_64-linux-gnu/libm.so.6'),
+                             ('libgcc', '/lib/x86_64-linux-gnu/libgcc_s.so.1'), ('libpthread', '/lib/x86_64-linux-gnu/libpthread.so.0'),
+                             ('libc', '/lib/x86_64-linux-gnu/libc.so.6'), ('libnss_files', '/lib/x86_64-linux-gnu/libnss_files.so.2')]:
+            expected += ['--ro-bind', str(self.files[role]), target]
+        for source, target in [('identity/passwd', '/etc/passwd'), ('identity/group', '/etc/group'),
+                               ('identity/nsswitch.conf', '/etc/nsswitch.conf'), ('input', '/input')]:
+            expected += ['--ro-bind', str(self.run / source), target]
+        expected += ['--dir', '/opt/client/node_modules/@zowe', '--ro-bind',
+                     str(self.tree / 'package'), '/opt/client/node_modules/@zowe/cli']
+        for source, target in [('client-home', '/client-home'), ('plugins', '/plugins'), ('cwd', '/work')]:
+            expected += ['--bind', str(self.run / source), target]
+        expected += ['--chdir', '/work', '--setenv', 'PATH', '/opt/node/bin', '--setenv', 'TMPDIR', '/tmp',
+                     '--setenv', 'ZOWE_CLI_HOME', '/client-home', '--setenv', 'ZOWE_CLI_PLUGINS_DIR', '/plugins',
+                     '/opt/node/bin/node', '--no-addons', '--no-global-search-paths',
+                     '/opt/client/node_modules/@zowe/cli/lib/main.js',
+                     'zos-jobs', 'submit', 'local-file', '/input/public-client.jcl', '--host', '127.0.0.1',
+                     '--port', '1234', '--protocol', 'http', '--user', 'IBMUSER', '--password', 'TESTPASS',
+                     '--completion-timeout', '5', '--establish-connection-timeout', '5', '--response-format-json']
+        self.assertEqual(spawn.call_args.args[0], expected)
+        self.assertEqual(spawn.call_args.kwargs['env'], {})
+
+    def test_debug_log_zero_length_is_optional_valid_regular_file(self):
+        self.launch_mutation(lambda: self.write_log('imperative_debug.log', 0), 0)
+
+    def test_debug_log_exact_per_file_boundary_retains_failed_startup(self):
+        self.launch_mutation(lambda: self.write_log('imperative_debug.log', 1048576), 0)
+
+    def test_three_logs_exact_aggregate_boundary(self):
+        def mutate():
+            for name, count in [('imperative.log', 700000), ('zowe.log', 700000), ('imperative_debug.log', 697152)]:
+                self.write_log(name, count)
+        self.launch_mutation(mutate, 0)
+
+    def test_three_logs_aggregate_plus_one_refuses(self):
+        def mutate():
+            for name, count in [('imperative.log', 700000), ('zowe.log', 700000), ('imperative_debug.log', 697153)]:
+                self.write_log(name, count)
+        self.launch_mutation(mutate, 1)
+        self.assertIn(b'log total differs', (self.run / 'supervision-error.txt').read_bytes())
+
+    def test_debug_log_per_file_plus_one_refuses(self):
+        self.launch_mutation(lambda: self.write_log('imperative_debug.log', 1048577), 1)
+        self.assertIn(b'inspection cap', (self.run / 'supervision-error.txt').read_bytes())
+
+    def test_debug_log_names_outside_exact_membership_refuse(self):
+        for index, name in enumerate(['client-home/logs/imperative_debug.log.1', 'client-home/logs/debug.log',
+                                      'client-home/imperative_debug.log', 'cwd/imperative_debug.log']):
+            self.run = self.parent / f'name-{index}'
+            def mutate(name=name):
+                path = self.run / name; path.write_bytes(b'x'); path.chmod(0o600)
+            with self.subTest(name=name): self.launch_mutation(mutate, 1)
+
+    def test_debug_log_symlink_hardlink_fifo_and_directory_refuse(self):
+        for kind in ('symlink', 'hardlink', 'fifo', 'directory'):
+            self.run = self.parent / kind
+            def mutate(kind=kind):
+                path = self.run / 'client-home/logs/imperative_debug.log'
+                if kind == 'symlink': path.symlink_to(self.files['node'])
+                elif kind == 'hardlink': os.link(self.files['node'], path)
+                elif kind == 'fifo': os.mkfifo(path, 0o600)
+                else: path.mkdir(mode=0o700)
+            with self.subTest(kind=kind): self.launch_mutation(mutate, 1)
+
+    def test_debug_log_writable_and_special_modes_refuse(self):
+        for index, mode in enumerate((0o620, 0o602, 0o1600, 0o2600, 0o4600)):
+            self.run = self.parent / f'mode-{index}-{mode:o}'
+            with self.subTest(mode=mode):
+                self.launch_mutation(lambda mode=mode: self.write_log('imperative_debug.log', 1, mode), 1)
+
+    def test_debug_log_accepts_private_vendor_read_modes(self):
+        for mode in (0o600, 0o640, 0o644):
+            self.run = self.parent / f'read-mode-{mode:o}'
+            with self.subTest(mode=mode):
+                self.launch_mutation(lambda mode=mode: self.write_log('imperative_debug.log', 1, mode), 0)
 
 
 class PublicClientAdmissionTests(unittest.TestCase):
