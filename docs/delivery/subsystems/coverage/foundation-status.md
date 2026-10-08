@@ -412,6 +412,23 @@ denominator or publication body is rewritten or fetched. Source-body verificatio
 remains separate. Prepare independent mutation tests first; Cargo grant is
 manager-controlled and completion requires affected offline metadata checks.
 
+### Execution lint prerequisite
+
+Declare `CV-209.execution-contract-lint` under CV-209. The scanner's strict
+dependency-inclusive build exposed 20 existing interpreter and four existing
+compiler diagnostics. Exact owners are the reported compiler CICS resolution
+helpers and interpreter coordinator, machine/EIB/decimal commit, typed CICS/MQ
+and storage64 modules, with affected private tests and one isolated fragment.
+Mechanical repairs preserve evaluation/error order, effect identities and
+continuation/checkpoint bytes; no lint suppression or new private behavior is
+allowed. The unused private arithmetic wrapper may be removed after confirming
+no callers. Boxing the private `PendingKind::MqMqi` target DTO may reduce its
+inline size; it must preserve canonical recovery bytes and does not promise less
+total heap use. Focused continuation/recovery/arithmetic controls and strict
+affected-package Clippy precede its separate seal. Tooling slices do not claim
+dependency lint closure until this prerequisite and any further reported owners
+pass. Licensed/private-only implementation and unready CICS rows remain excluded.
+
 ### CV-204.package-bounds acceptance
 
 Status: **Complete (bounded package admission and codec only)**. The independently reproduced allocation/codec refusals are repaired. All 33 focused package tests and dependency-inclusive strict Clippy pass in the producing checkout; integrated application-package/spec/coverage, module, formatting and frozen dependency gates pass. Streaming preflight checks counts, text and checked footprint before typed decoding; capped export borrows retained packages and stops before full encoding. Duplicate JSON members refuse. Serde scratch and bounded metadata sets still allocate; this is not a process-wide heap quota. Identity framing and publication fencing remain pending.
