@@ -161,7 +161,7 @@ this closes no Foundation exit or licensed gate.
 
 ### CV-209.store-contract-lint
 
-Parent: CV-209. Status: **In progress**. This mechanical prerequisite owns only
+Parent: CV-209. Status: **Complete (bounded mechanical slice only)**. This mechanical prerequisite owns only
 four nested-condition diagnostics in the existing Memory/SQLite root-terminal
 guards and provider-mutation dependency check, plus nine private test snapshot
 tuple aliases revealed after those dependency errors were removed. Evaluation order, awaits, errors,
@@ -235,6 +235,13 @@ source freshness gate and full Foundation exit remain pending.
 ### CV-209.host-contract-lint acceptance
 
 Status: **Complete (bounded slice only)**. Mechanical implementation is in the preceding focused repair commit. With the separately accepted host-layout prerequisite, integrated strict host Clippy and all 355 host tests pass. This closes only the host-package lint slice.
+Formatting, frozen dependency policy, module, documentation/changelog/subsystem
+and diff checks pass for the reviewed integrated scope. The unavailable CICS
+source freshness gate and full Foundation exit remain pending.
+
+### CV-209.store-contract-lint acceptance
+
+Status: **Complete (bounded slice only)**. Integrated strict store/dependency Clippy, 124 root-terminal tests and 97 store unit tests pass. Three PostgreSQL unit tests were ignored and are not credited; the mechanical aliases and conditions do not alter durable contracts.
 Formatting, frozen dependency policy, module, documentation/changelog/subsystem
 and diff checks pass for the reviewed integrated scope. The unavailable CICS
 source freshness gate and full Foundation exit remain pending.

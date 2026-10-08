@@ -96,10 +96,7 @@ fn backends(label: &str) -> (OwnedFile, Vec<Arc<dyn PlatformStore>>) {
         ],
     )
 }
-pub(crate) fn snapshot(
-    store: &dyn PlatformStore,
-    r: &CheckedReplayRefusalStep,
-) -> (
+type ReplaySnapshot = (
     ExecutionRecord,
     Option<EffectRecord>,
     Vec<LifecycleEvent>,
@@ -107,7 +104,9 @@ pub(crate) fn snapshot(
     Vec<OutboxRecord>,
     Vec<ProviderStateRecord>,
     u64,
-) {
+);
+
+pub(crate) fn snapshot(store: &dyn PlatformStore, r: &CheckedReplayRefusalStep) -> ReplaySnapshot {
     (
         store
             .get_execution(&r.execution.execution_id)

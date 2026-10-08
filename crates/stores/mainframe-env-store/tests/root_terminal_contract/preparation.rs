@@ -23,10 +23,7 @@ fn request(store: &dyn PlatformStore) -> RootPreparationPublication {
         mutations: vec![attributed::put("native-root-owned-test", "first", 1, None)],
     }
 }
-fn snapshot(
-    store: &dyn PlatformStore,
-    request: &RootPreparationPublication,
-) -> (
+type PreparationSnapshot = (
     Option<ExecutionRecord>,
     Vec<LifecycleEvent>,
     Vec<OutboxRecord>,
@@ -34,7 +31,12 @@ fn snapshot(
     Vec<ProviderStateRecord>,
     u64,
     u64,
-) {
+);
+
+fn snapshot(
+    store: &dyn PlatformStore,
+    request: &RootPreparationPublication,
+) -> PreparationSnapshot {
     let mut rows = Vec::new();
     for prefix in ["durable-", "native-", "exact-", "legacy-", "audit"] {
         rows.extend(store.list_provider_state_prefix(prefix, 256).unwrap());

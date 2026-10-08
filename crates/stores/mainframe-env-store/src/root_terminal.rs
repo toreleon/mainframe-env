@@ -837,10 +837,10 @@ pub(crate) fn validate_publication(
         if !covers(namespace, key) {
             return Err(StoreError::Conflict);
         }
-        if let ProviderStateMutation::Move { old_key, .. } = mutation {
-            if !covers(namespace, old_key) {
-                return Err(StoreError::Conflict);
-            }
+        if let ProviderStateMutation::Move { old_key, .. } = mutation
+            && !covers(namespace, old_key)
+        {
+            return Err(StoreError::Conflict);
         }
         bytes = bytes
             .checked_add(payload)

@@ -210,17 +210,15 @@ pub(in crate::memory) fn guard_provider(
             if let Some(run) = value
                 .get("owner_run_unit")
                 .and_then(serde_json::Value::as_str)
-            {
-                if let Some(binding) = state
+                && let Some(binding) = state
                     .provider_state
                     .get(&(RUN_NAMESPACE.into(), run.into()))
-                {
-                    let root = std::str::from_utf8(&binding.payload)
-                        .map_err(|_| StoreError::IncompatibleVersion)?;
-                    let doc = Document::read(row(state, ROOT_DRIVER_NAMESPACE, root)?)?;
-                    if doc.phase != Phase::Open {
-                        return Err(StoreError::InvalidTransition);
-                    }
+            {
+                let root = std::str::from_utf8(&binding.payload)
+                    .map_err(|_| StoreError::IncompatibleVersion)?;
+                let doc = Document::read(row(state, ROOT_DRIVER_NAMESPACE, root)?)?;
+                if doc.phase != Phase::Open {
+                    return Err(StoreError::InvalidTransition);
                 }
             }
         }

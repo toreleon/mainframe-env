@@ -84,7 +84,9 @@ fn sqlite_preparation_exact_initial_indexes_and_foreign_overlaps_refuse() {
         }
     }
 }
-fn raw_snapshot(fixture: &OwnedSqlite) -> (Vec<(String, String, i64, Vec<u8>)>, (i64, i64)) {
+type RawSnapshot = (Vec<(String, String, i64, Vec<u8>)>, (i64, i64));
+
+fn raw_snapshot(fixture: &OwnedSqlite) -> RawSnapshot {
     tokio::runtime::Runtime::new().unwrap().block_on(async {
         let mut connection = sqlx::SqliteConnection::connect(&format!(
             "sqlite://{}?mode=rw",

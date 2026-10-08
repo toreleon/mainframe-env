@@ -34,7 +34,9 @@ impl Drop for Fixture {
     }
 }
 
-fn raw_state(store: &SqliteStateStore) -> (Vec<(String, String, i64, Vec<u8>)>, (i64, i64)) {
+type RawSnapshot = (Vec<(String, String, i64, Vec<u8>)>, (i64, i64));
+
+fn raw_state(store: &SqliteStateStore) -> RawSnapshot {
     let rows = store
         .run(
             sqlx::query_as(
