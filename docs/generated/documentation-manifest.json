@@ -3,7 +3,7 @@
     "markdown_documents": 242,
     "navigation_groups": 8,
     "normative_documents": 103,
-    "xtask_commands": 163
+    "xtask_commands": 164
   },
   "documents": [
     {
@@ -162,7 +162,7 @@
       "normative": false,
       "path": "crates/contracts/mainframe-env-coverage/README.md",
       "relative_links": 4,
-      "sha256": "sha256:b007a69b0d2d31294ad319d4abe1bd0b6892a64e1cf84274057d590631400467",
+      "sha256": "sha256:e30319a03ddf6a4dc4996de94f9c9601622f23237d002f6dc72fc74e2351f59c",
       "title": "mainframe-env-coverage",
       "xtask_commands": 2
     },
@@ -342,7 +342,7 @@
       "normative": false,
       "path": "docs/README.md",
       "relative_links": 184,
-      "sha256": "sha256:c4f291e4dd879fa32df252b04b09551acca0dd4e1e1af419644c4243dc1dff0d",
+      "sha256": "sha256:4854e1c3f06bdea3c84ea181af7114b4980a88624d952592fb80e3828e3d3620",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -1501,8 +1501,8 @@
       "path": "docs/decisions/0055-standard-package-mac-envelope.md",
       "relative_links": 0,
       "scope": "current package MAC envelope and finite retained verification",
-      "sha256": "sha256:b5ecfed7933a04d9bf84577280257b4a3472d908a6ace260708d25dab830b781",
-      "status": "Accepted design; dependency and implementation acceptance pending",
+      "sha256": "sha256:1956f6c95ad8844460cea1ebf551e7bf0bb2ac2feed4d5ad65ae607d440203eb",
+      "status": "Accepted design; bounded production MAC implementation accepted; full Foundation acceptance pending",
       "title": "ADR-0055: Use a bounded COSE_Mac0 profile for current package authentication",
       "xtask_commands": 0
     },
@@ -1510,7 +1510,7 @@
       "normative": false,
       "path": "docs/decisions/README.md",
       "relative_links": 58,
-      "sha256": "sha256:2a766b39c833feb9267adb1b48c6f4bb3c0345450594876f7ab674e393fcaf38",
+      "sha256": "sha256:e98755decdab37ec2476cab1b5be08b75fba4368d470bef44a64c2839005c8ce",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1750,17 +1750,17 @@
       "normative": false,
       "path": "docs/delivery/subsystems/coverage/foundation-plan.md",
       "relative_links": 0,
-      "sha256": "sha256:cf9dca2ba8f63e9d973506ffc9eb43e310c3a95ef7f8723eb67fe50b55630795",
+      "sha256": "sha256:aa211ddc4f810677e788716ae03309e7174a8318241aaf7283fc2910934a4739",
       "title": "Coverage and conformance — Coverage authority",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/coverage/foundation-status.md",
-      "relative_links": 5,
-      "sha256": "sha256:3f09244fe6d2644c1ecdb2e29d65da429720d96849d0b60279b983c66f27fdaf",
+      "relative_links": 0,
+      "sha256": "sha256:e08f85e1e6cc4264f5c2d31ca56b8a1bb931319f0e66b1b58062c72287ada0f2",
       "title": "Coverage and conformance — Coverage authority progress",
-      "xtask_commands": 6
+      "xtask_commands": 7
     },
     {
       "normative": false,
@@ -1986,7 +1986,7 @@
       "normative": false,
       "path": "docs/guides/CAPABILITIES.md",
       "relative_links": 32,
-      "sha256": "sha256:5b9b3986d493c7d5fda28775a057e6284309a38618584cca848fc242d8da0fd7",
+      "sha256": "sha256:691929c5243a6836030fbf4ccbf1d2e484b7d30cc0731b8e2c33b9d83ebe26d6",
       "title": "Capabilities and limitations",
       "xtask_commands": 0
     },
@@ -2102,7 +2102,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/coverage/IMPLEMENT_FOUNDATION.md",
       "relative_links": 1,
-      "sha256": "sha256:f45192d9d732d4d0ce706632027875c8f4de635ed4505f3dbe3de789b3b28566",
+      "sha256": "sha256:48ac2348b319dc865786532bccfd059a8c29dfa0dda791293af996d392834e3d",
       "title": "Execution Prompt — Coverage and conformance — Coverage authority",
       "xtask_commands": 0
     },
@@ -2262,7 +2262,7 @@
       "normative": false,
       "path": "docs/runbooks/CARDDEMO-OPERATOR.md",
       "relative_links": 2,
-      "sha256": "sha256:23f04110bd69bd50279efbedc4cf3c0da0c76cb3f0a1929670e832ffeb4544a6",
+      "sha256": "sha256:3cbd5593d24dd74a7d1f0936f80dc8182d46e91314c2af10ce4031561490fa2c",
       "title": "CardDemo operator compatibility",
       "xtask_commands": 4
     },

@@ -1,6 +1,6 @@
 # ADR-0055: Use a bounded COSE_Mac0 profile for current package authentication
 
-Status: Accepted design; dependency and implementation acceptance pending
+Status: Accepted design; bounded production MAC implementation accepted; full Foundation acceptance pending
 Owner: application trust and embedding maintainers
 Scope: current package MAC envelope and finite retained verification
 Applies from: mainframe-env current public package hardening
@@ -8,8 +8,8 @@ Applies from: mainframe-env current public package hardening
 ## Decision
 
 Preserve the existing symmetric HMAC-SHA256 trust model and ring provider.
-Adopt coset 0.4.2, defaults disabled, subject to actual lock/feature/source,
-license/advisory and MSRV acceptance. The inspected archive checksum is
+Use the accepted coset 0.4.2 dependency with defaults disabled under the
+reviewed lock/feature/source, license/advisory and documented MSRV limits. The inspected archive checksum is
 `1eb98d5e9155e2cf7cd942c8b3033097d4563b6fb0a00b9caecb74669555c058`.
 Foreign COSE/CBOR types remain private and never enter owned durable DTOs.
 This provides MAC authentication, not public-key signing or nonrepudiation.

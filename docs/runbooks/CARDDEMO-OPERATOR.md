@@ -156,7 +156,9 @@ export MAINFRAME_ENV_POSTGRES_TEST_URL=postgresql://postgres@127.0.0.1:55432/mai
 target/release/xtask carddemo-full --check
 ```
 
-Use the connection URL for your local test database. The full gate runs 20
-application journeys, memory isolation/overload, SQLite backup and restore, and
-PostgreSQL restart controls. Keep run output outside Git. These local workload
+Use the connection URL for your local test database. The full gate requires
+actual closure of all 20 journeys, 26 transaction requirements and 105 issue
+acceptance requirements before its memory isolation/overload, SQLite backup
+and restore, and PostgreSQL restart controls can establish full acceptance.
+The current candidate still refuses incomplete application observations. Keep run output outside Git. These local workload
 checks do not establish licensed IBM equivalence.

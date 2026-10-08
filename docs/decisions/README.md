@@ -64,7 +64,7 @@ CardDemo participant ownership and batch completion boundary.
 | [0052](0052-cics-operation-contexts.md) | borrowed CICS operation inputs and existing explicit receipt retention export | Accepted; scoped compatibility passed |
 | [0053](0053-selected-controller-publication-fence.md) | local shared admission fence and publication prevalidation | Accepted design; implementation pending |
 | [0054](0054-focused-conformance-output.md) | canonical focused JSONL output and bounded sink publication | Accepted; scoped compatibility passed |
-| [0055](0055-standard-package-mac-envelope.md) | bounded COSE_Mac0 profile and exact retained verification | Accepted design; acceptance pending |
+| [0055](0055-standard-package-mac-envelope.md) | bounded COSE_Mac0 profile and exact retained verification | Bounded production MAC implementation accepted; full Foundation pending |
 
 Parallel subsystem work allocated the same 0028 and 0029 numeric prefixes.
 Their distinct full filenames and subsystem-qualified labels identify each

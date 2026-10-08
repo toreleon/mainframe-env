@@ -256,16 +256,15 @@ Implementation progress is organized by subsystem and phase. Contract revisions 
 [`documentation-registry.json`](documentation-registry.json) identifies every
 normative document, supplies the generated navigation above, and declares the
 checked manifest location. It also owns subsystem phases, progress records,
-prompts, target releases, and completion dependencies. Subsystem navigation and
+prompts and completion dependencies. Subsystem navigation and
 indexes are generated from that mapping. Each normative document must state its status,
-owner, scope, and first applicable mainframe-env version near its title.
+owner, scope, and applicable subsystem/contract boundary near its title.
 
 Run `cargo xtask docs` after an intentional documentation change, then run
 `cargo xtask docs --check`. The check verifies the generated
 [`documentation-manifest.json`](generated/documentation-manifest.json), relative
 links and anchors, documented xtask subcommands and options, normative metadata,
-navigation, subsystem ownership and dependency consistency, and the
-released/development version authorities.
+navigation, subsystem ownership and dependency consistency.
 
 ## Document status vocabulary
 
@@ -279,5 +278,6 @@ released/development version authorities.
 | Superseded | Replaced by a named newer authority |
 
 Every new normative document should state its status, owner or approving
-authority, scope, and the version from which it applies. Historical records
-should name their candidate and must not be rewritten as current truth.
+authority, scope, and the subsystem/contract boundary from which it applies.
+Retained compatibility and normative decision records must not be rewritten
+as current execution evidence.
