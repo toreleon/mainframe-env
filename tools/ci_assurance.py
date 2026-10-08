@@ -127,9 +127,31 @@ def write_json(path: Path, value: dict) -> None:
     temp.replace(path)
 
 
-def record(root: Path, output: Path, gate: str, command: list[str], expect_tests: bool = False) -> int:
+def passed_test_summary(line: bytes) -> int | None:
+    """Count complete successful summaries; ignored/skipped tests earn no floor credit."""
+    if b'test result:' not in line:
+        return None
+    rust = re.fullmatch(
+        rb'test result: (ok|FAILED)\. ([0-9]+) passed; ([0-9]+) failed; '
+        rb'[0-9]+ ignored; [0-9]+ measured; [0-9]+ filtered out; '
+        rb'finished in [0-9]+(?:\.[0-9]+)?s', line.strip())
+    if rust and rust[1] == b'ok' and int(rust[3]) == 0:
+        return int(rust[2])
+    tooling = re.fullmatch(
+        rb'tooling test result: ok\. ([0-9]+) executed; ([0-9]+) skipped;'
+        rb'(?: [0-9]+ python files; [0-9]+ shell test files; '
+        rb'[0-9]+ shell syntax checks)?', line.strip())
+    if tooling and int(tooling[2]) <= int(tooling[1]):
+        return int(tooling[1]) - int(tooling[2])
+    raise ValueError('minimum test floor requires complete successful test summaries')
+
+
+def record(root: Path, output: Path, gate: str, command: list[str], expect_tests: bool = False,
+           min_tests: int | None = None) -> int:
     if not re.fullmatch(r'[a-z][a-z0-9-]*', gate) or not command:
         raise ValueError('a gate name and command are required')
+    if min_tests is not None and (type(min_tests) is not int or min_tests < 1):
+        raise ValueError('minimum passed-test count must be a positive integer')
     output.mkdir(parents=True, exist_ok=True)
     before = identity(root)
     started = time.monotonic()
@@ -145,23 +167,34 @@ def record(root: Path, output: Path, gate: str, command: list[str], expect_tests
                 file.write(line)
                 sys.stdout.buffer.write(line); sys.stdout.buffer.flush()
                 clean = re.sub(rb'\x1b\[[0-9;]*m', b'', line)
-                match = re.search(rb'test result: ok\. (\d+) passed;', clean)
-                if match: tests += int(match.group(1))
-                match = re.search(rb'tooling test result: ok\. (\d+) executed;', clean)
-                if match: tests = int(match.group(1))
+                if min_tests is not None:
+                    try:
+                        count = passed_test_summary(clean)
+                        if count is not None:
+                            tests += count
+                    except ValueError as problem:
+                        error = str(problem)
+                else:
+                    match = re.search(rb'test result: ok\. (\d+) passed;', clean)
+                    if match: tests += int(match.group(1))
+                    match = re.search(rb'tooling test result: ok\. (\d+) executed;', clean)
+                    if match: tests = int(match.group(1))
             process.stdout.close()
             code = process.wait()
     except OSError as problem:
         error = str(problem)
         log.write_text(error + '\n')
     unchanged = identity(root) == before and not subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=no'], cwd=root).strip()
-    passed = code == 0 and unchanged and (not expect_tests or tests > 0)
+    floor_met = min_tests is None or (error is None and tests >= min_tests)
+    passed = code == 0 and unchanged and (not expect_tests or tests > 0) and floor_met
     receipt = {'schema_version': 'mainframe-env.ci-command@1', **before, 'gate': gate, 'command': command,
                'exit_code': code, 'status': 'passed' if passed else 'failed', 'error': error,
                'duration_seconds': round(time.monotonic() - started, 6), 'observed_passed_tests': tests,
                'requires_nonempty_tests': expect_tests, 'candidate_unchanged': unchanged,
                'log_sha256': hashlib.sha256(log.read_bytes()).hexdigest(), 'full_assurance_credit': False,
                'licensed_credit': 0}
+    if min_tests is not None:
+        receipt['minimum_passed_tests'] = min_tests
     jenkins = bool(os.environ.get('JENKINS_URL') or os.environ.get('JENKINS_HOME'))
     receipt['runner'] = {
         'ci': 'jenkins' if jenkins else 'local',
@@ -247,7 +280,9 @@ def main() -> int:
     p.add_argument('--event', choices=['auto', *sorted(EVENTS)], default='auto')
     p.add_argument('--ref'); p.add_argument('--base')
     p.add_argument('--merge-commit', action='store_true')
-    p = sub.add_parser('record'); p.add_argument('--output', type=Path, required=True); p.add_argument('--gate', required=True); p.add_argument('--expect-tests', action='store_true'); p.add_argument('command', nargs=argparse.REMAINDER)
+    p = sub.add_parser('record'); p.add_argument('--output', type=Path, required=True); p.add_argument('--gate', required=True); p.add_argument('--expect-tests', action='store_true')
+    p.add_argument('--min-tests', type=int, help='Minimum actual passed-test count; ignored/skipped tests do not count')
+    p.add_argument('command', nargs=argparse.REMAINDER)
     p = sub.add_parser('summary'); p.add_argument('--plan', type=Path, required=True); p.add_argument('--directory', type=Path, required=True); p.add_argument('--output', type=Path, required=True); p.add_argument('--gates', nargs='*')
     args = parser.parse_args(); root = args.root.resolve()
     if args.mode == 'plan':
@@ -259,7 +294,7 @@ def main() -> int:
         print(json.dumps(plan, sort_keys=True)); return 0
     if args.mode == 'record':
         command = args.command[1:] if args.command[:1] == ['--'] else args.command
-        return record(root, args.output, args.gate, command, args.expect_tests)
+        return record(root, args.output, args.gate, command, args.expect_tests, args.min_tests)
     plan = json.loads(args.plan.read_text())
     summary = summarize(plan, args.directory, args.gates if args.gates is not None else plan['primary_gates'])
     write_json(args.output, summary); print(json.dumps(summary, sort_keys=True))

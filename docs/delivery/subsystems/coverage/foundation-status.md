@@ -273,3 +273,10 @@ Status: **Complete (bounded slice only)**. All 16 source-package tests, includin
 Formatting, frozen dependency policy, module, documentation/changelog/subsystem
 and diff checks pass for the reviewed integrated scope. The unavailable CICS
 source freshness gate and full Foundation exit remain pending.
+
+### CV-209.test-floor acceptance
+
+Status: **Complete (bounded slice only)**. All 35 integrated recorder tests pass. The workspace selector now requires 260 actual passed tests from complete successful summaries; this is wiring acceptance, not an executed workspace-floor or licensed certification pass.
+Formatting, frozen dependency policy, module, documentation/changelog/subsystem
+and diff checks pass for the reviewed integrated scope. The unavailable CICS
+source freshness gate and full Foundation exit remain pending.
