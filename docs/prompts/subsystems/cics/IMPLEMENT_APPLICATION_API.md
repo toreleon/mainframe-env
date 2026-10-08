@@ -18,40 +18,45 @@ requirements alongside the version-specific boundaries below.
 You are implementing **mainframe-env cics.application-api: complete CICS application API** for
 all 263 pinned CICS TS 6.x application commands.
 
-## Current CIC-901 boundary
+## Current entry and frozen CIC-901 boundary
 
-CIC-901 is an incremental, non-release boundary already frozen from three
-independently verified IBM HTML source batches: `sources-a` rows `0001`–`0088`,
-`sources-b` rows `0089`–`0176`, and `sources-c` rows `0177`–`0263`. Treat the
-committed maps, corpora, topic manifests, extraction plans, generated
-candidates, automatic review receipts, 263-row command contract, and compact IR
-registry as the current authority. Fetch missing or changed IBM material as
-fresh HTML through the repository browser-fetch bridge and the user's Chrome
-session, update the content-addressed cache, then reproject and independently
-verify it. Do not use PDF or introduce a human-only approval gate.
+Read the current `docs/delivery/subsystems/cics/application-api-status.md` and
+inspect the generated command contract and typed registrations before selecting
+work. The integrated registry has 260 `typed-runtime`, zero
+`legacy-compatibility` and three `unready` application rows: CICSMESSAGE,
+GETNEXT TIMER and ISSUE COPY. These are routing identities, not 260 complete
+commands. Do not reopen implemented families from historical checkpoint counts
+or admit an unready command without its reviewed slice and applicable gates.
 
-The frozen registry shape does not mean 263 executable commands. Its readiness
-split is exactly 3 `typed-runtime`, 20 `legacy-compatibility`, and 240 `unready`
-API rows. Only the 23 existing API routes are advertised. Automatic
-registration remains disabled, there is no default handler or generic-success
-fallback, and unready rows fail explicitly. SPI and FEPI identities cannot
-enter this application registry or be treated as application routes.
+The frozen CIC-901 source boundary covers three independently verified IBM HTML
+batches: `sources-a` rows `0001`–`0088`, `sources-b` rows `0089`–`0176` and
+`sources-c` rows `0177`–`0263`. Preserve the committed maps, corpora, topic
+manifests, extraction plans, generated candidates, independent reviews, 263-row
+command contract and compact IR registry. Its initial 3 typed / 20 legacy /
+240 unready split and 23 compatibility routes are historical freeze facts;
+later family registrations changed runtime readiness without changing the
+application denominator.
 
-Within that unchanged split, the existing time handler backs the official
-`ASKTIME ABSTIME` form, which returns the packed-decimal destination. Bare
-`ASKTIME` is unready until its distinct EIBDATE/EIBTIME updates are implemented.
-One generated compiler-only compatibility descriptor preserves exactly
-`INQUIRE PROGRAM` on the pre-existing raw `Inquire` route. It remains bound to
-SPI row `0155` outside the 263-row application registry and digest; it must not
-admit `SET FILE`, another `INQUIRE` form, unknown options, or an application
-candidate selected by an application discriminator.
+Use offline pinned `ibm_docs.py search` and `read` before changing semantics.
+Verify matching retained HTML before considering missing bytes unavailable.
+Follow `AGENTS.md` and `docs/runbooks/IBM-DOCS-CACHE.md`: ordinary work does not
+refresh sources. A missing body or TOC remains unavailable; do not re-pin it,
+replace it with current web text, or invoke the browser bridge without an
+explicit refresh request. A metadata or synthetic transport repository does not
+supply missing publication bodies. Reprojection consumes matching local bytes
+and must pass its independent verifier.
 
-CIC-901 carries zero execution, coverage, semantic, conformance, and licensed
-differential credit. It establishes the source-backed contract needed for
-CIC-902–CIC-905 vertical family slices; it does not make cics.application-api release-ready.
-Do not add release automation, nested environment orchestration, or a broad licensed campaign
-at this boundary. Licensed evidence remains mandatory at the full cics.application-api
-completion gate after the applicable executable families exist.
+The generated application contract has no automatic execution authority or
+conformance credit. Typed routes require explicit reviewed registrations;
+unready rows fail closed, with no default handler or generic-success fallback.
+SPI/FEPI identities and existing exact SPI compatibility forms remain outside
+the 263-row application registry and digest. Follow the existing routing
+contract rather than treating a compatibility descriptor as a new SPI route.
+
+CIC-901 source preparation does not complete cics.application-api. Continue the
+current status document's declared CIC-902–CIC-906 slices and retain pending
+licensed differentials; an implementation-only waiver grants no licensed credit
+or release authorization.
 
 ## Read and verify first
 
@@ -87,14 +92,16 @@ Also read and verify the current implementation baseline before editing:
 - `docs/runbooks/CAPACITY-AND-RECOVERY.md`; and
 - `docs/delivery/VERIFICATION-STRATEGY.md`.
 
-The deep review records the historical no-go and remains unchanged. Current
-entry authority is the status document: broad CIC-901 work requires **Ready
-for CIC-901**, backed by all 28 findings resolved and integrated, one fix commit
-per finding, focused regression references, and passing review Gates A–D on one
-unchanged candidate. Record that candidate's SHA/tree and dependency/CI
-references in the status document. Issue closure or separate green branches
-alone do not establish the entry gate. The existing cobol.execution/racf.security/dataset.data dependency
-receipts remain required; the hardening candidate is an additional prerequisite.
+The deep review records the historical no-go and remains unchanged. The
+integrated hardening and CIC-901 freeze are recorded in the current progress
+document; do not require its overall status to revert to the historical
+**Ready for CIC-901** entry label. Reconcile the 28 finding/regression mappings
+and review Gates A–D with the consumed candidate and existing CI references.
+Run missing or invalidated checks, preserving valid scoped results under the
+existing verification policy. Issue closure, a merged SHA or separate green
+branches alone does not establish acceptance. The cobol.execution,
+racf.security and dataset.data dependencies and the hardened execution/storage
+contracts still apply to each integrating slice.
 
 PR [#131](https://github.com/toreleon/mainframe-env/pull/131) merged as
 `8b7459ab9d9c23e3b872314323d3e30020e13f31`. First reconcile its existing fix and
@@ -252,8 +259,8 @@ existing CI selectors. Coverage percentages remain diagnostic, not IBM credit.
 ## Completion gate
 
 The CIC-901 non-release boundary does not weaken or satisfy this gate. Do not
-use its 263 closed contract rows, 23 advertised compatibility routes, or zero-
-credit source reviews as the completion numerator.
+use its 263 closed contract rows, historical compatibility-route count, current
+typed-readiness count or zero-credit source reviews as the completion numerator.
 
 Do not finish until 263/263 application commands pass all applicable coverage
 gates; option, EIB/response, condition, terminal, resource, conversation,

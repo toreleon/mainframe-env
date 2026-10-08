@@ -20,6 +20,33 @@ historical registry counts below refer to their producing inputs, rather than
 the current registry. Use the [routing authority](../../../architecture/CICS-COMMAND-ROUTING.md)
 and [system API progress](system-api-status.md) for current admission boundaries.
 
+## CIC-901.prompt-current-authority
+
+Parent: CIC-901. Status: **Complete (documentation only)**. This non-semantic
+slice owns the CICS application and system API implementation prompts and the
+routing document's
+current versus historical admission wording. It changes no catalog row,
+mandatory obligation, runtime route, source pin, public ABI or durable schema.
+The consumed base is `e3830278efc8de147f14b0e98da3d759250be782`; existing
+registries, routing contracts and progress records remain authoritative.
+Acceptance is a review of current versus historical instructions, local link
+validation, formatting, documentation/subsystem and changelog checks, dependency
+policy and `git diff --check`. Generated documentation uses its existing owner.
+The scoped review, all 33 local Markdown links and required documentation,
+subsystem, changelog, format, dependency-policy and diff checks pass. The existing
+documentation-manifest merge regressions pass. No runtime or source inputs
+changed; no behavioral, whole-phase or licensed completion is claimed.
+
+The requested CLI worker wave stopped before execution: the current account's
+access token could not be refreshed. Its isolated checkouts made no changes.
+The manager completed this documentation slice only. Offline search reports
+848 CICS topics and one TOC unavailable. The cache repository's pinned revision
+`d08efcb9849188abd2916aa9e7054eeefc159002` publishes metadata and synthetic
+transport, while the real archive is recorded as local-only. Public source
+refresh is not authorized. Next behavioral work requires matching external cache
+bytes and an authenticated CLI account; licensed campaigns remain excluded from
+this work.
+
 ## Authorized prerequisite completion, 2026-10-02
 
 The SPI/FEPI goal now includes finishing the CICS application API prerequisite

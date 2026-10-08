@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Align CICS implementation prompts and routing documentation with the current generated registry, retain historical freeze facts, and require matching local source bytes without an implicit refresh."

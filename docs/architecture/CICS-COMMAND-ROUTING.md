@@ -34,10 +34,11 @@ into three disjoint source authorities:
   and [review](../../conformance/subsystems/cics/application/cics/application-api-sources-c-review.json).
 
 Each batch binds a topic manifest and extraction plan to content-addressed HTML
-bodies in `$MAINFRAME_ENV_IBM_DOCS_CACHE`. Fresh bodies are obtained through the
-repository browser-fetch bridge and the user's Chrome session; PDF is not a
-source path. The projector emits structural facts and fragment hashes, while
-the independent verifier reparses the pinned HTML before comparing the
+bodies in `$MAINFRAME_ENV_IBM_DOCS_CACHE`. Ordinary review consumes existing
+matching local bytes. Missing bodies remain unavailable; a refresh requires an
+explicit request and follows the cache runbook's browser-fetch bridge contract.
+PDF is not a source path. The projector emits structural facts and fragment
+hashes, while the independent verifier reparses the pinned HTML before comparing the
 projection. Reviews auto-accept objective matches, fail on source or
 reprojection gaps, and retain row-and-dimension bounded ambiguities. There is no
 human-only approval gate. Source projection and review alone grant no coverage,
@@ -67,10 +68,11 @@ It contains all 263 API registry shapes with deterministic recognition,
 option-shape, family, EIBFN and handler identities. Readiness is deliberately
 split:
 
-- 184 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
+- 260 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
   `SYNCPOINT` routes and the reviewed incremental family slices;
 - 0 `legacy-compatibility` API routes; and
-- 79 `unready` rows that are recognized but fail explicitly as unsupported.
+- 3 `unready` rows: CICSMESSAGE, GETNEXT TIMER and ISSUE COPY, which fail
+  explicitly as unsupported.
 
 The now-empty raw compatibility set remains owned by the separate versioned
 [`legacy-execution-options.json`](../../conformance/subsystems/cics/application/cics/legacy-execution-options.json)
@@ -82,7 +84,19 @@ source receipts. The generator requires its route identities to match the
 legacy API runtime set exactly and verifies every admitted option against a
 current accepted source projection before emitting the registry.
 
-The current 191 API routes are the only advertised application commands.
+Current application admission comes from the explicit typed registrations and
+has the same 260/0/3 split. Readiness identifies a bounded route; it does not
+complete every command form, applicable gate or mandatory obligation. The
+[current progress record](../delivery/subsystems/cics/application-api-status.md)
+owns outstanding acceptance and distinguishes earlier checkpoint counts.
+
+### Recorded family boundaries
+
+The following family notes describe bounded implementation checkpoints. Their
+historical route counts and unready dispositions do not override the current
+generated registry or progress record; verify the selected slice's live owners
+and tests before changing behavior.
+
 The nine conversation-open and seven data/wait routes share the `cics-conversation-v1` ledger with
 the eight EXTRACT and POINT routes. Version 1 records remain readable; version
 2 adds bounded peer frames, staged CONVERSE sends, numbered data sends, and

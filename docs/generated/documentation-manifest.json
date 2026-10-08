@@ -375,9 +375,9 @@
       "normative": true,
       "owner": "CICS provider maintainers",
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
-      "relative_links": 24,
+      "relative_links": 25,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:0a82258f640d283389f817a42c5b295947c41a2b4b2faf31cbe36eb8b4a4fc6f",
+      "sha256": "sha256:b7d66ce43c278928cb3e63488945b8d7bcb9c9731e2b2d01b0634f832cdb4f0d",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -1590,7 +1590,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cics/application-api-status.md",
       "relative_links": 34,
-      "sha256": "sha256:51c9f1370b50dffd761275f39e6fbbb0f29cd5b4eb8689ab1d904926f72e544f",
+      "sha256": "sha256:79cc7fc4cb31223f9da4a7b1803e8e6ea3230c2463f2eb94d6c519ba522877a0",
       "title": "CICS — Application API progress",
       "xtask_commands": 5
     },
@@ -1998,7 +1998,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/cics/IMPLEMENT_APPLICATION_API.md",
       "relative_links": 6,
-      "sha256": "sha256:9d8b9db75eda917898e1eea57095b8b8fc8e7930a3f70470ae9ded804e7538c1",
+      "sha256": "sha256:8f89eb40d718abad38d46ecbffbdda81ee40c7fa9505b6b99d48d7c2df6c32d2",
       "title": "Execution Prompt — CICS — Application API",
       "xtask_commands": 0
     },
@@ -2006,7 +2006,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/cics/IMPLEMENT_SYSTEM_API.md",
       "relative_links": 4,
-      "sha256": "sha256:7ebb8112d85e835312d95e560de1450e581998a4a866c6dada7ac69a70fb53c0",
+      "sha256": "sha256:322e2d59ad17b70f66c97573d37fcc8f49c28c6842e51cbcd437d8bb4956f103",
       "title": "Execution Prompt — CICS — SPI and FEPI",
       "xtask_commands": 0
     },
