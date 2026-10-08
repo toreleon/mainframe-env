@@ -535,3 +535,32 @@ deadline is not a resolution tick or proof of safe reclamation. Preserve the
 existing conditional per-row deletions and partial-error limitation, documenting
 these obligations on the public function. This export supplies no complete
 retention-framework or licensed gate credit.
+
+### Tooling candidate integration
+
+The reviewed serialized coverage-schema, production-scanner and catalog-locator
+candidates pass 30, four and eight focused Rust tests respectively on their
+joint manager input. Native offline schemas, coverage, spec, module, formatting,
+frozen dependency and diff checks pass. Strict lint of the tooling owner alone
+passes with `--no-deps`; dependency-inclusive lint remains failed on the separately
+recorded MQ/CICS prerequisites. These three slices remain pending integration
+seals and do not claim full dependency lint or Foundation acceptance. Locator
+membership preserves all 1,506 rows and existing zero-credit dispositions.
+
+### MQ responsibility disposition
+
+The MQ review distinguishes redundant delegation and fixture convenience from
+retained production responsibilities. The mechanical slice may remove the
+`inspect` and `plan_delivery` delegates while retaining identical underlying
+operations; replace test-only `DeliveryRows::load` callers with the exact
+validation/scan/restore fixture sequence; and scope the four split service
+mint/bind conveniences to fixtures after caller proof. Production row/snapshot
+decoders, import initialization and planning, Binding-mode ownership, CICS/IMS
+lifecycle hooks, persisted fence and profile upgrade remain intact and pending
+their existing later-owned composition. No automatic migration, public minting
+or private feature activation is authorized. Existing occurrence capture may
+consume the exact validated result-preflight borrows instead of duplicate
+original/reply arguments, preserving identity, bytes and publication order.
+Request-byte and pending-reason provenance remain retained; no discarded reads
+or new refusal predicate is authorized as a lint repair. Strict MQ lint remains
+pending where genuine production roots have no authorized operational caller.
