@@ -216,8 +216,10 @@ fn checked_counts_limits_and_direct_assembly_refuse_short_mixed_or_other_profile
         v.selectors = selectors;
         assert!(MqMqiLocalTypeInquiry::from_inquiry(v, MqMqiLimits::default()).is_err());
     }
-    let mut limits = MqMqiLimits::default();
-    limits.selectors = 2;
+    let limits = MqMqiLimits {
+        selectors: 2,
+        ..MqMqiLimits::default()
+    };
     assert!(MqMqiLocalTypeInquiry::from_inquiry(base, limits).is_err());
 }
 

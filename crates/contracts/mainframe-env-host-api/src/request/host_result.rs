@@ -350,22 +350,7 @@ impl HostResult {
             {
                 Err(HostProblem::ResourceExhausted)
             }
-            Self::Mq(result)
-                if result.message.len() > limits.max_record_bytes
-                    || result
-                        .message_id
-                        .as_ref()
-                        .is_some_and(|value| value.len() != 24)
-                    || result
-                        .correlation_id
-                        .as_ref()
-                        .is_some_and(|value| value.len() != 24)
-                    || result.trigger_program.as_ref().is_some_and(|program| {
-                        program.is_empty() || program.len() > limits.max_name_bytes
-                    }) =>
-            {
-                Err(HostProblem::ResourceExhausted)
-            }
+            Self::Mq(result) => result.validate(limits),
             Self::State {
                 value: Some(value), ..
             } if value.len() > limits.max_state_bytes => Err(HostProblem::ResourceExhausted),

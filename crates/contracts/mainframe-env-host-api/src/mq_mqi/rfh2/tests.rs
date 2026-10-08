@@ -410,8 +410,10 @@ fn malformed_and_recognized_pending_forms_are_distinct_and_bounded() {
             Err(MqPropertyProblem::Unsupported)
         );
     }
-    let mut small = MqMqiLimits::default();
-    small.buffer_bytes = valid.len() - 1;
+    let small = MqMqiLimits {
+        buffer_bytes: valid.len() - 1,
+        ..MqMqiLimits::default()
+    };
     assert_eq!(
         mq_rfh2_decode(&md, &valid, small),
         Err(MqPropertyProblem::Capacity)

@@ -309,8 +309,10 @@ fn pending_unknown_and_duplicate_outcomes_remain_distinct_typed_observations() {
 #[test]
 fn host_field_limits_and_mqi_product_limits_both_apply() {
     let mut candidate = effect();
-    let mut limits = HostLimits::default();
-    limits.max_name_bytes = 3;
+    let limits = HostLimits {
+        max_name_bytes: 3,
+        ..HostLimits::default()
+    };
     assert_eq!(
         candidate.validate(limits),
         Err(HostProblem::ResourceExhausted)
@@ -340,8 +342,10 @@ fn host_field_limits_and_mqi_product_limits_both_apply() {
             characters: vec![0, 255],
         },
     };
-    let mut limits = HostLimits::default();
-    limits.max_fields = 1;
+    let mut limits = HostLimits {
+        max_fields: 1,
+        ..HostLimits::default()
+    };
     assert_eq!(value.validate(limits), Err(HostProblem::ResourceExhausted));
     limits.max_fields = 2;
     limits.max_record_bytes = 1;
@@ -424,9 +428,11 @@ fn payloads_and_output_capacities_are_preflighted_against_host_limits() {
             },
         },
     ];
-    let mut limits = HostLimits::default();
-    limits.max_record_bytes = 2;
-    limits.max_fields = 2;
+    let limits = HostLimits {
+        max_record_bytes: 2,
+        max_fields: 2,
+        ..HostLimits::default()
+    };
     for request in requests {
         let mut candidate = effect();
         typed(&mut candidate).envelope.request = request;

@@ -194,9 +194,9 @@ impl ScopedHostService {
             },
             _ => None,
         });
-        let result = if replay.is_some() && checked_inquiry.is_none() {
-            Err(HostProblem::Unsupported)
-        } else if context.is_some() && !matches!(&request.request, crate::HostRequest::Program(_)) {
+        let result = if (replay.is_some() && checked_inquiry.is_none())
+            || (context.is_some() && !matches!(&request.request, crate::HostRequest::Program(_)))
+        {
             Err(HostProblem::Unsupported)
         } else if request.run_unit != invocation.run_unit_id {
             Err(HostProblem::Malformed)

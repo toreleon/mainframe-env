@@ -217,8 +217,10 @@ fn full_bounds_property_authority_and_context_unit_are_fail_closed() {
             transaction: None,
         },
     };
-    let mut limits = HostLimits::default();
-    limits.max_record_bytes = 47;
+    let limits = HostLimits {
+        max_record_bytes: 47,
+        ..HostLimits::default()
+    };
     assert!(host.validate(limits).is_err());
 }
 #[test]
