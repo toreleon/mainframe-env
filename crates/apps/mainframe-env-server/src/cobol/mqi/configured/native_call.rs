@@ -66,7 +66,7 @@ impl CobolProgram {
                 Some(RootEntry::Retained {
                     native: Some(claim),
                     ..
-                }) => claim.clone(),
+                }) => claim.as_ref().clone(),
                 _ => return Ok(None), // exact legacy/private route remains unchanged
             };
             let frame = if parent.parent_execution_id.is_none() {

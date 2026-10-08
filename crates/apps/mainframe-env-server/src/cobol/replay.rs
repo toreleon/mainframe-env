@@ -604,7 +604,7 @@ pub(super) fn protocol_terminal_mutation_from(
     if record.namespace != CALL_PROTOCOL_NAMESPACE || record.key != key {
         return Err(HostProblem::UnknownOutcome);
     }
-    let protocol = match decode_protocol(&record).map_err(|_| HostProblem::UnknownOutcome)? {
+    let protocol = match decode_protocol(record).map_err(|_| HostProblem::UnknownOutcome)? {
         DecodedProtocol::Legacy => CallProtocol {
             schema_version: 2,
             owner_execution: protocol_owner_execution(invocation)?,

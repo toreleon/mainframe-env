@@ -91,7 +91,7 @@ fn root_update(root: &ScopedRun, fence: &SourceFence, expected: u64) -> Provider
     let key = root.members.get_mut(&staged.record.key).unwrap();
     key.row_version = staged.record.version;
     root.refresh(
-        &staged
+        staged
             .record
             .namespace
             .strip_prefix(INSTANCE_NAMESPACE_PREFIX)
@@ -101,7 +101,7 @@ fn root_update(root: &ScopedRun, fence: &SourceFence, expected: u64) -> Provider
     ProviderStateMutation::Put(
         write(
             RUN_STATE_NAMESPACE,
-            &staged
+            staged
                 .record
                 .namespace
                 .strip_prefix(INSTANCE_NAMESPACE_PREFIX)

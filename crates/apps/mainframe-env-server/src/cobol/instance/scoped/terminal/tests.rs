@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod tests {
+mod controls {
     use super::super::*;
     use crate::cobol::hardening::parent;
     use mainframe_env_execution_api::{

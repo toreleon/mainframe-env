@@ -69,7 +69,7 @@ fn compiled_native_root_connection_normal_and_known_abend_publish_both_terminal_
                 "{outcome:?}"
             );
             assert_eq!(original, before);
-            assert!(original.bindings.get("mq.host-context").is_none());
+            assert!(!original.bindings.contains_key("mq.host-context"));
             let execution = f
                 .store
                 .get_execution(&original.execution_id)

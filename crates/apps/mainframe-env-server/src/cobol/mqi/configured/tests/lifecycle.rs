@@ -1,7 +1,6 @@
 use super::setup::*;
 use super::*;
 use mainframe_env_execution_api::*;
-use mainframe_env_host_api::*;
 use std::sync::atomic::Ordering;
 
 #[test]

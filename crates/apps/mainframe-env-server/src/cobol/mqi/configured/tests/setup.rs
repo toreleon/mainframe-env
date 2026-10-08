@@ -1,12 +1,10 @@
 use super::*;
 use crate::cobol::*;
 use mainframe_env_compiler::CobolCompiler;
-use mainframe_env_compiler_api::*;
 use mainframe_env_execution_api::*;
 use mainframe_env_host_api::*;
 use mainframe_env_interpreter::{CoordinatorLimits, ExecutionCoordinator};
 use mainframe_env_store::{LocalArtifactStore, MemoryStore, SqliteStateStore};
-use mainframe_env_store_api::*;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
@@ -46,10 +44,9 @@ impl EnterpriseAuthorizer for Saf {
         }
         if resource.class == EnterpriseResourceClass::MqUnitOfWork
             && resource.name.as_str() == "CURRENT"
+            && let Some(hook) = self.terminal_hook.lock().unwrap().as_mut()
         {
-            if let Some(hook) = self.terminal_hook.lock().unwrap().as_mut() {
-                hook();
-            }
+            hook();
         }
         if self.deny.load(Ordering::SeqCst) {
             Err(HostProblem::Unauthorized)
@@ -137,12 +134,14 @@ impl HostProvider for WeakRouter {
         self.router.upgrade().unwrap().invoke(original, effect)
     }
 }
+type AdmissionHook = Box<dyn FnOnce(&InstalledBatchAdmission<'_>) + Send>;
+
 pub(super) struct RecordingFactory {
     pub host: Arc<ConfiguredInstalledMqHost>,
     pub children: Mutex<Vec<Invocation>>,
     pub observations: Mutex<Vec<Arc<dyn mainframe_env_interpreter::MqMqiProgramFrame>>>,
-    pub hook: Mutex<Option<Box<dyn FnOnce(&InstalledBatchAdmission<'_>) + Send>>>,
-    pub nested_hook: Mutex<Option<Box<dyn FnOnce(&InstalledBatchAdmission<'_>) + Send>>>,
+    pub hook: Mutex<Option<AdmissionHook>>,
+    pub nested_hook: Mutex<Option<AdmissionHook>>,
     pub override_host: Mutex<Option<Arc<ConfiguredInstalledMqHost>>>,
     pub fail_preparation: AtomicBool,
     pub drop_at_admission: AtomicBool,

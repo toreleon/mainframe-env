@@ -965,3 +965,21 @@ serializer scratch is not a global heap quota. File output adds no parent-direct
 durability, concurrent-writer or hostile-path guarantee, and stdout prefixes
 cannot be rolled back. Supplemental source skips and all unready/private gates
 remain unchanged and receive zero new credit.
+
+### CV-209.server-contract-lint acceptance
+
+Status: **Complete (bounded mechanical server owner only)**. All twenty-two
+original unique diagnostics are repaired through equivalent borrows/assertions,
+private aliases and retained-claim indirection with its inseparable direct
+caller. Public signatures, every original test literal and durable bytes remain
+unchanged. Ninety-one unique existing controls across eleven nonempty selectors
+pass in the producing scope, including the unchanged native-connect and replay/
+instance controls. Joint strict all-targets server/tooling owner lint passes
+after integrating the state-schema tests and output adapter. Module, formatting,
+frozen dependency policy, docs/changelog/subsystem and diff gates pass.
+
+The private Some claim gains a Box allocation; no total-heap improvement is
+claimed. Dependency-inclusive MQ lint and Foundation acceptance remain pending.
+No private behavior is activated, no failed test is hidden, and no official or
+licensed numerator changes. Source skips and the three unready CICS gates remain
+unchanged.

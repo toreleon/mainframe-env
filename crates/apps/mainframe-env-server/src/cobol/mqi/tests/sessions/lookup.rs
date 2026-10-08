@@ -42,13 +42,7 @@ impl MqMqiProgramFrame for LookupFrame {
         Ok(MqMqiUnitOfWork::Local { unit: 73 })
     }
 }
-fn session_for(
-    frame: Arc<dyn MqMqiProgramFrame>,
-) -> (
-    SessionGuard,
-    Arc<Mutex<Vec<ExecutionOutcome>>>,
-    Arc<Mutex<Vec<HostProblem>>>,
-) {
+fn session_for(frame: Arc<dyn MqMqiProgramFrame>) -> SessionObservation {
     let events = Arc::new(Mutex::new(vec![]));
     let aborts = Arc::new(Mutex::new(vec![]));
     (
