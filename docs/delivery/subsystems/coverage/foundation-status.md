@@ -582,3 +582,12 @@ diff checks pass. Strict tooling-owner lint passes with `--no-deps`; the unchang
 dependency-inclusive MQ/CICS lint failures remain separately pending and are not
 waived or described as passed. Foundation/public exit acceptance remains pending.
 Missing supplemental cache checks remain `skipped/unavailable`, zero credit.
+
+### CV-201.catalog-locator-membership acceptance
+
+Status: **Complete (offline catalog locator membership only)**. The shared catalog compiler and coverage check join locators to their own indexed baseline manifest or supporting receipt. Eight independent real-boundary tests pass, including five coherent rehashed locator refusals and three controls. All 1,506 rows, immutable denominators and five zero-credit normalization dispositions remain unchanged. This validates membership, not source-body execution or licensed behavior.
+Joint schemas/coverage/spec, module, formatting, frozen dependency, metadata and
+diff checks pass. Strict tooling-owner lint passes with `--no-deps`; the unchanged
+dependency-inclusive MQ/CICS lint failures remain separately pending and are not
+waived or described as passed. Foundation/public exit acceptance remains pending.
+Missing supplemental cache checks remain `skipped/unavailable`, zero credit.

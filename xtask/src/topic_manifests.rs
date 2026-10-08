@@ -294,6 +294,48 @@ pub(super) fn locator_topic_path(locator: &str) -> Option<&str> {
     (!path.is_empty()).then_some(path)
 }
 
+/// Resolve a baseline's source authority without consulting publication bodies.
+/// Supporting receipts name individual topics outside its primary book manifest.
+pub(super) fn catalog_topic_paths(
+    root: &Path,
+    baseline: &Value,
+    index_path: &Path,
+) -> TaskResult<(BTreeSet<String>, BTreeSet<String>)> {
+    let id = text(baseline, "id", index_path)?;
+    let source = &baseline["source"];
+    let product = text(source, "product", index_path)?;
+    let pinned = pinned_topic_paths(
+        root,
+        text(source, "manifest", index_path)?,
+        id,
+        text(source, "sha256", index_path)?,
+    )?;
+    let mut supporting = BTreeSet::new();
+    if let Some(receipts) = baseline.get("supporting_sources") {
+        let receipts = receipts
+            .as_array()
+            .ok_or_else(|| format!("baseline {id} supporting_sources is not an array"))?;
+        for receipt in receipts {
+            validate_official_source(receipt, index_path, id)?;
+            let topic = text(receipt, "topic_path", index_path)?;
+            require(
+                text(receipt, "kind", index_path)? == "documentation-topic"
+                    && text(receipt, "product", index_path)? == product
+                    && topic.starts_with(&format!("{product}/"))
+                    && !topic.contains("..")
+                    && text(receipt, "url", index_path)?
+                        .starts_with(&format!("https://www.ibm.com/docs/api/v1/content/{topic}?")),
+                &format!("baseline {id} supporting topic receipt identity differs: {topic}"),
+            )?;
+            require(
+                supporting.insert(topic.to_string()),
+                &format!("baseline {id} repeats supporting topic {topic}"),
+            )?;
+        }
+    }
+    Ok((pinned, supporting))
+}
+
 fn manifest_path(root: &Path, relative: &str, owner: &str) -> TaskResult<PathBuf> {
     require(
         relative.starts_with(MANIFEST_PREFIX)

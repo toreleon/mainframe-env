@@ -10123,7 +10123,7 @@ fn check_coverage(root: &Path) -> TaskResult {
         "official catalog global denominator must remain 1506",
     )?;
 
-    topic_manifests::check(root)?;
+    conformance_catalog::check_catalog_locator_membership(root, &index, &index_path)?;
     check_publication_bytes(root)?;
     check_probe_record_figures(root)?;
 
