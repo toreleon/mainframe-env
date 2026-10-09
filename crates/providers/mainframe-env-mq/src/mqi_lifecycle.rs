@@ -110,16 +110,6 @@ impl MqLifecycleDirectory {
         })
     }
 
-    /// Host-selected process topology only: never infer sharing from principal,
-    /// a string hash, an application owner assertion, or equal binding bytes.
-    pub(crate) fn mint_process(
-        &mut self,
-        admitted: &Invocation,
-        now: u64,
-    ) -> Result<ProcessLease, HostProblem> {
-        self.mint_process_in_mode(admitted, now, ContextMode::Binding)
-    }
-
     fn mint_process_in_mode(
         &mut self,
         admitted: &Invocation,
@@ -151,15 +141,6 @@ impl MqLifecycleDirectory {
             directory: self.identity,
             process,
         })
-    }
-
-    pub(crate) fn bind_root(
-        &mut self,
-        process: ProcessLease,
-        admitted: &Invocation,
-        now: u64,
-    ) -> Result<FrameLease, HostProblem> {
-        self.bind_root_in_mode(process, admitted, now, ContextMode::Binding)
     }
 
     fn bind_root_in_mode(
