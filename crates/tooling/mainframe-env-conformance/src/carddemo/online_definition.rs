@@ -182,3 +182,89 @@ pub(super) fn transaction_online_definition(
         maps,
     })
 }
+
+pub(super) fn navigation_online_definition(
+    corpus_dir: &Path,
+) -> Result<OnlineApplicationDefinition, CorpusProblem> {
+    // Select source closure before invoking the compiler or loading any map.
+    let map_paths = [
+        "app/bms/COSGN00.bms",
+        "app/bms/COMEN01.bms",
+        "app/bms/COTRN00.bms",
+        "app/bms/COTRN01.bms",
+        "app/bms/COTRN02.bms",
+    ];
+    let bundles = source_input::navigation_bundles(corpus_dir)?;
+    let csd = String::from_utf8(read_corpus_file(
+        corpus_dir,
+        &corpus_dir.join("app/csd/CARDDEMO.CSD"),
+    )?)
+    .map_err(|_| CorpusProblem::new("carddemo.online.csd_invalid", "base CSD is not UTF-8"))?;
+    let resources = parse_csd(&csd).map_err(package_problem)?;
+    let mut transactions = BTreeMap::new();
+    for (transaction, expected_program) in [
+        ("CC00", "COSGN00C"),
+        ("CM00", "COMEN01C"),
+        ("CT00", "COTRN00C"),
+        ("CT01", "COTRN01C"),
+        ("CT02", "COTRN02C"),
+    ] {
+        let matching = resources
+            .iter()
+            .filter(|resource| resource.kind == "TRANSACTION" && resource.name == transaction)
+            .collect::<Vec<_>>();
+        if matching.len() != 1
+            || matching[0].properties.get("PROGRAM").map(String::as_str) != Some(expected_program)
+            || matching[0].properties.get("STATUS").map(String::as_str) != Some("ENABLED")
+        {
+            return Err(CorpusProblem::new(
+                "carddemo.transaction.csd_drift",
+                transaction,
+            ));
+        }
+        transactions.insert(transaction.into(), expected_program.into());
+    }
+    for (kind, names) in [
+        (
+            "PROGRAM",
+            &["COSGN00C", "COMEN01C", "COTRN00C", "COTRN01C", "COTRN02C"][..],
+        ),
+        (
+            "MAPSET",
+            &["COSGN00", "COMEN01", "COTRN00", "COTRN01", "COTRN02"][..],
+        ),
+    ] {
+        for name in names {
+            let matching = resources
+                .iter()
+                .filter(|r| r.kind == kind && r.name == *name)
+                .collect::<Vec<_>>();
+            if matching.len() != 1
+                || matching[0].properties.get("STATUS").map(String::as_str) != Some("ENABLED")
+            {
+                return Err(CorpusProblem::new("carddemo.navigation.csd_drift", *name));
+            }
+        }
+    }
+    let compiler = CobolCompiler::default();
+    let mut programs = Vec::new();
+    let mut semantic_models = Vec::new();
+    for (primary, bundle) in bundles {
+        let name = Path::new(&primary)
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .ok_or_else(|| CorpusProblem::new("carddemo.online.program_invalid", "invalid name"))?;
+        let (program, semantic) = compile_online_program(&compiler, name, &primary, &bundle)?;
+        programs.push(program);
+        semantic_models.push(semantic);
+    }
+    let maps = map_paths
+        .into_iter()
+        .map(|path| bms::carddemo_map(corpus_dir, path, &semantic_models))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(OnlineApplicationDefinition {
+        programs,
+        transactions,
+        maps,
+    })
+}

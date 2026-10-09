@@ -23,6 +23,10 @@ pub use mq_receipt::verify_carddemo_mq_authorization_from_env;
 #[cfg(test)]
 mod journey_closure_tests;
 mod transaction_harness;
+use transaction_harness::select_regular_option;
+mod transaction_navigation;
+#[cfg(test)]
+mod transaction_navigation_tests;
 #[cfg(test)]
 mod transaction_tests;
 
@@ -10383,38 +10387,6 @@ async fn select_admin_option(
         &selected,
         expected_mapset,
         &format!("admin option {option}"),
-    )?;
-    Ok(route)
-}
-
-async fn select_regular_option(
-    server: &ProductServer,
-    app: &axum::Router,
-    option: u8,
-    expected_mapset: &str,
-) -> Result<CardDemoOnlineSession, CorpusProblem> {
-    let route = open_carddemo_menu(
-        server,
-        app,
-        "WEBUSER",
-        "transport-password",
-        "USER0001",
-        "PASSWORD",
-        "COMEN01",
-    )
-    .await?;
-    let selected = carddemo_terminal_exchange(
-        app,
-        &route.session,
-        &route.headers,
-        0x7d,
-        BTreeMap::from([("OPTION".into(), option.to_string())]),
-    )
-    .await?;
-    require_online_mapset(
-        &selected,
-        expected_mapset,
-        &format!("regular option {option}"),
     )?;
     Ok(route)
 }

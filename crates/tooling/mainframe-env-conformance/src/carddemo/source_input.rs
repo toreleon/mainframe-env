@@ -74,6 +74,50 @@ pub(super) fn source_file(
 pub(super) fn transaction_bundles(
     corpus_dir: &Path,
 ) -> Result<Vec<(String, SourceBundle)>, CorpusProblem> {
+    selected_transaction_bundles(
+        corpus_dir,
+        &[
+            "app/cbl/COSGN00C.cbl",
+            "app/cbl/COMEN01C.cbl",
+            "app/cbl/COTRN02C.cbl",
+            "app/cbl/CSUTLDTC.cbl",
+        ],
+        &[
+            "app/cpy-bms/COSGN00.CPY",
+            "app/cpy-bms/COMEN01.CPY",
+            "app/cpy-bms/COTRN02.CPY",
+        ],
+    )
+}
+
+pub(super) fn navigation_bundles(
+    corpus_dir: &Path,
+) -> Result<Vec<(String, SourceBundle)>, CorpusProblem> {
+    selected_transaction_bundles(
+        corpus_dir,
+        &[
+            "app/cbl/COSGN00C.cbl",
+            "app/cbl/COMEN01C.cbl",
+            "app/cbl/COTRN00C.cbl",
+            "app/cbl/COTRN01C.cbl",
+            "app/cbl/COTRN02C.cbl",
+            "app/cbl/CSUTLDTC.cbl",
+        ],
+        &[
+            "app/cpy-bms/COSGN00.CPY",
+            "app/cpy-bms/COMEN01.CPY",
+            "app/cpy-bms/COTRN00.CPY",
+            "app/cpy-bms/COTRN01.CPY",
+            "app/cpy-bms/COTRN02.CPY",
+        ],
+    )
+}
+
+fn selected_transaction_bundles(
+    corpus_dir: &Path,
+    primary_paths: &[&str],
+    map_paths: &[&str],
+) -> Result<Vec<(String, SourceBundle)>, CorpusProblem> {
     let limits = SourceLimits::default();
     let application_paths = [
         "app/cpy/COCOM01Y.cpy",
@@ -86,14 +130,9 @@ pub(super) fn transaction_bundles(
         "app/cpy/CVACT01Y.cpy",
         "app/cpy/CVACT03Y.cpy",
     ];
-    let map_paths = [
-        "app/cpy-bms/COSGN00.CPY",
-        "app/cpy-bms/COMEN01.CPY",
-        "app/cpy-bms/COTRN02.CPY",
-    ];
     let mut copybooks = Vec::new();
     let mut libraries = Vec::new();
-    for (index, paths) in [application_paths.as_slice(), map_paths.as_slice()]
+    for (index, paths) in [application_paths.as_slice(), map_paths]
         .into_iter()
         .enumerate()
     {
@@ -117,33 +156,29 @@ pub(super) fn transaction_bundles(
         .map_err(|error| CorpusProblem::new("carddemo.abi.invalid", error.to_string()))?;
     copybooks.extend(abi.files);
     libraries.extend(abi.libraries);
-    [
-        "app/cbl/COSGN00C.cbl",
-        "app/cbl/COMEN01C.cbl",
-        "app/cbl/COTRN02C.cbl",
-        "app/cbl/CSUTLDTC.cbl",
-    ]
-    .into_iter()
-    .map(|path| {
-        let mut files = vec![source_file(corpus_dir, path, limits)?];
-        files.extend(copybooks.iter().cloned());
-        let logical = LogicalPath::new(path, limits.max_path_bytes).map_err(|error| {
-            CorpusProblem::new("carddemo.layout.closure_invalid", error.to_string())
-        })?;
-        let bundle = SourceBundle::with_libraries(
-            &logical,
-            files,
-            libraries.clone(),
-            BTreeMap::new(),
-            Vec::new(),
-            limits,
-        )
-        .map_err(|error| {
-            CorpusProblem::new("carddemo.layout.closure_invalid", error.to_string())
-        })?;
-        Ok((path.into(), bundle))
-    })
-    .collect()
+    primary_paths
+        .iter()
+        .copied()
+        .map(|path| {
+            let mut files = vec![source_file(corpus_dir, path, limits)?];
+            files.extend(copybooks.iter().cloned());
+            let logical = LogicalPath::new(path, limits.max_path_bytes).map_err(|error| {
+                CorpusProblem::new("carddemo.layout.closure_invalid", error.to_string())
+            })?;
+            let bundle = SourceBundle::with_libraries(
+                &logical,
+                files,
+                libraries.clone(),
+                BTreeMap::new(),
+                Vec::new(),
+                limits,
+            )
+            .map_err(|error| {
+                CorpusProblem::new("carddemo.layout.closure_invalid", error.to_string())
+            })?;
+            Ok((path.into(), bundle))
+        })
+        .collect()
 }
 
 pub(super) fn subsystem_abi_libraries(

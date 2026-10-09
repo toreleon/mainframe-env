@@ -50,6 +50,7 @@ pub(super) fn verify_carddemo_base_online_observed(
         )
         .await?;
         exercise_transaction_observations(&mut exercise.route_observations).await?;
+        exercise_navigation_observations(&mut exercise.route_observations).await?;
         Ok::<_, CorpusProblem>(exercise)
     });
     let _ = fs::remove_dir_all(&artifact_root);
@@ -131,4 +132,12 @@ pub(super) async fn exercise_transaction_observations(
 ) -> Result<(), CorpusProblem> {
     transaction_harness::exercise_transaction_dates(observations).await?;
     transaction_harness::exercise_transaction_duplicate(observations).await
+}
+
+/// Bind navigation credit only after actual comparisons and owned teardown complete.
+pub(super) async fn exercise_navigation_observations(
+    observations: &mut RouteObservations,
+) -> Result<(), CorpusProblem> {
+    let result = transaction_navigation::compare_navigation().await;
+    transaction_harness::bind_comparison(observations, "screen navigation", result)
 }

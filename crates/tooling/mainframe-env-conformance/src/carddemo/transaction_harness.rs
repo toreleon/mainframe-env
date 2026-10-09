@@ -12,7 +12,7 @@ const SNAPSHOT_DATASETS: [&str; 5] = [
     "AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS",
     "AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH",
 ];
-type RawRows = (Vec<Vec<u8>>, Vec<Vec<u8>>, u64);
+pub(super) type RawRows = (Vec<Vec<u8>>, Vec<Vec<u8>>, u64);
 
 struct ArtifactDirectory {
     path: PathBuf,
@@ -119,7 +119,25 @@ impl TransactionFixture {
         self.export_json("trace.json", &actual_trace)
     }
 
-    fn export_json<T: Serialize + ?Sized>(
+    fn export_bytes(&self, name: &str, bytes: &[u8]) -> Result<(), CorpusProblem> {
+        let Some(directory) = &self.output else {
+            return Ok(());
+        };
+        require(
+            bytes.len() > 4 * 1024 * 1024,
+            "compiled debug payload exceeds bounded size",
+        )?;
+        fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(directory.join(name))
+            .and_then(|mut file| file.write_all(bytes))
+            .map_err(|error| {
+                CorpusProblem::new("carddemo.transaction.debug_export", error.to_string())
+            })
+    }
+
+    pub(super) fn export_json<T: Serialize + ?Sized>(
         &self,
         name: &str,
         actual: &T,
@@ -155,6 +173,26 @@ impl TransactionFixture {
             keys.len() != rows.len(),
             "fixture primary keys are duplicated",
         )?;
+        Self::open_selected_rows(rows, false).await
+    }
+
+    pub(super) async fn open_navigation_rows(rows: Vec<Vec<u8>>) -> Result<Self, CorpusProblem> {
+        require(
+            rows.is_empty() || rows.len() > 12 || rows.iter().any(|row| row.len() != 350),
+            "navigation fixture requires one to twelve complete 350-byte rows",
+        )?;
+        let keys = rows.iter().map(|row| &row[..16]).collect::<BTreeSet<_>>();
+        require(
+            keys.len() != rows.len(),
+            "fixture primary keys are duplicated",
+        )?;
+        Self::open_selected_rows(rows, true).await
+    }
+
+    async fn open_selected_rows(
+        rows: Vec<Vec<u8>>,
+        navigation: bool,
+    ) -> Result<Self, CorpusProblem> {
         let corpus = env::var_os(CORPUS_ENV).ok_or_else(|| {
             CorpusProblem::new(
                 "carddemo.corpus.environment_missing",
@@ -162,7 +200,11 @@ impl TransactionFixture {
             )
         })?;
         let corpus = Path::new(&corpus);
-        let definition = online_definition::transaction_online_definition(corpus)?;
+        let definition = if navigation {
+            online_definition::navigation_online_definition(corpus)?
+        } else {
+            online_definition::transaction_online_definition(corpus)?
+        };
         let mut artifacts = ArtifactDirectory::create()?;
         let output = create_output_directory(&artifacts.path)?;
         let server = ProductServer::open(
@@ -189,7 +231,28 @@ impl TransactionFixture {
             _artifacts: artifacts,
             output,
         };
-        match fixture.initialize(corpus, definition, rows) {
+        let initialized = (|| {
+            if navigation {
+                for program in &definition.programs {
+                    fixture.export_bytes(
+                        &format!("compiled-{}.bin", program.name),
+                        &program.payload,
+                    )?;
+                    fixture.export_json(
+                        &format!("compiled-{}.json", program.name),
+                        &(
+                            &program.name,
+                            format!("{:?}", program.artifact),
+                            format!("{:?}", program.manifest),
+                            &program.semantic_identity,
+                            format!("{:x}", Sha256::digest(&program.payload)),
+                        ),
+                    )?;
+                }
+            }
+            fixture.initialize(corpus, definition, rows)
+        })();
+        match initialized {
             Ok(()) => Ok(fixture),
             Err(problem) => fixture.finish(Err(problem)).await,
         }
@@ -338,7 +401,7 @@ fn raw_rows(server: &ProductServer, name: &str) -> Result<RawRows, CorpusProblem
     }
 }
 
-fn snapshot(server: &ProductServer) -> Result<Vec<RawRows>, CorpusProblem> {
+pub(super) fn snapshot(server: &ProductServer) -> Result<Vec<RawRows>, CorpusProblem> {
     SNAPSHOT_DATASETS
         .into_iter()
         .map(|name| raw_rows(server, name))
@@ -682,4 +745,178 @@ async fn compare_duplicate() -> Result<(), CorpusProblem> {
     }
     .await;
     fixture.finish(result).await
+}
+
+pub(super) async fn select_regular_option(
+    server: &ProductServer,
+    app: &axum::Router,
+    option: u8,
+    expected_mapset: &str,
+) -> Result<CardDemoOnlineSession, CorpusProblem> {
+    let route = open_carddemo_menu(
+        server,
+        app,
+        "WEBUSER",
+        "transport-password",
+        "USER0001",
+        "PASSWORD",
+        "COMEN01",
+    )
+    .await?;
+    let selected = carddemo_terminal_exchange(
+        app,
+        &route.session,
+        &route.headers,
+        0x7d,
+        BTreeMap::from([("OPTION".into(), option.to_string())]),
+    )
+    .await?;
+    require_online_mapset(
+        &selected,
+        expected_mapset,
+        &format!("regular option {option}"),
+    )?;
+    Ok(route)
+}
+
+// Frozen navigation fixture literals and exact initial tuple admission.
+pub(super) const NAVIGATION_PROCESSING: [&str; 12] = [
+    "2026-03-03",
+    "2026-03-01",
+    "2026-03-01",
+    "2026-03-02",
+    "2026-03-04",
+    "2026-03-04",
+    "2026-03-02",
+    "2026-03-05",
+    "2026-03-03",
+    "2026-03-01",
+    "2026-03-05",
+    "2026-03-02",
+];
+
+pub(super) fn navigation_refuse(
+    failed: bool,
+    detail: impl Into<String>,
+) -> Result<(), CorpusProblem> {
+    if failed {
+        Err(CorpusProblem::new(
+            "carddemo.navigation.comparison_mismatch",
+            detail,
+        ))
+    } else {
+        Ok(())
+    }
+}
+pub(super) fn navigation_padded(value: &str, width: usize) -> String {
+    format!("{value:<width$}")
+}
+pub(super) fn navigation_encoded(value: &str) -> Result<Vec<u8>, CorpusProblem> {
+    CodePage::Cp037.encode(value, value.len()).map_err(|error| {
+        CorpusProblem::new("carddemo.navigation.literal_encoding", error.to_string())
+    })
+}
+pub(super) fn navigation_key(key: u8) -> String {
+    format!("{key:016}")
+}
+pub(super) fn navigation_record(key: u8) -> Result<Vec<u8>, CorpusProblem> {
+    let mut text = String::new();
+    for (literal, width) in [
+        (navigation_key(key), 16),
+        ("01".into(), 2),
+        ("0001".into(), 4),
+        ("ONLINE".into(), 10),
+        (format!("NAV ROW {key}"), 100),
+        ("0000000010{".into(), 11),
+        ("123456789".into(), 9),
+        ("NAVIGATION SHOP".into(), 50),
+        ("BOSTON".into(), 50),
+        ("02110".into(), 10),
+        ("0500024453765740".into(), 16),
+        ("2026-02-28".into(), 26),
+        (NAVIGATION_PROCESSING[usize::from(key - 41)].into(), 26),
+        ("".into(), 20),
+    ] {
+        text.push_str(&navigation_padded(&literal, width));
+    }
+    navigation_refuse(
+        text.len() != 350,
+        "independent navigation navigation_record width differs",
+    )?;
+    navigation_encoded(&text)
+}
+pub(super) fn navigation_tuple(order: &[u8]) -> Result<RawRows, CorpusProblem> {
+    Ok((
+        order
+            .iter()
+            .copied()
+            .map(navigation_record)
+            .collect::<Result<_, _>>()?,
+        order
+            .iter()
+            .map(|key| navigation_encoded(&navigation_key(*key)))
+            .collect::<Result<_, _>>()?,
+        3,
+    ))
+}
+pub(super) fn navigation_rows() -> Result<Vec<Vec<u8>>, CorpusProblem> {
+    (41..=52).map(navigation_record).collect()
+}
+pub(super) fn validate_navigation_initial(state: &[RawRows]) -> Result<(), CorpusProblem> {
+    navigation_refuse(state.len() != 5, "five actual dataset tuples required")?;
+    navigation_refuse(
+        state[0] != navigation_tuple(&[41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52])?,
+        "literal primary rows/identities/version differ",
+    )?;
+    navigation_refuse(
+        state[1] != navigation_tuple(&[42, 43, 50, 44, 47, 52, 41, 49, 45, 46, 48, 51])?,
+        "literal AIX rows/identities/version differ",
+    )?;
+    navigation_refuse(
+        state[2..].iter().any(|tuple| tuple.2 != 1),
+        "source seed version differs",
+    )
+}
+
+// Exact opaque map comparisons belong beside the selected terminal fixture.
+pub(super) fn navigation_fields(
+    response: &serde_json::Value,
+    expected: BTreeMap<String, String>,
+) -> Result<(), CorpusProblem> {
+    let actual = online_screen_fields(response)?;
+    for (name, literal) in expected {
+        let ebcdic = navigation_encoded(&literal)?;
+        navigation_refuse(
+            actual
+                .get(&name)
+                .is_none_or(|value| value.as_slice() != literal.as_bytes() && value != &ebcdic),
+            format!(
+                "field {name}: expected {literal:?}; actual {:?}",
+                actual.get(&name)
+            ),
+        )?;
+    }
+    Ok(())
+}
+pub(super) fn navigation_screen_identity(
+    response: &serde_json::Value,
+    mapset: &str,
+    map: &str,
+    program: &str,
+    transaction: &str,
+) -> Result<(), CorpusProblem> {
+    navigation_refuse(
+        response["mapset"] != mapset || response["map"] != map,
+        format!(
+            "actual map identity {:?}/{:?}, expected {mapset}/{map}",
+            response["mapset"], response["map"]
+        ),
+    )?;
+    navigation_fields(
+        response,
+        BTreeMap::from([
+            ("PGMNAME".into(), program.into()),
+            ("TRNNAME".into(), transaction.into()),
+        ]),
+    )
 }

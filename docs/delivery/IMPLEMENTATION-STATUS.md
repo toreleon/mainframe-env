@@ -32,5 +32,11 @@ inputs; it does not establish a fresh full-suite pass or licensed equivalence.
 | Licensed certification | Differential certification | [Shared harness foundation implemented; licensed environments and campaigns pending](subsystems/certification/licensed-status.md) |
 <!-- END GENERATED SUBSYSTEM INDEX -->
 
+The [Foundation progress record](subsystems/coverage/foundation-status.md)
+separates qualified supervisor, MQ and selected navigation results from pending
+strict/application and final-candidate gates. Full CardDemo closure still requires
+20 journeys with 114 observations and 26 selected issue rows with 105 acceptance
+requirements; scoped passes do not complete these obligations.
+
 Use the [plans](subsystems/README.md), [dependencies](subsystems/DEPENDENCIES.md),
 and [implementation prompts](../prompts/subsystems/README.md) to select work.

@@ -8,34 +8,43 @@ Status: **Bounded implementation accepted; integrated acceptance pending**
 
 ## Scope and acceptance boundary
 
-Foundation owns official catalogs, six independent coverage gates, semantic
+Foundation owns pinned catalogs, six independent coverage gates, semantic
 identities, package trust/install runtime, subsystem ABI libraries, program/route
-registration and cross-subsystem validation. Thirty-seven bounded packages are
-sealed. The accepted positioning dependency is commit
-`29d55cbc8183ca7274e30dc6f6079b2e29e501e7`; its scoped results do not complete
-the Foundation exit gate.
+registration and cross-subsystem validation. Qualified scoped results below apply
+to their producing inputs and reviewed source/environment equivalence. Importing
+source or sealing a package does not establish a fresh clean-candidate CI pass.
 
-Public work excludes licensed/private-only implementation and the three unready
+Public implementation excludes licensed/private-only work and the three unready
 CICS rows **CICSMESSAGE**, **GETNEXT TIMER** and **ISSUE COPY**. Preserve their
-identities and pending gates, all specifications/fixtures/tests, compatibility
-readers and existing source pins. Missing supplemental bodies remain
-**user-skipped/unavailable, zero credit**; do not refresh/re-pin or repeat unchanged
-missing-source requests. Independent available-input public validation remains
-required.
+identities, specifications, fixtures, tests and pending gates. Missing supplemental
+IBM bodies remain **user-skipped/unavailable, zero credit**; do not refresh/re-pin
+or repeat unchanged missing-source requests. Independent public validation with
+available inputs remains required. Detailed execution evidence stays external.
 
-Raw commands/results, failed producers, source-equivalence comparisons and retained
-executables stay external. Reuse requires relevant-input/source/environment
-equivalence; a dirty-development result is not a new clean-candidate CI execution.
-Never relabel old failures, add coverage for generated registration, or infer
-official/licensed compatibility from internal fixtures.
+The original **IBM MQ 9.4 MQI semantic baseline is unavailable**, separately
+from user-skipped supplementary topics. New MQI semantic implementation is
+blocked and earns zero credit until that required baseline is available; selected
+local contract/infrastructure controls do not replace the semantic source gate.
 
 ```mermaid
 flowchart LR
-    Inputs["Pinned catalogs and inputs"] --> Scoped["Accepted bounded owners"]
-    Scoped --> CICS["CICS retirement: pending"]
-    Scoped --> Client["Final candidate client gate: pending"]
-    CICS --> Public["Integrated public exit: pending"]
-    Client --> Public
+    Foundation["Bounded Foundation implementation"] --> CICS["CICS positioning: accepted"]
+    CICS --> NAV["Selected navigation and strict: qualified pass"]
+    NAV --> App["Full CardDemo: 20 journeys / 26 selected issues pending"]
+    Foundation --> Retirement["Task-end retirement / nested clocks: pending"]
+    Retirement --> App
+    Foundation --> Client["Finite client: qualified pass"]
+    Client --> Candidate["Final unchanged candidate validation: pending"]
+    Foundation --> MQ["MQ selected controls pass / strict fails"]
+    Foundation --> Batch["Batch assurance: blocked"]
+    Foundation --> Workspace["Workspace / MSRV / architecture / backend: pending"]
+    Foundation --> Distribution["Distribution / sandbox size / batch performance: pending"]
+    App --> Exit["Integrated public acceptance: pending"]
+    Candidate --> Exit
+    MQ --> Exit
+    Batch --> Exit
+    Workspace --> Exit
+    Distribution --> Exit
 ```
 
 ## Work packages
@@ -61,123 +70,90 @@ with endpoint normalization under its separate source-bound projection.
 
 ## Current bounded results
 
-| Slice | Accepted result and qualification | Pending dependency |
+| Slice | Current behavior or qualified result | Acceptance boundary / next step |
 |---|---|---|
-| Host/store/batch/execution/CICS/server/conformance lint and mechanical layout | Declared affected repairs and floor/conformance-output owners implemented | Whole-workspace strict lint and current integrated validation |
-| MQ mechanical layout / original-request size consistency | Size binding refuses inconsistent canonical counts before retained intent lookup; 31 selected controls pass; old methods/literals preserved | Strict MQ retains **25 original dormant production diagnostics**, zero new/changed-owner diagnostics. Import/decoder/lifecycle/fence/profile duties and full MQ lint remain pending; old full-package results predate fixture-only changes |
-| Journey closure / date-and-duplicate transactions | Closure authority/transport and selected comparisons implemented | Navigation/AIX application observation and all 20/26/105 acceptance requirements |
-| PostgreSQL selection / TCP-only loopback owner | Twelve live controls pass on the qualified source-equivalent producer; clean producer/native identities retained | Global/backend/current affected acceptance. Host loader/timezone qualification, prior cleanup failures and one PID-1 defunct child remain; synthetic CardDemo restart is not public-corpus closure |
-| STRING references | Seven frozen native controls, layout baseline and unchanged pointer/UNSTRING preservation pass; strict affected lint/integration checks pass | Existing resolver/qualification boundary remains; no full grammar, IBM differential or navigation acceptance |
-| Figurative byte comparisons | Eight frozen native controls, 44-fixture method counted as one, and three interpreter controls pass; ordinary identifier/literal/numeric behavior preserved | Full grammar/differential/application acceptance |
-| Symbolic BMS input storage | Eight final controls and seventeen existing regression methods pass; raw/non-BMS guards, literals/compiled fixture bytes and old methods preserved; strict affected lint passes | Fixed ordinary symbolic-group scope only; Legacy guard is static proof, not a separately executed variant. No provider/full-layout/wire/application acceptance |
-| Candidate cleanliness | Recorder checks clean committed tracked/untracked source before launch and at completion; ignored targets/external logs remain valid | No continuous attestation; final selected candidate gates still required |
-| Optional command supervision | Current error/log binding, retained leader authority, sole wait and finite timeout/output teardown accepted; 82 unique controls observed across separate qualified producers | Linux procfs/exclusive wait/kernel/escape and earlier PID-1 zombie limitations remain; not one relabeled green campaign or portable containment proof |
-| Optional client inputs | Strict retained @1 / finite @2 lock readers, twelve fixed roles, bounded archive/SRI/tree/manifest admission; 33 focused controls pass | Eight required CI tools unchanged. Node signatures unverified; Zowe SRI is not source-build attestation; bwrap/libraries and namespace bootstrap remain host-qualified |
-| Finite client command | Ten fixed actions, exact scalars/settings/JCL/readonly mounts, empty child environment, raw captures and actual-reap semantics accepted; qualified private PID/proc full136 tooling pass | Host full136 census failure remains a failure; namespace pass is tooling evidence, not host absence or client containment |
-| Client action layout / logs | Exact local `node_modules/@zowe/cli` layout/debug-log policy; qualified full146 tooling pass with final identifier-only equivalence | Real client workload separate; finite membership, modes/links and log caps unchanged |
-| Command-local validation cost | Private single-use PRE proof avoids only redundant POST archive parsing; affected96 / integrated106 controls pass | Every current byte still hashed, both POST archive fences held; no persistent/metadata-only/cross-action cache or allowance change |
-| Command-local tree directory authority | 112 selected controls pass, including thirteen new controls; old bodies/pins/default validation preserved. Held ancestors/root/package, fresh manifest, closing order and raw leaf-fd ownership accepted | Bounded namespace admission, not atomic/continuous filesystem snapshot, native containment or live action acceptance |
-| Sandbox build parallelism | Build owner explicitly passes jobs2 to Rust/Git image builds; scoped policy checks pass | Current image build/size, sandbox correctness, batch speed and workload measurement |
-| Public status/prompt consistency | Subsystem/phase terminology, implemented sealer and source/coverage boundaries retained | Current docs/API/architecture/schema/profile/distribution exit checks |
-| Batch-controller source assurance | **Failed** on unchanged preexisting inputs: the check expects an obsolete single-file source location and a removed apply-method name | A separate owner-aware assurance repair is assigned and pending. Preserve the gate and independent controller requirements; the failure is neither waived nor counted as passing |
+| Lint and mechanical layout | Affected Host/store/batch/execution/CICS/server/conformance repairs and floor/output owners implemented | Current whole-workspace strict lint and integrated validation remain required |
+| MQ layout and requested-size consistency | Canonical count mismatch is refused before retained intent lookup; 31 selected controls pass | Bounded request consistency does not establish complete MQ lifecycle/recovery |
+| MQ publication and binding slices | Six source owners preserve 22 selected controls: seven publication-fence and fifteen binding controls; all 22 pass | **Strict MQ fails with 24 mapped diagnostics**, zero unmapped diagnostics. Repair public production owners; private exclusion is not a lint exemption. Full MQ lifecycle/concurrency/recovery/profile acceptance remains pending |
+| PostgreSQL selection | Twelve live controls pass within the TCP-only loopback scope | Current backend/global/application obligations remain pending; synthetic restart is not public-corpus or crash recovery closure |
+| STRING and figurative comparisons | Seven STRING controls and eight figurative controls pass; unchanged pointer/UNSTRING and ordinary comparison behavior preserved | Full grammar, IBM differential and application acceptance remain pending |
+| Symbolic BMS input storage | Eight new and seventeen existing methods pass; affected strict lint passes; raw/non-BMS and independent literals preserved | Ordinary symbolic-group scope only; no full provider/layout/wire/application acceptance |
+| Candidate cleanliness | Recorder requires clean committed tracked/untracked source at launch and completion; ignored targets/external output remain allowed | No continuous attestation; final selected candidate gates still required |
+| Command supervision and census rescan | Finite timeout/output, retained leader authority, sole wait and actual error/log binding implemented. The rescan candidate has **167 focused passes, zero skips** | Qualified Linux/tooling scope; no universal process absence, portable containment or host-escape proof. Integrate reviewed source and validate affected current policies |
+| Optional client input admission | Finite retained @1 / additive @2 readers, twelve fixed roles and full archive/SRI/tree/manifest/state checks; 33 focused controls pass | Ordinary CI's eight required tools unchanged; upstream signatures/source-build attestation and host-qualified runtime/bootstrap limits remain explicit |
+| Finite client command and action layout | Ten fixed actions, exact scalars/settings/JCL/readonly mounts, empty child environment, raw captures and local CLI/debug-log policy implemented | Fixed roles/membership/modes/links/output limits remain; no arbitrary argv, scripts/plugins or host mount widening |
+| Command-local byte/tree authority | Single-use PRE proof skips only redundant POST archive parsing; both POST archive fences remain held. Directory-authority scope has 112 selected passes, old bodies/pins/default validation preserved | All current bytes/state still verified. No persistent, metadata-only or cross-action admission cache; no atomic/continuous filesystem snapshot or live time-limit credit from byte diagnostics |
+| Sandbox build parallelism | Existing build owner sets two Rust/Git build jobs | Current image build/size, sandbox correctness and actual batch measurement remain pending |
+| Batch-controller source assurance | Fresh scanner selection has **43 Python passes**, zero skips. Required artifact/context preservation and exact cleanup completed | Rust ten-test selection **timed out with zero completed tests**. Later Rust scanner controls, normal executable, batch gate and strict remain unreached; resource closure supplies no test credit |
 
-The latest **single instrumented byte-only diagnostic** completed/reaped exit0,
-owner error null, with unchanged inputs/source: PRE **6.170227912s**, POST
-**2.503510612s**, profile whole **8.679312400s**, owner whole **8.900773228s**.
-Each phase verifies **10,216 leaves /42,715,208 tree bytes**. Canonical calls are
-root2/manifest1/member0 per phase, role14 PRE/12 POST; archive parser opens2/0.
-All original hash/SRI/state/namespace/manifest checks, archive outer fences,
-descriptor closure and single-use proof observations pass. These inclusive,
-overlapping instrumented measurements are one attribution result, not a controlled
-speedup benchmark or proof of a live **10-second action /120-second fixture**.
+## Application prerequisites
 
-## Application prerequisites and current scope
-
-| Owner / slice | Current state | Exact continuing boundary |
+| Slice | Current status | Continuing acceptance boundary |
 |---|---|---|
-| Transaction navigation comparator/tests | **Fourteen passes and two failures** in the latest sixteen-control producer; compile/test owner elapsed **294.74 seconds**, exit/reap 101, no owner error. Twenty-six real fixtures capture 102 HTTP exchanges and 73 Dataset state captures, with unchanged protected state and exact shutdown/target cleanup | Detail refusal rejects a 79-byte test literal against the source-correct 78-byte ERRMSG; a separate receipt-binding assertion observes no navigation token. Source-only corrections are approved, but fresh sixteen-control validation remains pending. The earlier eleven-pass/five-failure producer and other failures retain separate identities |
-| CICS first reverse positioned-read prerequisite | **Sealed bounded repair; 37 distinct scoped controls have qualified passing results**, comprising 25 new controls and 12 preserved baselines across separate producers. Two changed exact CICS methods have actual passes; 35 controls retain qualified unchanged-input reuse. Separate strict lint passes for Host API, Dataset, CICS and server, with all guard bodies and helper callers preserved | Navigation acceptance, task-end browse retirement and nested host clock/cancellation boundaries remain pending. Original seven genuine first-read failures, one setup failure, separately corrected duplicate failure, earlier compile/lint failures and producer 04 target-cap breach stay distinct; no single full campaign or global CICS acceptance is claimed |
-| CICS task-end browse retirement | Separate source-only authority design and two standalone real ProductServer control proposals; current release omits tracked browse cleanup | Source proposals for root RETURN and public abort remain unapplied and unexecuted; they use existing APIs independently of positioning repair. Implementation and normal/abnormal public retirement acceptance remain pending. Preserve per-cursor progress, original actor, SAF/grant/generation/cancellation/deadline checks and unknown ownership; no Drop suppression, fabricated privilege or unconditional retirement claim |
-| Finite public-client compatibility fixture | **Native 04 passes the one exact fixture: 1 pass, 0 failures, 0 ignored and 400 filtered; 81.81 seconds.** It reuses the successful fixed13 executable without compiling. Ten SDK actions are waited, with one terminal poll and twelve real HTTP observations. Exact seven-byte IEFBR14 content, all five protected-state equality checks and joined cleanup pass. The separate corrected pure controls retain 13 passes, 0 failures and 0 ignored | This is bounded finite compatibility on a qualified development producer, not global, official/licensed or final clean CI acceptance. Initial thirteen controls retain seven passes and six first-positive failures; native 01–03 remain failed producers. The exact three-string SDK caller-echo exception preserves all other disclosure, server-wire, state and time assertions. Strict affected conformance lint passes on the mechanically repaired and formatted source; twenty-five old MQ dependency warnings remain separate. The prior eight-error lint producer remains a failure. The pure/live results retain their earlier producer with reviewed behavior equivalence. Final-candidate validation and broader route/profile compatibility remain pending |
+| Selected transaction navigation | Corrected sixteen-control producer passes. Current test-only repair has **seven fresh named passes**, zero failures/skips; **nine controls retain qualified prior reuse**. Affected conformance strict lint passes with zero selected-package warnings/errors; 25 MQ dependency warnings remain separate. Exact cleanup succeeds | Selected CD.J06 comparisons only, with empty issue observations. AIX probes are first-party evidence rather than full application AIX coverage. Source-equivalent development results are not root clean CI or full CardDemo closure; integration and current final-candidate validation remain required |
+| CICS first reverse positioning | Bounded repair accepted: **37 distinct scoped controls** pass across qualified scopes, with separate affected Host API/Dataset/CICS/server strict success | Task-end retirement, genuine nested host clock/cancellation boundaries and full application closure remain pending |
+| CICS task-end browse retirement | **Two genuine semantic failures** from real ProductServer controls: root RETURN and public abort leave the captured browse cursor live at AA01/AA/AA. Known fixture teardown retires the cursor and joins shutdown | No passing retirement result. Production repair and normal/abnormal retirement acceptance remain pending. Preserve original actor, per-cursor progress, SAF/grant/generation/cancellation/deadline checks and unknown ownership; no Drop suppression or fabricated privilege |
+| Finite public-client compatibility | One real authenticated fixture passes: ten waited SDK actions, one terminal poll, twelve HTTP observations, exact seven-byte IEFBR14 content, five protected-state equality checks and joined cleanup. Thirteen pure controls and affected conformance strict pass | Bounded compatibility on a qualified development producer. Final clean-candidate validation, broader routes/profiles and official/licensed acceptance remain pending. The exact three-string caller-echo exception retains all other disclosure, server-wire, state and time assertions |
+| Full-profile observation candidate | Source preparation preserves public receipts, observes four selected state-comparison tokens and uses a frozen public Db2 oracle for ordered fixed-width PS rows; seven comparator/API controls written | Controls/full profile remain unexecuted. No rollback, VSAM or complete IMS CD.J17/J18 / CD-025 acceptance. Retain NAV/client registrations and validate the integrated producer; successful-path shutdown does not close failure-path cleanup |
 
-The sealed positioning repair passes its selected module budget, formatting,
-frozen dependency policy, schema, specification, coverage, semantic identity,
-package, ABI, program, route, dehardcoding, documentation and changelog gates.
-Its qualified separate producers do not constitute one full campaign. The
-batch-controller source-assurance failure remains a distinct pending gate.
+Selected navigation preserves the existing sixteen controls and frozen
+raw/source/CSD/map identities: thirteen initial zero fields versus reentered
+spaces; PF5-only rows 42–51 versus ordinary 41–50; lexical TDESC01 refusal; full
+PF7 rows 41–50/page 1/reached-top with twelve READPREV calls (eleven NORMAL plus
+ENDFILE primary 20), then already-top with zero reads. Preserve full tuples,
+readonly state, NOTFND 13/80, no extra READ and TAMT001–010. Partial page 2 is not
+accepted. Tokens require every intended comparison and shutdown and the actual
+observation seam; a selected CD.J06 result supplies no issue token.
 
-The latest navigation producer is bound to unchanged source before retention and
-after cleanup. Both refusal-message literals contain one excess trailing space:
-the pinned BMS and copybook declare 78 bytes, independently requiring each
-27-byte message plus 51 spaces. Compiler, MOVE, SEND MAP and the retained field
-frames preserve 78 bytes. Remove only those two excess spaces under the approved
-source scope; retain exact field equality. The separate receipt-binding correction
-must reach the existing observation seam before any navigation token is credited.
-Neither correction has a fresh passing producer.
+The finite client retains actual ProductServer/MemoryStore/HTTP forwarding,
+held loopback port, second valid principal, five-second readiness, **120-second
+phase and inclusive ten-second actions**, fixed calls/at most twelve polls,
+independent JSON/content/state/refusal assertions and exact owned cleanup.
+Query status does not establish named-status route coverage; lookup refusal is
+not direct spool403; selected content is not full DD inventory or profile parity.
+No npm/scripts/plugins/global lookup, new pins/downloads, ambient credentials or
+host mount widening. Stop at a genuine prerequisite; do not weaken oracles or
+limits, retry unchanged failures or substitute version/readiness probes.
 
-Native 04's finite-client pass retains its unchanged successful producing source,
-actual owner/caller exit 0 and reap 0. Cleanup joined serve, shut down ProductServer,
-refused the former listener and left workers, active requests and sessions at zero
-with no cleanup failures. Its restored executable was removed after verified use;
-the successful fixed13 storage is retained. That prior pass remains qualified
-separately from current strict lint, which passes after five clone-to-slice,
-two conditional and one return-expression repairs plus formatting. All literal
-values and thirteen selectors remain unchanged; old guard bodies are not claimed
-byte-identical. The prior eight-error lint remains a distinct failure. Current
-strict owner exits/reaps 0 in 72.42 seconds with no owner error; 34 emitted metadata
-artifacts pass physical restoration checks before exact target cleanup. The 25
-old MQ warnings are separate dependency diagnostics. Pure and live results are
-qualified by reviewed behavior equivalence, without a fresh execution claim. Earlier native 01–03 and initial thirteen-control
-failures remain immutable. Task-end retirement and genuine nested host clocks
-remain public gaps; no full Foundation acceptance follows.
+## Reproducible verification
 
-Remaining navigation acceptance retains the existing sixteen controls, frozen
-raw/source/CSD/map identities and jobs2 on one exact owned target. Preserve thirteen
-initial zero fields versus reentered spaces; PF5-only rows 42–51 versus ordinary
-rows 41–50; lexical TDESC01 refusal; full PF7 rows 41–50, page 1 and reached-top
-message with twelve READPREV calls (eleven NORMAL plus ENDFILE primary 20), followed
-by second PF7 already-top with zero reads. Preserve full tuples, state, NOTFND
-13/80, no extra READ and amount names TAMT001–010. Partial page 2 is not accepted. Physical AIX probes are separate first-party evidence, not application
-AIX coverage. Token binding remains conditional on all intended comparisons and
-shutdowns passing and the intended observation seam being reached.
+Use the pinned tools and the diff-selected owners in the
+[verification workflow](../../../runbooks/VERIFICATION-WORKFLOW.md) and
+[Jenkinsfile](../../../../Jenkinsfile). These are commands/selectors, not reported
+fresh results. Confirm nonzero selected tests and inspect actual warning ownership.
+Run expensive gates only in their declared scope with reviewed resources; preserve
+output externally and clean the exact owned target after required retention.
 
-The accepted finite client scope retains its test-only
-conformance registration/private fixture/fragment ownership, real
-ProductServer/MemoryStore/local artifacts, held loopback port, joined shutdown,
-actual HTTP forwarding and second valid principal. Preserve five-second readiness,
-120-second phase, inclusive ten-second actions, fixed calls/at most twelve polls,
-independent JSON/selected seven-byte STEP1:SYSPRINT/state/refusal assertions and
-exact owned directory/listener cleanup. Query status is not named-status route
-coverage; lookup refusal is not direct spool403; selected content is not full DD
-inventory or official z/OSMF profile parity. No npm/scripts/plugins/global lookup,
-new pins/downloads, credentials/ambient profiles or host mount widening.
+| Owner / gate | Existing command or selector |
+|---|---|
+| Supervisor controls | `"$MAINFRAME_ENV_PYTHON" -B -m unittest discover -s tools/tests -p test_ci_assurance.py` |
+| Scanner controls | `"$MAINFRAME_ENV_PYTHON" -B -m unittest tools.tests.test_production_scanner tools.tests.test_typed_semantic_boundaries` |
+| Selected NAV controls | `cargo test --frozen --offline -p mainframe-env-conformance --lib carddemo::transaction_navigation_tests:: -- --test-threads=1` |
+| Affected conformance strict | `cargo clippy --frozen --offline -p mainframe-env-conformance --all-targets --no-deps -- -D warnings` |
+| MQ strict | `cargo clippy --frozen --offline -p mainframe-env-mq --all-targets --no-deps -- -D warnings` |
+| Architecture / batch / full application | `cargo xtask architecture-fast --check`; `cargo xtask batch-controllers --check`; `cargo xtask carddemo-full --check` |
+| Docs / API / dependency policy | `cargo xtask docs --check`; `"$MAINFRAME_ENV_PYTHON" -B tools/check_public_api_docs.py`; `cargo deny check` |
+| Workspace / MSRV | `cargo test --workspace --all-features --locked --no-fail-fast`; `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`; `cargo +1.95.0 check --workspace --all-targets --all-features --locked` |
 
-Stop at a genuine prerequisite and retain its actual producer/outcomes/cleanup;
-do not retry unchanged inputs, weaken oracles, expand the 10/120-second limits or substitute
-version/readiness probes. Shared clean-candidate acceptance remains separate.
+The existing CI planner selects additional affected spec/schema/catalog/coverage,
+semantic identity, package/ABI/program/route/dehardcoding/profile and runtime
+architecture checks. Use its recorder for actual candidate-bound test floors;
+a raw aggregate count does not establish a CI floor. Optional Linux client
+inputs do not make ordinary cross-platform CI require Node or bubblewrap.
 
 ## Integrated exit: pending
 
-| Required gate | Current obligation |
+| Required gate | Exact remaining obligation |
 |---|---|
-| Workspace and test floor | Current unchanged candidate workspace/all-features regression and strict lint; **at least 260 actually passing tests**. Ignored/skipped/filtered/zero-test selections do not fill the floor |
-| MSRV / public docs/API | Current pinned MSRV workspace check, public API ratchets/rustdoc/docs; no scoped worker total substitutes for these gates |
-| Architecture / source / schema / profile | Current affected catalog/coverage/semantic identity/package/batch/ABI/program/route/dehardcoding/schema/profile/inventory and runtime architecture owners; H1 application hardcodes/string exceptions remain exactly zero |
-| Strict MQ | Resolve/validate all 25 remaining public production diagnostics under their owners; private exclusion is not a lint exemption |
-| Full CardDemo | Actual installed-data closure for **20/20 journeys, 26/26 transaction requirements, 105/105 issue acceptance requirements**, plus applicable isolation/load/backup/restore/restart/denial/rollback/cancellation. No generated token or selected physical probe fills missing observations |
-| Backend | Current affected store/backend/global obligations; qualified twelve-control PostgreSQL scope alone does not complete them |
-| Live client | The bounded authenticated workload passes on the qualified development producer with current-byte admission, independent content/refusal/state and cleanup assertions. Current unchanged final-candidate validation and clean CI acceptance remain required; the scoped fixture does not complete official route or full profile compatibility |
-| Public distribution and performance | Current legal/input/dependency/distribution checks; existing finite image build/size and sandbox verifier, actual CardDemo batch owner, separate memory-scaling measurement. No fresh performance closure or invented size/time threshold |
+| Workspace / MSRV / docs/API | Current unchanged-candidate regression and strict lint, pinned MSRV, public API/rustdoc/docs and **at least 260 actually passing tests**; ignored/skipped/filtered/zero-test selections supply no floor credit |
+| Architecture / source / schema / profile | Current affected catalogs, six coverage gates, semantic identities, package/batch/ABI/program/route/dehardcoding/schema/profile/inventory and runtime architecture owners; H1 application hardcodes/string exceptions remain exactly zero |
+| MQ | Current strict failure with 24 mapped diagnostics and full applicable public behavior gates remain unresolved; private exclusion cannot waive public lint |
+| Full CardDemo | Installed-data closure for **20/20 journeys with 114/114 observations and 26/26 selected issue rows with 105/105 acceptance requirements**, plus applicable isolation/load/backup/restore/restart/denial/rollback/cancellation; no generated token or selected physical probe fills absent observations |
+| Backend / client | Current store/backend/global obligations and final unchanged-candidate authenticated client checks; qualified PostgreSQL/finite client results do not complete these or official route/profile compatibility |
+| Distribution / performance | Current legal/input/dependency/distribution checks, existing finite image build/size and sandbox verifier, actual CardDemo batch measurement and separate memory-scaling measurement; no current performance closure or invented threshold |
 
-Use existing gate owners/selectors from the Foundation plan, common execution
-contract and CI workflow. Tool/contract/conformance/input changes still select
-their affected policies; optional Linux client inputs do not expand ordinary
-cross-platform CI's eight required tools. Full affected checks require the actual
-unchanged candidate; accepted scoped evidence may be reused only with explicit
-relevant-input/environment equivalence, never rewritten as current execution.
-
-Use implemented `cargo xtask work-package-seal` for exact allowlists/generated
-trailers and its `--check`; no hand-hashed substitute or new controller ledger.
-Seals record bounded ownership, not product execution. Final public gates,
-official/licensed differentials and excluded private rows keep their genuine
+Use implemented `cargo xtask work-package-seal` and its `--check` for bounded
+ownership; generated trailers are not execution credit. Keep logs, failed
+outcomes, producer/equivalence details and immutable raw receipts external.
+Official/licensed differentials and excluded private/unready rows retain their
 pending states. Foundation is not globally complete.
