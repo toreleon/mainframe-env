@@ -1,6 +1,8 @@
 """Cost-aware CI selection and exact-candidate command receipts (standard library only)."""
 from __future__ import annotations
 import argparse
+from contextvars import ContextVar
+import errno
 import hashlib
 import importlib.util
 import json
@@ -194,6 +196,18 @@ def _validate_limits(timeout_seconds, max_output_bytes) -> None:
         raise ValueError('output limit must be a positive integer no larger than sys.maxsize')
 
 
+class _LinuxCensusVanished(OSError):
+    """One numeric stat vanished; its entire census is unusable."""
+
+
+_LINUX_CENSUS_UNTIL = ContextVar('_linux_census_until', default=None)
+
+
+def _check_linux_census_deadline(until) -> None:
+    if until is not None and time.monotonic() >= until:
+        raise OSError('owned group membership census observation deadline exceeded')
+
+
 def _linux_group_has_members(pgid: int) -> bool:
     """Conservatively inspect Linux group metadata, excluding its retained leader.
 
@@ -203,24 +217,62 @@ def _linux_group_has_members(pgid: int) -> bool:
     Processes in a different group are outside this boundary. This is a census,
     not an atomic containment barrier against concurrent group changes/forking.
     """
+    until = _LINUX_CENSUS_UNTIL.get()
     count = 0
     with os.scandir('/proc') as entries:
         for entry in entries:
             if not entry.name.isdecimal() or int(entry.name) == pgid:
                 continue
+            _check_linux_census_deadline(until)
             count += 1
             if count > 65536:
                 raise OSError('owned group membership census exceeds 65536 processes')
             # Do not ignore vanished entries: a disappearing parent might have
             # forked an unlisted child. Unknown membership cannot earn success.
-            raw = (Path(entry.path) / 'stat').read_bytes()
+            _check_linux_census_deadline(until)
+            try:
+                raw = (Path(entry.path) / 'stat').read_bytes()
+            except OSError as problem:
+                if problem.errno in (errno.ENOENT, errno.ESRCH):
+                    raise _LinuxCensusVanished(
+                        problem.errno, problem.strerror, problem.filename) from problem
+                raise
             try:
                 group = int(raw.rsplit(b')', 1)[1].split()[2])
             except (IndexError, ValueError) as problem:
                 raise OSError('invalid Linux process-group metadata') from problem
             if group == pgid:
                 return True
+    _check_linux_census_deadline(until)
     return False
+
+
+def _linux_group_observation(pgid: int, deadline: float) -> bool:
+    """Accept only complete negative censuses within one fixed local allowance.
+
+    The caller must retain the leader throughout every observation. A vanished
+    numeric stat aborts the whole scan; at most two fresh scans may follow. This
+    does not make procfs atomic or preempt a blocked metadata syscall.
+    """
+    until = min(deadline, time.monotonic() + 0.05)
+    token = _LINUX_CENSUS_UNTIL.set(until)
+    try:
+        for attempt in range(3):
+            _check_linux_census_deadline(until)
+            try:
+                members = _linux_group_has_members(pgid)
+            except _LinuxCensusVanished:
+                if attempt == 2:
+                    raise
+                continue
+            if members:
+                # Positive evidence cannot be replaced by a later empty scan.
+                return True
+            _check_linux_census_deadline(until)
+            return False
+        raise AssertionError('unreachable census observation state')
+    finally:
+        _LINUX_CENSUS_UNTIL.reset(token)
 
 
 def _run_owned(command: list[str], root: Path, on_output, *, timeout_seconds,
@@ -297,13 +349,13 @@ def _run_owned(command: list[str], root: Path, on_output, *, timeout_seconds,
             return -state.si_status
         raise OSError('non-reaping observation returned an unexpected child state')
 
-    def group_has_members():
-        return _linux_group_has_members(owned_group())
+    def group_has_members(observation_deadline):
+        return _linux_group_observation(owned_group(), observation_deadline)
 
-    def still_owned_work():
+    def still_owned_work(observation_deadline):
         # The zombie leader itself keeps killpg(0) successful. It is not a
         # leftover descendant and must not turn every zero exit into failure.
-        return observe_exit() is None or group_has_members()
+        return observe_exit() is None or group_has_members(observation_deadline)
 
     def signal_group(sig):
         try:
@@ -357,7 +409,7 @@ def _run_owned(command: list[str], root: Path, on_output, *, timeout_seconds,
             if cancelled is not None:
                 raise InterruptedError(f'command cancelled by signal {cancelled}')
             status = observe_exit()
-            if status is not None and group_has_members():
+            if status is not None and group_has_members(deadline):
                 raise OSError('launcher exited with remaining owned process group')
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -376,13 +428,13 @@ def _run_owned(command: list[str], root: Path, on_output, *, timeout_seconds,
                     signal_group(signal.SIGTERM)
                     grace = time.monotonic() + 0.2
                     while time.monotonic() < grace:
-                        if not still_owned_work():
+                        if not still_owned_work(grace):
                             break
                         try:
                             drain(min(0.02, max(0, grace - time.monotonic())))
                         except BaseException as problem:
                             fail(str(problem) or type(problem).__name__)
-                    if still_owned_work():
+                    if still_owned_work(grace):
                         signal_group(signal.SIGKILL)
             except BaseException as problem:
                 fail('command cleanup failed: ' + (str(problem) or type(problem).__name__))
@@ -400,7 +452,7 @@ def _run_owned(command: list[str], root: Path, on_output, *, timeout_seconds,
                     fail(str(problem) or type(problem).__name__)
             if fence:
                 try:
-                    if group_has_members():
+                    if group_has_members(deadline if error is None else end):
                         fail('owned process group remains after cleanup')
                         signal_group(signal.SIGKILL)
                 except OSError as problem:

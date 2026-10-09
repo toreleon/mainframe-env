@@ -1946,4 +1946,258 @@ class PublicClientParentRootTests(unittest.TestCase):
         self.refuse_hidden_root('--r')
 
 
+class GroupCensusRescanTests(unittest.TestCase):
+    def snapshots(self, observations):
+        from contextlib import contextmanager
+        from types import SimpleNamespace
+        scans, reads, current = [], [], [None]
+        @contextmanager
+        def scan(root):
+            self.assertEqual(root, '/proc')
+            current[0] = observations[min(len(scans), len(observations) - 1)]
+            scans.append(tuple(name for name, value in current[0]))
+            yield iter(SimpleNamespace(name=name, path='/proc/' + name)
+                       for name, value in current[0])
+        def read(path):
+            self.assertEqual(path.name, 'stat')
+            reads.append(path.parent.name)
+            value = dict(current[0])[path.parent.name]
+            if callable(value):
+                value = value()
+            if isinstance(value, BaseException):
+                raise value
+            return value
+        @contextmanager
+        def context():
+            with patch.object(ci.os, 'scandir', scan), patch.object(Path, 'read_bytes', read):
+                yield scans, reads
+        return context()
+
+    def owner(self, observations):
+        from types import SimpleNamespace
+        read_fd, write_fd = os.pipe()
+        os.write(write_fd, b'actual partial'); os.close(write_fd)
+        process = Mock(pid=987654321, stdout=os.fdopen(read_fd, 'rb'), stderr=None)
+        events, chunks, reaped = [], [], [False]
+        actual_census = ci._linux_group_has_members
+        def census(pgid):
+            self.assertEqual(pgid, 987654321)
+            self.assertFalse(reaped[0]); events.append('census')
+            return actual_census(pgid)
+        def observe(kind, pid, flags):
+            self.assertFalse(reaped[0]); events.append('observe')
+            self.assertEqual((kind, pid), (os.P_PID, 987654321))
+            self.assertTrue(flags & os.WNOWAIT)
+            return SimpleNamespace(si_pid=pid, si_code=os.CLD_EXITED, si_status=0)
+        def kill(pgid, signum):
+            self.assertFalse(reaped[0]); events.append('signal')
+            self.assertEqual(pgid, 987654321)
+        def wait(**kwargs):
+            events.append('wait'); reaped[0] = True
+            return 0
+        process.wait.side_effect = wait
+        try:
+            with self.snapshots(observations) as (scans, reads), \
+                    patch.object(ci, '_validate_limits', return_value=None), \
+                    patch.object(ci.subprocess, 'Popen', return_value=process), \
+                    patch.object(ci.os, 'waitid', side_effect=observe), \
+                    patch.object(ci.os, 'killpg', side_effect=kill), \
+                    patch.object(ci, '_linux_group_has_members', side_effect=census):
+                result = ci._run_owned(['never-executed'], ROOT,
+                    lambda stream, data: chunks.append(data), timeout_seconds=.5)
+        finally:
+            process.stdout.close()
+        process.poll.assert_not_called()
+        self.assertEqual(events.count('wait'), 1)
+        self.assertEqual(events[events.index('wait') + 1:], [])
+        return result, events, scans, reads, chunks
+
+    def test_transient_enoent_aborts_whole_scan_then_accepts_complete_empty(self):
+        with self.snapshots([
+                [('42', OSError(2, 'vanished')), ('43', b'43 (unread) S 1 987654321 0')],
+                [('44', b'44 (new snapshot) S 1 1 0')]]) as (scans, reads):
+            self.assertFalse(ci._linux_group_observation(987654321, time.monotonic() + 1))
+        self.assertEqual(scans, [('42', '43'), ('44',)])
+        self.assertEqual(reads, ['42', '44'])
+
+    def test_transient_esrch_requires_another_whole_scan(self):
+        with self.snapshots([
+                [('42', OSError(3, 'vanished'))],
+                [('44', b'44 (complete) S 1 1 0')]]) as (scans, reads):
+            self.assertFalse(ci._linux_group_observation(987654321, time.monotonic() + 1))
+        self.assertEqual(scans, [('42',), ('44',)])
+        self.assertEqual(reads, ['42', '44'])
+
+    def test_disappearing_parent_new_child_is_positive_on_fresh_scan(self):
+        with self.snapshots([
+                [('42', OSError(2, 'parent disappeared'))],
+                [('44', b'44 (forked child) R 1 987654321 0')], []]) as (scans, reads):
+            self.assertTrue(ci._linux_group_observation(987654321, time.monotonic() + 1))
+        self.assertEqual(scans, [('42',), ('44',)])
+        self.assertEqual(reads, ['42', '44'])
+
+    def test_positive_member_is_not_overwritten_or_retried(self):
+        with self.snapshots([
+                [('42', b'42 (owned zombie) Z 1 987654321 0'), ('43', OSError(2, 'vanished'))],
+                []]) as (scans, reads):
+            self.assertTrue(ci._linux_group_observation(987654321, time.monotonic() + 1))
+        self.assertEqual(scans, [('42', '43')])
+        self.assertEqual(reads, ['42'])
+
+    def test_always_disappearing_refuses_after_at_most_three_whole_scans(self):
+        with self.snapshots([[('42', OSError(2, 'vanished'))]]) as (scans, reads):
+            with self.assertRaises(OSError):
+                ci._linux_group_observation(987654321, time.monotonic() + 1)
+        self.assertEqual(scans, [('42',), ('42',), ('42',)])
+        self.assertEqual(reads, ['42', '42', '42'])
+
+    def test_permission_io_and_malformed_metadata_refuse_without_retry(self):
+        for value in [OSError(13, 'unreadable'), OSError(5, 'I/O failure'), b'malformed stat']:
+            with self.subTest(value=value), self.snapshots([[('42', value)], []]) as (scans, reads):
+                with self.assertRaises(OSError):
+                    ci._linux_group_observation(987654321, time.monotonic() + 1)
+                self.assertEqual(scans, [('42',)])
+                self.assertEqual(reads, ['42'])
+
+    def test_scandir_disappearance_is_not_numeric_stat_disappearance(self):
+        with patch.object(ci.os, 'scandir', side_effect=OSError(2, 'proc unavailable')) as scan:
+            with self.assertRaises(OSError):
+                ci._linux_group_observation(987654321, time.monotonic() + 1)
+        self.assertEqual(scan.call_count, 1)
+
+    def test_iterator_disappearance_is_not_numeric_stat_disappearance(self):
+        from contextlib import contextmanager
+        calls = []
+        def entries():
+            raise OSError(2, 'proc iteration disappeared')
+            yield from ()
+        @contextmanager
+        def scan(root):
+            calls.append(root)
+            yield entries()
+        with patch.object(ci.os, 'scandir', scan), patch.object(Path, 'read_bytes') as read:
+            with self.assertRaises(OSError):
+                ci._linux_group_observation(987654321, time.monotonic() + 1)
+        self.assertEqual(calls, ['/proc'])
+        read.assert_not_called()
+
+    def test_over_limit_scan_refuses_without_retry(self):
+        from contextlib import contextmanager
+        from types import SimpleNamespace
+        calls = []
+        @contextmanager
+        def scan(root):
+            calls.append(root)
+            yield (SimpleNamespace(name=str(pid), path='/proc/' + str(pid))
+                   for pid in range(100000, 165537))
+        with patch.object(ci.os, 'scandir', scan), \
+                patch.object(Path, 'read_bytes', return_value=b'42 (other) S 1 1 0') as read, \
+                patch.object(ci.time, 'monotonic', return_value=0):
+            with self.assertRaisesRegex(OSError, '65536'):
+                ci._linux_group_observation(987654321, 1)
+        self.assertEqual(calls, ['/proc'])
+        self.assertEqual(read.call_count, 65536)
+
+    def test_retry_does_not_refresh_fifty_millisecond_allowance(self):
+        clock = [0.0]
+        def vanished():
+            clock[0] = .04
+            raise OSError(2, 'vanished')
+        def late_empty():
+            clock[0] = .051
+            return b'44 (other) S 1 1 0'
+        with patch.object(ci.time, 'monotonic', side_effect=lambda: clock[0]), \
+                self.snapshots([[('42', vanished)], [('44', late_empty)]]) as (scans, reads):
+            with self.assertRaisesRegex(OSError, 'deadline'):
+                ci._linux_group_observation(987654321, 1)
+        self.assertEqual(scans, [('42',), ('44',)])
+        self.assertEqual(reads, ['42', '44'])
+
+    def test_caller_deadline_clamps_and_late_complete_empty_refuses(self):
+        clock = [0.0]
+        def late_empty():
+            clock[0] = .01
+            return b'42 (other) S 1 1 0'
+        with patch.object(ci.time, 'monotonic', side_effect=lambda: clock[0]), \
+                self.snapshots([[('42', late_empty)]]) as (scans, reads):
+            with self.assertRaisesRegex(OSError, 'deadline'):
+                ci._linux_group_observation(987654321, .01)
+        self.assertEqual(scans, [('42',)])
+        self.assertEqual(reads, ['42'])
+
+    def test_expired_boundary_never_starts_a_fresh_scan(self):
+        with patch.object(ci.time, 'monotonic', return_value=.02), \
+                patch.object(ci.os, 'scandir') as scan:
+            with self.assertRaisesRegex(OSError, 'deadline'):
+                ci._linux_group_observation(987654321, .01)
+        scan.assert_not_called()
+
+    def test_mid_scan_expiry_refuses_before_next_numeric_stat(self):
+        clock = [0.0]
+        def first():
+            clock[0] = .05
+            return b'42 (other) S 1 1 0'
+        with patch.object(ci.time, 'monotonic', side_effect=lambda: clock[0]), \
+                self.snapshots([[('42', first), ('43', b'43 (other) S 1 1 0')]]) as (scans, reads):
+            with self.assertRaisesRegex(OSError, 'deadline'):
+                ci._linux_group_observation(987654321, 1)
+        self.assertEqual(scans, [('42', '43')])
+        self.assertEqual(reads, ['42'])
+
+    def test_deadline_is_checked_immediately_before_stat_read(self):
+        with patch.object(ci.time, 'monotonic', side_effect=[0, 0, 0, .05]), \
+                self.snapshots([[('42', b'42 (other) S 1 1 0')]]) as (scans, reads):
+            with self.assertRaisesRegex(OSError, 'deadline'):
+                ci._linux_group_observation(987654321, 1)
+        self.assertEqual(scans, [('42',)])
+        self.assertEqual(reads, [])
+
+    def test_observed_positive_wins_even_if_its_read_finishes_late(self):
+        clock = [0.0]
+        def positive():
+            clock[0] = .051
+            return b'42 (owned) R 1 987654321 0'
+        with patch.object(ci.time, 'monotonic', side_effect=lambda: clock[0]), \
+                self.snapshots([[('42', positive)], []]) as (scans, reads):
+            self.assertTrue(ci._linux_group_observation(987654321, 1))
+        self.assertEqual(scans, [('42',)])
+        self.assertEqual(reads, ['42'])
+
+    def test_scoped_deadline_resets_on_error_and_other_context_is_unbound(self):
+        from contextvars import Context
+        token = ci._LINUX_CENSUS_UNTIL.set(.7)
+        try:
+            with self.snapshots([[('42', OSError(13, 'unreadable'))]]), \
+                    patch.object(ci.time, 'monotonic', return_value=0):
+                with self.assertRaises(OSError):
+                    ci._linux_group_observation(987654321, 1)
+            self.assertEqual(ci._LINUX_CENSUS_UNTIL.get(), .7)
+            self.assertIsNone(Context().run(ci._LINUX_CENSUS_UNTIL.get))
+        finally:
+            ci._LINUX_CENSUS_UNTIL.reset(token)
+        self.assertIsNone(ci._LINUX_CENSUS_UNTIL.get())
+
+    def test_transient_owner_census_can_complete_without_signalling(self):
+        (code, error), events, scans, reads, chunks = self.owner([
+            [('42', OSError(2, 'vanished'))], [('44', b'44 (other) S 1 1 0')]])
+        self.assertEqual((code, error), (0, None))
+        self.assertNotIn('signal', events)
+        self.assertEqual(scans[:2], [('42',), ('44',)])
+        self.assertTrue(all(snapshot == ('44',) for snapshot in scans[2:]))
+        self.assertEqual(reads[:2], ['42', '44'])
+        self.assertTrue(all(pid == '44' for pid in reads[2:]))
+        self.assertEqual(b''.join(chunks), b'actual partial')
+
+    def test_fresh_child_refusal_is_not_erased_by_later_empty_cleanup(self):
+        (code, error), events, scans, reads, chunks = self.owner([
+            [('42', OSError(2, 'parent vanished'))],
+            [('44', b'44 (forked child) R 1 987654321 0')], []])
+        self.assertEqual(code, 0)
+        self.assertIn('launcher exited with remaining owned process group', error)
+        self.assertIn('signal', events)
+        self.assertEqual(scans[:2], [('42',), ('44',)])
+        self.assertEqual(reads, ['42', '44'])
+        self.assertEqual(b''.join(chunks), b'actual partial')
+
+
 if __name__=='__main__':unittest.main()
