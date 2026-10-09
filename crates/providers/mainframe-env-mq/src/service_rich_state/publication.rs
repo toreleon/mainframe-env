@@ -122,15 +122,6 @@ impl RichStoredState {
         self.plan(candidate, false, false, additions, limits)
     }
 
-    /// Explicit next persisted fence, same catalog/generation and live state.
-    /// No implicit backout/cold recovery, coordinator permit or owner retirement.
-    pub(in crate::service) fn plan_next_fence(
-        &self,
-        limits: PublicationLimits,
-    ) -> Result<RichPublicationPlan, PublicationError> {
-        self.plan(&self.delivery, true, false, Vec::new(), limits)
-    }
-
     pub(super) fn plan(
         &self,
         candidate: &MqDeliveryKernel,
