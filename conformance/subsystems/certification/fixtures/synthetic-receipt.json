@@ -30,7 +30,7 @@
         "digest": "sha256:fccd2a8e5cc24dd08aeb32754daf14ed80e9f1b20b5d9e762a1b0cfe429ceeba"
       }
     ],
-    "conformance_spec_digest": "sha256:c156b4c4f76035f1d41ee1fe988e38d2847cdb2f1dacf388f1c5200fd0a7f66b",
+    "conformance_spec_digest": "sha256:b16e455d5c5039d66dcf9c547b35b9fb1e8e3d55cd118d0c42036f84238942a6",
     "fixture_digest": "sha256:5cce953c42c1ddeca1166750f5b7a1bffb2765c4db40f289c64d8af1567b5a5b",
     "oracle_adapter_digest": "sha256:7bde0441642fff59ab28af46e815c7c1ba4f65e47ca1066aad7536a910b9873d",
     "normalization_policy_digest": "sha256:111f3304ea7c6c9f3a7d380756ebb7cc5180283b59fa4e38dc8f12d358cd2ce9",

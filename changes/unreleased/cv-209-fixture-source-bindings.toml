@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Restore the normative metadata fixture's required repository prefix and bind the zero-credit synthetic receipt and independent test expectation to the committed specification bytes."

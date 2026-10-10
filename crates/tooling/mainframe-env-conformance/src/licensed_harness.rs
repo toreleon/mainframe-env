@@ -739,7 +739,7 @@ mod tests {
                 "sha256:fccd2a8e5cc24dd08aeb32754daf14ed80e9f1b20b5d9e762a1b0cfe429ceeba".into(),
             )]),
             conformance_spec_digest:
-                "sha256:c156b4c4f76035f1d41ee1fe988e38d2847cdb2f1dacf388f1c5200fd0a7f66b".into(),
+                "sha256:b16e455d5c5039d66dcf9c547b35b9fb1e8e3d55cd118d0c42036f84238942a6".into(),
             fixture_digest:
                 "sha256:5cce953c42c1ddeca1166750f5b7a1bffb2765c4db40f289c64d8af1567b5a5b".into(),
             oracle_adapter_digest:

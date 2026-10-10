@@ -1001,7 +1001,7 @@ mod tests {
 
     #[test]
     fn normative_metadata_is_required_and_bounded() {
-        let complete = "# Contract\nStatus: **Accepted**\nOwner: maintainers\nScope: bounded contract\nApplies from: current source checkout\n";
+        let complete = "# Contract\nStatus: **Accepted**\nOwner: maintainers\nScope: bounded contract\nApplies from: mainframe-env current source checkout\n";
         assert!(normative_metadata("docs/contract.md", complete).is_ok());
         assert!(normative_metadata("docs/contract.md", "# Contract\nStatus: Accepted\n").is_err());
     }
