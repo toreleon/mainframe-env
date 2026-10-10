@@ -121,7 +121,6 @@ impl MqMqiAdmitted<'_> {
     }
 }
 
-#[derive(Debug)]
 #[must_use = "admission does not execute an MQI call or authorize resource mutation"]
 pub(crate) enum MqMqiAdmission<'a> {
     ServiceValidation(MqMqiAdmitted<'a>),
@@ -131,6 +130,26 @@ pub(crate) enum MqMqiAdmission<'a> {
     },
     /// Source-exact direct-call condition. No provider state was inspected.
     ForbiddenContext(Box<MqMqiResult>),
+}
+
+// Preserve diagnostics for unsupported admissions, including their retained
+// original identity and pending reason.
+impl std::fmt::Debug for MqMqiAdmission<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ServiceValidation(identity) => {
+                f.debug_tuple("ServiceValidation").field(identity).finish()
+            }
+            Self::Pending { identity, reason } => f
+                .debug_struct("Pending")
+                .field("identity", identity)
+                .field("reason", reason)
+                .finish(),
+            Self::ForbiddenContext(result) => {
+                f.debug_tuple("ForbiddenContext").field(result).finish()
+            }
+        }
+    }
 }
 
 fn controls(
