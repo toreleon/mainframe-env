@@ -355,10 +355,12 @@ class ExecutionOwnershipTests(unittest.TestCase):
     @unittest.skipUnless(sys.platform == 'linux' and hasattr(os, 'fork'), 'Linux launched-group fixture')
     def test_real_descendant_timeout_closes_group_before_restore_and_cleanup(self):
         receipt = {}
+        # Parent and child share an unbuffered pipe. Each identity record must
+        # be one write below PIPE_BUF; multi-argument print can interleave.
         child_script = '''import os, signal, time
 child = os.fork()
 if child == 0:
-    print('CHILD', os.getpid(), os.getpgrp(), flush=True)
+    os.write(1, f'CHILD {os.getpid()} {os.getpgrp()}\\n'.encode())
     while True:
         for name in ('CARGO_TARGET_DIR', 'CARGO_BUILD_BUILD_DIR'):
             with open(os.path.join(os.environ[name], 'child-artifact'), 'w') as stream:
@@ -366,10 +368,10 @@ if child == 0:
         time.sleep(.005)
 def stop(signum, frame):
     pid, status = os.waitpid(child, 0)
-    print('REAPED', pid, status, flush=True)
+    os.write(1, f'REAPED {pid} {status}\\n'.encode())
     raise SystemExit(0)
 signal.signal(signal.SIGTERM, stop)
-print('PARENT', os.getpid(), os.getpgrp(), flush=True)
+os.write(1, f'PARENT {os.getpid()} {os.getpgrp()}\\n'.encode())
 while True:
     time.sleep(.01)
 '''
@@ -382,6 +384,8 @@ while True:
                 (snapshot / 'source.rs').write_text('MUTANT')
                 result = module.execute(owner, log, 1, [sys.executable, '-u', '-c', child_script])
                 receipt['execution'] = result
+                print(json.dumps({'fixture': 'real descendant diagnostic', 'execution': result,
+                                  'process_trace': log.read_text()}, sort_keys=True))
                 self.assertEqual(result['classification'], 'timed_out')
                 self.assertEqual(result['killing_tests'], [])
                 self.assertTrue(result['process_supervision']['group_closed'])
