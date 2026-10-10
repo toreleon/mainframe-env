@@ -2,6 +2,7 @@
   "schema_version": "mainframe-env.coverage-dependency-additions@1",
   "target_subsystem": "coverage.foundation",
   "edges": [
+    ["mainframe-env-batch", "mainframe-env-application"],
     ["mainframe-env-cics", "mainframe-env-source"],
     ["mainframe-env-cli", "mainframe-env-cics"],
     ["mainframe-env-cli", "mainframe-env-db2"],
