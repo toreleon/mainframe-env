@@ -165,8 +165,8 @@ fn publication_fencing_sqlite_subprocess_install_and_rollback_restart() {
     for rollback in [false, true] {
         let points = windows(Outcome::ExitAfter);
         for (point, boundary) in points.iter().enumerate() {
-            let root = test_config().artifact_root;
-            std::fs::create_dir_all(&root).unwrap();
+            let (config, _directory) = test_config();
+            let root = config.artifact_root;
             for (ordinal, (phase, expected_exit)) in [
                 ("setup", 0),
                 ("crash", 86),
