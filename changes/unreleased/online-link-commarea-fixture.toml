@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Installed and selected a real CICS child program in the online LINK COMMAREA test so it exercises the selected-program route instead of the uninstalled batch IEFBR14 target (#397)."

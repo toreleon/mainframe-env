@@ -21175,7 +21175,7 @@ mod tests {
     #[test]
     fn online_link_updates_typed_commarea_through_selected_program_route() {
         let limits = SourceLimits::default();
-        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. LINKER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 LINK-AREA PIC X(160) VALUE X'7B22706172616D65746572223A6E756C6C2C22646473223A5B5D7D'.\n01 LINK-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS LINK PROGRAM('IEFBR14') COMMAREA(LINK-AREA) LENGTH(LENGTH OF LINK-AREA) DATALENGTH(1) END-EXEC.\nMOVE EIBFN TO LINK-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. LINKER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 LINK-AREA PIC X(160) VALUE X'7B22706172616D65746572223A6E756C6C2C22646473223A5B5D7D'.\n01 LINK-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS LINK PROGRAM('LNKCHLD') COMMAREA(LINK-AREA) LENGTH(LENGTH OF LINK-AREA) DATALENGTH(1) END-EXEC.\nMOVE EIBFN TO LINK-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
         let path = LogicalPath::new("LINKER.cbl", limits.max_path_bytes).unwrap();
         let bundle = SourceBundle::new(
             &path,
@@ -21206,17 +21206,30 @@ mod tests {
             CompilerResult::Published { artifact, .. } => artifact,
             other => panic!("LINK fixture did not publish: {other:?}"),
         };
+        let child = published_source_fixture(
+            "LNKCHLD",
+            concat!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. LNKCHLD. DATA DIVISION. LINKAGE SECTION. ",
+                "01 DFHCOMMAREA PIC X(160). PROCEDURE DIVISION USING DFHCOMMAREA. ",
+                "MOVE '{\"return_code\":0}' TO DFHCOMMAREA. GOBACK."
+            ),
+        );
+        let child_ref = ArtifactRef::new(
+            child.content_id().to_reference(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
         let server = ProductServer::memory(config()).unwrap();
         server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
         server
             .racf
-            .define_profile("FACILITY", "CICS.PROGRAM.IEFBR14", "IBMUSER", None)
+            .define_profile("FACILITY", "CICS.PROGRAM.LNKCHLD", "IBMUSER", None)
             .unwrap();
         server
             .racf
             .permit(
                 "FACILITY",
-                "CICS.PROGRAM.IEFBR14",
+                "CICS.PROGRAM.LNKCHLD",
                 "IBMUSER",
                 AccessIntent::Execute,
             )
@@ -21228,13 +21241,16 @@ mod tests {
         .unwrap();
         server
             .install_online_application(OnlineApplicationDefinition {
-                programs: vec![OnlineProgramDefinition {
-                    name: "LINKER".into(),
-                    artifact: artifact_ref.clone(),
-                    payload: artifact.payload().to_vec(),
-                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
-                    semantic_identity: artifact.semantic_id().to_reference(),
-                }],
+                programs: vec![
+                    OnlineProgramDefinition {
+                        name: "LINKER".into(),
+                        artifact: artifact_ref.clone(),
+                        payload: artifact.payload().to_vec(),
+                        manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                        semantic_identity: artifact.semantic_id().to_reference(),
+                    },
+                    OnlineProgramDefinition::current("LNKCHLD", &child),
+                ],
                 transactions: BTreeMap::from([("LK00".into(), "LINKER".into())]),
                 maps: vec![BmsMapDefinition {
                     mapset: "LINKER".into(),
@@ -21246,6 +21262,20 @@ mod tests {
                     fields: Vec::new(),
                 }],
             })
+            .unwrap();
+        server
+            .cics
+            .register_program_definitions(&[CicsProgramDefinition {
+                name: "LNKCHLD".into(),
+                generation: 1,
+                artifact: child_ref,
+                semantic_identity: child.semantic_id().to_reference(),
+                entry_offset: 0,
+                enabled: true,
+                remote: false,
+                reload: false,
+                java_status: CicsJavaStatus::NotJava,
+            }])
             .unwrap();
         let session = SessionId::new("typed-link", 64).unwrap();
         let invocation = server
