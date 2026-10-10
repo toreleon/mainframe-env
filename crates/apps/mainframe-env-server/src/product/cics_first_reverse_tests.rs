@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod cics_first_reverse_tests {
     use super::*;
-    use mainframe_env_host_api::CicsResponse;
+    use mainframe_env_host_api::{CicsDisposition, CicsResponse};
     use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
 
     const FILE: &[u8] = b"REVFILE";
@@ -507,9 +507,13 @@ mod cics_first_reverse_tests {
                     "actual_result": format!("{result:?}"),
                 })
             );
-            assert!(
-                matches!(result, Err(HostProblem::Condition { ref name, response: 16, .. })
-                if name == "INVREQ"),
+            assert_eq!(
+                result,
+                Err(GatewayProblem::new(
+                    StatusCode::CONFLICT,
+                    "condition",
+                    "host service failed: Condition { name: \"INVREQ\", response: 16, response2: 0 }",
+                )),
                 "real captured cursor must be absent: {result:?}"
             );
         }
