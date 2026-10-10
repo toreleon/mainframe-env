@@ -31,6 +31,16 @@ def digest(path: Path) -> str:
 
 
 class SupplyChainTests(unittest.TestCase):
+    def test_archive_name_refuses_control_boundaries_and_preserves_unicode(self):
+        for character in ("\x00", "\x09", "\x1f", "\x7f", "\x80", "\x85", "\x9f"):
+            with self.subTest(codepoint=ord(character)):
+                with self.assertRaises(supply_chain.SupplyChainError):
+                    supply_chain.archive_name("package/a" + character + "b", "package")
+        for character in (" ", "~", "\xa0", "é", "界", "😀"):
+            name = "package/a" + character + "b"
+            with self.subTest(codepoint=ord(character)):
+                self.assertEqual(supply_chain.archive_name(name, "package"), name)
+
     def test_archive_name_preserves_components_and_utf8_byte_boundaries(self):
         for name in ("package/.env", "package/..name", "package/a b/é",
                      "package/" + "x" * 4088, "package/" + "é" * 2044):

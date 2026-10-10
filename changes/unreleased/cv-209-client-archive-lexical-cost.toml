@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Reduce repeated canonical archive-path control, depth and ancestor work while preserving all public-client hashes, SRI, identities, descriptor fences and original inclusive action/phase limits."

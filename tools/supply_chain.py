@@ -37,6 +37,7 @@ SAFE_ID = re.compile(r"[a-z0-9][a-z0-9-]{0,127}\Z")
 SAFE_VERSION = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,191}\Z")
 ACTION = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+@[0-9a-f]{40}\Z")
 IMAGE = re.compile(r"[^\s@]+@sha256:[0-9a-f]{64}\Z")
+PROFILE_CONTROLS = re.compile(r"[\x00-\x1f\x7f-\x9f]")
 MAX_JSON_BYTES = 1024 * 1024
 MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
 MAX_TREE_FILES = 200_000
@@ -379,7 +380,7 @@ def archive_name(value: str, root: str, directory: bool = False) -> str:
     # every archive/tree entry; no filesystem authority is inferred here.
     require(bool(name) and len(name.encode("utf-8")) <= 4096
             and all(part not in {"", ".", ".."} for part in parts)
-            and "\\" not in name and not any(ord(c) < 32 or 127 <= ord(c) <= 159 for c in name)
+            and "\\" not in name and PROFILE_CONTROLS.search(name) is None
             and parts[0] == root, f"unsafe profile archive path: {value!r}")
     require(directory or len(parts) > 1, "archive root is not a file")
     return name
@@ -408,7 +409,7 @@ def validate_node_archive(path: Path, node: dict) -> None:
             seen.add(name)
             if not member.isdir():
                 non_directories.add(name)
-            require(len(PurePosixPath(name).parts) <= 32 and not member.mode & 0o7000, "unsafe Node archive member")
+            require(len(name.split("/")) <= 32 and not member.mode & 0o7000, "unsafe Node archive member")
             if name in selected:
                 pin = selected[name]
                 require(member.type in {tarfile.REGTYPE, tarfile.AREGTYPE} and member.size == pin["bytes"] and member.mode == pin.get("mode", 0o644), "Node selected member size/type/mode differs")
@@ -425,7 +426,9 @@ def validate_node_archive(path: Path, node: dict) -> None:
                 bounded_integer(member.size, 0, NODE_MEMBER_BYTES, "Node member")
                 payload += member.size
                 require(payload <= NODE_PAYLOAD, "Node archive payload exceeds bound")
-    require(not any(str(parent) in non_directories for name in seen for parent in PurePosixPath(name).parents), "Node archive has non-directory ancestors")
+    require(not any("/".join(parts[:index]) in non_directories
+                    for name in seen for parts in [name.split("/")]
+                    for index in range(len(parts) - 1, 0, -1)), "Node archive has non-directory ancestors")
     require(found == set(selected), "Node archive lacks selected binary/LICENSE")
 
 
@@ -440,7 +443,7 @@ def zowe_archive_rows(path: Path, zowe: dict) -> dict[str, dict]:
             name = archive_name(member.name, "package", member.isdir())
             require(name not in seen and len(seen) < limits["files"] + ZOWE_DIRECTORIES, "duplicate or excessive Zowe archive entries")
             seen.add(name)
-            require(len(PurePosixPath(name).parts) <= limits["max_depth"], "Zowe archive depth exceeds bound")
+            require(len(name.split("/")) <= limits["max_depth"], "Zowe archive depth exceeds bound")
             require(member.type in {tarfile.REGTYPE, tarfile.AREGTYPE, tarfile.DIRTYPE}, "unexpected Zowe archive entry type")
             require(member.mode in limits["modes"], "Zowe archive mode differs")
             if member.isdir():
@@ -453,7 +456,8 @@ def zowe_archive_rows(path: Path, zowe: dict) -> dict[str, dict]:
             total += member.size
             require(total <= limits["bytes"], "Zowe archive payload exceeds bound")
             rows[name] = {"path": name, "bytes": member.size, "sha256": member_hash(archive, member), "mode": member.mode}
-    parents = {str(parent) for name in rows for parent in PurePosixPath(name).parents if str(parent) != "."}
+    parents = {"/".join(parts[:index]) for name in rows for parts in [name.split("/")]
+               for index in range(1, len(parts))}
     require(not set(rows) & parents and directories <= parents and len(parents) <= ZOWE_DIRECTORIES, "Zowe archive has file ancestors or unexpected directories")
     require(len(rows) == limits["files"] and total == limits["bytes"], "Zowe archive totals differ")
     return rows
