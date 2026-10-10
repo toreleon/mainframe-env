@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Add a dedicated Linux per-command resource witness that defers TERM while reaping its actual direct and adopted children. Preserve the existing supervisor's command, output, census and cleanup bounds; primary wait4 usage stays separate from adopted waits. SIGKILL or uncertain children still refuse closure, and historical timeout receipts remain failed."
