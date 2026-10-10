@@ -5,6 +5,8 @@
 mod license_notices_cli;
 
 #[cfg(test)]
+mod batch_controller_policy_tests;
+#[cfg(test)]
 mod carddemo_base_batch_provenance;
 mod carddemo_host_integration;
 mod carddemo_readacct;
@@ -9194,7 +9196,20 @@ fn check_db2_catalog(root: &Path) -> TaskResult {
 fn check_batch_controllers(root: &Path) -> TaskResult {
     let service_path = root.join("crates/apps/mainframe-env-batch/src/service.rs");
     let controller_path = root.join("crates/apps/mainframe-env-batch/src/controller.rs");
-    let production_service = production_scanner::read_source(root, &service_path)?;
+    let mut production_service = production_scanner::read_source(root, &service_path)?;
+    production_service.push_str(&production_scanner::read_linked_source(
+        root,
+        &service_path,
+        "publication",
+        "BatchPublicationWrite",
+    )?);
+    for module in ["program_dispatch", "ims_controller"] {
+        production_service.push_str(&production_scanner::read_linked_module_source(
+            root,
+            &service_path,
+            module,
+        )?);
+    }
     let production_controller = production_scanner::read_source(root, &controller_path)?;
     let production = format!("{production_service}\n{production_controller}").to_ascii_uppercase();
     for forbidden in [
@@ -9245,17 +9260,24 @@ fn check_batch_controllers(root: &Path) -> TaskResult {
             &format!("batch controller service integration omits {required}"),
         )?;
     }
-    let production_product = production_scanner::read_source(
-        root,
-        &root.join("crates/apps/mainframe-env-server/src/product.rs"),
-    )?;
+    let product_path = root.join("crates/apps/mainframe-env-server/src/product.rs");
+    let production_product = production_scanner::read_source(root, &product_path)?;
+    let production_decoder =
+        production_scanner::read_linked_module_source(root, &product_path, "batch_controller")?;
     require(
         production_product.contains("pub fn publish_application_generation")
             && production_product.contains("selected_application_v2")
-            && production_product.contains("apply_application_batch_controllers")
+            && production_product.contains("self.prevalidate_application_publication(")
+            && production_product.contains("writer.install_controllers(plan.controllers)")
             && production_product.contains("BatchControllerProgram")
-            && production_product.contains("decode_application_batch_controller")
-            && !production_product.contains("selected_identity: &str"),
+            && production_decoder.contains("fn prevalidate_application_publication(")
+            && production_decoder.contains("selected: &SelectedApplicationGeneration")
+            && production_decoder.contains("let package = selected.package();")
+            && production_decoder
+                .contains("decode_application_batch_controller(package, controller)")
+            && production_decoder.contains("identity: selected.record().identity.clone()")
+            && !production_product.contains("selected_identity: &str")
+            && !production_decoder.contains("selected_identity: &str"),
         "composition does not derive controllers from a verified selected package handle",
     )?;
     let contracts_path = root.join("conformance/subsystems/coverage/inventory/contracts.json");

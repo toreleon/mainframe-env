@@ -249,8 +249,18 @@ def between(source: str, start: str, end: str) -> str:
 
 def linked_production(parent: Path, module: str, exported: str) -> str:
     """Follow one plain private module and its explicit public re-export."""
+    return _linked_production(parent, module, exported)
+
+
+def linked_module_production(parent: Path, module: str) -> str:
+    """Follow one actual plain private module without requiring a public export."""
+    return _linked_production(parent, module, None)
+
+
+def _linked_production(parent: Path, module: str, exported: str | None) -> str:
+    names = (module,) if exported is None else (module, exported)
     require(
-        all(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) for name in (module, exported)),
+        all(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) for name in names),
         "linked production source expects Rust identifiers",
     )
     source = production(parent.read_text(encoding="utf-8"))
@@ -281,11 +291,12 @@ def linked_production(parent: Path, module: str, exported: str) -> str:
         any(re.fullmatch(rf"\s*mod\s+{module}\s*;\s*", item) for item in statements),
         f"production parent omits plain private module {module}",
     )
-    require(
-        any(re.fullmatch(rf"\s*pub\s+use\s+{module}\s*::\s*{exported}\s*;\s*", item)
-            for item in statements),
-        f"production parent omits explicit re-export {module}::{exported}",
-    )
+    if exported is not None:
+        require(
+            any(re.fullmatch(rf"\s*pub\s+use\s+{module}\s*::\s*{exported}\s*;\s*", item)
+                for item in statements),
+            f"production parent omits explicit re-export {module}::{exported}",
+        )
     require(parent.suffix == ".rs" and parent.stem != "mod", "unsupported linked parent source")
     child = parent.with_suffix("") / f"{module}.rs"
     return production(child.read_text(encoding="utf-8"))
@@ -710,6 +721,13 @@ def check(root: Path) -> None:
 
 
 def main() -> None:
+    if sys.argv[1:] == ["--production-module-file"]:
+        request = json.load(sys.stdin)
+        require(isinstance(request, list) and len(request) == 2
+                and all(isinstance(item, str) for item in request),
+                "linked production module scanner expects parent and module")
+        json.dump([linked_module_production(Path(request[0]), request[1])], sys.stdout)
+        return
     if sys.argv[1:] == ["--production-linked-file"]:
         request = json.load(sys.stdin)
         require(isinstance(request, list) and len(request) == 3

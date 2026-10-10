@@ -12,6 +12,28 @@ SPEC.loader.exec_module(typed_boundaries)
 
 
 class TypedSemanticBoundaryTests(unittest.TestCase):
+    def test_linked_private_module_preserves_ownership_without_public_export(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory) / "product.rs"
+            child = Path(directory) / "product" / "dispatch.rs"
+            child.parent.mkdir()
+            child.write_text('fn execute() {}\n#[cfg(test)] mod fixtures { const NAME: &str = "COBTUPDT"; }')
+            parent.write_text("mod dispatch;")
+            production = typed_boundaries.linked_module_production(parent, "dispatch")
+            self.assertIn("fn execute()", production)
+            self.assertNotIn("COBTUPDT", production)
+            for source in (
+                "// mod dispatch;",
+                'const NAME: &str = "mod dispatch;";',
+                "#[cfg(test)] mod dispatch;",
+                "mod fixtures { mod dispatch; }",
+                '#[path = "other.rs"] mod dispatch;',
+            ):
+                with self.subTest(source=source):
+                    parent.write_text(source)
+                    with self.assertRaises(typed_boundaries.BoundaryError):
+                        typed_boundaries.linked_module_production(parent, "dispatch")
+
     def test_linked_production_requires_real_top_level_module_and_export(self):
         with tempfile.TemporaryDirectory() as directory:
             parent = Path(directory) / "product.rs"

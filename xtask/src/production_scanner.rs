@@ -51,6 +51,22 @@ pub(crate) fn read_linked_source(
         .ok_or_else(|| "linked production scanner returned no source".into())
 }
 
+pub(crate) fn read_linked_module_source(
+    root: &Path,
+    parent: &Path,
+    module: &str,
+) -> TaskResult<String> {
+    let input = serde_json::to_vec(&(parent, module)).map_err(|error| error.to_string())?;
+    let mut sources = scan(root, "--production-module-file", &input)?;
+    require(
+        sources.len() == 1,
+        "linked production module scanner returned the wrong source count",
+    )?;
+    sources
+        .pop()
+        .ok_or_else(|| "linked production module scanner returned no source".into())
+}
+
 fn scan(root: &Path, mode: &str, input: &[u8]) -> TaskResult<Vec<String>> {
     let tool = root.join("tools/check_typed_semantic_boundaries.py");
     let mut child = Command::new("python3")
@@ -211,6 +227,29 @@ fn execute(program: &str) -> bool { program.is_empty() }"#,
             let fixture = Fixture::new(source);
             let failure = read_source(&root, &fixture.path).unwrap_err();
             assert!(failure.contains("Rust delimiter"), "{source}: {failure}");
+        }
+    }
+
+    #[test]
+    fn linked_private_module_requires_actual_top_level_production_declaration() {
+        let root = crate::repository_root().unwrap();
+        let fixture = Fixture::new("mod dispatch;");
+        let child_directory = fixture.path.with_extension("");
+        fs::create_dir(&child_directory).unwrap();
+        fs::write(child_directory.join("dispatch.rs"), "fn execute() {}").unwrap();
+        assert!(
+            read_linked_module_source(&root, &fixture.path, "dispatch")
+                .unwrap()
+                .contains("fn execute()")
+        );
+        for parent in [
+            "// mod dispatch;",
+            "#[cfg(test)] mod dispatch;",
+            "mod fixtures { mod dispatch; }",
+            "#[path = \"other.rs\"] mod dispatch;",
+        ] {
+            fs::write(&fixture.path, parent).unwrap();
+            assert!(read_linked_module_source(&root, &fixture.path, "dispatch").is_err());
         }
     }
 
