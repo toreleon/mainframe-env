@@ -122,9 +122,11 @@ fn with_limits(
     let scope = scope(&inv, owner(), &original, &p)?;
     let admission = admit_mqi(&scope, &inv, 1)?;
     let identity = match &admission {
-        MqMqiAdmission::ServiceValidation(identity) | MqMqiAdmission::Pending { identity, .. } => {
-            identity
-        }
+        MqMqiAdmission::ServiceValidation(identity)
+        | MqMqiAdmission::Pending {
+            _identity: identity,
+            ..
+        } => identity,
         MqMqiAdmission::ForbiddenContext(_) => panic!("test requires an admitted shape"),
     };
     let mut reply = EffectResult {

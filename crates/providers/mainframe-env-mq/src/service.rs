@@ -45,6 +45,8 @@ use rows::{commit_row_changes, load_or_migrate, load_row_map, row_changes};
 pub use selection::operations::producer::{ProducerBatchContext, ProducerGmt, ProducerSource};
 pub(crate) use selection::operations::{PointFacts, StructureFacts};
 
+// The private import planner has no production caller; retain its regressions.
+#[cfg(test)]
 #[path = "service_legacy_delivery_import.rs"]
 pub(crate) mod legacy_delivery_import;
 

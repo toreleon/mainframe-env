@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Cleared the 24 strict-lint dead-code diagnostics in the public MQ provider by compiling the private legacy import planner and test-only helpers only for tests; the production rich-state reader and its schema marker stay compiled and no behavior changes."

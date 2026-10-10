@@ -151,7 +151,7 @@ fn source_exact_syncpoint_matrix_does_not_select_a_coordinator() {
                     assert!(matches!(
                         result,
                         MqMqiAdmission::Pending {
-                            reason: MqMqiPending::ExternalUnitOfWork,
+                            _reason: MqMqiPending::ExternalUnitOfWork,
                             ..
                         }
                     ));

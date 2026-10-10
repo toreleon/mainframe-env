@@ -2,6 +2,7 @@
 //! No public selection or automatic upgrade. Admission, audit/effect composition
 //! and adoption after the full atomic transaction remain manager-owned.
 
+use super::rich_state::RICH_MARKER_SCHEMA;
 use super::*;
 use crate::delivery::checkpoint::rows::{
     DeliveryRowError, DeliveryRowIdentity, DeliveryRowLimits, DeliveryRows,
@@ -11,8 +12,6 @@ use mainframe_env_host_api::{
     MqExpiry, MqMessage, MqMessageDescriptor, MqMessageIdentifiers, MqMessageLimits,
     MqMessageOrdering, MqPersistence, MqPriority,
 };
-
-pub(crate) const RICH_MARKER_SCHEMA: &str = "mainframe-env.mq-row-store@2";
 
 #[derive(Clone, Copy, Default)]
 pub(crate) struct LegacyImportLimits {

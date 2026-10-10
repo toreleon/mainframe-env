@@ -323,7 +323,7 @@ fn callback_notification_role_and_pending_forms_never_become_commands() {
         let e = effect(&inv, &mutation(), &env);
         let scope = scope(&inv, owner(), &e, &p).unwrap();
         assert!(matches!(admit_mqi(&scope, &inv, 1).unwrap(),
-            MqMqiAdmission::Pending { identity, reason } if reason == expected && identity.owner == owner()));
+            MqMqiAdmission::Pending { _identity: identity, _reason: reason } if reason == expected && identity.owner == owner()));
         assert_eq!(registry.active_handles(), before);
     }
     let mut env = envelope();

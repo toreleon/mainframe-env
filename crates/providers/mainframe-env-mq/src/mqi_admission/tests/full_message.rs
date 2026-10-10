@@ -93,7 +93,7 @@ fn complete_message_forms_are_explicitly_unsupported_without_rewriting_original_
         assert!(matches!(
             admitted,
             MqMqiAdmission::Pending {
-                reason: MqMqiPending::StructureAndWireMapping,
+                _reason: MqMqiPending::StructureAndWireMapping,
                 ..
             }
         ));

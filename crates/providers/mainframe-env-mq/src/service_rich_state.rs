@@ -10,11 +10,14 @@ use crate::{MqDeliveryKernel, MqDeliveryLimits};
 use mainframe_env_host_api::{MqMessageLimits, MqPersistence};
 use mainframe_env_store_api::MAX_PROVIDER_STATE_SCAN;
 
+pub(super) const RICH_MARKER_SCHEMA: &str = "mainframe-env.mq-row-store@2";
+
 #[path = "service_rich_state/strict.rs"]
 mod strict;
 
 #[path = "service_rich_state/publication.rs"]
 pub(super) mod publication;
+#[cfg(test)]
 #[path = "service_rich_state/upgrade.rs"]
 mod upgrade;
 
@@ -325,7 +328,7 @@ pub(super) fn decode_records(
             validate_state(&state, limits.legacy)?;
             Ok(StoredAuthority::Legacy(DurableState { versions, state }))
         }
-        legacy_delivery_import::RICH_MARKER_SCHEMA => {
+        RICH_MARKER_SCHEMA => {
             // The replacement marker can be larger than the source manifest.
             // Retained replay keeps its old ceiling; marker/catalog overhead
             // belongs to the combined physical budget, not a phantom v1 state.
@@ -336,7 +339,7 @@ pub(super) fn decode_records(
                 serde_json::from_slice(&manifest.payload).map_err(|_| ReadError::Corrupt)?;
             if marker.target_row_prefix != PREFIX
                 || marker.legacy_next_handle == 0
-                || marker.schema_version != legacy_delivery_import::RICH_MARKER_SCHEMA
+                || marker.schema_version != RICH_MARKER_SCHEMA
                 || records.iter().any(|r| {
                     matches!(
                         r.namespace.as_str(),

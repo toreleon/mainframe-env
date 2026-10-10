@@ -126,8 +126,9 @@ impl MqMqiAdmitted<'_> {
 pub(crate) enum MqMqiAdmission<'a> {
     ServiceValidation(MqMqiAdmitted<'a>),
     Pending {
-        identity: MqMqiAdmitted<'a>,
-        reason: MqMqiPending,
+        // Production rejects pending forms; tests inspect their classification.
+        _identity: MqMqiAdmitted<'a>,
+        _reason: MqMqiPending,
     },
     /// Source-exact direct-call condition. No provider state was inspected.
     ForbiddenContext(Box<MqMqiResult>),
@@ -321,7 +322,10 @@ pub(crate) fn admit_mqi<'a>(
     };
     identity.recheck_controls(now_tick)?;
     match pending_form(&envelope.request, context.environment, context.owner) {
-        Some(reason) => Ok(MqMqiAdmission::Pending { identity, reason }),
+        Some(reason) => Ok(MqMqiAdmission::Pending {
+            _identity: identity,
+            _reason: reason,
+        }),
         None => Ok(MqMqiAdmission::ServiceValidation(identity)),
     }
 }

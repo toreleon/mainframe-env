@@ -287,6 +287,7 @@ impl Projection {
                 .collect(),
         })
     }
+    #[cfg(test)]
     fn into_live(self) -> Result<Checkpoint, MqDeliveryError> {
         Ok(Checkpoint {
             schema_version: LIVE_SCHEMA.into(),
@@ -341,6 +342,7 @@ pub(in crate::delivery) fn encode_cold(
 }
 impl MqDeliveryKernel {
     /// Strict schema-selected private storage read. Old public readers keep @1.
+    #[cfg(test)]
     pub(crate) fn decode_stored(
         bytes: &[u8],
         catalog: &MqObjectCatalog,
