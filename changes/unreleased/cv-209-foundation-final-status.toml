@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Record source-qualified Foundation validation and fresh native sandbox readiness while preserving workspace, source and process-census failures without acceptance waivers."
