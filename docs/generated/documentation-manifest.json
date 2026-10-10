@@ -2041,7 +2041,7 @@
       "path": "docs/guides/MAINFRAME-SANDBOX.md",
       "relative_links": 4,
       "scope": "Executable profiles, lifecycle and agent access",
-      "sha256": "sha256:5d58f6ac9a489cd20e123f26eea4948daaee21f653b4854e9086a4ef3a08f41a",
+      "sha256": "sha256:2ada695e5fc2211c0027214c55785350bc75986c0d614328316c1e2d22c16fc5",
       "status": "Implemented for native and container execution; Cube VM validation pending",
       "title": "Mainframe Sandbox",
       "xtask_commands": 0
