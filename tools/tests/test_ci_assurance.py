@@ -1028,7 +1028,7 @@ class CommandSupervisionReviewTests(unittest.TestCase):
                         SimpleNamespace(name='42',path='/proc/42'),SimpleNamespace(name='self')])
         for group,expected in [(987654321,True),(1,False)]:
             with self.subTest(group=group), patch.object(ci.os,'scandir',scan), \
-                    patch.object(Path,'read_bytes',return_value=f'42 (a ) name) Z 1 {group} 0'.encode()) as read:
+                    patch.object(ci,'_linux_stat_bytes',return_value=f'42 (a ) name) Z 1 {group} 0'.encode()) as read:
                 self.assertEqual(ci._linux_group_has_members(987654321),expected)
                 self.assertEqual(read.call_count,1)
 
@@ -1037,7 +1037,7 @@ class CommandSupervisionReviewTests(unittest.TestCase):
         from types import SimpleNamespace
         @contextmanager
         def scan(root): yield iter([SimpleNamespace(name='42',path='/proc/42')])
-        with patch.object(ci.os,'scandir',scan),patch.object(Path,'read_bytes',side_effect=FileNotFoundError('vanished')):
+        with patch.object(ci.os,'scandir',scan),patch.object(ci,'_linux_stat_bytes',side_effect=FileNotFoundError('vanished')):
             with self.assertRaises(OSError): ci._linux_group_has_members(987654321)
 
     def test_autoreaping_sigchld_refuses_before_launch(self):
@@ -1981,6 +1981,34 @@ class PublicClientParentRootTests(unittest.TestCase):
         self.refuse_hidden_root('--r')
 
 
+class LinuxStatReaderTests(unittest.TestCase):
+    def test_reads_complete_metadata_without_a_prefix_cap(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'stat'
+            raw = b'42 (long metadata) S 1 1 0 ' + b'0 ' * 65536
+            path.write_bytes(raw)
+            self.assertEqual(ci._linux_stat_bytes(str(path)), raw)
+
+    def test_read_error_propagates_and_closes_the_stream(self):
+        stream = Mock()
+        stream.__enter__ = Mock(return_value=stream)
+        stream.__exit__ = Mock(return_value=False)
+        stream.read.side_effect = OSError(5, 'metadata read failed')
+        with patch('builtins.open', return_value=stream), \
+                self.assertRaisesRegex(OSError, 'metadata read failed'):
+            ci._linux_stat_bytes('/proc/42/stat')
+        stream.__exit__.assert_called_once()
+
+    def test_close_error_cannot_admit_metadata(self):
+        stream = Mock()
+        stream.__enter__ = Mock(return_value=stream)
+        stream.__exit__ = Mock(side_effect=OSError(5, 'metadata close failed'))
+        stream.read.return_value = b'42 (other) S 1 1 0'
+        with patch('builtins.open', return_value=stream), \
+                self.assertRaisesRegex(OSError, 'metadata close failed'):
+            ci._linux_stat_bytes('/proc/42/stat')
+
+
 class GroupCensusRescanTests(unittest.TestCase):
     def snapshots(self, observations):
         from contextlib import contextmanager
@@ -1994,6 +2022,7 @@ class GroupCensusRescanTests(unittest.TestCase):
             yield iter(SimpleNamespace(name=name, path='/proc/' + name)
                        for name, value in current[0])
         def read(path):
+            path = Path(path)
             self.assertEqual(path.name, 'stat')
             reads.append(path.parent.name)
             value = dict(current[0])[path.parent.name]
@@ -2004,7 +2033,7 @@ class GroupCensusRescanTests(unittest.TestCase):
             return value
         @contextmanager
         def context():
-            with patch.object(ci.os, 'scandir', scan), patch.object(Path, 'read_bytes', read):
+            with patch.object(ci.os, 'scandir', scan), patch.object(ci, '_linux_stat_bytes', read):
                 yield scans, reads
         return context()
 
@@ -2110,7 +2139,7 @@ class GroupCensusRescanTests(unittest.TestCase):
         def scan(root):
             calls.append(root)
             yield entries()
-        with patch.object(ci.os, 'scandir', scan), patch.object(Path, 'read_bytes') as read:
+        with patch.object(ci.os, 'scandir', scan), patch.object(ci, '_linux_stat_bytes') as read:
             with self.assertRaises(OSError):
                 ci._linux_group_observation(987654321, time.monotonic() + 1)
         self.assertEqual(calls, ['/proc'])
@@ -2126,7 +2155,7 @@ class GroupCensusRescanTests(unittest.TestCase):
             yield (SimpleNamespace(name=str(pid), path='/proc/' + str(pid))
                    for pid in range(100000, 165537))
         with patch.object(ci.os, 'scandir', scan), \
-                patch.object(Path, 'read_bytes', return_value=b'42 (other) S 1 1 0') as read, \
+                patch.object(ci, '_linux_stat_bytes', return_value=b'42 (other) S 1 1 0') as read, \
                 patch.object(ci.time, 'monotonic', return_value=0):
             with self.assertRaisesRegex(OSError, '65536'):
                 ci._linux_group_observation(987654321, 1)

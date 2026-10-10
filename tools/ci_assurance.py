@@ -208,6 +208,14 @@ def _check_linux_census_deadline(until) -> None:
         raise OSError('owned group membership census observation deadline exceeded')
 
 
+def _linux_stat_bytes(path: str) -> bytes:
+    # scandir already supplies the absolute path. Avoid rebuilding pathlib
+    # objects for every PID within the fixed census allowance; still read the
+    # entire stat and propagate open/read/close failures.
+    with open(path, 'rb') as stream:
+        return stream.read()
+
+
 def _linux_group_has_members(pgid: int) -> bool:
     """Conservatively inspect Linux group metadata, excluding its retained leader.
 
@@ -231,7 +239,7 @@ def _linux_group_has_members(pgid: int) -> bool:
             # forked an unlisted child. Unknown membership cannot earn success.
             _check_linux_census_deadline(until)
             try:
-                raw = (Path(entry.path) / 'stat').read_bytes()
+                raw = _linux_stat_bytes(entry.path + '/stat')
             except OSError as problem:
                 if problem.errno in (errno.ENOENT, errno.ESRCH):
                     raise _LinuxCensusVanished(
