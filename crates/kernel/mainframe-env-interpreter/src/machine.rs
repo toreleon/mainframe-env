@@ -42,7 +42,15 @@ use xml_helpers::*;
 
 use typed_decimal::{decimal_add, decimal_divide, decimal_multiply, decimal_subtract};
 mod amode64_access;
+#[cfg(feature = "assurance-observers")]
+mod cics_read_copyback;
 mod completion;
+#[cfg(feature = "assurance-observers")]
+pub use cics_read_copyback::{
+    CicsReadCopybackArchive, CicsReadCopybackCell, CicsReadCopybackEffect, CicsReadCopybackOrigin,
+    CicsReadCopybackPlan, CicsReadCopybackProblem, CicsReadCopybackRecord,
+    CicsReadCopybackSelection, CicsReadCopybackSlotSelection, CicsReadCopybackValue,
+};
 mod normal_return;
 pub use normal_return::{InstalledProgramReturn, InstalledProgramReturnKind};
 mod condition_literals;
@@ -509,6 +517,8 @@ pub struct ReferenceMachine {
     deferred_drive: Option<MachineDrive<EffectRequest>>,
     // Volatile live-drive observation; deliberately absent from every snapshot.
     normal_return: Option<normal_return::NormalReturnMarker>,
+    #[cfg(feature = "assurance-observers")]
+    cics_read_copyback: Option<cics_read_copyback::Collector>,
 }
 impl ReferenceMachine {
     pub fn from_binary(
@@ -858,6 +868,8 @@ impl ReferenceMachine {
             perform_stack: Vec::new(),
             deferred_drive: None,
             normal_return: None,
+            #[cfg(feature = "assurance-observers")]
+            cics_read_copyback: None,
         };
         typed_decimal::validate_machine(&machine)?;
         typed_cics::validate_machine(&machine)?;
@@ -911,7 +923,7 @@ impl ReferenceMachine {
                     .entry_initials
                     .get(&reference.storage)
                     .cloned()
-                    .unwrap_or(bytes_attribute(&initializer, "initial")?.to_vec());
+                    .unwrap_or(layout_admission::initialization_bytes(&initializer)?);
                 machine.write_storage(reference.storage, &bytes)?;
             }
             machine.reapply_entry_context()?;
@@ -1005,6 +1017,10 @@ impl ReferenceMachine {
     }
 
     pub fn restore(&mut self, snapshot: MachineSnapshot) -> Result<(), MachineProblem> {
+        #[cfg(feature = "assurance-observers")]
+        if let Some(collector) = &mut self.cics_read_copyback {
+            collector.refuse(CicsReadCopybackProblem::Restoration);
+        }
         // The old schema has no opaque MQI alias/lifecycle references. Never
         // restore it under a new typed frame and silently mint replacement access.
         if self.mqi.is_some() || snapshot.schema_version == 0 {
@@ -1529,7 +1545,7 @@ impl ReferenceMachine {
             .entry_initials
             .get(&initial_storage_id)
             .cloned()
-            .unwrap_or(bytes_attribute(initializer, "initial")?.to_vec());
+            .unwrap_or(layout_admission::initialization_bytes(initializer)?);
         let psaptr_initial_offset = psaptr_view
             .offset
             .checked_sub(initial_storage_view.offset)
@@ -1618,6 +1634,21 @@ impl ReferenceMachine {
     }
 
     fn resume_host(&mut self, result: EffectResult) -> Result<(), MachineProblem> {
+        #[cfg(feature = "assurance-observers")]
+        if let Some(collector) = &mut self.cics_read_copyback {
+            collector.resumed(&result);
+        }
+        let outcome = self.resume_host_inner(result);
+        #[cfg(feature = "assurance-observers")]
+        if outcome.is_err()
+            && let Some(collector) = &mut self.cics_read_copyback
+        {
+            collector.refuse(CicsReadCopybackProblem::Application);
+        }
+        outcome
+    }
+
+    fn resume_host_inner(&mut self, result: EffectResult) -> Result<(), MachineProblem> {
         let pending = self
             .pending
             .take()
@@ -2034,48 +2065,8 @@ impl ReferenceMachine {
                     }
                 }
             }
-            (
-                PendingKind::Cics {
-                    operation,
-                    storage64_intent,
-                    argument_summary: _,
-                    container,
-                    into,
-                    outputs,
-                    response: response_target,
-                    response2: response2_target,
-                    address_set,
-                    no_handle,
-                },
-                HostResult::Cics(response),
-            ) => {
-                let responded = response_target.is_some() || no_handle;
-                let load_base = typed_cics::write_response_state(
-                    self,
-                    (operation, container.as_ref()),
-                    storage64_intent,
-                    response_target.as_ref(),
-                    response2_target.as_ref(),
-                    address_set.as_ref(),
-                    &outputs,
-                    &response,
-                )?;
-                let container_set_base = typed_cics::apply_payload_outputs(
-                    self,
-                    operation,
-                    into.as_ref(),
-                    &outputs,
-                    &response,
-                    load_base,
-                )?;
-                typed_cics::finish(
-                    self,
-                    operation,
-                    container.as_ref(),
-                    container_set_base,
-                    response,
-                    responded,
-                )?;
+            (kind @ PendingKind::Cics { .. }, HostResult::Cics(response)) => {
+                typed_cics::apply_reply(self, kind, response)?;
             }
             (
                 PendingKind::DatasetRead { .. }
@@ -2127,7 +2118,7 @@ impl ReferenceMachine {
                     .entry_initials
                     .get(&reference.storage)
                     .cloned()
-                    .unwrap_or(bytes_attribute(operation, "initial")?.to_vec());
+                    .unwrap_or(layout_admission::initialization_bytes(operation)?);
                 self.write_storage(reference.storage, &bytes)?;
                 self.reapply_entry_context()?;
             }
@@ -4474,6 +4465,8 @@ impl ReferenceMachine {
         effect
             .validate(HostLimits::default())
             .map_err(MachineProblem::Host)?;
+        #[cfg(feature = "assurance-observers")]
+        self.observe_read_copyback_offer(&effect, &kind);
         self.pending = Some(Pending {
             sequence: self.effect_sequence,
             kind,
@@ -4991,11 +4984,7 @@ impl ReferenceMachine {
                         (operation.identity.name() == "init"
                             && optional_text_attribute(operation, "name")
                                 .is_some_and(|name| normalize(name) == target.layout.name))
-                        .then(|| {
-                            bytes_attribute(operation, "initial")
-                                .ok()
-                                .map(<[u8]>::to_vec)
-                        })
+                        .then(|| layout_admission::initialization_bytes(operation).ok())
                         .flatten()
                     })
                 })
@@ -8935,6 +8924,7 @@ pub fn supported_operations() -> &'static BTreeSet<OperationIdentity> {
             .into_iter()
             .map(|name| OperationIdentity::new(NAMESPACE, name, 1).expect("static operation"))
             .collect::<BTreeSet<_>>();
+        operations.insert(mainframe_env_ir::cobol_chunked_initialization_identity());
         operations.extend(typed_cics::operation_identities());
         operations.extend(typed_decimal::operation_identities());
         operations
@@ -9315,16 +9305,6 @@ fn optional_integer_attribute(operation: &Operation, name: &str) -> Option<i64> 
 fn usize_attribute(operation: &Operation, name: &str) -> Result<usize, MachineProblem> {
     usize::try_from(integer_attribute(operation, name)?)
         .map_err(|_| MachineProblem::InvalidOperation)
-}
-fn bytes_attribute<'a>(operation: &'a Operation, name: &str) -> Result<&'a [u8], MachineProblem> {
-    operation
-        .attributes
-        .get(name)
-        .and_then(|value| match value {
-            Attribute::Bytes(bytes) => Some(bytes.as_slice()),
-            _ => None,
-        })
-        .ok_or(MachineProblem::InvalidOperation)
 }
 fn position(args: &[String], needle: &str) -> Option<usize> {
     args.iter().position(|arg| arg.eq_ignore_ascii_case(needle))
@@ -11453,6 +11433,7 @@ mod size_truncation_tests;
 
 #[cfg(test)]
 mod tests {
+    mod chunked_initialization_tests;
     use super::*;
     use mainframe_env_execution_api::{
         ArtifactRef, CapabilityId, ExecutionId, IdempotencyKey, Principal, PrincipalId, RequestId,

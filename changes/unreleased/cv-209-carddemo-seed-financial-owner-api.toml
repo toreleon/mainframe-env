@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Use the existing interactive invocation class for seed alias observations and preserve the complete financial step guard in Clippy-compliant form."

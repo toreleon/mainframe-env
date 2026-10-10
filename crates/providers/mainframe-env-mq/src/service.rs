@@ -60,6 +60,24 @@ mod selection;
 use selection::LegacyAccess;
 pub(crate) use selection::operations::native_terminal::SelectedTerminalPreparation;
 
+pub(crate) fn selected_custody_handoff_rows() -> Vec<mainframe_env_store_api::ProviderStateIdentity>
+{
+    let (control, key) = selection::operations::custody_control_identity();
+    [
+        (control, key),
+        (STATE_NAMESPACE, STATE_KEY),
+        (CATALOG_NAMESPACE, CATALOG_KEY),
+        crate::delivery::checkpoint::rows::custody_metadata_identity(),
+    ]
+    .into_iter()
+    .map(
+        |(namespace, key)| mainframe_env_store_api::ProviderStateIdentity {
+            namespace: namespace.into(),
+            key: key.into(),
+        },
+    )
+    .collect()
+}
 pub(crate) fn selected_terminal_namespaces() -> Vec<String> {
     [
         STATE_NAMESPACE,
@@ -268,6 +286,13 @@ pub trait MqReplayClock: Send + Sync {
     /// point observations contain panics and refuse selected-service reentry;
     /// returned ticks never replace physical core/provider dependency checks.
     fn now_tick(&self) -> Result<u64, HostProblem>;
+    /// Optional explicit custody observation from this same actual trusted
+    /// clock authority. It must return its current durable logical tick without
+    /// callbacks, service reentry, publication, cleanup or another authority.
+    /// No stale-cache/caller-selected fallback is accepted by the manager.
+    fn custody_tick(&self) -> Result<u64, HostProblem> {
+        Err(HostProblem::Unsupported)
+    }
 }
 
 pub struct MqService {
@@ -281,6 +306,7 @@ pub struct MqService {
     replay_clock: Option<Arc<dyn MqReplayClock>>,
     producer_sources: Option<selection::operations::producer::ProducerSources>,
     producer_sampling: AtomicBool,
+    selected_revoked: AtomicBool,
     pub(crate) rfh2_source:
         Option<Arc<dyn crate::trusted_batch_embedding::MqBatchLeDllCodesetSource>>,
 }
@@ -341,6 +367,7 @@ impl MqService {
             replay_clock,
             producer_sources: None,
             producer_sampling: AtomicBool::new(false),
+            selected_revoked: AtomicBool::new(false),
         }))
     }
 

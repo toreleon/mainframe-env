@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add a bounded Linux first-party CardDemo compiled mixed-load probe with unchanged default execution controls, actual ordered committed-effect overlap, independent raw READCUST output and shared/session state comparisons, and retained shutdown/cleanup evidence; keep full-profile observation publication and original physical-backend certification separate until actual validation."

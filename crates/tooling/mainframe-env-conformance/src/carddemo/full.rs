@@ -11,7 +11,9 @@ pub fn verify_carddemo_full_from_env(
             "CARDDEMO_CORPUS_DIR is required",
         )
     })?);
-    let corpus = verify_carddemo_corpus(&corpus_dir, inventory_path)?;
+    let (corpus, corpus_observations) =
+        verify_carddemo_corpus_observed(&corpus_dir, inventory_path)?;
+    route_observations.extend(corpus_observations)?;
     let cdv1 = verify_cdv1_correction(inventory_path, &corpus.commit)?;
     if env::var_os("MAINFRAME_ENV_POSTGRES_TEST_URL").is_none() {
         return Err(CorpusProblem::new(
@@ -21,7 +23,8 @@ pub fn verify_carddemo_full_from_env(
     }
 
     let package = verify_carddemo_application_package_from_env(inventory_path)?;
-    let resources = verify_carddemo_resources_from_env(inventory_path)?;
+    let (resources, source_resource_proof) =
+        source_resource_observations::verify_from_env(inventory_path)?;
     if resources.unresolved != ["CDV1->COCRDSEC"] {
         return Err(CorpusProblem::new(
             "carddemo.full.resource_correction_drift",
@@ -31,7 +34,8 @@ pub fn verify_carddemo_full_from_env(
     let (online, online_observations) =
         online_receipt::verify_carddemo_base_online_observed(inventory_path)?;
     route_observations.extend(online_observations)?;
-    let batch = verify_carddemo_base_batch_from_env(inventory_path)?;
+    let (batch, batch_observations) = verify_carddemo_base_batch_observed(inventory_path)?;
+    route_observations.extend(batch_observations)?;
     let (db2, db2_observations) = verify_carddemo_db2_observed(inventory_path)?;
     route_observations.extend(db2_observations)?;
     let ims = verify_carddemo_ims_from_env(inventory_path)?;
@@ -78,6 +82,7 @@ pub fn verify_carddemo_full_from_env(
         .map_err(|error| CorpusProblem::new("carddemo.full.runtime", error.to_string()))?;
     let exercise = runtime.block_on(exercise_full_certification())?;
     route_observations.extend(exercise.route_observations)?;
+    source_resource_proof.bind(&mut route_observations)?;
     let (journeys_passed, issues_input_passed) = authority.finish(&route_observations)?;
     let release_disposition = "source-checkout; carddemo-conformance-only".to_string();
     let owned_commands = vec![

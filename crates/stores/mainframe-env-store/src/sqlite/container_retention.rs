@@ -86,6 +86,13 @@ impl SqliteStateStore {
                 {
                     return Err(StoreError::Conflict);
                 }
+                self.root_guard_successor_identity(
+                    &mut transaction,
+                    &candidate.row.namespace,
+                    &candidate.row.key,
+                    None,
+                )
+                .await?;
                 validate_sqlite_provider_observation(&mut transaction, request.target, candidate)
                     .await?;
                 validate_sqlite_provider_dependency(&mut transaction, candidate).await?;
@@ -126,6 +133,15 @@ impl SqliteStateStore {
                 {
                     return Err(StoreError::Conflict);
                 }
+            }
+            if let Some((_, _, replacement)) = &capacity {
+                self.root_guard_successor_identity(
+                    &mut transaction,
+                    &replacement.record.namespace,
+                    &replacement.record.key,
+                    Some(&replacement.record.payload),
+                )
+                .await?;
             }
             insert_sqlite_archive(&mut transaction, &archive, storage_bytes).await?;
             for candidate in &candidates {

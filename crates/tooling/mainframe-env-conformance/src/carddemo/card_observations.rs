@@ -257,6 +257,14 @@ fn state_matches(state: &CardState, rewritten: bool) -> bool {
             .eq(AIX_ORDER.into_iter().map(|position| PRIMARY_KEYS[position]))
 }
 
+// Exact independently frozen admitted rewrite on both views; versions must not move.
+pub(super) fn unchanged_rewritten(before: &CardState, after: &CardState) -> bool {
+    state_matches(before, true)
+        && state_matches(after, true)
+        && before.base.version == after.base.version
+        && before.index.version == after.index.version
+}
+
 pub(super) fn require_seed(state: &CardState) -> Result<(), CorpusProblem> {
     if !state_matches(state, false) {
         return Err(drift(
@@ -345,6 +353,33 @@ mod tests {
         assert_eq!(error.code, "carddemo.online.card_base_index_drift");
         assert!(observations.journeys().is_empty());
         assert!(observations.issues().is_empty());
+    }
+
+    #[test]
+    fn selected_read_only_navigation_refuses_raw_mutation_identity_or_version_drift() {
+        let before = state(true, 5, 8);
+        assert!(unchanged_rewritten(&before, &before));
+        let mut after = before.clone();
+        after.base.records[0][30] ^= 1;
+        assert!(!unchanged_rewritten(&before, &after));
+        let mut after = before.clone();
+        after.index.records[1][90] ^= 1;
+        assert!(!unchanged_rewritten(&before, &after));
+        let mut after = before.clone();
+        after.base.identities.swap(0, 1);
+        assert!(!unchanged_rewritten(&before, &after));
+        let mut after = before.clone();
+        after.index.identities.pop();
+        assert!(!unchanged_rewritten(&before, &after));
+        let mut after = before.clone();
+        after.index.records.push(after.index.records[0].clone());
+        assert!(!unchanged_rewritten(&before, &after));
+        let mut after = before.clone();
+        after.base.version += 1;
+        after.base.attributes_version += 1;
+        after.base.catalog.version += 1;
+        assert!(!unchanged_rewritten(&before, &after));
+        assert!(!unchanged_rewritten(&before, &state(false, 5, 8)));
     }
 
     #[test]

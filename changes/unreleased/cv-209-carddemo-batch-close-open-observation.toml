@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Prepare private pinned CLOSEFIL/OPENFIL observations from five named CICS states and complete ordered CMDOUT after the original batch restart checks and checked cleanup; preserve public receipts and execution bounds."

@@ -99,6 +99,8 @@ pub struct BmsField {
     pub attributes: Vec<String>,
     pub justify: Vec<String>,
     pub initial: Option<String>,
+    /// Explicit declared DFHMDF operands; no implicit macro defaults.
+    pub options: BTreeMap<String, String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -111,6 +113,33 @@ pub struct BmsMap {
     pub column: Option<usize>,
     pub size: Option<(usize, usize)>,
     pub fields: Vec<BmsField>,
+    /// Explicit opening DFHMSD operands; closing TYPE=FINAL is not a default.
+    pub mapset_options: BTreeMap<String, String>,
+    /// Explicit DFHMDI operands.
+    pub map_options: BTreeMap<String, String>,
+}
+
+impl BmsMap {
+    fn field_option<'a>(&'a self, field: &'a BmsField, key: &str) -> Option<&'a str> {
+        field
+            .options
+            .get(key)
+            .or_else(|| self.map_options.get(key))
+            .or_else(|| self.mapset_options.get(key))
+            .map(String::as_str)
+    }
+
+    /// Declared field > map > mapset COLOR, without terminal capability/default resolution.
+    #[must_use]
+    pub fn field_color<'a>(&'a self, field: &'a BmsField) -> Option<&'a str> {
+        self.field_option(field, "COLOR")
+    }
+
+    /// Declared field > map > mapset HILIGHT, without terminal capability/default resolution.
+    #[must_use]
+    pub fn field_highlight<'a>(&'a self, field: &'a BmsField) -> Option<&'a str> {
+        self.field_option(field, "HILIGHT")
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -330,24 +359,30 @@ impl ProgramFrames {
 }
 
 pub fn parse_bms(source: &str) -> Result<BmsMap, InstallProblem> {
-    let statements = continued_statements(source);
+    let statements = continued_statements(source)?;
     let mut mapset = None;
     let mut map = None;
     let mut line = None;
     let mut column = None;
     let mut size = None;
     let mut fields = Vec::new();
+    let mut mapset_options = BTreeMap::new();
+    let mut map_options = BTreeMap::new();
     for statement in statements {
         let upper = statement.to_ascii_uppercase();
         let words = upper.split_whitespace().collect::<Vec<_>>();
         if let Some(index) = words.iter().position(|word| *word == "DFHMSD") {
             if mapset.is_none() {
+                let operands = upper.find("DFHMSD").expect("macro token") + "DFHMSD".len();
+                mapset_options = crate::bms_options::parse_operands(&statement[operands..])?;
                 mapset = index
                     .checked_sub(1)
                     .and_then(|index| words.get(index))
                     .map(|value| (*value).into());
             }
         } else if let Some(index) = words.iter().position(|word| *word == "DFHMDI") {
+            let operands = upper.find("DFHMDI").expect("macro token") + "DFHMDI".len();
+            map_options = crate::bms_options::parse_operands(&statement[operands..])?;
             map = index
                 .checked_sub(1)
                 .and_then(|index| words.get(index))
@@ -369,6 +404,9 @@ pub fn parse_bms(source: &str) -> Result<BmsMap, InstallProblem> {
                 attributes: list_property(&upper, "ATTRB"),
                 justify: list_property(&upper, "JUSTIFY"),
                 initial: quoted_property(&statement, "INITIAL"),
+                options: crate::bms_options::parse_operands(
+                    &statement[upper.find("DFHMDF").expect("macro token") + "DFHMDF".len()..],
+                )?,
             });
         }
     }
@@ -379,6 +417,8 @@ pub fn parse_bms(source: &str) -> Result<BmsMap, InstallProblem> {
         column,
         size,
         fields,
+        mapset_options,
+        map_options,
     })
 }
 
@@ -453,26 +493,58 @@ pub fn parse_csd(source: &str) -> Result<Vec<CsdResource>, InstallProblem> {
     Ok(resources)
 }
 
-fn continued_statements(source: &str) -> Vec<String> {
+// A line beginning '*' is a comment only outside an open quoted operand.
+// This preserves the pinned CardDemo 47+23-star INITIAL continuation as one
+// literal and the following DFHMDF as a separate statement. Physical assembler
+// column/sequence-field semantics are not claimed by this host-text parser.
+fn continued_statements(source: &str) -> Result<Vec<String>, InstallProblem> {
     let mut statements = Vec::new();
     let mut current = String::new();
+    let mut quote = None;
     for line in source.lines() {
         let trimmed = line.trim_end();
-        if trimmed.trim_start().starts_with('*') || trimmed.trim().is_empty() {
+        if trimmed.trim().is_empty() || quote.is_none() && trimmed.trim_start().starts_with('*') {
             continue;
         }
-        if !current.is_empty() {
+        if !current.is_empty() && quote.is_none() {
             current.push(' ');
         }
-        current.push_str(trimmed.trim_end_matches('-').trim());
-        if !trimmed.ends_with('-') {
+        let continued = trimmed.ends_with('-');
+        let content = if continued {
+            &trimmed[..trimmed.len() - 1]
+        } else {
+            trimmed
+        }
+        .trim_start();
+        current.push_str(content);
+        let mut chars = content.chars().peekable();
+        while let Some(ch) = chars.next() {
+            if let Some(delimiter) = quote {
+                if ch == delimiter {
+                    if chars.peek() == Some(&delimiter) {
+                        chars.next();
+                    } else {
+                        quote = None;
+                    }
+                }
+            } else if matches!(ch, '\'' | '"') {
+                quote = Some(ch);
+            }
+        }
+        if !continued {
+            if quote.is_some() {
+                return Err(InstallProblem::InvalidIdentity);
+            }
             statements.push(std::mem::take(&mut current));
         }
+    }
+    if quote.is_some() {
+        return Err(InstallProblem::InvalidIdentity);
     }
     if !current.is_empty() {
         statements.push(current);
     }
-    statements
+    Ok(statements)
 }
 
 fn scalar_property(source: &str, name: &str) -> Option<usize> {
@@ -515,8 +587,21 @@ fn quoted_property(source: &str, name: &str) -> Option<String> {
     if !matches!(quote, '\'' | '"') {
         return property(&source.to_ascii_uppercase(), name).map(str::to_string);
     }
-    let tail = &source[start + quote.len_utf8()..];
-    Some(tail.split(quote).next()?.to_string())
+    let mut chars = source[start + quote.len_utf8()..].chars().peekable();
+    let mut value = String::new();
+    while let Some(ch) = chars.next() {
+        if ch == quote {
+            if chars.peek() == Some(&quote) {
+                chars.next();
+                value.push(quote);
+            } else {
+                return Some(value);
+            }
+        } else {
+            value.push(ch);
+        }
+    }
+    None
 }
 
 #[derive(Clone)]

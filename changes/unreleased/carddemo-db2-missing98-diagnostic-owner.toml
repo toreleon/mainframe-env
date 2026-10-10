@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add a separate pinned-input key98 CTTU diagnostic owner with the original exact error and seed predicates, failure-only exact bytes for five fixed technical/error fields plus metadata and row digests retained privately while its Memory owner is alive, checked drain and exclusive fixture cleanup, and zero application acceptance credit; retain the original key99 owner and failure."

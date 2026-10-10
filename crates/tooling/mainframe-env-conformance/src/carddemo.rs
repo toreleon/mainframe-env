@@ -3,6 +3,9 @@
 mod source_input;
 use source_input::{collect_paths, source_file, subsystem_abi_libraries};
 
+#[cfg(all(test, target_os = "linux"))]
+mod corpus_campaign_tests;
+mod corpus_observations;
 mod corpus_validation;
 use corpus_validation::*;
 mod bounds;
@@ -12,12 +15,38 @@ mod journey_closure;
 use journey_closure::{close_carddemo_issues, close_carddemo_journeys};
 mod journey_observations;
 use journey_observations::RouteObservations;
+mod account_rewrite_observations;
+mod base_batch_routes;
+mod batch_observations;
+use base_batch_routes::{
+    base_batch_control_invocation, base_batch_spool_digests, base_batch_spool_text,
+    exercise_base_batch_routes,
+};
+mod bill_observations;
 mod card_observations;
+mod catalog_observations;
+#[cfg(all(test, target_os = "linux"))]
+mod compiled_overlap_tests;
+mod date_call_observations;
+mod db2_admin_menu;
 mod db2_control_observations;
+mod db2_local_observations;
 mod db2_observations;
+mod db2_online_rows;
+mod financial_observations;
 mod full;
+mod insert_observations;
 mod jes_security_observations;
+mod menu_observations;
+#[cfg(all(test, target_os = "linux"))]
+mod missing98_diagnostic_tests;
+#[cfg(all(test, target_os = "linux"))]
+mod overlap_store;
+mod primary_card_pages;
 mod security_observations;
+mod seed_observations;
+mod source_artifact_binding;
+mod user_mutation_observations;
 #[cfg(test)]
 use full::exercise_full_certification;
 pub use full::verify_carddemo_full_from_env;
@@ -29,6 +58,8 @@ pub use mq_receipt::verify_carddemo_mq_authorization_from_env;
 mod base_online_observation_tests;
 #[cfg(test)]
 mod journey_closure_tests;
+#[cfg(all(test, unix))]
+mod terminal_process_tests;
 mod transaction_harness;
 use transaction_harness::select_regular_option;
 mod transaction_navigation;
@@ -38,11 +69,18 @@ mod transaction_navigation_tests;
 mod transaction_tests;
 
 mod authorization_context;
+mod base_message_oracles;
 mod bms;
 mod bms_seed_oracles;
 mod control_library;
 mod ims_packages;
+mod ims_receipt;
 mod ims_routes;
+#[cfg(all(test, feature = "assurance-observers"))]
+mod read_copyback_observations;
+mod read_request_observations;
+mod signon_field_oracles;
+mod source_resource_observations;
 use authorization_context::{authorization_invocation, mq_client_invocation};
 mod online_authorities;
 mod online_definition;
@@ -681,6 +719,10 @@ pub struct CardDemoDb2Receipt {
     pub db2_shape_sha256: String,
 }
 
+/// Pinned source compilation and local IMS controller/provider checks.
+/// `application_routes` counts completed first-party compiled application actors.
+/// Controller dispatches and the synthetic typed DLI probe earn none; their
+/// original job/control fields remain local provider evidence.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct CardDemoImsReceipt {
     pub schema_version: String,
@@ -785,6 +827,9 @@ struct Cdv1CorrectionReceipt {
 
 struct BaseOnlineExercise {
     route_observations: RouteObservations,
+    seed_proof: seed_observations::SeedProof,
+    installation_proof: source_artifact_binding::InstallationProof,
+    catalog_proof: catalog_observations::CatalogProof,
     initial_screen_bytes: usize,
     screen_paths: usize,
     dataset_reads: usize,
@@ -829,9 +874,32 @@ pub fn verify_carddemo_corpus(
     corpus_dir: &Path,
     inventory_path: &Path,
 ) -> Result<CardDemoCorpusReceipt, CorpusProblem> {
+    verify_carddemo_corpus_checked(corpus_dir, inventory_path, None)
+}
+
+fn verify_carddemo_corpus_observed(
+    corpus_dir: &Path,
+    inventory_path: &Path,
+) -> Result<(CardDemoCorpusReceipt, RouteObservations), CorpusProblem> {
+    corpus_observations::require_pinned_inventory(inventory_path)?;
+    let mut checks = corpus_observations::GateChecks::default();
+    let receipt = verify_carddemo_corpus_checked(corpus_dir, inventory_path, Some(&mut checks))?;
+    corpus_observations::require_pinned_inventory(inventory_path)?;
+    let observations = checks.finish(corpus_dir, &receipt)?;
+    Ok((receipt, observations))
+}
+
+fn verify_carddemo_corpus_checked(
+    corpus_dir: &Path,
+    inventory_path: &Path,
+    mut capture: Option<&mut corpus_observations::GateChecks>,
+) -> Result<CardDemoCorpusReceipt, CorpusProblem> {
     require_corpus_directory(corpus_dir)?;
     let contract = read_contract(inventory_path)?;
     validate_contract(&contract)?;
+    if let Some(checks) = capture.as_deref_mut() {
+        checks.declare(&contract)?;
+    }
 
     let status = git(
         corpus_dir,
@@ -844,6 +912,10 @@ pub fn verify_carddemo_corpus(
         ));
     }
 
+    if let Some(checks) = capture.as_deref_mut() {
+        checks.fixed(corpus_observations::FixedCheck::Cleanliness, "", &status)?;
+    }
+
     let commit = git(corpus_dir, &["rev-parse", "HEAD"])?;
     require_equal(
         "carddemo.corpus.commit_drift",
@@ -851,15 +923,27 @@ pub fn verify_carddemo_corpus(
         &contract.commit,
         &commit,
     )?;
+    if let Some(checks) = capture.as_deref_mut() {
+        checks.fixed(
+            corpus_observations::FixedCheck::Commit,
+            &contract.commit,
+            &commit,
+        )?;
+    }
     let tree = git(corpus_dir, &["rev-parse", "HEAD^{tree}"])?;
     require_equal("carddemo.corpus.tree_drift", "tree", &contract.tree, &tree)?;
+    if let Some(checks) = capture.as_deref_mut() {
+        checks.fixed(corpus_observations::FixedCheck::Tree, &contract.tree, &tree)?;
+    }
     let repository = git(corpus_dir, &["remote", "get-url", "origin"])?;
-    require_equal(
-        "carddemo.corpus.repository_drift",
-        "repository",
-        &contract.repository,
-        &repository,
-    )?;
+    corpus_observations::require_repository(&contract.repository, &repository)?;
+    if let Some(checks) = capture.as_deref_mut() {
+        checks.fixed(
+            corpus_observations::FixedCheck::Repository,
+            &contract.repository,
+            &repository,
+        )?;
+    }
 
     let license_path = corpus_dir.join("LICENSE");
     let license_bytes = read_corpus_file(corpus_dir, &license_path)?;
@@ -881,6 +965,14 @@ pub fn verify_carddemo_corpus(
         ));
     }
 
+    if let Some(checks) = capture.as_deref_mut() {
+        checks.fixed(
+            corpus_observations::FixedCheck::License,
+            &contract.license_sha256,
+            &license_sha256,
+        )?;
+    }
+
     let tracked_files = tracked_files(corpus_dir)?;
     let content_sha256 = canonical_content_digest(corpus_dir, &tracked_files)?;
     require_equal(
@@ -889,6 +981,14 @@ pub fn verify_carddemo_corpus(
         &contract.executable_content_identity.sha256,
         &content_sha256,
     )?;
+
+    if let Some(checks) = capture.as_deref_mut() {
+        checks.fixed(
+            corpus_observations::FixedCheck::Content,
+            &contract.executable_content_identity.sha256,
+            &content_sha256,
+        )?;
+    }
 
     let mut runtime_oracles = Vec::with_capacity(contract.runtime_oracles.len());
     for archive in &contract.runtime_oracles {
@@ -900,6 +1000,9 @@ pub fn verify_carddemo_corpus(
             &archive.sha256,
             &actual,
         )?;
+        if let Some(checks) = capture.as_deref_mut() {
+            checks.archive(&archive.path, &archive.sha256, &actual)?;
+        }
         runtime_oracles.push(RuntimeOracleReceipt {
             path: archive.path.clone(),
             sha256: actual,
@@ -923,6 +1026,9 @@ pub fn verify_carddemo_corpus(
                 "carddemo.corpus.contract_invalid",
                 format!("duplicate file-count identity {}", check.id),
             ));
+        }
+        if let Some(checks) = capture.as_deref_mut() {
+            checks.count(&check.id, check.expected, actual)?;
         }
     }
 
@@ -2048,6 +2154,19 @@ const fn package_kind_slug(kind: EntryKind) -> &'static str {
 pub fn verify_carddemo_resources_from_env(
     inventory_path: &Path,
 ) -> Result<CardDemoResourceReceipt, CorpusProblem> {
+    verify_carddemo_resources(inventory_path, false).map(|(receipt, _)| receipt)
+}
+
+fn verify_carddemo_resources(
+    inventory_path: &Path,
+    observe_source: bool,
+) -> Result<
+    (
+        CardDemoResourceReceipt,
+        Option<source_resource_observations::SourceResourceProof>,
+    ),
+    CorpusProblem,
+> {
     let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
@@ -2056,6 +2175,13 @@ pub fn verify_carddemo_resources_from_env(
     })?;
     let corpus_dir = Path::new(&corpus_dir);
     let corpus = verify_carddemo_corpus(corpus_dir, inventory_path)?;
+    let mut source_witness = if observe_source {
+        Some(source_resource_observations::SourceResourceWitness::new(
+            corpus_dir,
+        )?)
+    } else {
+        None
+    };
     let bms_paths = collect_paths(
         corpus_dir,
         &[
@@ -2103,6 +2229,9 @@ pub fn verify_carddemo_resources_from_env(
                 format!("{path}: {problem:?}"),
             )
         })?;
+        if let Some(witness) = source_witness.as_mut() {
+            witness.observe_bms(path, &parsed)?;
+        }
         mapsets.insert(parsed.mapset.clone());
         maps.insert(format!("{}.{}", parsed.mapset, parsed.name));
         fields += parsed.fields.len();
@@ -2113,12 +2242,16 @@ pub fn verify_carddemo_resources_from_env(
     for path in &csd_paths {
         let source = String::from_utf8(read_corpus_file(corpus_dir, &corpus_dir.join(path))?)
             .map_err(|_| CorpusProblem::new("carddemo.resource.invalid", "CSD is not UTF-8"))?;
-        for resource in parse_csd(&source).map_err(|problem| {
+        let parsed = parse_csd(&source).map_err(|problem| {
             CorpusProblem::new(
                 "carddemo.resource.csd_invalid",
                 format!("{path}: {problem:?}"),
             )
-        })? {
+        })?;
+        if let Some(witness) = source_witness.as_mut() {
+            witness.observe_csd(path, &parsed)?;
+        }
+        for resource in parsed {
             let key = format!("{}.{}", resource.kind, resource.name);
             digest_field(&mut digest, key.as_bytes());
             digest_field(&mut digest, format!("{:?}", resource.properties).as_bytes());
@@ -2150,7 +2283,7 @@ pub fn verify_carddemo_resources_from_env(
             .filter(|resource| resource.kind == kind)
             .count()
     };
-    Ok(CardDemoResourceReceipt {
+    let receipt = CardDemoResourceReceipt {
         schema_version: "mainframe-env.carddemo-resource-receipt@1".into(),
         status: "pass".into(),
         corpus_commit: corpus.commit,
@@ -2165,7 +2298,11 @@ pub fn verify_carddemo_resources_from_env(
         cross_references,
         unresolved,
         resource_sha256: format!("{:x}", digest.finalize()),
-    })
+    };
+    let proof = source_witness
+        .map(|witness| witness.finish(&source_paths, &available_programs, &resources, &receipt))
+        .transpose()?;
+    Ok((receipt, proof))
 }
 
 pub fn verify_carddemo_program_routing_from_env(
@@ -4440,6 +4577,12 @@ pub fn verify_carddemo_batch_programs_from_env(
 pub fn verify_carddemo_base_batch_from_env(
     inventory_path: &Path,
 ) -> Result<CardDemoBaseBatchReceipt, CorpusProblem> {
+    verify_carddemo_base_batch_observed(inventory_path).map(|(receipt, _)| receipt)
+}
+
+fn verify_carddemo_base_batch_observed(
+    inventory_path: &Path,
+) -> Result<(CardDemoBaseBatchReceipt, RouteObservations), CorpusProblem> {
     let batch = verify_carddemo_batch_programs_from_env(inventory_path)?;
     let corpus_dir = PathBuf::from(env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
@@ -4592,12 +4735,18 @@ fn verify_carddemo_db2_observed(
         &db2_catalog,
         &BTreeSet::from(["COBTUPDT".to_string()]),
     )?;
-    let online = carddemo_db2_online_definition(&corpus_dir)?;
+    db2_online_rows::check_sources(&corpus_dir)?;
+    let (online, menu_expectation) = carddemo_db2_online_definition(&corpus_dir)?;
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|error| CorpusProblem::new("carddemo.db2.runtime", error.to_string()))?;
-    let exercise = runtime.block_on(exercise_db2_routes(&corpus_dir, online, definitions))?;
+    let exercise = runtime.block_on(exercise_db2_routes(
+        &corpus_dir,
+        online,
+        definitions,
+        menu_expectation,
+    ))?;
     let ddl_files = collect_paths(&corpus_dir, &["app/app-transaction-type-db2/ddl"], "ddl")?.len();
     let mut shape = Sha256::new();
     digest_field(&mut shape, corpus.commit.as_bytes());
@@ -5003,6 +5152,7 @@ async fn exercise_db2_routes(
     corpus_dir: &Path,
     online: OnlineApplicationDefinition,
     definitions: Vec<BatchProgramDefinition>,
+    menu_expectation: db2_admin_menu::Expectation,
 ) -> Result<Db2Exercise, CorpusProblem> {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -5038,7 +5188,9 @@ async fn exercise_db2_routes(
     server
         .install_batch_programs(definitions.clone())
         .map_err(terminal_problem)?;
+    db2_local_observations::check_inputs(corpus_dir)?;
     install_carddemo_db2_package(&server, &definitions)?;
+    db2_local_observations::require_state(&server, db2_local_observations::RowsPhase::Empty)?;
     server
         .bootstrap_user("IBMUSER", b"TESTPASS")
         .map_err(terminal_problem)?;
@@ -5047,6 +5199,8 @@ async fn exercise_db2_routes(
     server
         .install_online_application(online)
         .map_err(terminal_problem)?;
+    let mut admin_menu_proof =
+        menu_expectation.observe_installed(corpus_dir, store.as_ref(), &artifact_root)?;
     let racf = server.racf_service();
     racf.define_profile("DATASET", "AWS.M2.CARDDEMO.**", "IBMUSER", None)
         .map_err(terminal_problem)?;
@@ -5162,7 +5316,14 @@ async fn exercise_db2_routes(
         &corpus_dir.join("app/app-transaction-type-db2/jcl/CREADB21.jcl"),
     )?)
     .map_err(|_| CorpusProblem::new("carddemo.db2.jcl_invalid", "CREADB21 is not UTF-8"))?;
+    db2_local_observations::require_controls(&server, corpus_dir)?;
     let create_id = submit_job_with_retcode(&server, &app, &create, "CC 0000").await?;
+    db2_local_observations::require_utility(
+        &server,
+        &create_id,
+        db2_local_observations::UtilityJob::Create,
+    )?;
+    db2_local_observations::require_state(&server, db2_local_observations::RowsPhase::Loaded)?;
     job_ids.insert("CREADB2".into(), create_id);
     if server
         .db2_service()
@@ -5182,6 +5343,8 @@ async fn exercise_db2_routes(
             "CREADB21 did not create and load 7 type plus 18 category rows",
         ));
     }
+
+    db2_online_rows::require_rows(&server, db2_online_rows::Phase::Seed)?;
 
     let denied = terminal_http(
         &app,
@@ -5221,6 +5384,7 @@ async fn exercise_db2_routes(
         "COADM01",
     )
     .await?;
+    let list_before = db2_admin_menu::before(store.as_ref(), &server, &list_menu.session)?;
     let list_screen = carddemo_terminal_exchange(
         &app,
         &list_menu.session,
@@ -5236,6 +5400,19 @@ async fn exercise_db2_routes(
         )
     })?;
     require_online_mapset(&list_screen, "COTRTLI", "Db2 transaction-type list")?;
+    admin_menu_proof.observe_selection(
+        &db2_admin_menu::Context::new(
+            corpus_dir,
+            store.as_ref(),
+            &server,
+            &artifact_root,
+            &list_menu.session,
+        ),
+        &list_menu.menu_response,
+        &list_screen,
+        list_before,
+        5,
+    )?;
     let update_menu = open_carddemo_menu(
         &server,
         &app,
@@ -5246,6 +5423,7 @@ async fn exercise_db2_routes(
         "COADM01",
     )
     .await?;
+    let update_before = db2_admin_menu::before(store.as_ref(), &server, &update_menu.session)?;
     let update_screen = carddemo_terminal_exchange(
         &app,
         &update_menu.session,
@@ -5265,6 +5443,19 @@ async fn exercise_db2_routes(
         "COTRTUP",
         "Db2 transaction-type maintenance",
     )?;
+    admin_menu_proof.observe_selection(
+        &db2_admin_menu::Context::new(
+            corpus_dir,
+            store.as_ref(),
+            &server,
+            &artifact_root,
+            &update_menu.session,
+        ),
+        &update_menu.menu_response,
+        &update_screen,
+        update_before,
+        6,
+    )?;
     let missing = carddemo_terminal_exchange(
         &app,
         &update_menu.session,
@@ -5280,6 +5471,8 @@ async fn exercise_db2_routes(
         )
     })?;
     require_online_mapset(&missing, "COTRTUP", "Db2 missing type lookup")?;
+    db2_online_rows::require_missing(&missing)?;
+    db2_online_rows::require_rows(&server, db2_online_rows::Phase::Seed)?;
     let create = carddemo_terminal_exchange(
         &app,
         &update_menu.session,
@@ -5325,6 +5518,8 @@ async fn exercise_db2_routes(
         )
     })?;
     require_online_mapset(&inserted, "COTRTUP", "Db2 online insert")?;
+    db2_online_rows::require_committed(&inserted, db2_online_rows::Phase::Inserted)?;
+    db2_online_rows::require_rows(&server, db2_online_rows::Phase::Inserted)?;
     if !server
         .db2_service()
         .table_rows("CARDDEMO.TRANSACTION_TYPE")
@@ -5413,6 +5608,8 @@ async fn exercise_db2_routes(
         )
     })?;
     require_online_mapset(&updated, "COTRTUP", "Db2 online update")?;
+    db2_online_rows::require_committed(&updated, db2_online_rows::Phase::Updated)?;
+    db2_online_rows::require_rows(&server, db2_online_rows::Phase::Updated)?;
     if !server
         .db2_service()
         .table_rows("CARDDEMO.TRANSACTION_TYPE")
@@ -5501,6 +5698,8 @@ async fn exercise_db2_routes(
         )
     })?;
     require_online_mapset(&deleted, "COTRTUP", "Db2 online delete")?;
+    db2_online_rows::require_committed(&deleted, db2_online_rows::Phase::Deleted)?;
+    db2_online_rows::require_rows(&server, db2_online_rows::Phase::Deleted)?;
     if server
         .db2_service()
         .table_rows("CARDDEMO.TRANSACTION_TYPE")
@@ -5707,6 +5906,12 @@ async fn exercise_db2_routes(
     )?)
     .map_err(|_| CorpusProblem::new("carddemo.db2.jcl_invalid", "TRANEXTR is not UTF-8"))?;
     let extract_id = submit_job_with_retcode(&server, &app, &extract, "CC 0000").await?;
+    db2_local_observations::require_utility(
+        &server,
+        &extract_id,
+        db2_local_observations::UtilityJob::Extract,
+    )?;
+    db2_local_observations::require_state(&server, db2_local_observations::RowsPhase::Maintained)?;
     job_ids.insert("TRANEXTR".into(), extract_id);
 
     let extracted_type = utility_records(&server, "AWS.M2.CARDDEMO.TRANTYPE.PS", None)?;
@@ -5750,7 +5955,7 @@ async fn exercise_db2_routes(
     drop(server);
     let restarted = ProductServer::open_with_package_trust(
         config,
-        store,
+        store.clone(),
         secrets,
         default_program_router(),
         carddemo_package_trust()?,
@@ -5771,6 +5976,20 @@ async fn exercise_db2_routes(
         ));
     }
     db2_observations::require_vsam(&restarted)?;
+    db2_local_observations::require_state(
+        &restarted,
+        db2_local_observations::RowsPhase::Maintained,
+    )?;
+    db2_local_observations::require_utility(
+        &restarted,
+        &job_ids["CREADB2"],
+        db2_local_observations::UtilityJob::Create,
+    )?;
+    db2_local_observations::require_utility(
+        &restarted,
+        &job_ids["TRANEXTR"],
+        db2_local_observations::UtilityJob::Extract,
+    )?;
     let restarted_app = restarted.router();
     let resumed = carddemo_terminal_exchange(
         &restarted_app,
@@ -5787,6 +6006,7 @@ async fn exercise_db2_routes(
         )
     })?;
     require_online_mapset(&resumed, "COTRTLI", "Db2 cursor restart")?;
+    admin_menu_proof.observe_reopened(corpus_dir, store.as_ref(), &artifact_root)?;
     drop(restarted_app);
     if !restarted.graceful_shutdown().await {
         return Err(CorpusProblem::new(
@@ -5795,8 +6015,10 @@ async fn exercise_db2_routes(
         ));
     }
     drop(restarted);
+    drop(store);
     fs::remove_dir_all(&artifact_root)
         .map_err(|error| CorpusProblem::new("carddemo.db2.artifact_cleanup", error.to_string()))?;
+    admin_menu_proof.bind(&mut route_observations)?;
     Ok(Db2Exercise {
         route_observations,
         online_routes: 2,
@@ -5929,32 +6151,15 @@ pub fn verify_carddemo_ims_from_env(
         digest_field(&mut shape, name.as_bytes());
         digest_field(&mut shape, digest.as_bytes());
     }
-    Ok(CardDemoImsReceipt {
-        schema_version: "mainframe-env.carddemo-ims-receipt@1".into(),
-        status: "pass".into(),
-        corpus_commit: corpus.commit,
+    Ok(ims_receipt::provider_control_receipt(
+        corpus.commit,
         definitions_checked,
-        databases_installed: exercise.databases_installed,
-        psbs_installed: exercise.psbs_installed,
-        pcbs_installed: exercise.pcbs_installed,
         programs_compiled,
         dli_operations,
-        application_routes: exercise.selected_job_routes + 1,
-        selected_job_routes: exercise.selected_job_routes,
-        roots: exercise.roots,
-        children: exercise.children,
-        secondary_index_entries: exercise.secondary_index_entries,
-        load_unload_routes: 2,
-        checkpoint_controls: 1,
-        restart_controls: 1,
-        authorization_controls: 1,
-        malformed_controls: 1,
-        resource_controls: 1,
-        provider_failure_controls: 1,
-        hierarchy_sha256: exercise.hierarchy_sha256,
-        spool_sha256: exercise.spool_sha256,
-        ims_shape_sha256: format!("{:x}", shape.finalize()),
-    })
+        exercise,
+        format!("{:x}", shape.finalize()),
+    )
+    .0)
 }
 
 fn verify_cdv1_correction(
@@ -6239,10 +6444,19 @@ async fn exercise_mq_authorization_routes(
     corpus_dir: &Path,
     ims_definition: ImsApplicationDefinition,
 ) -> Result<MqAuthorizationExercise, CorpusProblem> {
-    let artifact_root = env::temp_dir().join(format!(
-        "mainframe-env-carddemo-mq-authorization-{}",
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|error| CorpusProblem::new("carddemo.mq.clock", error.to_string()))?
+        .as_nanos();
+    let artifact_parent = env::temp_dir()
+        .canonicalize()
+        .map_err(|error| CorpusProblem::new("carddemo.mq.artifact_parent", error.to_string()))?;
+    let artifact_root = artifact_parent.join(format!(
+        "mainframe-env-carddemo-mq-authorization-{}-{nonce}",
         std::process::id()
     ));
+    fs::create_dir(&artifact_root)
+        .map_err(|error| CorpusProblem::new("carddemo.mq.artifact_owner", error.to_string()))?;
     let config = ServerConfig {
         store_profile: StoreProfile::Memory,
         artifact_root: artifact_root.clone(),
@@ -6873,8 +7087,9 @@ async fn exercise_mq_authorization_routes(
         &corpus_dir.join("app/app-authorization-ims-db2-mq/jcl/CBPAUP0J.jcl"),
     )?)
     .map_err(|_| CorpusProblem::new("carddemo.authorization.jcl", "CBPAUP0J is not UTF-8"))?;
-    let purge_job =
-        submit_job_with_retcode(&server, &server.router(), &purge_jcl, "CC 0000").await?;
+    let app = server.router();
+    let purge_job = submit_job_with_retcode(&server, &app, &purge_jcl, "CC 0000").await?;
+    drop(app);
     let spool_invocation = base_batch_control_invocation()?;
     let (purge_output, _) = server
         .batch_service()
@@ -6962,6 +7177,9 @@ async fn exercise_mq_authorization_routes(
         ));
     }
     let queue_sha256 = mq_queue_digests(&mq)?;
+    // The last typed host call was the completed missing-grant refusal above.
+    // Release its MQ provider clone before retiring this fixture's first server.
+    drop(typed_host);
     if !server.graceful_shutdown().await {
         return Err(CorpusProblem::new(
             "carddemo.mq.shutdown_failed",
@@ -7004,9 +7222,15 @@ async fn exercise_mq_authorization_routes(
             "MQ, IMS, or Db2 authorization state changed across restart",
         ));
     }
-    let _ = restarted.graceful_shutdown().await;
+    if !restarted.graceful_shutdown().await {
+        return Err(CorpusProblem::new(
+            "carddemo.mq.shutdown_failed",
+            "restarted MQ authorization server did not shut down",
+        ));
+    }
     drop(restarted);
-    let _ = fs::remove_dir_all(&artifact_root);
+    fs::remove_dir_all(&artifact_root)
+        .map_err(|error| CorpusProblem::new("carddemo.mq.artifact_cleanup", error.to_string()))?;
     Ok(MqAuthorizationExercise {
         queues_installed: install.queues,
         triggers_installed: install.triggers,
@@ -7660,964 +7884,6 @@ fn db2_dataset_digests(server: &ProductServer) -> Result<BTreeMap<String, String
         output.insert(dataset.into(), format!("{:x}", digest.finalize()));
     }
     Ok(output)
-}
-
-async fn exercise_base_batch_routes(
-    corpus_dir: &Path,
-    corpus_commit: String,
-    online: OnlineApplicationDefinition,
-    definitions: Vec<BatchProgramDefinition>,
-) -> Result<CardDemoBaseBatchReceipt, CorpusProblem> {
-    const BUSINESS_DATE: &str = "2022-07-06";
-    const COBOL_CURRENT_DATE: &str = "2022070600000000+0000";
-    let artifact_root = env::temp_dir().join(format!(
-        "mainframe-env-carddemo-base-batch-{}",
-        std::process::id()
-    ));
-    let config = ServerConfig {
-        store_profile: StoreProfile::Memory,
-        cobol_current_date: Some(COBOL_CURRENT_DATE.into()),
-        artifact_root: artifact_root.clone(),
-        tls: TlsConfig {
-            enabled: false,
-            certificate_path: None,
-            private_key_reference: None,
-        },
-        ..ServerConfig::default()
-    };
-    let store = Arc::new(MemoryStore::new(Default::default()));
-    let secrets = Arc::new(MemorySecretResolver::default());
-    let server = ProductServer::open(
-        config.clone(),
-        store.clone(),
-        secrets.clone(),
-        default_program_router(),
-    )
-    .map_err(terminal_problem)?;
-    server
-        .bootstrap_user("IBMUSER", b"TESTPASS")
-        .map_err(terminal_problem)?;
-    install_base_online_authorities(&server, corpus_dir, &online)?;
-    server
-        .install_online_application(online)
-        .map_err(terminal_problem)?;
-    server
-        .install_batch_programs(definitions)
-        .map_err(terminal_problem)?;
-    let control_invocation = base_batch_control_invocation()?;
-    let racf = server.racf_service();
-    for object in carddemo_base_seed_objects(corpus_dir)? {
-        racf.permit(
-            "DATASET",
-            object.dataset.as_str(),
-            "IBMUSER",
-            AccessIntent::Alter,
-        )
-        .map_err(terminal_problem)?;
-    }
-    let csd = String::from_utf8(read_corpus_file(
-        corpus_dir,
-        &corpus_dir.join("app/csd/CARDDEMO.CSD"),
-    )?)
-    .map_err(|_| CorpusProblem::new("carddemo.base_batch.csd_invalid", "CSD is not UTF-8"))?;
-    for dataset in parse_csd(&csd)
-        .map_err(package_problem)?
-        .into_iter()
-        .filter(|resource| resource.kind == "FILE")
-        .filter_map(|resource| resource.properties.get("DSNAME").cloned())
-    {
-        racf.permit("DATASET", &dataset, "IBMUSER", AccessIntent::Alter)
-            .map_err(terminal_problem)?;
-    }
-    racf.define_profile("DATASET", "AWS.M2.CARDDEMO.**", "IBMUSER", None)
-        .map_err(terminal_problem)?;
-    racf.permit(
-        "DATASET",
-        "AWS.M2.CARDDEMO.**",
-        "IBMUSER",
-        AccessIntent::Alter,
-    )
-    .map_err(terminal_problem)?;
-    racf.define_profile("DATASET", "AWS.M2.CARDEMO.**", "IBMUSER", None)
-        .map_err(terminal_problem)?;
-    racf.permit(
-        "DATASET",
-        "AWS.M2.CARDEMO.**",
-        "IBMUSER",
-        AccessIntent::Alter,
-    )
-    .map_err(terminal_problem)?;
-    let app = server.router();
-    install_base_batch_source_datasets(&server, corpus_dir)?;
-    let mut job_ids = BTreeMap::new();
-    for relative in [
-        "app/jcl/ACCTFILE.jcl",
-        "app/jcl/CARDFILE.jcl",
-        "app/jcl/CUSTFILE.jcl",
-        "app/jcl/XREFFILE.jcl",
-        "app/jcl/TCATBALF.jcl",
-        "app/jcl/TRANCATG.jcl",
-        "app/jcl/TRANTYPE.jcl",
-        "app/jcl/DISCGRP.jcl",
-        "app/jcl/DUSRSECJ.jcl",
-        "app/jcl/TRANFILE.jcl",
-    ] {
-        let jcl = String::from_utf8(read_corpus_file(corpus_dir, &corpus_dir.join(relative))?)
-            .map_err(|_| {
-                CorpusProblem::new(
-                    "carddemo.base_batch.jcl_invalid",
-                    format!("{relative} is not UTF-8"),
-                )
-            })?;
-        let id = submit_job_with_retcode(&server, &app, &jcl, "CC 0000")
-            .await
-            .map_err(|problem| {
-                CorpusProblem::new(
-                    "carddemo.base_batch.job_failed",
-                    format!("{relative}: {problem}"),
-                )
-            })?;
-        job_ids.insert(base_batch_job_label(relative)?, id);
-    }
-    for relative in ["app/jcl/DEFGDGB.jcl", "app/jcl/DALYREJS.jcl"] {
-        let jcl = String::from_utf8(read_corpus_file(corpus_dir, &corpus_dir.join(relative))?)
-            .map_err(|_| {
-                CorpusProblem::new(
-                    "carddemo.base_batch.jcl_invalid",
-                    format!("{relative} is not UTF-8"),
-                )
-            })?;
-        let id = submit_job_with_retcode(&server, &app, &jcl, "CC 0000")
-            .await
-            .map_err(|problem| {
-                CorpusProblem::new(
-                    "carddemo.base_batch.job_failed",
-                    format!("{relative}: {problem}"),
-                )
-            })?;
-        job_ids.insert(base_batch_job_label(relative)?, id);
-    }
-    let close_jcl = String::from_utf8(read_corpus_file(
-        corpus_dir,
-        &corpus_dir.join("app/jcl/CLOSEFIL.jcl"),
-    )?)
-    .map_err(|_| {
-        CorpusProblem::new(
-            "carddemo.base_batch.jcl_invalid",
-            "app/jcl/CLOSEFIL.jcl is not UTF-8",
-        )
-    })?;
-    let close_id = submit_job_with_retcode(&server, &app, &close_jcl, "CC 0000").await?;
-    job_ids.insert("CLOSEFIL".into(), close_id.clone());
-    for file in ["TRANSACT", "CCXREF", "ACCTDAT", "CXACAIX", "USRSEC"] {
-        if server
-            .cics_service()
-            .file_status(file)
-            .map_err(terminal_problem)?
-            != CicsFileStatus::Closed
-        {
-            return Err(CorpusProblem::new(
-                "carddemo.base_batch.cics_close_drift",
-                format!("{file} was not closed by CLOSEFIL"),
-            ));
-        }
-    }
-    if server
-        .batch_service()
-        .spool(&control_invocation, &close_id, "CMDOUT", 0, 16)
-        .map_err(terminal_problem)?
-        .0
-        != [
-            "TRANSACT CLOSED",
-            "CCXREF CLOSED",
-            "ACCTDAT CLOSED",
-            "CXACAIX CLOSED",
-            "USRSEC CLOSED",
-        ]
-        .map(|record| record.as_bytes().to_vec())
-    {
-        return Err(CorpusProblem::new(
-            "carddemo.base_batch.cics_close_drift",
-            "CLOSEFIL command output differs",
-        ));
-    }
-    for (relative, expected) in [
-        ("app/jcl/POSTTRAN.jcl", "CC 0004"),
-        ("app/jcl/INTCALC.jcl", "CC 0000"),
-        ("app/jcl/TRANBKP.jcl", "CC 0000"),
-        ("app/jcl/COMBTRAN.jcl", "CC 0000"),
-        ("app/jcl/TRANIDX.jcl", "CC 0000"),
-        ("app/jcl/TRANREPT.jcl", "CC 0000"),
-        ("app/jcl/PRTCATBL.jcl", "CC 0000"),
-    ] {
-        let jcl = String::from_utf8(read_corpus_file(corpus_dir, &corpus_dir.join(relative))?)
-            .map_err(|_| {
-                CorpusProblem::new(
-                    "carddemo.base_batch.jcl_invalid",
-                    format!("{relative} is not UTF-8"),
-                )
-            })?;
-        let id = submit_job_with_retcode(&server, &app, &jcl, expected)
-            .await
-            .map_err(|problem| {
-                CorpusProblem::new(
-                    "carddemo.base_batch.job_failed",
-                    format!("{relative}: {problem}"),
-                )
-            })?;
-        job_ids.insert(base_batch_job_label(relative)?, id);
-        if relative == "app/jcl/TRANBKP.jcl" {
-            utility_records(&server, "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS", None).map_err(
-                |problem| {
-                    CorpusProblem::new(
-                        "carddemo.base_batch.backup_drift",
-                        format!("TRANBKP did not recreate the transaction master: {problem}"),
-                    )
-                },
-            )?;
-        }
-    }
-    if let Ok(directory) = env::var("CARDDEMO_TRANREPT_EXTRACT_DIR") {
-        let directory = Path::new(&directory);
-        if !directory.is_absolute() {
-            return Err(CorpusProblem::new(
-                "carddemo.base_batch.extract_path",
-                "CARDDEMO_TRANREPT_EXTRACT_DIR must be absolute",
-            ));
-        }
-        fs::create_dir_all(directory).map_err(|error| {
-            CorpusProblem::new("carddemo.base_batch.extract", error.to_string())
-        })?;
-        for (dataset, filename) in [
-            (
-                "AWS.M2.CARDDEMO.TRANSACT.BKUP.G0002V00",
-                "tranrept-input.bin",
-            ),
-            (
-                "AWS.M2.CARDDEMO.TRANSACT.DALY.G0001V00",
-                "tranrept-selected.bin",
-            ),
-            ("AWS.M2.CARDDEMO.TRANREPT.G0001V00", "tranrept-report.bin"),
-        ] {
-            let records = utility_records(&server, dataset, None)?;
-            let bytes = records.concat();
-            fs::write(directory.join(filename), bytes).map_err(|error| {
-                CorpusProblem::new("carddemo.base_batch.extract", error.to_string())
-            })?;
-            let name = DatasetName::new(dataset, 128).map_err(|_| {
-                CorpusProblem::new("carddemo.base_batch.extract", "dataset name is invalid")
-            })?;
-            let DatasetResult::Attributes {
-                attributes,
-                version,
-            } = server
-                .dataset_service()
-                .invoke(DatasetRequest::Attributes {
-                    dataset: name.clone(),
-                })
-                .map_err(terminal_problem)?
-            else {
-                return Err(CorpusProblem::new(
-                    "carddemo.base_batch.extract",
-                    "attributes unavailable",
-                ));
-            };
-            let DatasetResult::Records {
-                version: read_version,
-                identities,
-                ..
-            } = server
-                .dataset_service()
-                .invoke(DatasetRequest::Read {
-                    dataset: name,
-                    member: None,
-                    key: None,
-                    max_records: 4_096,
-                    control: Default::default(),
-                })
-                .map_err(terminal_problem)?
-            else {
-                return Err(CorpusProblem::new(
-                    "carddemo.base_batch.extract",
-                    "records unavailable",
-                ));
-            };
-            fs::write(
-                directory.join(format!("{filename}.meta")),
-                format!(
-                    "attributes={:?}\nversion={version}\nread_version={read_version}\nidentities={} first={:?}\n",
-                    attributes,
-                    identities.len(),
-                    identities.first()
-                ),
-            )
-            .map_err(|error| CorpusProblem::new("carddemo.base_batch.extract", error.to_string()))?;
-        }
-    }
-    let tranrept_selected_records =
-        utility_records(&server, "AWS.M2.CARDDEMO.TRANSACT.DALY.G0001V00", None)?.len();
-    let tranrept_report_records =
-        utility_records(&server, "AWS.M2.CARDDEMO.TRANREPT.G0001V00", None)?.len();
-    if tranrept_selected_records == 0 || tranrept_report_records == 0 {
-        return Err(CorpusProblem::new(
-            "carddemo.base_batch.tranrept_empty",
-            format!(
-                "TRANREPT selected {tranrept_selected_records} records and wrote {tranrept_report_records} report records"
-            ),
-        ));
-    }
-    let post_id = job_ids
-        .get("POSTTRAN")
-        .ok_or_else(|| CorpusProblem::new("carddemo.base_batch.job_missing", "POSTTRAN missing"))?;
-    let post_text = base_batch_spool_text(&server, post_id)?;
-    let compact_post = post_text
-        .chars()
-        .filter(|character| !character.is_whitespace())
-        .collect::<String>();
-    if !compact_post.contains("TRANSACTIONSPROCESSED:000000300")
-        || !compact_post.contains("TRANSACTIONSREJECTED:000000038")
-    {
-        return Err(CorpusProblem::new(
-            "carddemo.base_batch.posting_drift",
-            "POSTTRAN did not report 300 processed and 38 rejected transactions",
-        ));
-    }
-    let statement = corrected_creastmt(corpus_dir)?;
-    let statement_id = submit_job_with_retcode(&server, &app, &statement, "CC 0000")
-        .await
-        .map_err(|problem| {
-            CorpusProblem::new(
-                "carddemo.base_batch.job_failed",
-                format!("app/jcl/CREASTMT.JCL: {problem}"),
-            )
-        })?;
-    job_ids.insert("CREASTMT".into(), statement_id);
-    for name in [
-        "AWS.M2.CARDDEMO.TRXFL.SEQ",
-        "AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS",
-        "AWS.M2.CARDDEMO.STATEMNT.PS",
-        "AWS.M2.CARDDEMO.STATEMNT.HTML",
-        "AWS.M2.CARDDEMO.TCATBALF.REPT",
-    ] {
-        if utility_records(&server, name, None)?.is_empty() {
-            return Err(CorpusProblem::new(
-                "carddemo.base_batch.output_empty",
-                format!("{name} is empty"),
-            ));
-        }
-    }
-
-    let internal_jcl = String::from_utf8(read_corpus_file(
-        corpus_dir,
-        &corpus_dir.join("app/jcl/INTRDRJ1.JCL"),
-    )?)
-    .map_err(|_| {
-        CorpusProblem::new(
-            "carddemo.base_batch.jcl_invalid",
-            "app/jcl/INTRDRJ1.JCL is not UTF-8",
-        )
-    })?;
-    let internal_id = submit_job_with_retcode(&server, &app, &internal_jcl, "CC 0000").await?;
-    job_ids.insert("INTRDRJ1".into(), internal_id);
-    let principal =
-        PrincipalId::new("IBMUSER", InvocationLimits::default()).expect("static batch principal");
-    let (_, more) = server
-        .batch_service()
-        .list(Some(&principal), None, 128)
-        .map_err(terminal_problem)?;
-    if more {
-        return Err(CorpusProblem::new(
-            "carddemo.base_batch.job_limit",
-            "job list exceeded the base-cycle observation bound",
-        ));
-    }
-    let child = wait_for_listed_job(
-        &server,
-        &principal,
-        "INTRDRJ2",
-        128,
-        "carddemo.base_batch.internal_missing",
-        "carddemo.base_batch.internal_incomplete",
-    )
-    .await?;
-    if child.state != JobState::Completed || child.return_code != Some(0) {
-        return Err(CorpusProblem::new(
-            "carddemo.base_batch.internal_incomplete",
-            format!("INTRDRJ2 did not complete: {child:?}"),
-        ));
-    }
-    job_ids.insert("INTRDRJ2".into(), child.id);
-    if utility_records(&server, "AWS.M2.CARDEMO.FTP.TEST.BKUP.INTRDR", None)?
-        != utility_records(&server, "AWS.M2.CARDEMO.FTP.TEST.BKUP", None)?
-    {
-        return Err(CorpusProblem::new(
-            "carddemo.base_batch.internal_copy_drift",
-            "INTRDRJ2 did not reproduce the FTP backup exactly",
-        ));
-    }
-
-    let open_jcl = String::from_utf8(read_corpus_file(
-        corpus_dir,
-        &corpus_dir.join("app/jcl/OPENFIL.jcl"),
-    )?)
-    .map_err(|_| {
-        CorpusProblem::new(
-            "carddemo.base_batch.jcl_invalid",
-            "app/jcl/OPENFIL.jcl is not UTF-8",
-        )
-    })?;
-    let open_id = submit_job_with_retcode(&server, &app, &open_jcl, "CC 0000").await?;
-    job_ids.insert("OPENFIL".into(), open_id.clone());
-    for file in ["TRANSACT", "CCXREF", "ACCTDAT", "CXACAIX", "USRSEC"] {
-        if server
-            .cics_service()
-            .file_status(file)
-            .map_err(terminal_problem)?
-            != CicsFileStatus::Open
-        {
-            return Err(CorpusProblem::new(
-                "carddemo.base_batch.cics_open_drift",
-                format!("{file} was not opened by OPENFIL"),
-            ));
-        }
-    }
-    if server
-        .batch_service()
-        .spool(&control_invocation, &open_id, "CMDOUT", 0, 16)
-        .map_err(terminal_problem)?
-        .0
-        != [
-            "TRANSACT OPEN",
-            "CCXREF OPEN",
-            "ACCTDAT OPEN",
-            "CXACAIX OPEN",
-            "USRSEC OPEN",
-        ]
-        .map(|record| record.as_bytes().to_vec())
-    {
-        return Err(CorpusProblem::new(
-            "carddemo.base_batch.cics_open_drift",
-            "OPENFIL command output differs",
-        ));
-    }
-
-    let rollback_jcl = "//CD23ROLL JOB CLASS=A\n//FAIL EXEC PGM=NOTREAL\n//WORK DD DSN=AWS.M2.CARDDEMO.CD23.ROLLBACK,DISP=(NEW,KEEP,DELETE),\n// UNIT=SYSDA,DCB=(LRECL=80,RECFM=FB)\n";
-    server
-        .start_background_workers()
-        .map_err(terminal_problem)?;
-    let rollback_headers = base_batch_job_headers();
-    let (rollback_status, rollback_body) = terminal_http(
-        &app,
-        Method::PUT,
-        "/zosmf/restjobs/jobs",
-        rollback_headers.clone(),
-        rollback_jcl.as_bytes().to_vec(),
-    )
-    .await?;
-    let rollback_job: serde_json::Value = serde_json::from_slice(&rollback_body)
-        .map_err(|error| CorpusProblem::new("carddemo.base_batch.rollback", error.to_string()))?;
-    let rollback_job = if rollback_status == StatusCode::CREATED {
-        wait_for_submitted_job(&server, &app, &rollback_headers, rollback_job).await?
-    } else {
-        rollback_job
-    };
-    if rollback_status != StatusCode::CREATED
-        || rollback_job["status"] != "OUTPUT"
-        || !rollback_job["retcode"].is_null()
-        || server.dataset_service().invoke(DatasetRequest::Attributes {
-            dataset: DatasetName::new(
-                "AWS.M2.CARDDEMO.CD23.ROLLBACK",
-                InvocationLimits::default().max_binding_bytes,
-            )
-            .expect("static rollback dataset"),
-        }) != Err(HostProblem::NotFound)
-    {
-        return Err(CorpusProblem::new(
-            "carddemo.base_batch.rollback",
-            format!("abnormal allocation was not rolled back: {rollback_job}"),
-        ));
-    }
-    job_ids.insert(
-        "ROLLBACK-CONTROL".into(),
-        rollback_job["jobid"]
-            .as_str()
-            .ok_or_else(|| {
-                CorpusProblem::new("carddemo.base_batch.rollback", "rollback job ID is missing")
-            })?
-            .to_string(),
-    );
-
-    let cancelled = server
-        .batch_service()
-        .submit(
-            &control_invocation,
-            &JclBundle {
-                primary: "//CD23CANC JOB CLASS=A\n//WAIT EXEC PGM=IEFBR14\n".into(),
-                ..Default::default()
-            },
-            &IdempotencyKey::new("carddemo-base-batch-cancel", InvocationLimits::default())
-                .expect("static cancellation idempotency key"),
-            true,
-        )
-        .map_err(terminal_problem)?;
-    let (cancel_status, _) = terminal_http(
-        &app,
-        Method::PUT,
-        &format!("/zosmf/restjobs/jobs/{}/{}", cancelled.name, cancelled.id),
-        base_batch_job_headers(),
-        Vec::new(),
-    )
-    .await?;
-    if cancel_status != StatusCode::NO_CONTENT
-        || server
-            .batch_service()
-            .get(&cancelled.id)
-            .map_err(terminal_problem)?
-            .state
-            != JobState::Cancelled
-    {
-        return Err(CorpusProblem::new(
-            "carddemo.base_batch.cancellation",
-            "held job did not cancel through the public z/OSMF route",
-        ));
-    }
-    job_ids.insert("CANCEL-CONTROL".into(), cancelled.id);
-
-    let dataset_sha256 = base_batch_dataset_digests(&server)?;
-    let spool_sha256 = base_batch_spool_digests(&server, &job_ids)?;
-    drop(app);
-    if !server.graceful_shutdown().await {
-        return Err(CorpusProblem::new(
-            "carddemo.base_batch.shutdown_failed",
-            "base batch server did not shut down",
-        ));
-    }
-    drop(racf);
-    drop(server);
-    let restarted = ProductServer::open(config, store, secrets, default_program_router())
-        .map_err(terminal_problem)?;
-    if base_batch_dataset_digests(&restarted)? != dataset_sha256
-        || base_batch_spool_digests(&restarted, &job_ids)? != spool_sha256
-        || ["TRANSACT", "CCXREF", "ACCTDAT", "CXACAIX", "USRSEC"]
-            .into_iter()
-            .any(|file| restarted.cics_service().file_status(file) != Ok(CicsFileStatus::Open))
-    {
-        return Err(CorpusProblem::new(
-            "carddemo.base_batch.restart_drift",
-            "dataset, spool, or CICS state changed across warm restart",
-        ));
-    }
-    if !restarted.graceful_shutdown().await {
-        return Err(CorpusProblem::new(
-            "carddemo.base_batch.shutdown_failed",
-            "restarted base batch server did not shut down",
-        ));
-    }
-    drop(restarted);
-
-    let journeys_passed = 3usize;
-    let initialization_jobs = 12usize;
-    let operational_jobs = 9usize;
-    let cics_file_controls = 2usize;
-    let internal_submissions = 1usize;
-    let warm_restart_controls = 1usize;
-    let rollback_controls = 1usize;
-    let cancellation_controls = 1usize;
-    let mut shape = Sha256::new();
-    digest_field(&mut shape, corpus_commit.as_bytes());
-    digest_field(&mut shape, BUSINESS_DATE.as_bytes());
-    for value in [
-        journeys_passed,
-        initialization_jobs,
-        operational_jobs,
-        cics_file_controls,
-        internal_submissions,
-        warm_restart_controls,
-        rollback_controls,
-        cancellation_controls,
-        tranrept_selected_records,
-        tranrept_report_records,
-    ] {
-        digest_field(&mut shape, &(value as u64).to_be_bytes());
-    }
-    for (name, digest) in &dataset_sha256 {
-        digest_field(&mut shape, name.as_bytes());
-        digest_field(&mut shape, digest.as_bytes());
-    }
-    for (name, digest) in &spool_sha256 {
-        digest_field(&mut shape, name.as_bytes());
-        digest_field(&mut shape, digest.as_bytes());
-    }
-    let _ = fs::remove_dir_all(&artifact_root);
-    Ok(CardDemoBaseBatchReceipt {
-        schema_version: "mainframe-env.carddemo-base-batch-receipt@1".into(),
-        status: "pass".into(),
-        corpus_commit,
-        business_date: BUSINESS_DATE.into(),
-        journeys_passed,
-        initialization_jobs,
-        operational_jobs,
-        cics_file_controls,
-        internal_submissions,
-        warm_restart_controls,
-        rollback_controls,
-        cancellation_controls,
-        tranrept_selected_records,
-        tranrept_report_records,
-        dataset_sha256,
-        spool_sha256,
-        journey_shape_sha256: format!("{:x}", shape.finalize()),
-    })
-}
-
-fn base_batch_job_label(relative: &str) -> Result<String, CorpusProblem> {
-    Path::new(relative)
-        .file_stem()
-        .and_then(|value| value.to_str())
-        .map(str::to_ascii_uppercase)
-        .ok_or_else(|| {
-            CorpusProblem::new(
-                "carddemo.base_batch.path_invalid",
-                format!("{relative} has no job label"),
-            )
-        })
-}
-
-fn base_batch_job_headers() -> BTreeMap<String, String> {
-    BTreeMap::from([
-        (
-            "authorization".into(),
-            format!(
-                "Basic {}",
-                base64::engine::general_purpose::STANDARD.encode("IBMUSER:TESTPASS")
-            ),
-        ),
-        ("x-csrf-zosmf-header".into(), "true".into()),
-    ])
-}
-
-fn base_batch_control_invocation() -> Result<Invocation, CorpusProblem> {
-    let limits = InvocationLimits::default();
-    let grants = [
-        "host.security.authorize",
-        "host.program.invoke",
-        "host.spool.read",
-        "host.spool.write",
-    ]
-    .into_iter()
-    .map(|capability| {
-        CapabilityId::new(capability, limits).map_err(|_| {
-            CorpusProblem::new(
-                "carddemo.base_batch.control_invalid",
-                "control capability is invalid",
-            )
-        })
-    })
-    .collect::<Result<BTreeSet<_>, _>>()?;
-    Invocation::new(
-        RequestId::new("carddemo-base-batch-control-request", limits)
-            .expect("static control request"),
-        ExecutionId::new("carddemo-base-batch-control-execution", limits)
-            .expect("static control execution"),
-        RunUnitId::new("carddemo-base-batch-control-run", limits).expect("static control run"),
-        None,
-        Selector::new("zosmf:job-control", limits).expect("static control selector"),
-        ArtifactRef::new("mainframe-env-batch@1", limits).expect("static control artifact"),
-        Principal::new(
-            PrincipalId::new("IBMUSER", limits).expect("static control principal"),
-            grants,
-            limits,
-        )
-        .expect("bounded control principal"),
-        ServiceClass::Batch,
-        0,
-        1_000_000,
-        TraceId::new("carddemo-base-batch-control-trace", limits).expect("static control trace"),
-        IdempotencyKey::new("carddemo-base-batch-control-invocation", limits)
-            .expect("static control invocation key"),
-        1,
-        ResourceLimits::default(),
-        BTreeMap::new(),
-        limits,
-    )
-    .map_err(|_| {
-        CorpusProblem::new(
-            "carddemo.base_batch.control_invalid",
-            "control invocation is invalid",
-        )
-    })
-}
-
-fn base_batch_spool_text(server: &ProductServer, id: &str) -> Result<String, CorpusProblem> {
-    let invocation = base_batch_control_invocation()?;
-    let mut text = String::new();
-    for (_, name, records, _) in server
-        .batch_service()
-        .spool_files(&invocation, id)
-        .map_err(terminal_problem)?
-    {
-        let (values, more) = server
-            .batch_service()
-            .spool(&invocation, id, &name, 0, records.max(1))
-            .map_err(terminal_problem)?;
-        if more {
-            return Err(CorpusProblem::new(
-                "carddemo.base_batch.spool_limit",
-                format!("{id}/{name} exceeded its declared record count"),
-            ));
-        }
-        for value in values {
-            text.push_str(&String::from_utf8_lossy(&value));
-            text.push('\n');
-        }
-    }
-    Ok(text)
-}
-
-fn base_batch_dataset_digests(
-    server: &ProductServer,
-) -> Result<BTreeMap<String, String>, CorpusProblem> {
-    let DatasetResult::Listed { names, more } = server
-        .dataset_service()
-        .invoke(DatasetRequest::List {
-            pattern: "AWS.M2.CARD*".into(),
-            start: None,
-            max_items: 4_096,
-        })
-        .map_err(terminal_problem)?
-    else {
-        return Err(CorpusProblem::new(
-            "carddemo.base_batch.catalog_drift",
-            "dataset list returned the wrong result",
-        ));
-    };
-    if more {
-        return Err(CorpusProblem::new(
-            "carddemo.base_batch.catalog_limit",
-            "base-cycle catalog exceeded 4096 entries",
-        ));
-    }
-    let mut observations = BTreeMap::<String, String>::new();
-    let mut catalog = Sha256::new();
-    for name in &names {
-        digest_field(&mut catalog, name.as_str().as_bytes());
-    }
-    observations.insert("@CATALOG".into(), format!("{:x}", catalog.finalize()));
-    for name in names {
-        let attributes = match server.dataset_service().invoke(DatasetRequest::Attributes {
-            dataset: name.clone(),
-        }) {
-            Ok(DatasetResult::Attributes {
-                attributes,
-                version,
-            }) => (attributes, version),
-            Err(HostProblem::NotFound) => continue,
-            Ok(_) => {
-                return Err(CorpusProblem::new(
-                    "carddemo.base_batch.dataset_drift",
-                    format!("{} attributes returned the wrong result", name.as_str()),
-                ));
-            }
-            Err(problem) => return Err(terminal_problem(problem)),
-        };
-        let mut digest = Sha256::new();
-        digest_field(
-            &mut digest,
-            format!("{:?}", attributes.0.organization).as_bytes(),
-        );
-        digest_field(
-            &mut digest,
-            format!("{:?}", attributes.0.record_format).as_bytes(),
-        );
-        digest_field(
-            &mut digest,
-            &attributes.0.logical_record_length.to_be_bytes(),
-        );
-        digest_field(
-            &mut digest,
-            &attributes.0.key_offset.unwrap_or(u32::MAX).to_be_bytes(),
-        );
-        digest_field(
-            &mut digest,
-            &attributes.0.key_length.unwrap_or(u32::MAX).to_be_bytes(),
-        );
-        digest_field(
-            &mut digest,
-            &attributes.0.ccsid.unwrap_or(u16::MAX).to_be_bytes(),
-        );
-        digest_field(&mut digest, &attributes.1.to_be_bytes());
-        if attributes.0.organization == DatasetOrganization::Partitioned {
-            let DatasetResult::Members {
-                names: members,
-                more,
-            } = server
-                .dataset_service()
-                .invoke(DatasetRequest::ListMembers {
-                    dataset: name.clone(),
-                    start: None,
-                    max_items: 4_096,
-                })
-                .map_err(terminal_problem)?
-            else {
-                return Err(CorpusProblem::new(
-                    "carddemo.base_batch.member_drift",
-                    format!("{} member list returned the wrong result", name.as_str()),
-                ));
-            };
-            if more {
-                return Err(CorpusProblem::new(
-                    "carddemo.base_batch.member_limit",
-                    format!("{} exceeded 4096 members", name.as_str()),
-                ));
-            }
-            for member in members {
-                digest_field(&mut digest, member.as_str().as_bytes());
-                let DatasetResult::Records {
-                    records,
-                    identities,
-                    version,
-                } = server
-                    .dataset_service()
-                    .invoke(DatasetRequest::Read {
-                        dataset: name.clone(),
-                        member: Some(member),
-                        key: None,
-                        max_records: 4_096,
-                        control: Default::default(),
-                    })
-                    .map_err(terminal_problem)?
-                else {
-                    return Err(CorpusProblem::new(
-                        "carddemo.base_batch.member_drift",
-                        format!("{} member read returned the wrong result", name.as_str()),
-                    ));
-                };
-                digest_field(&mut digest, &version.to_be_bytes());
-                for record in records {
-                    digest_field(&mut digest, &record);
-                }
-                for identity in identities {
-                    digest_field(&mut digest, &identity);
-                }
-            }
-        } else {
-            let DatasetResult::Records {
-                records,
-                identities,
-                version,
-            } = server
-                .dataset_service()
-                .invoke(DatasetRequest::Read {
-                    dataset: name.clone(),
-                    member: None,
-                    key: None,
-                    max_records: 4_096,
-                    control: Default::default(),
-                })
-                .map_err(terminal_problem)?
-            else {
-                return Err(CorpusProblem::new(
-                    "carddemo.base_batch.dataset_drift",
-                    format!("{} read returned the wrong result", name.as_str()),
-                ));
-            };
-            digest_field(&mut digest, &version.to_be_bytes());
-            for record in records {
-                digest_field(&mut digest, &record);
-            }
-            for identity in identities {
-                digest_field(&mut digest, &identity);
-            }
-        }
-        observations.insert(name.as_str().into(), format!("{:x}", digest.finalize()));
-    }
-    for required in [
-        "AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS",
-        "AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH",
-        "AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH",
-        "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS",
-        "AWS.M2.CARDDEMO.TRXFL.SEQ",
-        "AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS",
-        "AWS.M2.CARDDEMO.STATEMNT.PS",
-        "AWS.M2.CARDDEMO.STATEMNT.HTML",
-        "AWS.M2.CARDDEMO.TCATBALF.REPT",
-        "AWS.M2.CARDEMO.FTP.TEST.BKUP.INTRDR",
-    ] {
-        if !observations.contains_key(required) {
-            return Err(CorpusProblem::new(
-                "carddemo.base_batch.dataset_missing",
-                format!("{required} is missing from exact observations"),
-            ));
-        }
-    }
-    for base in [
-        "AWS.M2.CARDDEMO.DALYREJS.G",
-        "AWS.M2.CARDDEMO.SYSTRAN.G",
-        "AWS.M2.CARDDEMO.TRANSACT.BKUP.G",
-        "AWS.M2.CARDDEMO.TRANSACT.COMBINED.G",
-        "AWS.M2.CARDDEMO.TRANSACT.DALY.G",
-        "AWS.M2.CARDDEMO.TRANREPT.G",
-        "AWS.M2.CARDDEMO.TCATBALF.BKUP.G",
-    ] {
-        if !observations.keys().any(|name| name.starts_with(base)) {
-            return Err(CorpusProblem::new(
-                "carddemo.base_batch.gdg_missing",
-                format!("{base} generation is missing"),
-            ));
-        }
-    }
-    Ok(observations)
-}
-
-fn base_batch_spool_digests(
-    server: &ProductServer,
-    job_ids: &BTreeMap<String, String>,
-) -> Result<BTreeMap<String, String>, CorpusProblem> {
-    let invocation = base_batch_control_invocation()?;
-    let mut observations = BTreeMap::new();
-    for (label, id) in job_ids {
-        let job = server.batch_service().get(id).map_err(terminal_problem)?;
-        if !job.state.terminal() {
-            return Err(CorpusProblem::new(
-                "carddemo.base_batch.job_incomplete",
-                format!("{label}/{id} is not terminal"),
-            ));
-        }
-        let mut digest = Sha256::new();
-        digest_field(&mut digest, label.as_bytes());
-        digest_field(&mut digest, id.as_bytes());
-        digest_field(&mut digest, format!("{:?}", job.state).as_bytes());
-        digest_field(
-            &mut digest,
-            &job.return_code.unwrap_or(i32::MIN).to_be_bytes(),
-        );
-        digest_field(
-            &mut digest,
-            job.abend_code.as_deref().unwrap_or("").as_bytes(),
-        );
-        for (_, name, records, _) in server
-            .batch_service()
-            .spool_files(&invocation, id)
-            .map_err(terminal_problem)?
-        {
-            digest_field(&mut digest, name.as_bytes());
-            let (values, more) = server
-                .batch_service()
-                .spool(&invocation, id, &name, 0, records.max(1))
-                .map_err(terminal_problem)?;
-            if more {
-                return Err(CorpusProblem::new(
-                    "carddemo.base_batch.spool_limit",
-                    format!("{label}/{name} exceeded its declared record count"),
-                ));
-            }
-            for value in values {
-                digest_field(&mut digest, &value);
-            }
-        }
-        observations.insert(label.clone(), format!("{:x}", digest.finalize()));
-    }
-    Ok(observations)
 }
 
 fn corrected_creastmt(corpus_dir: &Path) -> Result<String, CorpusProblem> {
@@ -9670,8 +8936,11 @@ async fn exercise_base_online_smoke(
     secrets: Arc<MemorySecretResolver>,
     corpus_dir: PathBuf,
     definition: OnlineApplicationDefinition,
+    source_binding: source_artifact_binding::SourceInstallExpectation,
 ) -> Result<BaseOnlineExercise, CorpusProblem> {
     let mut route_observations = RouteObservations::default();
+    signon_field_oracles::require_clock_input(config.cobol_current_date.as_deref())?;
+    let binding_root = config.artifact_root.clone();
     let server = ProductServer::open(
         config.clone(),
         store.clone(),
@@ -9679,6 +8948,30 @@ async fn exercise_base_online_smoke(
         default_program_router(),
     )
     .map_err(terminal_problem)?;
+    #[cfg(all(test, feature = "assurance-observers"))]
+    let copyback_manager = read_copyback_observations::install(&server)?;
+    #[cfg(all(test, feature = "assurance-observers"))]
+    let copyback_prepared =
+        read_copyback_observations::Prepared::from_programs(&corpus_dir, &definition.programs)?;
+    let account_update_artifacts = definition
+        .programs
+        .iter()
+        .filter(|program| ["COACTUPC", "COMEN01C"].contains(&program.name.as_str()))
+        .map(|program| (program.name.clone(), program.artifact.clone()))
+        .collect::<BTreeMap<_, _>>();
+    if account_update_artifacts.len() != 2 {
+        return Err(CorpusProblem::new(
+            "carddemo.online.account_rewrite_commit_drift",
+            "selected compiled account/menu artifacts missing",
+        ));
+    }
+    // Retain the actual source-published definitions offered to this install.
+    // Each selected request owner must use this exact immutable artifact.
+    let installed_read_actors = definition
+        .programs
+        .iter()
+        .map(|program| (program.name.clone(), program.artifact.clone()))
+        .collect::<BTreeMap<_, _>>();
     let expected_maps = definition
         .maps
         .iter()
@@ -9707,6 +9000,11 @@ async fn exercise_base_online_smoke(
             ))
         },
     )?;
+    let seed_proof = seed_observations::capture(&server, &corpus_dir)?;
+    let installation =
+        source_binding.observe_initial(&corpus_dir, store.as_ref(), &binding_root)?;
+    let mut catalog_proof =
+        catalog_observations::observe_initial(&corpus_dir, &server, store.as_ref())?;
     let mut selected_maps = BTreeSet::new();
     let app = server.router();
     let launch = terminal_http(
@@ -9753,6 +9051,8 @@ async fn exercise_base_online_smoke(
             "CC00 did not render the sign-on screen",
         ));
     }
+    let signon_launch_proof =
+        signon_field_oracles::compare_launch(&corpus_dir, &response["terminal"])?;
     selected_maps.insert(
         response["terminal"]["mapset"]
             .as_str()
@@ -9776,6 +9076,10 @@ async fn exercise_base_online_smoke(
         ("x-csrf-zosmf-header".into(), "true".into()),
         ("x-csrf-token".into(), csrf.to_string()),
     ]);
+    let not_found_trace_at = server
+        .online_trace(session)
+        .map_err(terminal_problem)?
+        .len();
     let input = terminal_http(
         &app,
         Method::PUT,
@@ -9789,6 +9093,7 @@ async fn exercise_base_online_smoke(
     )
     .await?;
     require_terminal_status(input.0, StatusCode::OK, "invalid sign-on input")?;
+    signon_field_oracles::require_input_receipt(&response["terminal"], &input.1, session, 0x7d)?;
     let resumed = terminal_http(
         &app,
         Method::POST,
@@ -9821,6 +9126,13 @@ async fn exercise_base_online_smoke(
     )?;
     let resumed_json: serde_json::Value = serde_json::from_slice(&resumed.1)
         .map_err(|error| CorpusProblem::new("carddemo.online.response", error.to_string()))?;
+    let signon_not_found_proof =
+        signon_field_oracles::compare_not_found(&resumed_json, signon_launch_proof)?;
+    signon_field_oracles::require_not_found_typed_resume(
+        &resumed_json,
+        session,
+        &base_message_oracles::trace_since(&server, session, not_found_trace_at)?,
+    )?;
     let session_id = SessionId::new(session, InvocationLimits::default().max_binding_bytes)
         .map_err(|_| CorpusProblem::new("carddemo.online.response", "session is invalid"))?;
     let before_expiry = resumed_json["expires_at_tick"]
@@ -9844,6 +9156,49 @@ async fn exercise_base_online_smoke(
             ),
         ));
     }
+    let not_found_proof = base_message_oracles::compare_not_found(
+        &corpus_dir,
+        &resumed_json,
+        &base_message_oracles::trace_since(&server, session, not_found_trace_at)?,
+    )?;
+    let wrong_password_trace_at = server
+        .online_trace(session)
+        .map_err(terminal_problem)?
+        .len();
+    let wrong_password = carddemo_terminal_exchange(
+        &app,
+        session,
+        &mutation_headers,
+        0x7d,
+        BTreeMap::from([
+            ("USERID".into(), "USER0001".into()),
+            ("PASSWD".into(), "BADPASS".into()),
+        ]),
+    )
+    .await?;
+    if serde_json::to_vec(&wrong_password)
+        .map_err(|error| CorpusProblem::new("carddemo.online.response", error.to_string()))?
+        .windows(7)
+        .any(|value| value == b"BADPASS")
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.online.secret_disclosed",
+            "wrong-password sign-on response disclosed the supplied password",
+        ));
+    }
+    base_message_oracles::compare_wrong_password(
+        &corpus_dir,
+        &wrong_password,
+        &base_message_oracles::trace_since(&server, session, wrong_password_trace_at)?,
+        not_found_proof,
+        &mut route_observations,
+    )?;
+    signon_field_oracles::compare_wrong_password(
+        &wrong_password,
+        signon_not_found_proof,
+        &mut route_observations,
+    )?;
+    signon_field_oracles::exercise_typed_controls(&server, &app, &corpus_dir).await?;
     let valid_input = terminal_http(
         &app,
         Method::PUT,
@@ -9857,6 +9212,8 @@ async fn exercise_base_online_smoke(
     )
     .await?;
     require_terminal_status(valid_input.0, StatusCode::OK, "valid sign-on input")?;
+    let signon_read_before =
+        read_request_observations::before_stage(store.as_ref(), &server, session)?;
     let menu = terminal_http(
         &app,
         Method::POST,
@@ -9895,6 +9252,20 @@ async fn exercise_base_online_smoke(
             ),
         ));
     }
+    read_request_observations::compare_stage(
+        &read_request_observations::StageContext::new(
+            store.as_ref(),
+            &server,
+            &corpus_dir,
+            session,
+            &installed_read_actors,
+        ),
+        &signon_read_before,
+        &menu_json,
+        read_request_observations::Route::Signon,
+        &mut route_observations,
+    )?;
+    menu_observations::compare_regular_menu(&corpus_dir, &menu_json)?;
     selected_maps.insert("COMEN01".into());
     let account_input = terminal_http(
         &app,
@@ -9941,6 +9312,14 @@ async fn exercise_base_online_smoke(
         ));
     }
     selected_maps.insert("COACTVW".into());
+    let account_read_before =
+        read_request_observations::before_stage(store.as_ref(), &server, session)?;
+    #[cfg(all(test, feature = "assurance-observers"))]
+    let copyback_observation = copyback_prepared.arm(&copyback_manager, session)?;
+    let account_detail_trace_at = server
+        .online_trace(session)
+        .map_err(terminal_problem)?
+        .len();
     let account_detail = carddemo_terminal_exchange(
         &app,
         session,
@@ -9950,6 +9329,11 @@ async fn exercise_base_online_smoke(
     )
     .await?;
     let _account_fields = online_screen_fields(&account_detail)?;
+    base_message_oracles::compare_account_detail_reads(
+        &corpus_dir,
+        &account_detail,
+        &base_message_oracles::trace_since(&server, session, account_detail_trace_at)?,
+    )?;
     if normal_online_effects(&server, session, CicsOperation::Read) < 4 {
         return Err(CorpusProblem::new(
             "carddemo.online.account_values",
@@ -9962,8 +9346,52 @@ async fn exercise_base_online_smoke(
         &_account_fields,
         &mut route_observations,
     )?;
+    read_request_observations::compare_stage(
+        &read_request_observations::StageContext::new(
+            store.as_ref(),
+            &server,
+            &corpus_dir,
+            session,
+            &installed_read_actors,
+        ),
+        &account_read_before,
+        &account_detail,
+        read_request_observations::Route::Account,
+        &mut route_observations,
+    )?;
+    #[cfg(all(test, feature = "assurance-observers"))]
+    {
+        // Exact postapplication storage is additional control evidence only.
+        // All original later routes, both drains and owned removal remain required.
+        copyback_prepared.compare(
+            copyback_observation.completed().map_err(|_| {
+                CorpusProblem::new(
+                    "carddemo.online.read_copyback_storage",
+                    "actual observation incomplete",
+                )
+            })?,
+            &account_detail,
+            session,
+            &installed_read_actors,
+            store.as_ref(),
+        )?;
+        // The manager retains this same Arc; release it before the original reopen.
+        drop(copyback_observation);
+        drop(copyback_prepared);
+        drop(copyback_manager);
+    }
     let rollback_controls =
         exercise_account_rollback_control(&server, &app, &mut route_observations).await?;
+    let mut account_update_proof = account_rewrite_observations::exercise(
+        &account_rewrite_observations::Context {
+            store: store.as_ref(),
+            server: &server,
+            corpus: &corpus_dir,
+            installed: &account_update_artifacts,
+        },
+        &app,
+    )
+    .await?;
     let card_mutations =
         exercise_card_update_mutation(&server, &app, &mut route_observations).await?;
     for (option, expected_mapset) in [
@@ -10018,6 +9446,9 @@ async fn exercise_base_online_smoke(
             "COADM01",
         )
         .await?;
+        if option == 1 {
+            menu_observations::compare_admin_menu(&corpus_dir, &app, &route).await?;
+        }
         selected_maps.insert("COADM01".into());
         let selected = carddemo_terminal_exchange(
             &app,
@@ -10063,6 +9494,8 @@ async fn exercise_base_online_smoke(
             .map_err(terminal_problem)
     })?;
     let restart_route = select_regular_option(&server, &app, 3, "COCRDLI").await?;
+    let menu_restart = menu_observations::RestartMenu::prepare(&corpus_dir, &server, &app).await?;
+    account_update_proof.retain_before_reopen(&server)?;
     drop(app);
     if !server.graceful_shutdown().await {
         return Err(CorpusProblem::new(
@@ -10071,8 +9504,12 @@ async fn exercise_base_online_smoke(
         ));
     }
     drop(server);
-    let restarted = ProductServer::open(config, store, secrets, default_program_router())
+    let restarted = ProductServer::open(config, store.clone(), secrets, default_program_router())
         .map_err(terminal_problem)?;
+    account_update_proof.compare_reopened(&restarted)?;
+    let installation_proof =
+        installation.observe_reopened(&corpus_dir, store.as_ref(), &binding_root)?;
+    catalog_proof.observe_reopened(&corpus_dir, &restarted, store.as_ref())?;
     let restarted_app = restarted.router();
     let restarted_page = carddemo_terminal_exchange(
         &restarted_app,
@@ -10083,6 +9520,9 @@ async fn exercise_base_online_smoke(
     )
     .await?;
     require_online_mapset(&restarted_page, "COCRDLI", "card list restart resume")?;
+    menu_restart
+        .resume(&restarted, &restarted_app, &mut route_observations)
+        .await?;
     if restarted.cics_service().active_worker_count() != 0 {
         return Err(CorpusProblem::new(
             "carddemo.online.restart_worker",
@@ -10097,6 +9537,7 @@ async fn exercise_base_online_smoke(
         ));
     }
     drop(restarted);
+    account_update_proof.bind(&mut route_observations)?;
     let mut observations = vec![
         format!("maps:{}", selected_maps.len()),
         format!("dataset-reads:{dataset_reads}"),
@@ -10109,6 +9550,9 @@ async fn exercise_base_online_smoke(
     observations.extend(controls.observations);
     Ok(BaseOnlineExercise {
         route_observations,
+        seed_proof,
+        installation_proof,
+        catalog_proof,
         initial_screen_bytes: screen.len(),
         screen_paths: selected_maps.len(),
         dataset_reads,
@@ -10126,6 +9570,7 @@ async fn exercise_base_online_smoke(
 struct CardDemoOnlineSession {
     session: String,
     headers: BTreeMap<String, String>,
+    menu_response: serde_json::Value,
 }
 
 async fn open_carddemo_menu(
@@ -10189,7 +9634,11 @@ async fn open_carddemo_menu(
             ),
         )
     })?;
-    Ok(CardDemoOnlineSession { session, headers })
+    Ok(CardDemoOnlineSession {
+        session,
+        headers,
+        menu_response: signed_on,
+    })
 }
 
 async fn carddemo_terminal_exchange(
@@ -10289,6 +9738,9 @@ async fn exercise_admin_user_lifecycle(
     route_observations: &mut RouteObservations,
 ) -> Result<usize, CorpusProblem> {
     security_observations::verify_user_security_seed(server)?;
+    user_mutation_observations::verify_sources()?;
+    let raw_before = user_mutation_observations::capture(server)?;
+    user_mutation_observations::require_seed(&raw_before)?;
     let dataset = "AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS";
     let before = carddemo_dataset_text_records(server, dataset)?;
     if before.iter().any(|record| record.starts_with("TEST0001")) {
@@ -10305,6 +9757,10 @@ async fn exercise_admin_user_lifecycle(
         ("PASSWD".into(), "SECRETP1".into()),
         ("USRTYPE".into(), "U".into()),
     ]);
+    let add_trace_before = server
+        .online_trace(&add.session)
+        .map_err(terminal_problem)?
+        .len();
     let added =
         carddemo_terminal_exchange(app, &add.session, &add.headers, 0x7d, add_fields.clone())
             .await?;
@@ -10320,6 +9776,19 @@ async fn exercise_admin_user_lifecycle(
             "user lifecycle screen disclosed a password",
         ));
     }
+    let raw_after_add = user_mutation_observations::capture(server)?;
+    let add_trace = server
+        .online_trace(&add.session)
+        .map_err(terminal_problem)?;
+    let add_effects = add_trace.get(add_trace_before..).ok_or_else(|| {
+        CorpusProblem::new("carddemo.online.user_raw_state_drift", "add trace shrank")
+    })?;
+    user_mutation_observations::require_transition(
+        user_mutation_observations::Mutation::Add,
+        &raw_before,
+        &raw_after_add,
+        add_effects,
+    )?;
     let after_add = carddemo_dataset_text_records(server, dataset)?;
     let added_record = after_add
         .iter()
@@ -10345,6 +9814,8 @@ async fn exercise_admin_user_lifecycle(
             ))
         },
     )?;
+    let duplicate_raw_before = user_mutation_observations::capture(server)?;
+    user_mutation_observations::require_unchanged(&raw_after_add, &duplicate_raw_before)?;
     let duplicate_before = transaction_harness::snapshot(server)?;
     let duplicate_trace_before = server
         .online_trace(&add.session)
@@ -10363,6 +9834,10 @@ async fn exercise_admin_user_lifecycle(
         ));
     }
 
+    user_mutation_observations::require_unchanged(
+        &duplicate_raw_before,
+        &user_mutation_observations::capture(server)?,
+    )?;
     let duplicate_after = transaction_harness::snapshot(server)?;
     let duplicate_trace = server
         .online_trace(&add.session)
@@ -10395,6 +9870,8 @@ async fn exercise_admin_user_lifecycle(
         ));
     }
     let missing_route = select_admin_option(server, app, 3, "COUSR02").await?;
+    let missing_raw_before = user_mutation_observations::capture(server)?;
+    user_mutation_observations::require_unchanged(&raw_after_add, &missing_raw_before)?;
     let missing_before = transaction_harness::snapshot(server)?;
     let missing_trace_before = server
         .online_trace(&missing_route.session)
@@ -10408,6 +9885,10 @@ async fn exercise_admin_user_lifecycle(
         BTreeMap::from([("USRIDIN".into(), "MISS0001".into())]),
     )
     .await?;
+    user_mutation_observations::require_unchanged(
+        &missing_raw_before,
+        &user_mutation_observations::capture(server)?,
+    )?;
     let missing_after = transaction_harness::snapshot(server)?;
     let missing_trace = server
         .online_trace(&missing_route.session)
@@ -10431,6 +9912,8 @@ async fn exercise_admin_user_lifecycle(
         missing_observed,
     )?;
 
+    user_mutation_observations::exercise_list_cursor(server, app, route_observations).await?;
+
     let update = select_admin_option(server, app, 3, "COUSR02").await?;
     let selected = carddemo_terminal_exchange(
         app,
@@ -10449,6 +9932,12 @@ async fn exercise_admin_user_lifecycle(
             "user update route did not display the keyed record",
         ));
     }
+    let raw_update_before = user_mutation_observations::capture(server)?;
+    user_mutation_observations::require_unchanged(&raw_after_add, &raw_update_before)?;
+    let update_trace_before = server
+        .online_trace(&update.session)
+        .map_err(terminal_problem)?
+        .len();
     let updated = carddemo_terminal_exchange(
         app,
         &update.session,
@@ -10464,6 +9953,22 @@ async fn exercise_admin_user_lifecycle(
     )
     .await?;
     require_online_mapset(&updated, "COUSR02", "user update")?;
+    let raw_after_update = user_mutation_observations::capture(server)?;
+    let update_trace = server
+        .online_trace(&update.session)
+        .map_err(terminal_problem)?;
+    let update_effects = update_trace.get(update_trace_before..).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.online.user_raw_state_drift",
+            "update trace shrank",
+        )
+    })?;
+    user_mutation_observations::require_transition(
+        user_mutation_observations::Mutation::Update,
+        &raw_update_before,
+        &raw_after_update,
+        update_effects,
+    )?;
     let after_update = carddemo_dataset_text_records(server, dataset)?;
     route_observations.compare(
         journey_closure::AuthorityKind::Journey,
@@ -10501,6 +10006,12 @@ async fn exercise_admin_user_lifecycle(
             "user delete route did not display the keyed record",
         ));
     }
+    let raw_delete_before = user_mutation_observations::capture(server)?;
+    user_mutation_observations::require_unchanged(&raw_after_update, &raw_delete_before)?;
+    let delete_trace_before = server
+        .online_trace(&delete.session)
+        .map_err(terminal_problem)?
+        .len();
     let deleted = carddemo_terminal_exchange(
         app,
         &delete.session,
@@ -10510,6 +10021,22 @@ async fn exercise_admin_user_lifecycle(
     )
     .await?;
     require_online_mapset(&deleted, "COUSR03", "user delete")?;
+    let raw_after_delete = user_mutation_observations::capture(server)?;
+    let delete_trace = server
+        .online_trace(&delete.session)
+        .map_err(terminal_problem)?;
+    let delete_effects = delete_trace.get(delete_trace_before..).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.online.user_raw_state_drift",
+            "delete trace shrank",
+        )
+    })?;
+    user_mutation_observations::require_transition(
+        user_mutation_observations::Mutation::Delete,
+        &raw_delete_before,
+        &raw_after_delete,
+        delete_effects,
+    )?;
     let after_delete = carddemo_dataset_text_records(server, dataset)?;
     route_observations.compare(
         journey_closure::AuthorityKind::Journey,
@@ -10571,7 +10098,26 @@ async fn exercise_regular_online_journeys(
     let card_account = "00000000050";
     let transaction = "0000000000683580";
 
-    let card_list = select_regular_option(server, app, 3, "COCRDLI").await?;
+    primary_card_pages::check_inputs(corpus_dir)?;
+    let list_before = card_observations::capture(server)?;
+    let selection =
+        transaction_harness::select_regular_option_with_response(server, app, 3, "COCRDLI").await?;
+    let card_list = selection.route;
+    let mut list_trace = server.online_trace(&card_list.session).map_err(|_| {
+        CorpusProblem::new(
+            "carddemo.online.primary_card_page_drift",
+            "trace unavailable",
+        )
+    })?;
+    primary_card_pages::require_page(
+        &selection.response,
+        &card_list.session,
+        primary_card_pages::Page::First,
+        &selection.before_trace,
+        &list_trace,
+    )?;
+    let list_after_first = card_observations::capture(server)?;
+    primary_card_pages::require_unchanged(&list_before, &list_after_first)?;
     for (aid, operation) in [(0xf8, "card list PF8"), (0xf7, "card list PF7")] {
         let page = carddemo_terminal_exchange(
             app,
@@ -10591,6 +10137,27 @@ async fn exercise_regular_online_journeys(
                 ),
             )
         })?;
+        let after_trace = server.online_trace(&card_list.session).map_err(|_| {
+            CorpusProblem::new(
+                "carddemo.online.primary_card_page_drift",
+                "trace unavailable",
+            )
+        })?;
+        let selected_page = if aid == 0xf8 {
+            primary_card_pages::Page::Next
+        } else {
+            primary_card_pages::Page::Back
+        };
+        primary_card_pages::require_page(
+            &page,
+            &card_list.session,
+            selected_page,
+            &list_trace,
+            &after_trace,
+        )?;
+        let after_state = card_observations::capture(server)?;
+        primary_card_pages::require_unchanged(&list_before, &after_state)?;
+        list_trace = after_trace;
     }
 
     let card_detail = select_regular_option(server, app, 4, "COCRDSL").await?;
@@ -10654,6 +10221,7 @@ async fn exercise_regular_online_journeys(
     let transact_dataset = "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS";
     let before_transactions = carddemo_dataset_text_records(server, transact_dataset)?;
     let add = select_regular_option(server, app, 8, "COTRN02").await?;
+    let insert_proof = insert_observations::InsertProof::capture(server, corpus_dir, &add.session)?;
     let added = carddemo_terminal_exchange(
         app,
         &add.session,
@@ -10688,6 +10256,7 @@ async fn exercise_regular_online_journeys(
     })?;
     require_online_mapset(&added, "COTRN02", "transaction add")?;
     let after_transactions = carddemo_dataset_text_records(server, transact_dataset)?;
+    insert_proof.compare(server, &add.session, &added)?;
     route_observations.compare(
         journey_closure::AuthorityKind::Journey,
         "CD.J06",
@@ -10710,6 +10279,11 @@ async fn exercise_regular_online_journeys(
         },
     )?;
 
+    let purchase_key_proof = base_message_oracles::compare_purchase_key(
+        corpus_dir,
+        &before_transactions,
+        &after_transactions,
+    )?;
     let reports_before = server
         .cics_service()
         .transient_records("JOBS")
@@ -10733,6 +10307,19 @@ async fn exercise_regular_online_journeys(
             "monthly report route did not request explicit confirmation",
         ));
     }
+    let report_review_proof = base_message_oracles::compare_report_review(
+        corpus_dir,
+        &review,
+        &reports_before,
+        &server
+            .cics_service()
+            .transient_records("JOBS")
+            .map_err(terminal_problem)?,
+    )?;
+    let report_trace_at = server
+        .online_trace(&report.session)
+        .map_err(terminal_problem)?
+        .len();
     let reported = carddemo_terminal_exchange(
         app,
         &report.session,
@@ -10764,6 +10351,15 @@ async fn exercise_regular_online_journeys(
         ));
     }
 
+    let report_messages_proof = base_message_oracles::compare_report_request(
+        corpus_dir,
+        &reported,
+        &reports_before,
+        &reports_after,
+        &base_message_oracles::trace_since(server, &report.session, report_trace_at)?,
+        report_review_proof,
+        route_observations,
+    )?;
     let account_dataset = "AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS";
     let before_accounts = carddemo_dataset_text_records(server, account_dataset)?;
     let before_account = before_accounts
@@ -10791,6 +10387,9 @@ async fn exercise_regular_online_journeys(
     )
     .await?;
     require_online_mapset(&review, "COBIL00", "bill review")?;
+    let bill_review_proof = base_message_oracles::compare_bill_review(corpus_dir, &review)?;
+    let bill_proof = bill_observations::BillProof::capture(server, corpus_dir, &bill.session)?;
+    let bill_clock_before = bill_observations::utc_second()?;
     let paid = carddemo_terminal_exchange(
         app,
         &bill.session,
@@ -10802,6 +10401,7 @@ async fn exercise_regular_online_journeys(
         ]),
     )
     .await?;
+    let bill_clock_after = bill_observations::utc_second()?;
     require_online_mapset(&paid, "COBIL00", "bill payment")?;
     let after_accounts = carddemo_dataset_text_records(server, account_dataset)?;
     let after_account = after_accounts
@@ -10814,6 +10414,13 @@ async fn exercise_regular_online_journeys(
             )
         })?;
     let final_transactions = carddemo_dataset_text_records(server, transact_dataset)?;
+    let bill_clock_proof = bill_proof.compare(
+        server,
+        &bill.session,
+        &paid,
+        bill_clock_before,
+        bill_clock_after,
+    )?;
     route_observations.compare(
         journey_closure::AuthorityKind::Journey,
         "CD.J07",
@@ -10838,6 +10445,15 @@ async fn exercise_regular_online_journeys(
             ))
         },
     )?;
+    base_message_oracles::compare_bill_success(
+        corpus_dir,
+        &paid,
+        report_messages_proof,
+        bill_review_proof,
+        purchase_key_proof,
+        route_observations,
+    )?;
+    bill_clock_proof.bind(route_observations)?;
     Ok(3)
 }
 
@@ -11926,8 +11542,11 @@ fn screen_contains(screen: &[u8], text: &str) -> bool {
 
 fn carddemo_db2_online_definition(
     corpus_dir: &Path,
-) -> Result<OnlineApplicationDefinition, CorpusProblem> {
-    let mut definition = carddemo_base_online_definition(corpus_dir)?;
+) -> Result<(OnlineApplicationDefinition, db2_admin_menu::Expectation), CorpusProblem> {
+    let mut menu = db2_admin_menu::Expectation::new(corpus_dir)?;
+    let mut definition = online_definition::carddemo_base_online_definition_for_db2_admin_menu(
+        corpus_dir, &mut menu,
+    )?;
     let bundles = carddemo_db2_bundles(corpus_dir)?
         .into_iter()
         .map(|(relative, bundle)| {
@@ -12001,10 +11620,9 @@ fn carddemo_db2_online_definition(
                 format!("{relative} did not publish"),
             ));
         };
-        definition.programs.push(OnlineProgramDefinition::current(
-            (*program).clone(),
-            &artifact,
-        ));
+        let published = OnlineProgramDefinition::current((*program).clone(), &artifact);
+        menu.observe_publisher(program, relative, bundle, &published)?;
+        definition.programs.push(published);
     }
     definition.transactions.extend(transactions);
     definition.maps.extend(carddemo_maps(
@@ -12021,7 +11639,8 @@ fn carddemo_db2_online_definition(
             "Db2 application resource counts differ",
         ));
     }
-    Ok(definition)
+    menu.finish(&definition)?;
+    Ok((definition, menu))
 }
 
 fn carddemo_base_seed_objects(corpus_dir: &Path) -> Result<Vec<DatasetSeedObject>, CorpusProblem> {
@@ -12283,6 +11902,9 @@ fn carddemo_db2_bundles(corpus_dir: &Path) -> Result<Vec<(String, SourceBundle)>
         .collect())
 }
 
+#[cfg(all(test, target_os = "linux"))]
+mod full_catalog_observations;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -12471,6 +12093,58 @@ mod tests {
         assert_eq!(
             count.verify().unwrap_err().code,
             "carddemo.corpus.file_count_drift"
+        );
+    }
+
+    #[test]
+    fn local_repository_origin_refusal_preserves_code_without_disclosing_path() {
+        let fixture = Fixture::create();
+        let origin = fixture.root.join("private-local-origin");
+        command(
+            &fixture.root,
+            &["remote", "set-url", "origin", origin.to_str().unwrap()],
+        );
+        let error = fixture.verify().unwrap_err();
+        assert_eq!(error.code, "carddemo.corpus.repository_drift");
+        assert_eq!(
+            error.detail,
+            "repository origin differs from the pinned inventory"
+        );
+        assert!(!error.to_string().contains(origin.to_str().unwrap()));
+        assert!(!error.to_string().contains(fixture.root.to_str().unwrap()));
+    }
+
+    #[test]
+    fn same_count_corrupt_source_masked_from_status_is_still_rejected() {
+        let fixture = Fixture::create();
+        let before = tracked_files(&fixture.root).unwrap();
+        command(
+            &fixture.root,
+            &["update-index", "--assume-unchanged", "app/cbl/ONE.cbl"],
+        );
+        fs::write(fixture.root.join("app/cbl/ONE.cbl"), b"PROGRAM-ID. TWO.\n").unwrap();
+        assert!(
+            git(
+                &fixture.root,
+                &["status", "--porcelain=v1", "--untracked-files=all"]
+            )
+            .unwrap()
+            .is_empty()
+        );
+        assert_eq!(tracked_files(&fixture.root).unwrap(), before);
+        assert_eq!(
+            fixture.verify().unwrap_err().code,
+            "carddemo.corpus.content_drift"
+        );
+    }
+
+    #[test]
+    fn unaccepted_license_identifier_refuses_even_with_unchanged_license_bytes() {
+        let fixture = Fixture::create();
+        fixture.update_contract(|contract| contract["license"] = json!("MIT"));
+        assert_eq!(
+            fixture.verify().unwrap_err().code,
+            "carddemo.corpus.license_unaccepted"
         );
     }
 

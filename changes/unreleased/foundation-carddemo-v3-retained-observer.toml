@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add a source-bound observer for retained V3 package, publication, controller and local catalog state across Memory and SQLite lifecycle operations."

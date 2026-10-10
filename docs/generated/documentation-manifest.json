@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 243,
+    "markdown_documents": 248,
     "navigation_groups": 8,
-    "normative_documents": 104,
+    "normative_documents": 109,
     "xtask_commands": 162
   },
   "documents": [
@@ -341,8 +341,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 185,
-      "sha256": "sha256:e5ffaa12d83b41891d4816a07d52d2e202a605d8667322709d0e57f493649546",
+      "relative_links": 190,
+      "sha256": "sha256:7ff6da09fac43482d641b4ad46ec301d76309db16f68f6ee2678ef657c6f9e0e",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -411,9 +411,9 @@
       "normative": true,
       "owner": "compiler and IR maintainers",
       "path": "docs/architecture/COMPILER-AND-IR.md",
-      "relative_links": 1,
+      "relative_links": 2,
       "scope": "compiler stages, IR contracts, and publication pipeline",
-      "sha256": "sha256:76d3b6017452017e912750e5688c646b60bc502d37972b4ce309f0dff7244165",
+      "sha256": "sha256:16b204c7643454d5afb8596785a4c2f090fb52502f0b54f59582cd0ce06fb7e5",
       "status": "Accepted by repository owner",
       "title": "Compiler and IR Architecture",
       "xtask_commands": 0
@@ -1519,10 +1519,70 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env explicit native MQ root custody profile",
+      "normative": true,
+      "owner": "configured COBOL root driver, selected MQ authority and store adapters",
+      "path": "docs/decisions/0057-native-mq-root-custody-cutoff.md",
+      "relative_links": 0,
+      "scope": "one actual synchronous native root and its one selected MQ authority",
+      "sha256": "sha256:efe2b81bcfe266dc7577bfe2073d1fbcc5fad1d3c49ecab567bee29f4c0d261f",
+      "status": "Proposed; external implementation draft, execution evidence pending",
+      "title": "Explicit native MQ root custody cutoff",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env explicit native MQ custody and protected-scope succession profile",
+      "normative": true,
+      "owner": "configured COBOL root driver, selected MQ authority and store adapters",
+      "path": "docs/decisions/0058-native-mq-protected-scope-succession.md",
+      "relative_links": 0,
+      "scope": "explicit protected-scope successor of one manager-held fenced native MQ root",
+      "sha256": "sha256:d18caa57c64e9da1dcbb5211ca47a879f5b59c2eacb204484b8b576874173583",
+      "status": "proposed, unexecuted",
+      "title": "ADR 0058: Explicit protected native MQ scope succession",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env optional Unix owned-file native MQ custody profile",
+      "normative": true,
+      "owner": "SQLite store adapter and configured native MQ root maintainers",
+      "path": "docs/decisions/0059-native-mq-serial-owned-sqlite-file-custody.md",
+      "relative_links": 0,
+      "scope": "serial born-owned SQLite file custody for explicit native MQ scope succession",
+      "sha256": "sha256:08000506798a72b85056927902395becac2720030ed5564f749cd873defbd13e",
+      "status": "proposed infrastructure contract; controls and native producer unrun.",
+      "title": "ADR0059: serial owned SQLite file custody for native MQ succession",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env optional assurance-observers infrastructure profile",
+      "normative": true,
+      "owner": "CICS runtime, interpreter and privileged Rust embedding maintainers",
+      "path": "docs/decisions/0060-passive-cics-read-copyback.md",
+      "relative_links": 0,
+      "scope": "optional passive equal-width successful READ storage postimage assurance observation",
+      "sha256": "sha256:e659d7548173e4958b6df7a3fff42c4ae1c4f71e5d9f3aa8b5a8ee0647aa09a9",
+      "status": "proposed. This is an infrastructure observation contract, not subsystem semantic or acceptance completion.",
+      "title": "0060. Optional passive CICS READ copyback observation",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env local mainframe.core.cobol@2.init byte carrier",
+      "normative": true,
+      "owner": "compiler, IR and interpreter maintainers",
+      "path": "docs/decisions/0061-cobol-chunked-initializer-carrier.md",
+      "relative_links": 0,
+      "scope": "byte-preserving large initializer lowering, artifact admission and whole-view initialization",
+      "sha256": "sha256:eabf3d426e80022b6585a17938ec1f7dee46331c6430cae41c44184cad72f6c2",
+      "status": "proposed. This changes local executable representation, not IBM language meaning or acceptance completion.",
+      "title": "0061. Versioned bounded COBOL initializer byte carrier",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 59,
-      "sha256": "sha256:f961ab57a4472f9bb5c333e55104916bc4012bee7709957035c87f466d7f33aa",
+      "relative_links": 60,
+      "sha256": "sha256:1079b006bd124b09fc6b49167c81656c0d82feaa250a13bf48d0ee9215d16241",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1554,7 +1614,7 @@
       "normative": false,
       "path": "docs/delivery/IMPLEMENTATION-STATUS.md",
       "relative_links": 21,
-      "sha256": "sha256:a9d597a697bf8602936917c1d9aebb1cb5a10bb62d8b9331ab3289df0dd485d4",
+      "sha256": "sha256:c5ceaf449d18a5c5618494bf4fb2603370c888ac4a9f2f5ab3db3be923b5c7dc",
       "title": "Subsystem implementation status",
       "xtask_commands": 1
     },
@@ -1770,7 +1830,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/coverage/foundation-status.md",
       "relative_links": 2,
-      "sha256": "sha256:080c3fa00d31ef05a5071cc9cce1551d2230dc866de7c531416c86d8a17c1780",
+      "sha256": "sha256:863a2ee3f70f7c7b61cf5e15c15062c7875f64b8e2f7e63a8115462b383d572c",
       "title": "Coverage and conformance — Coverage authority progress",
       "xtask_commands": 5
     },
@@ -2834,6 +2894,26 @@
         {
           "label": "ADR-0056: CICS first reverse read at a retained position",
           "path": "docs/decisions/0056-cics-first-reverse-position.md"
+        },
+        {
+          "label": "ADR-0057: Explicit native MQ root custody cutoff",
+          "path": "docs/decisions/0057-native-mq-root-custody-cutoff.md"
+        },
+        {
+          "label": "ADR-0058: Protected native MQ scope succession",
+          "path": "docs/decisions/0058-native-mq-protected-scope-succession.md"
+        },
+        {
+          "label": "ADR-0059: Serial owned SQLite file custody",
+          "path": "docs/decisions/0059-native-mq-serial-owned-sqlite-file-custody.md"
+        },
+        {
+          "label": "ADR-0060: Passive CICS READ copyback observation",
+          "path": "docs/decisions/0060-passive-cics-read-copyback.md"
+        },
+        {
+          "label": "ADR-0061: Bounded COBOL initializer byte carrier",
+          "path": "docs/decisions/0061-cobol-chunked-initializer-carrier.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -3056,7 +3136,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:5b20d0b4dae429dbc36e44d4f80807d1b7dd97b1317ec90e35b37aa38037e20c",
+  "registry_sha256": "sha256:a573094cbc8cfc095801cb8f374467c9b82ad7b71ec573271049c8c246f69a76",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

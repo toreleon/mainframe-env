@@ -124,7 +124,13 @@ pub(in crate::memory) fn guard_outbox_delivery(
     let root =
         std::str::from_utf8(&binding.payload).map_err(|_| StoreError::IncompatibleVersion)?;
     let document = Document::read(row(state, ROOT_DRIVER_NAMESPACE, root)?)?;
-    if document.phase == Phase::Closing {
+    if document.phase == Phase::Closing
+        || (document.phase == Phase::Uncertain
+            && state.provider_state.contains_key(&(
+                mainframe_env_store_api::ROOT_CUSTODY_NAMESPACE.into(),
+                root.into(),
+            )))
+    {
         Err(StoreError::InvalidTransition)
     } else {
         Ok(())

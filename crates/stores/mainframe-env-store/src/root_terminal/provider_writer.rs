@@ -2,6 +2,23 @@
 use super::*;
 
 impl Document {
+    pub(crate) fn require_recorded_index(
+        &self,
+        binding: &ProviderStateRecord,
+    ) -> Result<(), StoreError> {
+        if binding.namespace == SCOPE_NAMESPACE {
+            return self.require_scope_index(binding, &binding.key, "");
+        }
+        if binding.namespace == ROW_SCOPE_NAMESPACE {
+            let (namespace, key) = self
+                .provider_rows
+                .iter()
+                .find(|(n, k)| row_scope_key(n, k) == binding.key)
+                .ok_or(StoreError::IncompatibleVersion)?;
+            return self.require_scope_index(binding, namespace, key);
+        }
+        self.require_index(binding)
+    }
     pub(crate) fn require_writer(
         &self,
         request: &RootProviderPublication,
@@ -82,7 +99,18 @@ impl Document {
         namespace: &str,
         key: &str,
     ) -> Result<(), StoreError> {
-        self.require_index(binding)?;
+        let expected = if binding.namespace == SCOPE_NAMESPACE && self.schema == SUCCESSOR_SCHEMA {
+            self.scope_versions
+                .iter()
+                .find(|(n, _)| n == namespace)
+                .map(|(_, version)| *version)
+                .ok_or(StoreError::IncompatibleVersion)?
+        } else {
+            1
+        };
+        if binding.version != expected || binding.payload != self.root.as_bytes() {
+            return Err(StoreError::Conflict);
+        }
         if (binding.namespace == SCOPE_NAMESPACE
             && self.provider_namespaces.iter().any(|n| n == namespace))
             || (binding.namespace == ROW_SCOPE_NAMESPACE

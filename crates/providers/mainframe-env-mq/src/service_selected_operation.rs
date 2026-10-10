@@ -45,6 +45,9 @@ pub(in crate::service) mod producer;
 mod property;
 #[path = "service_selected_operation/receipt.rs"]
 pub(in crate::service) mod receipt;
+pub(in crate::service) fn custody_control_identity() -> (&'static str, &'static str) {
+    (ownership::CONTROL_NAMESPACE, ownership::CONTROL_KEY)
+}
 #[path = "service_selected_operation/rfh2.rs"]
 mod rfh2;
 #[path = "service_selected_operation/rows.rs"]
@@ -320,6 +323,7 @@ impl MqService {
                 }
                 // Receipt/core/frame/limits/SAF proof above precedes every
                 // observation lookup. Resolution never allocates or resurrects.
+                self.require_selected_live()?;
                 transition::resolve_reply(
                     state,
                     &mut runtime,
@@ -343,6 +347,7 @@ impl MqService {
                     clock.now_tick()?,
                 )
                 .map_err(|_| HostProblem::UnknownOutcome)?;
+                self.require_selected_live()?;
                 return Ok(reply);
             }
             if state.receipts.contains_key(key) || runtime.replies.contains_key(key) {
@@ -376,6 +381,7 @@ impl MqService {
                 Ok(candidate) => candidate,
                 Err(HostProblem::Unauthorized) => {
                     let decision_tick = clock.now_tick()?;
+                    self.require_selected_live()?;
                     binding
                         .prepare(
                             audit(admitted, decision_tick, AuditDecision::Deny),
@@ -414,6 +420,7 @@ impl MqService {
                         AuditDecision::InfrastructureFailure
                     };
                     let decision_tick = clock.now_tick()?;
+                    self.require_selected_live()?;
                     binding
                         .prepare(
                             audit(admitted, decision_tick, decision),
@@ -552,6 +559,7 @@ impl MqService {
                 if let Some(request) = &candidate.rfh2 {
                     rfh2::require_binding_profile(&runtime.connections, request)?;
                 }
+                self.require_selected_live()?;
                 let publish = binding
                     .prepare(
                         // Known host publication succeeded, including a lossless
@@ -565,6 +573,7 @@ impl MqService {
                     .publish(decision_tick)
                     .map_err(intent_error);
                 publish?;
+                self.require_selected_live()?;
                 // All physical rows and audit committed. Only now adopt delivery,
                 // owner/bindings and cached reply; core completion stays external.
                 **state = next;
@@ -596,6 +605,7 @@ impl MqService {
                     rfh2::require_profile(&runtime, request)
                         .map_err(|_| HostProblem::UnknownOutcome)?;
                 }
+                self.require_selected_live()?;
                 transition::adopt(&mut runtime, owner, &mut candidate)?;
                 runtime.control = candidate.control.clone();
                 runtime.connections = candidate.connections.clone();
@@ -617,6 +627,7 @@ impl MqService {
                     clock.now_tick()?,
                 )
                 .map_err(|_| HostProblem::UnknownOutcome)?;
+                self.require_selected_live()?;
                 Ok(reply)
             })();
             if attempt.is_err() {

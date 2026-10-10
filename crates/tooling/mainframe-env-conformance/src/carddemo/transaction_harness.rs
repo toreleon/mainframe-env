@@ -55,6 +55,8 @@ impl Drop for ArtifactDirectory {
 pub(super) struct TransactionFixture {
     pub(super) app: axum::Router,
     pub(super) server: Arc<ProductServer>,
+    date_store: Arc<MemoryStore>,
+    date_definitions: Vec<OnlineProgramDefinition>,
     // Drop the router and server before removing this fixture's artifact directory.
     _artifacts: ArtifactDirectory,
     output: Option<PathBuf>,
@@ -200,6 +202,7 @@ impl TransactionFixture {
             )
         })?;
         let corpus = Path::new(&corpus);
+        date_call_observations::check_sources(corpus)?;
         let definition = if navigation {
             online_definition::navigation_online_definition(corpus)?
         } else {
@@ -207,6 +210,13 @@ impl TransactionFixture {
         };
         let mut artifacts = ArtifactDirectory::create()?;
         let output = create_output_directory(&artifacts.path)?;
+        let date_store = Arc::new(MemoryStore::new(Default::default()));
+        let date_definitions = definition
+            .programs
+            .iter()
+            .filter(|program| ["COTRN02C", "CSUTLDTC"].contains(&program.name.as_str()))
+            .cloned()
+            .collect::<Vec<_>>();
         let server = ProductServer::open(
             ServerConfig {
                 store_profile: StoreProfile::Memory,
@@ -218,7 +228,7 @@ impl TransactionFixture {
                 },
                 ..ServerConfig::default()
             },
-            Arc::new(MemoryStore::new(Default::default())),
+            date_store.clone(),
             Arc::new(MemorySecretResolver::default()),
             default_program_router(),
         )
@@ -228,6 +238,8 @@ impl TransactionFixture {
         let fixture = Self {
             app: server.router(),
             server,
+            date_store,
+            date_definitions,
             _artifacts: artifacts,
             output,
         };
@@ -500,6 +512,11 @@ pub(super) async fn compare_date(
     let fixture = TransactionFixture::open_with_transaction_rows(vec![baseline.clone()]).await?;
     let result = async {
         let route = select_regular_option(&fixture.server, &fixture.app, 8, "COTRN02").await?;
+        let date_calls = date_call_observations::BeforeStage::capture(
+            fixture.date_store.as_ref(),
+            &fixture._artifacts.path,
+            &fixture.date_definitions,
+        )?;
         let before = snapshot(&fixture.server)?;
         let trace_before = fixture
             .server
@@ -514,6 +531,13 @@ pub(super) async fn compare_date(
             fields(origin, processing),
         )
         .await?;
+        date_call_observations::compare_stage(
+            fixture.date_store.as_ref(),
+            &date_calls,
+            &response,
+            origin,
+            processing,
+        )?;
         let after = snapshot(&fixture.server)?;
         let trace = fixture
             .server
@@ -777,6 +801,54 @@ pub(super) async fn select_regular_option(
         &format!("regular option {option}"),
     )?;
     Ok(route)
+}
+
+pub(super) struct RegularSelection {
+    pub(super) route: CardDemoOnlineSession,
+    pub(super) response: serde_json::Value,
+    pub(super) before_trace: Vec<mainframe_env_cics::CicsTraceEntry>,
+}
+
+pub(super) async fn select_regular_option_with_response(
+    server: &ProductServer,
+    app: &axum::Router,
+    option: u8,
+    expected_mapset: &str,
+) -> Result<RegularSelection, CorpusProblem> {
+    let route = open_carddemo_menu(
+        server,
+        app,
+        "WEBUSER",
+        "transport-password",
+        "USER0001",
+        "PASSWORD",
+        "COMEN01",
+    )
+    .await?;
+    let before_trace = server.online_trace(&route.session).map_err(|_| {
+        CorpusProblem::new(
+            "carddemo.online.primary_card_page_drift",
+            "trace unavailable",
+        )
+    })?;
+    let selected = carddemo_terminal_exchange(
+        app,
+        &route.session,
+        &route.headers,
+        0x7d,
+        BTreeMap::from([("OPTION".into(), option.to_string())]),
+    )
+    .await?;
+    require_online_mapset(
+        &selected,
+        expected_mapset,
+        &format!("regular option {option}"),
+    )?;
+    Ok(RegularSelection {
+        route,
+        response: selected,
+        before_trace,
+    })
 }
 
 // Frozen navigation fixture literals and exact initial tuple admission.

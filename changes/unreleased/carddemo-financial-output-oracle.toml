@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Correct the independent CardDemo transaction oracle at POSTTRAN OPEN OUTPUT and qualify complete spool checks to the established local ProgramOutput.records issuing-step SYSPRINT carrier; preserve exact source rows, counts, hashes, ownership, version, EOF, clock and lifecycle guards. IBM DISPLAY default routing remains pending with zero vendor credit."

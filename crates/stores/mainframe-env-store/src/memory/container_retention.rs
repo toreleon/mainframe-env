@@ -29,6 +29,12 @@ impl MemoryStore {
             {
                 return Err(StoreError::Conflict);
             }
+            root_terminal::guard_successor_identity(
+                &state,
+                &candidate.row.namespace,
+                &candidate.row.key,
+                None,
+            )?;
             validate_memory_provider_dependency(&state, candidate)?;
         }
         let archive = build_archive(
@@ -93,8 +99,20 @@ impl MemoryStore {
             {
                 return Err(StoreError::Conflict);
             }
+            root_terminal::guard_successor_identity(
+                &state,
+                &candidate.row.namespace,
+                &candidate.row.key,
+                None,
+            )?;
             validate_memory_provider_dependency(&state, candidate)?;
         }
+        root_terminal::guard_successor_identity(
+            &state,
+            &request.capacity_replacement.record.namespace,
+            &request.capacity_replacement.record.key,
+            Some(&request.capacity_replacement.record.payload),
+        )?;
         let archive = build_archive(
             deletion.target,
             deletion.archived_tick,

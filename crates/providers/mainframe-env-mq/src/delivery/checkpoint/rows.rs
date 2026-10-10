@@ -23,6 +23,9 @@ const PENDING: &str = "mq-delivery-live-v1-pending";
 const FINAL: &str = "mq-delivery-live-v1-final";
 const CURSOR: &str = "mq-delivery-live-v1-cursor";
 const META_KEY: &str = "state";
+pub(crate) fn custody_metadata_identity() -> (&'static str, &'static str) {
+    (META, META_KEY)
+}
 const SCHEMA: &str = "mainframe-env.mq-delivery-rows@1";
 const SCHEMA_TWO: &str = "mainframe-env.mq-delivery-rows@2";
 /// Exact existing modeled row families; not a prefix mutation permission.

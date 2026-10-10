@@ -30,6 +30,11 @@ pub use product::{
     OnlineProgramDefinition, ProductCapacityStatus, ProductMetrics, ProductReadiness,
     ProductServer,
 };
+#[cfg(feature = "assurance-observers")]
+pub use product::{
+    ArmedReadCopybackObservation, CicsReadObservationProblem, CicsReadObserverManager,
+    CompletedReadCopyback, SourceBoundReadCopybackProfile,
+};
 pub use retention_maintenance::{RetentionMaintenance, RetentionMaintenancePass};
 
 pub const SERVER_GENERATION: &str = "mainframe-env-server@1";

@@ -262,6 +262,12 @@ impl RootClosureSnapshot {
     pub fn validate_bounds(&self) -> Result<(), StoreError> {
         self.budget().map(|_| ())
     }
+    /// Exact conservative usage of the shared original capture budget.
+    /// Storage accounting only; no authority or limit adjustment.
+    pub fn captured_usage(&self) -> Result<(usize, usize), StoreError> {
+        let budget = self.budget()?;
+        Ok((budget.operations, budget.bytes))
+    }
     fn budget(&self) -> Result<RootBudget, StoreError> {
         if self.actors.is_empty()
             || self.actors.len() > MAX_ROOT_ACTORS

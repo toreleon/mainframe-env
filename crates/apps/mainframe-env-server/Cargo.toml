@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 
 [features]
+assurance-observers = ["mainframe-env-interpreter/assurance-observers"]
 fault-injection = ["mainframe-env-cics/fault-injection"]
 
 [dependencies]

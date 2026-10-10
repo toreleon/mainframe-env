@@ -201,6 +201,8 @@ impl SqliteStateStore {
         transaction: &mut Transaction<'_, Sqlite>,
         mutations: Vec<ProviderStateMutation>,
     ) -> Result<(), StoreError> {
+        self.root_guard_successor_mutations(transaction, &mutations)
+            .await?;
         // The existing per-row triggers bump this signed integer. SQLite would
         // otherwise promote an overflowing epoch to REAL and lose fencing.
         // Check all physical endpoints before any touched row under this TX.

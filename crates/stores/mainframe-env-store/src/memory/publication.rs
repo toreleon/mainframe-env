@@ -124,6 +124,7 @@ impl MemoryStore {
         mutations: Vec<ProviderStateMutation>,
         limits: StoreLimits,
     ) -> Result<(), StoreError> {
+        root_terminal::guard_successor_mutations(state, &mutations)?;
         let staging_limits = StoreLimits {
             max_provider_state: usize::MAX,
             max_total_blob_bytes: usize::MAX,

@@ -8,9 +8,12 @@ use crate::{durable, validation};
 use mainframe_env_execution_api::{AuditSubjectRecord, ExecutionId, InvocationLimits};
 use mainframe_env_store_api::*;
 mod capture;
+mod custody;
 mod guards;
+mod owned_file;
 mod preparation;
 mod provider_writer;
+mod successor;
 
 fn put(record: ProviderStateRecord, expected_version: Option<u64>) -> ProviderStateMutation {
     ProviderStateMutation::Put(ProviderStateWrite {

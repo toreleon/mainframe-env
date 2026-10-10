@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Reuse exact immutable compiled CardDemo transaction and navigation fixture inputs inside tests while preserving fresh source admission, service state, actual route comparisons and teardown for every case."

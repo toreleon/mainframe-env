@@ -12,6 +12,9 @@ pub(super) const SOURCE: &str = "IDENTIFICATION DIVISION. PROGRAM-ID. MQFLOW. DA
 
 pub(super) struct Clock(pub AtomicU64, pub Mutex<Option<Box<dyn FnMut() + Send>>>);
 impl MqReplayClock for Clock {
+    fn custody_tick(&self) -> Result<u64, HostProblem> {
+        Ok(self.0.load(Ordering::SeqCst))
+    }
     fn now_tick(&self) -> Result<u64, HostProblem> {
         if let Some(hook) = self.1.lock().unwrap().as_mut() {
             hook();
@@ -222,6 +225,21 @@ impl Fixture {
             capacity,
             false,
             include_bytes!("rich_fixture.json"),
+        )
+    }
+    #[cfg(unix)]
+    pub fn owned_native_points(rows: &[u8]) -> (Self, Arc<SqliteStateStore>) {
+        let mut root = hardening::TestRoot::new();
+        root.0 = root.0.canonicalize().unwrap();
+        let path = root.0.join("configured.db");
+        let concrete =
+            Arc::new(SqliteStateStore::create_owned_file(&path, 64 << 20, 65536).unwrap());
+        let store: Arc<dyn PlatformStore> = concrete.clone();
+        normalize_fixture_bytes(&*store, rows);
+        let url = format!("sqlite://{}?mode=rwc", path.display());
+        (
+            Self::from_normalized(root, store, url, 16, false, false, false, true),
+            concrete,
         )
     }
     pub fn native_points(sqlite: bool, rows: &[u8]) -> Self {

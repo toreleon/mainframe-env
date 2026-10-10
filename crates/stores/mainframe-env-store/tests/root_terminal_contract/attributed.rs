@@ -2,10 +2,14 @@
 use super::*;
 #[path = "checked_read.rs"]
 mod checked_read;
+#[path = "custody.rs"]
+mod custody;
 #[path = "attributed_physical.rs"]
 mod physical;
 #[path = "replay_refusal.rs"]
 mod replay_refusal;
+#[path = "successor.rs"]
+mod successor;
 
 fn start(
     store: &dyn PlatformStore,

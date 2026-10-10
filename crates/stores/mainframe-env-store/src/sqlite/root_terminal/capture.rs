@@ -39,7 +39,7 @@ impl SqliteStateStore {
         self.root_optional_row_bounded(tx, namespace, key, MAX_ROOT_PAYLOAD_BYTES)
             .await
     }
-    async fn root_optional_row_bounded(
+    pub(super) async fn root_optional_row_bounded(
         &self,
         tx: &mut Transaction<'_, Sqlite>,
         namespace: &str,
@@ -106,7 +106,7 @@ impl SqliteStateStore {
         self.root_rows_bounded(tx, namespace, prefix, actor, max, MAX_ROOT_PAYLOAD_BYTES)
             .await
     }
-    async fn root_rows_bounded(
+    pub(super) async fn root_rows_bounded(
         &self,
         tx: &mut Transaction<'_, Sqlite>,
         namespace: &str,

@@ -183,6 +183,15 @@ impl WinningRootTerminal<'_> {
 /// Implementations must retain genuine compiled/catalog/host/store/control/MQ
 /// authority; this trait is not an application finality or authorization port.
 pub trait NativeRootHooks {
+    /// Structural journal choice only. The coordinator constructs actual fresh
+    /// admission and still produces its borrowed native proof only on success.
+    fn admit_storage(
+        &mut self,
+        store: &Arc<dyn PlatformStore>,
+        admission: RootDriverAdmission,
+    ) -> Result<RootDriverClaim, StoreError> {
+        store.admit_root_driver(admission)
+    }
     /// Eagerly associate the actual root/closed frame before machine dispatch.
     /// A failure retains the inserted ownership; it cannot make the root fresh.
     fn admitted(&mut self, original: &NativeRootAdmission<'_>) -> Result<(), HostProblem>;
@@ -311,16 +320,19 @@ impl NativeProgress<'_> {
     ) -> Result<(), StoreError> {
         let configuration = self.configuration.take().ok_or(StoreError::Conflict)?;
         self.last_tick = event.tick;
-        let claim = store.admit_root_driver(RootDriverAdmission {
-            execution,
-            event,
-            notification,
-            invocation_key: self.original.idempotency_key.clone(),
-            deadline_tick: self.original.deadline_tick,
-            configuration_digest: configuration.configuration_digest,
-            provider_namespaces: configuration.provider_namespaces,
-            provider_rows: configuration.provider_rows,
-        })?;
+        let claim = self.hooks.admit_storage(
+            store,
+            RootDriverAdmission {
+                execution,
+                event,
+                notification,
+                invocation_key: self.original.idempotency_key.clone(),
+                deadline_tick: self.original.deadline_tick,
+                configuration_digest: configuration.configuration_digest,
+                provider_namespaces: configuration.provider_namespaces,
+                provider_rows: configuration.provider_rows,
+            },
+        )?;
         self.claim = Some(claim);
         let proof = NativeRootAdmission {
             original: self.original,

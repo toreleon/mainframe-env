@@ -16,7 +16,15 @@ pub(super) fn verify_carddemo_base_online_observed(
             "CARDDEMO_CORPUS_DIR is required",
         )
     })?;
-    let definition = carddemo_base_online_definition(Path::new(&corpus_dir))?;
+    // Verify all selected first-party catalog inputs before owned installation.
+    catalog_observations::verify_pinned_sources(Path::new(&corpus_dir))?;
+    // Preserve the original v1 cohort receipt. The separate private envelope
+    // binds its identity to this selected compile and actual durable installation.
+    let package = verify_carddemo_application_package_from_env(inventory_path)?;
+    let (definition, source_binding) = online_definition::carddemo_base_online_definition_observed(
+        Path::new(&corpus_dir),
+        package,
+    )?;
     let programs = definition.programs.len();
     let transactions = definition.transactions.len();
     let maps = definition.maps.len();
@@ -32,6 +40,9 @@ pub(super) fn verify_carddemo_base_online_observed(
         .map_err(|error| CorpusProblem::new("carddemo.online.artifact_owner", error.to_string()))?;
     let config = ServerConfig {
         store_profile: StoreProfile::Memory,
+        // Offered FUNCTION CURRENT-DATE input from pinned TRANREPT.jcl's date control.
+        // All same-server COBOL headers use this date; live CICS ASKTIME is independent.
+        cobol_current_date: Some(base_message_oracles::REPORT_CURRENT_DATE.into()),
         artifact_root: artifact_root.clone(),
         tls: TlsConfig {
             enabled: false,
@@ -53,13 +64,14 @@ pub(super) fn verify_carddemo_base_online_observed(
             secrets,
             Path::new(&corpus_dir).to_path_buf(),
             definition,
+            source_binding,
         )
         .await?;
         exercise_transaction_observations(&mut exercise.route_observations).await?;
         exercise_navigation_observations(&mut exercise.route_observations).await?;
         Ok::<_, CorpusProblem>(exercise)
     });
-    let exercise = result?;
+    let mut exercise = result?;
     if exercise.screen_paths != maps
         || exercise.dataset_reads == 0
         || exercise.committed_mutations < 6
@@ -87,6 +99,19 @@ pub(super) fn verify_carddemo_base_online_observed(
     fs::remove_dir_all(&artifact_root).map_err(|error| {
         CorpusProblem::new("carddemo.online.artifact_cleanup", error.to_string())
     })?;
+    exercise
+        .seed_proof
+        .observe(&mut exercise.route_observations)?;
+    exercise.catalog_proof.bind_resource_catalog(
+        &exercise.installation_proof,
+        &mut exercise.route_observations,
+    )?;
+    exercise
+        .catalog_proof
+        .bind(&mut exercise.route_observations)?;
+    exercise
+        .installation_proof
+        .bind(&mut exercise.route_observations)?;
     let mut shape = Sha256::new();
     digest_field(&mut shape, terminal.corpus_commit.as_bytes());
     digest_field(&mut shape, &(programs as u64).to_be_bytes());

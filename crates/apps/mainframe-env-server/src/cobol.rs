@@ -243,6 +243,23 @@ fn persist_batch_file_cursors(
         .map_err(|_| HostProblem::InfrastructureFailure)
 }
 
+#[cfg(test)]
+#[derive(Default)]
+struct NativeRootReplyObservation {
+    first: Option<(Invocation, EffectRequest, EffectResult)>,
+    overflow: bool,
+}
+#[cfg(test)]
+impl NativeRootReplyObservation {
+    fn record(&mut self, original: &Invocation, offer: EffectRequest, returned: &EffectResult) {
+        if self.first.is_some() {
+            self.overflow = true;
+        } else {
+            self.first = Some((original.clone(), offer, returned.clone()));
+        }
+    }
+}
+
 struct CobolProgram {
     setup: std::sync::Mutex<()>,
     host: OnceLock<Arc<ScopedHostService>>,
@@ -254,6 +271,8 @@ struct CobolProgram {
     mqi_host: OnceLock<Arc<dyn ProgramMqHostAdmission>>,
     native_mq_host: OnceLock<std::sync::Weak<ConfiguredInstalledMqHost>>,
     native_root_program: OnceLock<std::sync::Weak<dyn HostProvider>>,
+    #[cfg(test)]
+    native_root_reply_observer: OnceLock<Arc<std::sync::Mutex<NativeRootReplyObservation>>>,
     clock_start: Instant,
     clock_epoch: Option<u64>,
 }
@@ -271,6 +290,8 @@ impl CobolProgram {
             mqi_host: OnceLock::new(),
             native_mq_host: OnceLock::new(),
             native_root_program: OnceLock::new(),
+            #[cfg(test)]
+            native_root_reply_observer: OnceLock::new(),
             clock_start: Instant::now(),
             clock_epoch: SystemTime::now()
                 .duration_since(UNIX_EPOCH)

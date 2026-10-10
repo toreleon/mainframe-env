@@ -1,9 +1,56 @@
 //! Source-backed base online application composition.
 use super::*;
 
+#[cfg(test)]
+mod compile_cache;
+
 pub(super) fn carddemo_base_online_definition(
     corpus_dir: &Path,
 ) -> Result<OnlineApplicationDefinition, CorpusProblem> {
+    build_base_online_definition(corpus_dir, None, None).map(|(definition, _)| definition)
+}
+
+pub(super) fn carddemo_base_online_definition_observed(
+    corpus_dir: &Path,
+    package: CardDemoPackageReceipt,
+) -> Result<
+    (
+        OnlineApplicationDefinition,
+        source_artifact_binding::SourceInstallExpectation,
+    ),
+    CorpusProblem,
+> {
+    let binding = source_artifact_binding::SourceInstallExpectation::new(corpus_dir, package)?;
+    let (definition, binding) = build_base_online_definition(corpus_dir, Some(binding), None)?;
+    Ok((
+        definition,
+        binding.ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.online.source_artifact_binding",
+                "observed compilation omitted its source binding",
+            )
+        })?,
+    ))
+}
+
+pub(super) fn carddemo_base_online_definition_for_db2_admin_menu(
+    corpus_dir: &Path,
+    menu: &mut db2_admin_menu::Expectation,
+) -> Result<OnlineApplicationDefinition, CorpusProblem> {
+    build_base_online_definition(corpus_dir, None, Some(menu)).map(|(definition, _)| definition)
+}
+
+fn build_base_online_definition(
+    corpus_dir: &Path,
+    mut binding: Option<source_artifact_binding::SourceInstallExpectation>,
+    mut menu: Option<&mut db2_admin_menu::Expectation>,
+) -> Result<
+    (
+        OnlineApplicationDefinition,
+        Option<source_artifact_binding::SourceInstallExpectation>,
+    ),
+    CorpusProblem,
+> {
     let mut bundles = BTreeMap::new();
     for (primary, bundle) in explicit_carddemo_bundles(corpus_dir)? {
         if !primary.starts_with("app/cbl/") {
@@ -57,6 +104,12 @@ pub(super) fn carddemo_base_online_definition(
             )
         })?;
         let (program, semantic) = compile_online_program(&compiler, name, primary, bundle)?;
+        if let Some(binding) = binding.as_mut() {
+            binding.add_program(name, primary, bundle, &program)?;
+        }
+        if let Some(menu) = menu.as_mut() {
+            menu.observe_publisher(name, primary, bundle, &program)?;
+        }
         semantic_models.push(semantic);
         programs.push(program);
     }
@@ -66,11 +119,15 @@ pub(super) fn carddemo_base_online_definition(
             "base program or source-backed transaction count differs",
         ));
     }
-    Ok(OnlineApplicationDefinition {
+    let definition = OnlineApplicationDefinition {
         programs,
         transactions,
         maps: carddemo_base_maps(corpus_dir, &semantic_models)?,
-    })
+    };
+    if let Some(binding) = binding.as_mut() {
+        binding.finish(&definition)?;
+    }
+    Ok((definition, binding))
 }
 
 fn compile_online_program(
@@ -124,6 +181,24 @@ fn compile_online_program(
     ))
 }
 
+// Cache only immutable fixture compilation in this crate's test binary.
+// The production route and base/source-install observation owner stay uncached.
+fn compile_fixture_program(
+    compiler: &CobolCompiler,
+    name: &str,
+    primary: &str,
+    bundle: &SourceBundle,
+) -> Result<(OnlineProgramDefinition, SemanticModel), CorpusProblem> {
+    #[cfg(test)]
+    {
+        compile_cache::compile(compiler, name, primary, bundle)
+    }
+    #[cfg(not(test))]
+    {
+        compile_online_program(compiler, name, primary, bundle)
+    }
+}
+
 pub(super) fn transaction_online_definition(
     corpus_dir: &Path,
 ) -> Result<OnlineApplicationDefinition, CorpusProblem> {
@@ -168,7 +243,7 @@ pub(super) fn transaction_online_definition(
             .file_stem()
             .and_then(|value| value.to_str())
             .ok_or_else(|| CorpusProblem::new("carddemo.online.program_invalid", "invalid name"))?;
-        let (program, semantic) = compile_online_program(&compiler, name, &primary, &bundle)?;
+        let (program, semantic) = compile_fixture_program(&compiler, name, &primary, &bundle)?;
         programs.push(program);
         semantic_models.push(semantic);
     }
@@ -254,7 +329,7 @@ pub(super) fn navigation_online_definition(
             .file_stem()
             .and_then(|value| value.to_str())
             .ok_or_else(|| CorpusProblem::new("carddemo.online.program_invalid", "invalid name"))?;
-        let (program, semantic) = compile_online_program(&compiler, name, &primary, &bundle)?;
+        let (program, semantic) = compile_fixture_program(&compiler, name, &primary, &bundle)?;
         programs.push(program);
         semantic_models.push(semantic);
     }

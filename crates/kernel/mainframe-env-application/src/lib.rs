@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+mod bms_options;
 mod package_authentication;
 mod package_v1;
 mod package_v2;

@@ -1007,7 +1007,12 @@ async fn exercise_ims_routes_at(
     }
     verify_reopened_replay(&reopened, &control)?;
     drop(reopened);
-    let _ = restarted.graceful_shutdown().await;
+    if !restarted.graceful_shutdown().await {
+        return Err(CorpusProblem::new(
+            "carddemo.ims.shutdown_failed",
+            "reopened IMS server did not shut down",
+        ));
+    }
     drop(restarted);
     if retained_root.is_none() {
         fs::remove_dir_all(&artifact_root).map_err(package_problem)?;

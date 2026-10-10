@@ -15,6 +15,9 @@ use mainframe_env_store_api::PlatformStore;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, Weak};
 mod budget;
+mod custody;
+#[cfg(test)]
+use custody::NativeMqRootManager;
 mod frame;
 pub(in crate::cobol) mod native_call;
 mod native_point;
@@ -76,6 +79,9 @@ pub struct ConfiguredInstalledMqHost {
     runtime: MqTrustedBatchRuntime,
     store: Arc<dyn PlatformStore>,
     control: Arc<dyn ProgramExecutionControl>,
+    clock: Arc<dyn MqReplayClock>,
+    authorizer: Arc<dyn EnterpriseAuthorizer>,
+    successor: Mutex<Option<mainframe_env_store_api::RootCustodyCutoff>>,
     descriptor: CapabilityDescriptor,
     host_limits: HostLimits,
     bounds: InstalledMqHostBounds,
@@ -86,6 +92,7 @@ pub struct ConfiguredInstalledMqHost {
     topology: Mutex<Topology>,
     this: Weak<Self>,
     native_points: bool,
+    custody_installed: std::sync::atomic::AtomicBool,
     // Read-only test observation of the real route, never a replacement provider.
     #[cfg(test)]
     originals: Mutex<Vec<(Invocation, EffectRequest, EffectResult)>>,
@@ -147,8 +154,8 @@ impl ConfiguredInstalledMqHost {
             mq_limits,
             generation,
             fence,
-            authorizer,
-            clock,
+            authorizer.clone(),
+            clock.clone(),
             descriptor.clone(),
             host_limits,
             mqi_limits,
@@ -166,6 +173,9 @@ impl ConfiguredInstalledMqHost {
             runtime,
             store,
             control,
+            clock,
+            authorizer,
+            successor: Mutex::new(None),
             descriptor,
             host_limits,
             bounds,
@@ -176,6 +186,7 @@ impl ConfiguredInstalledMqHost {
             topology: Mutex::new(Topology::default()),
             this: this.clone(),
             native_points,
+            custody_installed: std::sync::atomic::AtomicBool::new(false),
             #[cfg(test)]
             originals: Mutex::new(Vec::new()),
         });

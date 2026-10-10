@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Retain every executable artifact metadata field explicitly in the private CardDemo installed-catalog diagnostic receipt, preserving missing and empty dialect metadata and detecting future uncaptured storage fields at compilation."

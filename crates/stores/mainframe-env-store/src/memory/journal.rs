@@ -178,6 +178,24 @@ pub(super) fn journaled<T>(
 }
 
 impl JournalStore for MemoryStore {
+    fn root_custody_supported(&self) -> bool {
+        true
+    }
+    fn admit_root_successor(
+        &self,
+        request: mainframe_env_store_api::RootCustodySuccessor,
+    ) -> Result<mainframe_env_store_api::RootDriverClaim, StoreError> {
+        self.root_admit_successor(request)
+    }
+    fn capture_root_custody_cutoff(
+        &self,
+        claim: &mainframe_env_store_api::RootDriverClaim,
+        execution: &ExecutionRecord,
+        tick: u64,
+    ) -> Result<mainframe_env_store_api::RootCustodyCutoff, StoreError> {
+        self.root_capture_cutoff(claim, execution, tick)
+    }
+
     fn commit_checked_replay_refusal(
         &self,
         request: mainframe_env_store_api::CheckedReplayRefusalStep,

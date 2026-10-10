@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Add an isolated pinned-source seed lifecycle assurance owner with complete raw records, keys, revisions, retained generation bytes, CSD FILE routes and SQLite reopen checks; retain local AIX and Cp037 qualifications and leave full-profile consumption pending."

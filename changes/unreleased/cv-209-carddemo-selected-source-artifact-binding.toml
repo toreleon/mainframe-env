@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Compare selected pinned CardDemo online source closures with actual durable program and transaction mappings and complete stored executable artifacts before and after reopen; retain existing package receipts and global acceptance requirements."

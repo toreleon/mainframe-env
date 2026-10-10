@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Compare complete pinned CardDemo BMS/CSD parsed-source records and references against independent source literals; preserve selected installation scope and bind only the explicit original CDV1/COCRDSEC disposition."

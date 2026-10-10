@@ -36,7 +36,7 @@
     },
     {
       "path": "crates/apps/mainframe-env-server/src/product.rs",
-      "max_production_lines": 5368,
+      "max_production_lines": 4977,
       "responsibility": "Product construction, dependency assembly, application publication, JES control, and HTTP route behavior converge here.",
       "split_boundary": "Extract bootstrap/construction, publication, JES operations, and route-family adapters around the Product state owner."
     },
@@ -90,7 +90,7 @@
     },
     {
       "path": "crates/kernel/mainframe-env-interpreter/src/machine.rs",
-      "max_production_lines": 11453,
+      "max_production_lines": 11433,
       "responsibility": "The deterministic COBOL machine executes all operations, control flow, calls, host effects, and conditions.",
       "split_boundary": "Extract operation handlers by control, numeric/data, call, file/host-effect, and condition families around one machine state."
     },
@@ -150,7 +150,7 @@
     },
     {
       "path": "crates/stores/mainframe-env-store/src/memory.rs",
-      "max_production_lines": 3256,
+      "max_production_lines": 2760,
       "responsibility": "The deterministic in-memory adapter implements execution, work, session, replay, and provider-state contracts in one state owner.",
       "split_boundary": "Separate domain-specific store trait implementations while retaining one bounded in-memory state and atomic lock authority."
     },
@@ -161,14 +161,8 @@
       "split_boundary": "Extract PostgreSQL retention archive, observation, and dependency-validation repositories from core provider-state persistence while retaining one transaction authority."
     },
     {
-      "path": "crates/stores/mainframe-env-store/src/sqlite.rs",
-      "max_production_lines": 1489,
-      "responsibility": "The SQLite adapter owns provider-state CRUD, quotas, logical time, exact retention archives and observations, dependency validation, backup, and integrity checks.",
-      "split_boundary": "Extract SQLite retention archive, observation, and dependency-validation repositories from core provider-state persistence while retaining one transaction authority."
-    },
-    {
       "path": "crates/tooling/mainframe-env-conformance/src/carddemo.rs",
-      "max_production_lines": 12033,
+      "max_production_lines": 11907,
       "responsibility": "CardDemo conformance provisions the full fixture, drives online and batch journeys, and checks persistence and failures.",
       "split_boundary": "Separate fixture provisioning, online transactions, batch jobs, authorization, and durability/failure scenario families."
     },

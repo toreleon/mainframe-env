@@ -58,8 +58,8 @@ pub(super) fn carddemo_map(
         CorpusProblem::new("carddemo.terminal.bms_invalid", "BMS size is missing")
     })?;
     let mut definitions = Vec::new();
-    for field in parsed.fields {
-        let Some(name) = field.name else {
+    for field in &parsed.fields {
+        let Some(name) = field.name.clone() else {
             continue;
         };
         let (row, column) = field.position.ok_or_else(|| {
@@ -148,9 +148,9 @@ pub(super) fn carddemo_map(
             length: u16::try_from(length).map_err(|_| {
                 CorpusProblem::new("carddemo.terminal.bms_invalid", "BMS field is too large")
             })?,
-            initial: field.initial.unwrap_or_default().into_bytes(),
-            color: None,
-            highlight: None,
+            initial: field.initial.clone().unwrap_or_default().into_bytes(),
+            color: parsed.field_color(field).map(str::to_owned),
+            highlight: parsed.field_highlight(field).map(str::to_owned),
             protected: attributes.contains("PROT") || attributes.contains("ASKIP"),
             secret: attributes.contains("DRK"),
             fset: attributes.contains("FSET"),
@@ -183,4 +183,50 @@ pub(super) fn carddemo_map(
         })?,
         fields: definitions,
     })
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod metadata_tests {
+    use super::*;
+    use std::io::Write;
+    use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt};
+
+    #[test]
+    fn actual_adapter_preserves_explicit_extended_metadata_without_default_resolution() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = env::temp_dir().join(format!(
+            "carddemo-bms-declared-options-{}-{nonce}",
+            std::process::id()
+        ));
+        fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+        let before = fs::symlink_metadata(&root).unwrap();
+        let identity = (before.dev(), before.ino());
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(root.join("synthetic.bms"))
+            .unwrap();
+        file.write_all(b"SET DFHMSD COLOR=BLUE,HILIGHT=BLINK,EXTATT=YES\nMAP DFHMDI SIZE=(24,80),COLOR=RED,HILIGHT=REVERSE,DSATTS=(COLOR,HILIGHT),MAPATTS=(COLOR,HILIGHT)\nFIRST DFHMDF LENGTH=2,POS=(1,1)\nSECOND DFHMDF LENGTH=2,POS=(2,1),COLOR=DEFAULT,HILIGHT=OFF").unwrap();
+        file.sync_all().unwrap();
+        drop(file);
+        let actual = carddemo_map(&root, "synthetic.bms", &[]).unwrap();
+        assert_eq!(actual.fields.len(), 2);
+        assert_eq!(actual.fields[0].color.as_deref(), Some("RED"));
+        assert_eq!(actual.fields[0].highlight.as_deref(), Some("REVERSE"));
+        assert_eq!(actual.fields[1].color.as_deref(), Some("DEFAULT"));
+        assert_eq!(actual.fields[1].highlight.as_deref(), Some("OFF"));
+        // This synthetic parser/adapter control emits no application observations.
+        let after = fs::symlink_metadata(&root).unwrap();
+        assert!(after.is_dir());
+        assert_eq!((after.dev(), after.ino()), identity);
+        fs::remove_dir_all(&root).unwrap();
+        assert_eq!(
+            fs::symlink_metadata(&root).unwrap_err().kind(),
+            std::io::ErrorKind::NotFound
+        );
+    }
 }

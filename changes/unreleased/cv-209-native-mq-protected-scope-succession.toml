@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Add explicit actual-manager MQ successor admission with exact versioned scope CAS and immutable unknown-row fences on Memory and SQLite."

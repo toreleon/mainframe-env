@@ -416,6 +416,7 @@ fn diagnostic(code: &str, phase: Phase, category: FailureCategory, message: Stri
 
 #[cfg(test)]
 mod tests {
+    mod chunked_initialization_tests;
     use super::*;
     use mainframe_env_compiler_api::{CompileOptions, CompileTarget};
     use mainframe_env_ir::{

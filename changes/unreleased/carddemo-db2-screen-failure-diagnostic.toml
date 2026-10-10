@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Added bounded failure-only CardDemo Db2 screen comparison diagnostics while preserving exact independent map, field, padding and state predicates."

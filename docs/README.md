@@ -194,6 +194,11 @@ explicitly names that authority as superseded.
 - [ADR-0054: Canonical focused conformance output](decisions/0054-focused-conformance-output.md)
 - [ADR-0055: Standard package MAC envelope](decisions/0055-standard-package-mac-envelope.md)
 - [ADR-0056: CICS first reverse read at a retained position](decisions/0056-cics-first-reverse-position.md)
+- [ADR-0057: Explicit native MQ root custody cutoff](decisions/0057-native-mq-root-custody-cutoff.md)
+- [ADR-0058: Protected native MQ scope succession](decisions/0058-native-mq-protected-scope-succession.md)
+- [ADR-0059: Serial owned SQLite file custody](decisions/0059-native-mq-serial-owned-sqlite-file-custody.md)
+- [ADR-0060: Passive CICS READ copyback observation](decisions/0060-passive-cics-read-copyback.md)
+- [ADR-0061: Bounded COBOL initializer byte carrier](decisions/0061-cobol-chunked-initializer-carrier.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.
 
