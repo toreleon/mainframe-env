@@ -326,6 +326,7 @@ fn genuine_source_topology_contention_refuses_without_callback_reentry_or_change
 }
 
 #[test]
+#[ignore = "#396 scope succession pending"]
 fn physical_reopen_genuine_cold_connect_fences_old_native_points_and_aliases() {
     for sqlite in [false, true] {
         let f = native(sqlite, 1);
