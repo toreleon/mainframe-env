@@ -5,11 +5,28 @@ Owner: **application-package maintainers**
 Scope: **application package generation and installation contract**
 Applies from: **mainframe-env current subsystem contracts**
 
-Version 2 of the application-package envelope is additive to the accepted profile.carddemo
-reader. It binds the version 1 content-addressed manifest, a positive monotonic
+Current writers emit `mainframe-env.application-package@3`, using the framed
+identity defined in [ADR 0051](../decisions/0051-package-identity-framing.md).
+The typed envelope is additive to the accepted profile.carddemo reader. It binds
+the version 1 content-addressed manifest, a positive monotonic
 generation, the typed subsystem section contract, and a signature verified by
 an injected trust authority. Signature bytes and key IDs are carried by the
-package; trust keys and secrets are not.
+package; trust keys and secrets are not. The Rust DTO remains
+`ApplicationPackageV2`; its section tag selects the finite @2 or @3 identity
+domain. The schema describes the actual `base`, `generation`, `sections`, and
+`signature` fields, including omitted or explicit-null optional IMS sections.
+
+Fresh admission requires @3. Trusted retained @2 packages keep their original
+identities and signatures; recovery verifies them under current trust. A legacy
+retry must equal the complete retained package. Neither recovery nor retry
+relabels a signature. Standalone @1 remains available. Back up retained state
+before upgrading: an older binary cannot read current @3 generations.
+
+Identity writers enforce default `PackageLimits` before materializing hash
+inputs. Embedders with a larger approved budget use
+`package_generation_identity_with_limits` and configure the installer with the
+same limits. Native schema validation checks structure; it does not authenticate
+signatures, establish cross-reference closure, or measure process heap usage.
 
 The typed sections are host ABI libraries, SQL tables and seed rows, IMS
 definitions and seed rows, optional versioned IMS DBD/PSB metadata, MQ
@@ -62,11 +79,42 @@ idempotent provider operations from explicit partial state. Selection becomes
 complete only after all applicable sections are durable. This is recovery over
 separate provider transactions, not a cross-provider exactly-once claim.
 
+Selected batch controllers and IMS routes join the actual retained selection
+with a complete publication row: namespace, key, positive row version, package,
+generation and identity must match, and applicable signed sections must be
+`applied`. An absent publication row cannot authorize a standalone controller.
+Controller and SQL catalog plans are validated before the prepared record or
+provider effects; completed replay still validates signed shape and closure.
+
+The server and its batch service share one process-local publication lock
+([ADR 0053](../decisions/0053-selected-controller-publication-fence.md)). Selected
+dispatch retains a read guard through the synchronous participant call.
+Publication, rollback, recovery and executable installation use a write guard;
+contention refuses immediately. The service creates its borrowed writer under
+that actual guard, so callers cannot construct or serialize an admission permit.
+There is no lock upgrade or guard held across an await. Raw store writers remain
+a trusted embedding responsibility; this lock provides no cross-process or
+distributed exclusion.
+
+```mermaid
+flowchart LR
+    Package[Verified retained package] --> Plan[Validate complete prospective plan]
+    Plan --> Prepared[Persist prepared publication]
+    Prepared --> Providers[Apply applicable provider sections]
+    Providers --> Complete[Persist complete publication]
+    Selection[Actual selected generation] --> Join[Join exact publication tuple]
+    Complete --> Join
+    Join --> Dispatch[Selected synchronous dispatch]
+    Lock[Shared process publication lock] -. Write guard .-> Prepared
+    Lock -. Read guard through participant .-> Dispatch
+```
+
 IMS metadata publication uses the shared `mainframe-env.ims-metadata@1` DTO and
 validator. The provider atomically retains the package-bound generation and
 advances its selected-generation row through `ProviderStateStore`; rollback
 selects the exact retained generation. A package without the optional field
-keeps the historical package identity and publishes an explicit no-metadata
+keeps its frozen @2 identity when retained; current @3 frames optional-field
+presence explicitly. It publishes an explicit no-metadata
 selection, so a later generation cannot accidentally inherit stale IMS state.
 
 `ProductServer` owns the v2 installer. Its production constructor receives a
@@ -78,6 +126,28 @@ Missing, revoked, or malformed material denies the package; plaintext keys and
 signing operations are absent from the production verifier. Subsystem
 publishers obtain an opaque selected-generation handle from the installer,
 never a caller-provided digest.
+
+Fresh production packages use the bounded canonical `cose-mac0-hmac256@1`
+profile ([ADR 0055](../decisions/0055-standard-package-mac-envelope.md)):
+tagged COSE_Mac0, protected HMAC-256 algorithm and matching UTF-8 key ID,
+empty unprotected headers, the attached computed package identity, a 32-byte
+MAC and fixed application-authentication external AAD. Key IDs are 1–64 bytes
+and contain no control characters. Encoded signatures are capped at 256 bytes
+and decoded envelopes at 192 bytes before parsing. Noncanonical, duplicate,
+unknown or critical headers, trailing data and mismatched identities refuse
+before secret resolution. These bounds limit parser work, not total process heap.
+
+The existing `hmac-sha256@1` profile remains an explicit retained verification
+branch, with a 43-byte encoded cap, exactly 32 decoded MAC bytes and retained
+key IDs up to 128 bytes. Configured references retain that 128-byte limit; both
+profiles require resolved secrets of 32–4096 bytes. Production fresh admission
+accepts only the COSE profile. Retained raw @2 or @3 packages recover under
+current trust without rewriting their signature. If either side of an
+existing-generation retry uses the legacy policy, the complete package must
+equal the retained package; retry cannot upgrade or downgrade its envelope.
+Custom injected verifiers retain their explicit policy and are not evidence
+that production trust accepted a package. Symmetric MAC authentication does
+not provide nonrepudiation or authenticate an arbitrary storage snapshot.
 
 The migration from `mainframe-env.application-package@1` to version 2 is
 non-destructive. The old reader remains, and rollback remains possible by

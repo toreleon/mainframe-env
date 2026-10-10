@@ -124,8 +124,8 @@ impl Storage64Arena {
             || snapshot.next_id > ADDRESS_ID_LIMIT + 1
             || !(LOC24_START..=LOC24_END).contains(&snapshot.next_loc24)
             || !(LOC31_START..=LOC31_END).contains(&snapshot.next_loc31)
-            || (snapshot.next_loc24 - LOC24_START) % 16 != 0
-            || (snapshot.next_loc31 - LOC31_START) % 16 != 0
+            || !(snapshot.next_loc24 - LOC24_START).is_multiple_of(16)
+            || !(snapshot.next_loc31 - LOC31_START).is_multiple_of(16)
         {
             return Err(Storage64Problem::InvalidSnapshot);
         }
@@ -395,7 +395,7 @@ fn charged_length(length: u32) -> Option<u64> {
 }
 
 fn address_id(address: u64) -> Option<u32> {
-    if address & 0xF000_0000_ffff_ffff != ADDRESS_PREFIX | 8 {
+    if address & 0xf000_0000_ffff_ffff != ADDRESS_PREFIX | 8 {
         return None;
     }
     let id = u32::try_from((address >> 32) & 0x0fff_ffff).ok()?;
@@ -408,7 +408,7 @@ fn valid_below_bar_address(address: u64, length: usize, start: u64, next: u64) -
     };
     address.checked_sub(8).is_some_and(|begin| {
         begin >= start
-            && (begin - start) % 16 == 0
+            && (begin - start).is_multiple_of(16)
             && charged_length(length)
                 .and_then(|charge| begin.checked_add(charge))
                 .is_some_and(|end| end <= next)

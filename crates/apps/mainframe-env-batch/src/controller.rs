@@ -123,6 +123,7 @@ impl BatchControllerPlan {
                     || *root_record_bytes > 1_048_576
                     || *child_record_bytes > 1_048_576
                     || *parent_key_bytes == 0
+                    || *parent_key_bytes > *root_record_bytes
                     || *parent_key_bytes >= *child_record_bytes
                 {
                     return Err(HostProblem::Malformed);
@@ -236,6 +237,9 @@ pub struct BatchControllerInstallReceipt {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ResolvedBatchController {
+    pub application: String,
+    pub generation: u64,
+    pub identity: String,
     pub name: String,
     pub selector: BatchControllerSelector,
     pub program: BatchControllerProgram,
@@ -391,6 +395,9 @@ impl BatchControllerRegistry {
                     .insert(
                         selector.clone(),
                         ResolvedBatchController {
+                            application: application.clone(),
+                            generation: generation_number,
+                            identity: generation_identity.clone(),
                             name: name.clone(),
                             selector: selector.clone(),
                             program: program.clone(),
@@ -841,6 +848,60 @@ mod tests {
                 plan: BatchControllerPlan::ProgramCall,
             }],
         }
+    }
+
+    fn loader_generation(
+        generation_number: u64,
+        parent_key_bytes: usize,
+    ) -> BatchControllerGeneration {
+        let mut generation = generation(generation_number, "LOADER");
+        generation.controllers[0].selector =
+            BatchControllerSelector::ims("BMP", "LOADER", Some("PSB")).unwrap();
+        generation.controllers[0].plan = BatchControllerPlan::ImsLoad {
+            database: "DATABASE".into(),
+            root_dd: "ROOTS".into(),
+            child_dd: "CHILDREN".into(),
+            root_record_bytes: 4,
+            child_record_bytes: 8,
+            parent_key_bytes,
+        };
+        generation
+    }
+
+    #[test]
+    fn cv206_oversized_root_key_refuses_admission_and_preserves_selected_state() {
+        let mut registry = BatchControllerRegistry::default();
+        registry.install(loader_generation(1, 2)).unwrap();
+        registry.install(loader_generation(2, 3)).unwrap();
+        registry.select("EXAMPLE", 1).unwrap();
+        let before = registry.state_payload().unwrap();
+        let selector = BatchControllerSelector::ims("BMP", "LOADER", Some("PSB")).unwrap();
+        let selected = registry.resolve(&selector).unwrap();
+
+        assert_eq!(
+            registry.install(loader_generation(3, 5)),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(registry.state_payload().unwrap(), before);
+        assert_eq!(registry.resolve(&selector).unwrap(), selected);
+        assert_eq!(registry.select("EXAMPLE", 3), Err(HostProblem::NotFound));
+        let mut restored = BatchControllerRegistry::from_state(registry.state()).unwrap();
+        assert_eq!(restored.resolve(&selector).unwrap(), selected);
+        restored.select("EXAMPLE", 2).unwrap();
+        assert_eq!(restored.state_payload().unwrap(), {
+            registry.select("EXAMPLE", 2).unwrap();
+            registry.state_payload().unwrap()
+        });
+    }
+
+    #[test]
+    fn cv206_root_key_equal_to_root_record_width_is_admitted() {
+        let mut registry = BatchControllerRegistry::default();
+        let generation = loader_generation(1, 4);
+        let selector = generation.controllers[0].selector.clone();
+        let plan = generation.controllers[0].plan.clone();
+        registry.install(generation).unwrap();
+        assert_eq!(registry.resolve(&selector).unwrap().plan, plan);
     }
 
     #[test]

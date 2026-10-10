@@ -1,315 +1,170 @@
 # Coverage and conformance — Coverage authority progress
 
 Subsystem: **coverage**
+
 Phase: **foundation**
 
-Status: **Implementation candidate; acceptance pending**
+Status: **Bounded implementation accepted; integrated acceptance pending**
 
-## Implemented boundaries
+## Scope and acceptance boundary
 
-The shared Conformance IR separates official catalog rows, obligations,
-executable bindings, verdicts, and licensed-credit policy. Nine pinned IBM
-baselines define the 1,506 mandatory catalog identities. Publication bodies
-remain in an external cache; the repository retains bounded locators, topic
-manifests, schemas, and fixture specifications.
+Foundation owns pinned catalogs, six independent coverage gates, semantic
+identities, package trust/install runtime, subsystem ABI libraries, program/route
+registration and cross-subsystem validation. Qualified scoped results below apply
+to their producing inputs and reviewed source/environment equivalence. Importing
+source or sealing a package does not establish a fresh clean-candidate CI pass.
 
-| Work package | Owned implementation |
-|---|---|
-| CV-201 | Pinned topic manifests and normalized official catalogs |
-| CV-202 | Independent six-gate coverage rows and append-only verdict storage |
-| CV-203 | Generated semantic identities and explicit handler registry |
-| CV-204 | Signed package generations, reference validation, atomic selection, and rollback |
-| CV-205 | Catalog-driven Db2 and authorization routes |
-| CV-206 | Typed batch controllers decoded from selected signed packages |
-| CV-207 | Provider-owned compatibility source libraries for CICS, Db2, and MQ |
-| CV-208 | Generated utility/system-service and official/custom route registration |
-| CV-209 | Cross-subsystem validation and non-destructive migration boundaries |
+Public implementation excludes licensed/private-only work and the three unready
+CICS rows **CICSMESSAGE**, **GETNEXT TIMER** and **ISSUE COPY**. Preserve their
+identities, specifications, fixtures, tests and pending gates. Missing supplemental
+IBM bodies remain **user-skipped/unavailable, zero credit**; do not refresh/re-pin
+or repeat unchanged missing-source requests. Independent public validation with
+available inputs remains required. Detailed execution evidence stays external.
 
-Regression requirements include non-destructive Db2 install, upgrade, and
-rollback; primary-key integrity; HMAC-verified package publication; exact
-controller artifact binding; durable restart; raw Db2 bytes and defaults;
-compiled JSON Schema validation; signed program identities; allocation-safe
-package preflight; and bounded package/controller admission. Specifications,
-fixtures, and executable tests remain in the owning subsystem folders.
+The original **IBM MQ 9.4 MQI semantic baseline is unavailable**, separately
+from user-skipped supplementary topics. New MQI semantic implementation is
+blocked and earns zero credit until that required baseline is available; selected
+local contract/infrastructure controls do not replace the semantic source gate.
 
-## Validate the current candidate
-
-```bash
-cargo xtask spec --check
-cargo xtask coverage --check
-cargo xtask semantic-identities --check
-cargo xtask application-packages --check
-cargo xtask abi-libraries --check
-cargo xtask dehardcoding --check
+```mermaid
+flowchart LR
+    Foundation["Bounded Foundation implementation"] --> CICS["CICS positioning: accepted"]
+    CICS --> NAV["Selected navigation and strict: qualified pass"]
+    NAV --> App["Full CardDemo: 20 journeys / 26 selected issues pending"]
+    Foundation --> Retirement["Task-end browse retirement: selected pass"]
+    Retirement --> Clocks["Genuine nested host clocks: pending"]
+    Clocks --> App
+    Foundation --> Client["Finite client: qualified pass"]
+    Client --> Candidate["Final unchanged candidate validation: pending"]
+    Foundation --> MQ["MQ scoped strict: pass / final candidate: affected strict pass"]
+    Foundation --> Batch["Scanner / batch native assurance: selected pass"]
+    Foundation --> Workspace["Workspace regression / architecture / backend: pending"]
+    Foundation --> Distribution["Distribution / sandbox size / batch performance: pending"]
+    App --> Exit["Integrated public acceptance: pending"]
+    Candidate --> Exit
+    MQ --> Exit
+    Batch --> Exit
+    Workspace --> Exit
+    Distribution --> Exit
 ```
 
-Run applicable backend, CardDemo, and licensed checks with their required inputs.
-Historical release identities, execution receipts, and acceptance tables are
-removed. Keep fresh output outside Git and describe its candidate and scope in
-the change report. A local fixture, catalog, or source review cannot establish
-licensed IBM equivalence.
+## Work packages
 
-## Source and compatibility boundaries
-
-All source authority comes from the pinned IBM topic manifests under
-`conformance/subsystems/coverage/manifests/`. Raw topic bytes and retrieval
-observations remain outside the repository. The topic reader distinguishes
-republished or unexplained changes from an older cached revision; an ordinary
-review never silently re-pins a topic. See the
-[publication source investigation](../../../research/publication-source-probe.md)
-and [cache runbook](../../../runbooks/IBM-DOCS-CACHE.md).
-
-The original z/OSMF heading-level denominator remains frozen. Endpoint
-normalization is owned by the z/OSMF subsystem and creates its own source-bound
-projection; it does not rewrite the shared catalog's identities.
-
-## CV-209.host-contract-lint
-
-Status: **Complete (bounded mechanical slice only)**. This non-semantic slice owns mechanical lint repairs in
-the existing host-contract package and its tests. It changes no official catalog
-row, public ABI, behavior, source pin or durable schema. The consumed base is
-`e3830278efc8de147f14b0e98da3d759250be782`. The isolated CLI worker must preserve
-negative cases and strict lint policy, reporting any repair that needs a contract
-change instead of suppressing the diagnostic. Acceptance is the strict affected
-package Clippy run, package regressions, formatting, module/documentation/
-changelog checks, dependency policy and diff review. It grants no conformance or
-licensed credit and does not complete the whole-workspace lint backlog.
-
-## Current public completion scope
-
-Status: **In progress** on the consumed main candidate
-`f42b96642a8662a96d89e32599615aa95f00f222`. Continuation follows subsystem
-dependency order. Licensed and private-only implementation and the three unready
-CICS rows are excluded from task scope, retaining their identities and pending
-credit. Source cache availability does not establish product acceptance.
-
-Six isolated English CLI audits inspected existing owners. The initial checks
-found stale semantic-identity and ABI bindings; their bounded repairs are sealed
-below. All six checks now pass on the integrated candidate. These checks do not
-replace executable product regressions. Remaining audit findings must be
-reproduced by focused negatives before repair.
-
-| Slice | Parent, boundary and owners | Dependencies and acceptance |
+| Package | Accepted bounded scope | Remaining boundary |
 |---|---|---|
-| `CV-203.generated-binding` | CV-203; regenerate existing semantic identity artifacts through their current owner, without catalog/handler admission changes | Current normative inputs; owner check, deterministic regeneration, required metadata gates and reviewed diff |
-| `CV-207.generated-binding` | CV-207; regenerate existing ABI inventory through its current owner, preserving source bytes and library identity | Current provider-owned sources; owner check, deterministic regeneration, required metadata gates and reviewed diff |
-| `CV-202.snapshot-continuity` | CV-202; existing coverage contract/store and focused tests; preserve catalog row membership, unit/applicability and retained evidence across generations | Existing six-gate and immutable snapshot contracts; focused omission/drift/conflict negatives, unchanged state on refusal, positive monotonic/retry tests, coverage/spec and required gates |
-| `CV-205.catalog-generation` | CV-205; existing Db2 signed-catalog install/rollback and tests; no SQL language change | Current package/store contracts; reproduce identical-seed-at-capacity and retained-generation replacement defects; insert/conflict/refusal atomicity, reopen and rollback regressions, focused provider tests and required gates |
+| CV-201 | Nine pinned baseline manifests, normalized catalogs and locator membership | Preserve source identities and denominators; unavailable bodies give zero credit |
+| CV-202 | Six independent gates, immutable coverage/snapshots, continuity, schema bindings and package-state projections | Structural schemas supplement typed identity/topology/derived-count validation; integrated gates remain required |
+| CV-203 | Generated semantic identities/handler registry and repaired bindings | Registration is not runtime credit; selected routes require actual observations |
+| CV-204 | Bounded packages, atomic generation selection/rollback, framed @3 identities, canonical COSE_Mac0 authentication and publication fencing | Fresh authentication uses `cose-mac0-hmac256@1`; retained @2/raw identities verify without rewriting. MAC gives neither nonrepudiation nor arbitrary snapshot authentication. Process-local fencing/file-SQLite recovery do not prove distributed exclusion/backend parity |
+| CV-205 | Generic Db2 install/rollback, retained generations and seed-at-capacity controls | Current backend/application obligations; same-process reopen is not a process crash |
+| CV-206 | Installed typed batch controllers and duplicate-root/root-width admission | Actual signed package/publication selection precedes effects; retain integration gates |
+| CV-207 | Provider-owned CICS/Db2/MQ source libraries, bindings and bounded materialization | Preserve ABI bytes/licensing/source identities; local tests are not licensed equivalence |
+| CV-208 | Official/custom route and common-program registration, scanner and typed policy | Preserve namespaces and ownership; registration does not establish execution coverage |
+| CV-209 | Scoped lint/layout/tooling/conformance, runtime and compatibility prerequisites below | Workspace/MSRV, application, backend, live-client, distribution/performance and integrated exit remain pending |
 
-The manager owns shared contract decisions, status, generated output, sealing,
-worktree integration and PRs. A passing bounded slice does not complete Foundation
-or establish a licensed differential. CardDemo, affected backend and integrated
-exit requirements remain pending until executed on their consumed candidate.
+The nine baselines retain **1,506 mandatory identities**. Every applicable
+`recognized`, `validated`, `executed`, `conditioned`, `recovered` and `differential`
+gate must pass before a row is complete. Numerators/denominators belong to their
+catalog/applicability/verdict owners. The five VSAM normalization rows retain
+zero-publication credit; the original z/OSMF heading denominator stays frozen,
+with endpoint normalization under its separate source-bound projection.
 
-## Additional declared Foundation repairs
+## Current bounded results
 
-| Slice | Parent, exact owners and boundary | Acceptance and compatibility |
+| Slice | Current behavior or qualified result | Acceptance boundary / next step |
 |---|---|---|
-| `CV-207.materialization-bounds` | CV-207; existing source ABI materializer and tests; resource preflight before copies | Aggregate/count/per-file boundary failures with no partial materialization; exact-boundary success, identity/license/duplicate regressions; unchanged ABI bytes and source contract, focused source tests and required gates |
-| `CV-204.generation-selection` | CV-204; existing application installer generation commit, recovery and tests | Old-ready retry cannot implicitly roll back; stale staged commit and malformed retained topology fail closed; explicit rollback and valid staged/null/selected-ready round trips; focused installer and required gates. No signature/identity domain changes |
-| `CV-209.test-floor` | CV-209; existing CI assurance recorder/tests and workspace-test Jenkins selection | Optional minimum executed-test threshold; actual passes count, ignored/malformed/insufficient output refuses admission; selected workspace receipt requires 260; existing candidate binding and focused receipts remain intact |
-| `CV-209.host-effect-layout` | CV-209; shared HostRequest/HostResult MQI payload representation and mechanical consumers | Box only outer MQI payloads, preserve exclusive ownership and nested DTOs; independent canonical byte/digest and retained replay regressions, affected consumers compile, strict host Clippy, size evidence, ADR and required gates |
+| Lint and mechanical layout | Affected Host/store/batch/execution/CICS/server/conformance repairs and floor/output owners implemented | Workspace all-target/all-feature Clippy with warnings denied, compilation and rustdoc with warnings denied pass at clean `069ce5d9`; workspace regression, architecture and integrated acceptance remain pending |
+| MQ layout and requested-size consistency | Canonical count mismatch is refused before retained intent lookup; 31 selected controls pass | Bounded request consistency does not establish complete MQ lifecycle/recovery |
+| MQ publication and binding slices | Retained seven publication-fence and fifteen binding controls pass on their qualified producer. Fixture-only import/profile/storage/lifecycle setup moved behind test ownership; production rich-store marker and unsupported-admission diagnostics retained. Scoped development producer: **492 passes** (452 unit, 32 integration, eight compile-fail doctests), zero failures/ignored/filtered; five-package clean-candidate strict also passes with zero diagnostics at `3a061944` | The full MQ suite is qualified development evidence with concurrent unrelated source edits. Its original 24-diagnostic failure remains historical. The fresh workspace producer `b7d9ff93` passed the MQ provider suites but failed the server cold-reconnect control. At `7893a2d3`, the unchanged control reports `MECOORD0001 / UnknownOutcome / Execute` before a host reply: zero passes, one failure, no ignores. Diagnostic visibility preserves the existing completion, cold-epoch and alias assertions; it does not repair or waive the failure. Original MQI baseline remains unavailable; full public lifecycle/concurrency/recovery/profile acceptance remains pending |
+| PostgreSQL selection | Twelve live controls pass within the TCP-only loopback scope | Current backend/global/application obligations remain pending; synthetic restart is not public-corpus or crash recovery closure |
+| STRING and figurative comparisons | Seven STRING controls and eight figurative controls pass; unchanged pointer/UNSTRING and ordinary comparison behavior preserved | Full grammar, IBM differential and application acceptance remain pending |
+| Symbolic BMS input storage | Eight new and seventeen existing methods pass; affected strict lint passes; raw/non-BMS and independent literals preserved | Ordinary symbolic-group scope only; no full provider/layout/wire/application acceptance |
+| Candidate cleanliness | Recorder requires clean committed tracked/untracked source at launch and completion; ignored targets/external output remain allowed | No continuous attestation; final selected candidate gates still required |
+| Command supervision and census rescan | Finite timeout/output, retained leader authority, sole wait and actual error/log binding implemented. The rescan candidate has **167 focused passes, zero skips** | Qualified Linux/tooling scope; no universal process absence, portable containment or host-escape proof. The mutation owner at `069ce5d9` overrides both Cargo target and build directories in a fresh owned archive, checks identities around source writes, retains command logs and requires leader-exit/group closure plus receipt retention before cleanup. Seventy-two affected Python controls and one real descendant-timeout probe pass as development evidence. The retained clean `069ce5d9` tooling suite passes 1,032 tests with one existing skip. Filesystem and group checks are observations, not atomic containment; escaped descendants remain outside the launched-group boundary; native mutation results remain blocked by the retained current campaign: its fresh unchanged baseline passes in 210 seconds and two reference mutants are killed; the third is invalid because the existing 50 ms group census allowance expired. Restoration/cleanup are refused and the snapshot is retained. The campaign fails with zero acceptance credit; its CICS/MOVE/arithmetic/compiler groups are unexecuted. The earlier 20-kill/five-baseline result remains historical at `b7d9ff93`, without current ownership or global acceptance credit |
+| Optional client input admission | Finite retained @1 / additive @2 readers, twelve fixed roles and full archive/SRI/tree/manifest/state checks; 33 focused controls pass | Ordinary CI's eight required tools unchanged; upstream signatures/source-build attestation and host-qualified runtime/bootstrap limits remain explicit |
+| Finite client command and action layout | Ten fixed actions, exact scalars/settings/JCL/readonly mounts, empty child environment, raw captures and local CLI/debug-log policy implemented | Fixed roles/membership/modes/links/output limits remain; no arbitrary argv, scripts/plugins or host mount widening |
+| Command-local byte/tree authority | Single-use PRE proof skips only redundant POST archive parsing; both POST archive fences remain held. Directory-authority scope has 112 selected passes, old bodies/pins/default validation preserved | All current bytes/state still verified. No persistent, metadata-only or cross-action admission cache; no atomic/continuous filesystem snapshot or live time-limit credit from byte diagnostics |
+| Sandbox build parallelism and native setup ownership | Existing build owner retains two Rust/Git jobs. Setup adds frozen offline build, fresh checkout-owned targets, external producer logs/artifact hashes, source start/end identity checks, exact ownership cleanup and failure-aware readiness. **36 Python boundary controls pass**, zero failures/skips; build fixtures are synthetic and earn zero runtime credit | Native setup/retained producer result: Clean `d3ff8818` setup passes with fresh frozen/offline release artifacts, unchanged source/lock identities, independently checked installed/retained hashes and actual owned-target removal. The rebuilt installed verifier passes all eleven documented checks, including account use, durable card update/restart, independent data, deploy/rollback/reset, failed-deploy preservation, authenticated dataset/JES operations and foreground cleanup. The separate development instance passes HTTP/frontend and populated-account smoke checks; real stdio MCP initialization, discovery and status pass with nineteen tools. The earlier clean `069ce5d9` setup pass and account-map verifier failure remain retained separately. This is bounded native Linux development readiness; full CardDemo, image build/size and actual batch/memory acceptance remain pending. A runtime-help probe establishes packaging only; it does not replace application acceptance |
+| Batch-controller source assurance | Scanner now refuses unbalanced token scopes before test-item exclusion and preserves valid macros, comments and literals. Malformed scopes are refused before test exclusion, and linked child modules remain production owners. Current selected Python boundaries pass within the 76-control clean selection at `3a061944`; historical 43-Python evidence and the zero-completed-test Rust timeout retain their producing identities | Seven native scanner controls pass; five policy mutation controls and eleven selected batch controls pass at `3a061944`. The actual batch-controller gate and affected strict lint pass. Mutation anchors now follow the production file-control owner without changing the 20 mutation behaviors or five baseline commands. Required publication still selects a verified package handle and record identity before installing typed controllers. Lexical admission of 1,079 source files supplies no native or hardcode-gate credit; retained artifact/context cleanup supplies no execution credit |
 
-The host layout prerequisite intentionally changes Rust enum construction and
-nested patterns before public release. It does not change the explicit canonical
-wire/domain or durable encoding. Consumers use `Box::new` and owned unboxing;
-allocation costs remain explicit and no total-heap-bound claim is made. This
-parent-owned shared representation decision is separate from the mechanical lint
-slice, which depends on it. No new MQI operation, public admission or private
-participant implementation is authorized by this prerequisite.
+## Application prerequisites
 
-The remaining audit findings include package identity framing, bounded package
-codec/preflight, signed section prevalidation and publication fencing, serialized
-schema bindings, complete production scanning, common-program control ownership,
-controller root validation and executable journey/client/exit-gate closure.
-They remain pending bounded assignments and compatibility decisions; static
-findings are not reproduced defects or completion receipts. Retained signatures
-and identity domains must not be silently rehashed.
-
-### CV-203.generated-binding acceptance
-
-Status: **Complete (generated binding only)**. The failing owner check reproduced
-a stale catalog binding. Normal regeneration updates only the catalog input
-digest; the generated identity-set digest and all 1,506 descriptors are unchanged.
-The owner check, deterministic second generation, current spec/coverage checks,
-formatting, dependency policy, documentation/changelog/subsystem and diff checks
-pass. No handler or runtime gate receives credit from this repair.
-
-### CV-207.generated-binding acceptance
-
-Status: **Complete (generated inventory only)**. The failing inventory check
-reproduced stale DFHAID byte length/hash and the resulting CICS library digest.
-Normal owner regeneration updates those three fields to the unchanged provider
-source bytes. The owner check and deterministic second generation, formatting,
-dependency policy, module/documentation/changelog/subsystem and diff checks pass.
-This repair grants no ABI-equivalence, runtime or licensed credit.
-
-### CV-202.snapshot-continuity integration
-
-Status: **Complete (snapshot continuity only)**. New snapshot
-generations preserve row/unit/applicability descriptors and append-only retained
-evidence histories. Missing failure observations and stale sequence appends
-refuse before state changes; historical immutable retries remain idempotent.
-The tests-only candidate reproduced six failures with two passing controls. The
-reviewed repair passes all 28 coverage-package tests and strict package Clippy.
-Public methods, error vocabulary and persisted representation are unchanged.
-First-snapshot official membership still comes from the catalog/compiler owner.
-Current integrated spec/coverage, strict lint, formatting and dependency checks
-pass. The module extraction below resolves the facade gate without raising a
-ceiling. Required documentation/changelog/subsystem checks and the completion seal pass;
-this closes no Foundation exit or licensed gate.
-
-### CV-209.store-contract-lint
-
-Parent: CV-209. Status: **Complete (bounded mechanical slice only)**. This mechanical prerequisite owns only
-four nested-condition diagnostics in the existing Memory/SQLite root-terminal
-guards and provider-mutation dependency check, plus nine private test snapshot
-tuple aliases revealed after those dependency errors were removed. Evaluation order, awaits, errors,
-CAS/fencing and durable bytes remain unchanged. No lint suppression or new
-storage authority is permitted. Acceptance is strict affected-store Clippy,
-existing focused root-terminal regressions, module/format/required repository
-gates and diff review after the host lint/layout prerequisites are integrated.
-
-### Reviewed public repair integration
-
-The manager integrated only reviewed owned files and isolated fragments from the
-worker checkouts. Source-file hashes and producing-base identities remain in
-external handoffs; those results are not relabeled as integrated receipts.
-
-| Slice | Executed focused result | Accepted scope and remaining parent requirement |
+| Slice | Current status | Continuing acceptance boundary |
 |---|---|---|
-| `CV-205.catalog-generation` | Original failures reproduced on Memory/file-backed SQLite; 12 new and six existing regressions pass | Integrated dependency-inclusive Clippy and 12 catalog regressions pass; metadata gates and seal pass. Adapter reopen is not process-crash proof |
-| `CV-204.generation-selection` | Seven original failures/two positive controls; all 24 package tests and owned-package Clippy pass | Integrated dependency-inclusive Clippy and all 24 installer tests pass; metadata gates and seal pass; signatures/identity domains unchanged |
-| `CV-207.materialization-bounds` | Both original aggregate-bound failures reproduced; 10 ABI and all 16 source-package tests, strict Clippy pass | Integrated ABI owner and strict Clippy pass; metadata gates and seal pass; source bytes/order/digests unchanged |
-| `CV-209.test-floor` | Original 259-pass admission failure reproduced; all 35 focused recorder tests pass | All 35 integrated recorder tests pass; metadata gates and seal pass. Workspace recorder selects a 260 actual-pass minimum; certification wiring remains pending |
+| Selected transaction navigation | Corrected sixteen-control producer passes. Current test-only repair has **seven fresh named passes**, zero failures/skips; **nine controls retain qualified prior reuse**. Affected conformance strict lint passes with zero selected-package warnings/errors. The former MQ fixture/layout diagnostics were repaired within their mechanical ownership scope; historical warning logs retain their original producer. Exact cleanup succeeds | Selected CD.J06 comparisons only, with empty issue observations. AIX probes are first-party evidence rather than full application AIX coverage. Source-equivalent development results are not root clean CI or full CardDemo closure; integration and current final-candidate validation remain required |
+| CICS first reverse positioning | Bounded repair accepted: **37 distinct scoped controls** pass across qualified scopes, with separate affected Host API/Dataset/CICS/server strict success | Task-end retirement and existing provider/server positioning selections pass at `3a061944`. Genuine nested host clock/cancellation boundaries and full application closure remain pending |
+| CICS task-end browse retirement | Confirmed STARTBR owners retain the creating actor and replaced cursors; normal/abnormal cleanup records per-cursor progress. Lower-level RETURN does not end root task ownership. Ambiguous/unbound ordinary and automatic END replies retain ownership and prevent redispatch; known predispatch refusals remain retryable. Ten provider controls and two real ProductServer root RETURN/public abort controls pass at `3a061944`, with eight provider and eight server positioning regressions passing | Affected CICS/server strict passes in the five-package selection. Semantic source review uses pinned STARTBR/ENDBR/RETURN/ABEND bodies from `ibm-cics-ts-6x-2026-08-31`. Earlier failures remain externally retained at their original source identities. Preserve original actor, per-cursor progress, SAF/grant/generation/cancellation/deadline checks and unknown ownership; genuine nested clocks and full application acceptance remain pending |
+| Selected local LINK fixture | The static local-LINK control now installs an admitted compiled CICS child with its enabled program definition and valid COMMAREA reply. Its original LENGTH/DATALENGTH, EIBFN, copyback and suspension assertions pass at `97e5adcd`: one selected pass, no ignores/failures | Pinned LINK review uses `ibm-cics-ts-6x-application-api-sources-b-2026-09-10`, `dfhp4_link.html`; existing malformed-schema/oversized-COMMAREA refusals remain unchanged. This fixture correction gives no genuine nested-clock or full application closure |
+| Symbolic BMS numeric input storage | Clean `d3ff8818` passes all thirteen selected BMS storage controls and all 261 interpreter library tests, with zero failures/ignores. Affected interpreter/conformance all-target/all-feature Clippy with warnings denied and pinned Rust 1.95 MSRV checks pass. Fixed unsigned scale-zero numeric DISPLAY input copies validated terminal bytes; short numeric prefixes preserve surplus storage and omitted fields remain untouched. Unknown names, wrong schemas and malformed/overlong counts refuse before selected mapped writes | Pinned RECEIVE MAP, DFHMSD and DFHMDI review uses `ibm-cics-ts-6x-application-api-sources-b-2026-09-10`: `dfhp4_receivemap.html`, `dfhp47j.html`, `dfhp47g.html`. Source and controlled raw-storage tests grant no COBOL numeric parsing/arithmetic or licensed credit; the COBOL baseline remains unavailable. Existing text fitting stays explicit. The subsystem checker printed pass/exit zero, but its recorder failed the existing process-group census deadline; that gate remains failed with zero credit and no unchanged retry or bound increase |
+| Finite public-client compatibility | One real authenticated fixture passes: ten waited SDK actions, one terminal poll, twelve HTTP observations, exact seven-byte IEFBR14 content, five protected-state equality checks and joined cleanup. Thirteen pure controls and affected conformance strict pass | Bounded compatibility on a qualified development producer. Final clean-candidate validation, broader routes/profiles and official/licensed acceptance remain pending. The exact three-string caller-echo exception retains all other disclosure, server-wire, state and time assertions |
+| Full-profile observation candidate | Seven synthetic comparator/API controls pass in the clean `069ce5d9` conformance suite, checking matching bytes, skipped/duplicate comparisons, separate issue/journey tokens, merge refusal and text bounds | These are synthetic admission controls, zero product execution credit. The full profile remains unexecuted/ignored; ordered Db2 PS-byte comparisons and actual state-token observations remain unproved. No rollback, VSAM or complete IMS CD.J17/J18 / CD-025 acceptance. Retain NAV/client registrations and validate the integrated producer; successful-path shutdown does not close failure-path cleanup |
 
-Bounded slice acceptance records below identify completed repairs. Whole-phase
-acceptance remains pending. Installer recovery
-preserves an explicit null selection with retained Ready generations, rejects
-malformed topology before verifier calls, and separates ready commit retries
-from explicit rollback. ABI materialization bounds all member/library byte and
-file counts before source-buffer copies; bounded path metadata can allocate.
+Selected navigation preserves the existing sixteen controls and frozen
+raw/source/CSD/map identities: thirteen initial zero fields versus reentered
+spaces; PF5-only rows 42–51 versus ordinary 41–50; lexical TDESC01 refusal; full
+PF7 rows 41–50/page 1/reached-top with twelve READPREV calls (eleven NORMAL plus
+ENDFILE primary 20), then already-top with zero reads. Preserve full tuples,
+readonly state, NOTFND 13/80, no extra READ and TAMT001–010. Partial page 2 is not
+accepted. Tokens require every intended comparison and shutdown and the actual
+observation seam; a selected CD.J06 result supplies no issue token.
 
-Host layout validation reproduced an invalidated owned-source fixture binding.
-The manager extends `CV-209.host-effect-layout` to refresh only the two existing
-MQ local fixture digests in the shared spec from the changed transcript adapter.
-The existing independent binder validates that input source; expected fixture
-bytes, official rows/obligations, IBM publication pins and gates are unchanged.
-This source-identity update cannot reuse old candidate verdicts or oracle credit.
+The finite client retains actual ProductServer/MemoryStore/HTTP forwarding,
+held loopback port, second valid principal, five-second readiness, **120-second
+phase and inclusive ten-second actions**, fixed calls/at most twelve polls,
+independent JSON/content/state/refusal assertions and exact owned cleanup.
+Query status does not establish named-status route coverage; lookup refusal is
+not direct spool403; selected content is not full DD inventory or profile parity.
+No npm/scripts/plugins/global lookup, new pins/downloads, ambient credentials or
+host mount widening. Stop at a genuine prerequisite; do not weaken oracles or
+limits, retry unchanged failures or substitute version/readiness probes.
 
-The integrated module gate found that the new continuity checks exceed the
-coverage facade's frozen non-growing ceiling. The manager extends this slice
-to move the existing CoverageStore implementation into its private `store`
-module without changing its public methods, fields, evaluation order or tests.
-The reviewed facade inventory ceiling is lowered from 533 to 440 production
-lines; all other exemptions remain unchanged. Focused tests and strict lint
-must be rerun.
+## Reproducible verification
 
-The current integrated candidate passes all six Foundation owner checks,
-formatting, frozen dependency policy, strict Clippy for the five affected
-coverage/source/application/Db2/store packages with dependencies, 355 host
-tests, 24 installer tests, 12 catalog-generation tests and three local MQ
-source-binding tests. Store regressions pass 124 root-terminal tests and
-97 unit tests; three PostgreSQL unit tests remain ignored and receive no
-acceptance credit. No workspace test-floor, PostgreSQL parity, process-crash,
-CardDemo or live Zowe exit result follows from these scoped runs.
+Use the pinned tools and the diff-selected owners in the
+[verification workflow](../../../runbooks/VERIFICATION-WORKFLOW.md) and
+[Jenkinsfile](../../../../Jenkinsfile). These are commands/selectors, not reported
+fresh results. Confirm nonzero selected tests and inspect actual warning ownership.
+Run expensive gates only in their declared scope with reviewed resources; preserve
+output externally and clean the exact owned target after required retention.
 
-### Foundation exit remains pending
+| Owner / gate | Existing command or selector |
+|---|---|
+| Supervisor controls | `"$MAINFRAME_ENV_PYTHON" -B -m unittest discover -s tools/tests -p test_ci_assurance.py` |
+| Scanner controls | `"$MAINFRAME_ENV_PYTHON" -B -m unittest tools.tests.test_production_scanner tools.tests.test_typed_semantic_boundaries` |
+| Selected NAV controls | `cargo test --frozen --offline -p mainframe-env-conformance --lib carddemo::transaction_navigation_tests:: -- --test-threads=1` |
+| Affected conformance strict | `cargo clippy --frozen --offline -p mainframe-env-conformance --all-targets --no-deps -- -D warnings` |
+| MQ strict | `cargo clippy --frozen --offline -p mainframe-env-mq --all-targets --no-deps -- -D warnings` |
+| Architecture / batch / full application | `cargo xtask architecture-fast --check`; `cargo xtask batch-controllers --check`; `cargo xtask carddemo-full --check` |
+| Docs / API / dependency policy | `cargo xtask docs --check`; `"$MAINFRAME_ENV_PYTHON" -B tools/check_public_api_docs.py`; `cargo deny check` |
+| Workspace / MSRV | `cargo test --workspace --all-features --locked --no-fail-fast`; `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`; `cargo +1.95.0 check --workspace --all-targets --all-features --locked` |
 
-The broad `architecture-fast --check` stops at the existing CICS sources-a
-freshness guard because retained topic
-`SSNAQ8_11.1.0/reference-api/r_dump.html` is unavailable in the configured cache.
-All preceding execution-route, participant, canonical-effect, persistence,
-retention and CICS descriptor/source-map guards passed. This is an unavailable
-source gate, not a pass or a reason to refresh or re-pin sources. Scoped module
-and shared-contract repairs can be reviewed independently; full Foundation
-acceptance remains pending with this gate and the other exit requirements.
+At clean producer `069ce5d9`, the owning conformance library reports **412 passed, zero failed, five ignored**, xtask reports **204 passed, zero failed/ignored**, and Python tooling executes 1,033 tests with **1,032 passed and one existing skip**. Three embedded conformance child summaries explain the recorder's larger generic count; no raw aggregation is an accepted workspace floor. Formatting, changelog, docs, subsystem/API/module/typed policies, workspace all-target/all-feature Clippy with warnings denied, compilation, rustdoc with warnings denied and Rust 1.95.0 compilation pass.
 
-### CV-209.host-effect-layout acceptance
+The fresh workspace producer `b7d9ff93` failed 46 tests: 40 lacked the available pinned CardDemo corpus environment, two used stale ledger digests, two used stale xtask fixtures, one used an invalid LINK fixture and one failed MQ cold reconnect. The corrected independent suites and LINK selection pass at their retained producers; the MQ failure remains. The failed workspace gate earns **zero 260-test floor credit** and is not rerun with unchanged blocking inputs. Architecture remains blocked by unavailable pinned `SSNAQ8_11.1.0/reference-api/r_dump.html`, with zero credit and no refresh or re-pin. Earlier supply-chain/license/spec/COBOL results remain input-equivalent historical evidence at `83714b92`; external cached legal bytes were not newly attested, and old candidate-bound outputs are not relabeled.
 
-Status: **Complete (bounded slice only)**. Scoped compatibility acceptance passed: outer MQI boxing and migrated consumers preserve canonical vectors and retained replay codecs. Rust constructor/pattern migration is explicit in ADR-0050. The two changed local source bindings pass their independent binder; no IBM pin or expected bytes changed.
-Formatting, frozen dependency policy, module, documentation/changelog/subsystem
-and diff checks pass for the reviewed integrated scope. The unavailable CICS
-source freshness gate and full Foundation exit remain pending.
+Selected scanner, batch and task-retirement inputs at `3a061944` remain unchanged through `b7d9ff93` under retained input-equivalence review. Subsequent sealed changes restore source-bound ledger/fixture digests, repair the selected LINK fixture, expose the actual MQ cold-reconnect refusal, isolate mutation build ownership and repair numeric DISPLAY symbolic BMS input. Later checks remain scoped to their actual producers. Original receipts keep their actual producer; subsequent scoped checks are attributed separately.
+Historical compile, fixture and source-assurance failures remain external and
+supply no pass-floor credit. Every added bounded package is sealed and checked against its exact allowlist. The completed earlier workspace task targets were removed after external retention. The failed mutation snapshot and the latest BMS validation target remain retained after command-group census refusals; exact external paths and owner records are retained in the handoff. Cleanup earns no product execution credit.
 
-### CV-209.host-contract-lint acceptance
+The existing CI planner selects additional affected spec/schema/catalog/coverage,
+semantic identity, package/ABI/program/route/dehardcoding/profile and runtime
+architecture checks. Use its recorder for actual candidate-bound test floors;
+a raw aggregate count does not establish a CI floor. Optional Linux client
+inputs do not make ordinary cross-platform CI require Node or bubblewrap.
 
-Status: **Complete (bounded slice only)**. Mechanical implementation is in the preceding focused repair commit. With the separately accepted host-layout prerequisite, integrated strict host Clippy and all 355 host tests pass. This closes only the host-package lint slice.
-Formatting, frozen dependency policy, module, documentation/changelog/subsystem
-and diff checks pass for the reviewed integrated scope. The unavailable CICS
-source freshness gate and full Foundation exit remain pending.
+## Integrated exit: pending
 
-### CV-209.store-contract-lint acceptance
+| Required gate | Exact remaining obligation |
+|---|---|
+| Workspace / MSRV / docs/API | The clean `069ce5d9` producer passes workspace strict lint, compilation, pinned MSRV, public API, rustdoc and docs checks. The workspace regression gate and **at least 260 actually passing tests from its successful summaries** remain required; ignored/skipped/filtered/zero-test selections supply no floor credit |
+| Architecture / source / schema / profile | Current affected catalogs, six coverage gates, semantic identities, package/batch/ABI/program/route/dehardcoding/schema/profile/inventory and runtime architecture owners; H1 application hardcodes/string exceptions remain exactly zero |
+| MQ | Clean-candidate affected strict passes at `3a061944`; the full 492-test result remains qualified development evidence. The fresh workspace producer `b7d9ff93` passed the MQ provider suites but failed the server cold-reconnect control. At `7893a2d3`, the unchanged control reports `MECOORD0001 / UnknownOutcome / Execute` before a host reply: zero passes, one failure, no ignores. Diagnostic visibility preserves the existing completion, cold-epoch and alias assertions; it does not repair or waive the failure. Full applicable public behavior/profile gates remain unresolved, and the original pinned MQI semantic baseline remains unavailable; fixture exclusion grants no public lint exemption or semantic credit |
+| Full CardDemo | Installed-data closure for **20/20 journeys with 114/114 observations and 26/26 selected issue rows with 105/105 acceptance requirements**, plus applicable isolation/load/backup/restore/restart/denial/rollback/cancellation; no generated token or selected physical probe fills absent observations |
+| Backend / client | Current store/backend/global obligations and final unchanged-candidate authenticated client checks; qualified PostgreSQL/finite client results do not complete these or official route/profile compatibility |
+| Distribution / performance | Current legal/input/dependency/distribution checks, existing finite image build/size and sandbox verifier, actual CardDemo batch measurement and separate memory-scaling measurement; no current performance closure or invented threshold |
 
-Status: **Complete (bounded slice only)**. Integrated strict store/dependency Clippy, 124 root-terminal tests and 97 store unit tests pass. Three PostgreSQL unit tests were ignored and are not credited; the mechanical aliases and conditions do not alter durable contracts.
-Formatting, frozen dependency policy, module, documentation/changelog/subsystem
-and diff checks pass for the reviewed integrated scope. The unavailable CICS
-source freshness gate and full Foundation exit remain pending.
-
-### CV-202.snapshot-continuity acceptance
-
-Status: **Complete (bounded slice only)**. All 28 coverage tests, integrated strict Clippy, spec/coverage and module gates pass. The private store-module extraction preserves the public API and lowers the facade ceiling from 533 to 440; all other ceilings remain unchanged.
-Formatting, frozen dependency policy, module, documentation/changelog/subsystem
-and diff checks pass for the reviewed integrated scope. The unavailable CICS
-source freshness gate and full Foundation exit remain pending.
-
-### CV-204.generation-selection acceptance
-
-Status: **Complete (bounded slice only)**. All 24 integrated application-package tests and dependency-inclusive strict Clippy pass. Ready retries, stale staged refusal and retained topology/null selection are covered; identity framing, bounds and publication fencing remain separate pending work.
-Formatting, frozen dependency policy, module, documentation/changelog/subsystem
-and diff checks pass for the reviewed integrated scope. The unavailable CICS
-source freshness gate and full Foundation exit remain pending.
-
-### CV-205.catalog-generation acceptance
-
-Status: **Complete (bounded slice only)**. The 12 new Memory/file-backed SQLite regressions and six existing catalog regressions pass, with integrated strict Clippy. Identical seeds at capacity and conflicting retained identities are covered; same-process adapter reopen is not process-crash proof.
-Formatting, frozen dependency policy, module, documentation/changelog/subsystem
-and diff checks pass for the reviewed integrated scope. The unavailable CICS
-source freshness gate and full Foundation exit remain pending.
-
-### CV-207.materialization-bounds acceptance
-
-Status: **Complete (bounded slice only)**. All 16 source-package tests, including 10 ABI tests, strict Clippy and the current ABI inventory check pass. Aggregate/file/count preflight precedes source copies and hashing; bounded path metadata can still allocate. Source bytes and identities remain unchanged.
-Formatting, frozen dependency policy, module, documentation/changelog/subsystem
-and diff checks pass for the reviewed integrated scope. The unavailable CICS
-source freshness gate and full Foundation exit remain pending.
-
-### CV-209.test-floor acceptance
-
-Status: **Complete (bounded slice only)**. All 35 integrated recorder tests pass. The workspace selector now requires 260 actual passed tests from complete successful summaries; this is wiring acceptance, not an executed workspace-floor or licensed certification pass.
-Formatting, frozen dependency policy, module, documentation/changelog/subsystem
-and diff checks pass for the reviewed integrated scope. The unavailable CICS
-source freshness gate and full Foundation exit remain pending.
-
-## Next executable work
-
-Continue the recorded public Foundation repairs in dependency order: reproduce
-and decide package identity framing compatibility, then close bounded package
-codecs and signed publication preflight/fencing. The existing audits also identify
-schema mappings, production scanning, controller root validation and journey/client
-closure. All remain pending; no new discovery round, licensed campaign, private
-implementation or source refresh is authorized by these scoped seals.
-
-## Next declared public repair slices
-
-Consumed candidate: `d0cce85e`; the preceding bounded repairs are sealed, while
-Foundation remains in progress. No licensed/private-only implementation or
-unready CICS command is included.
-
-| Slice | Parent and exact owners | Focused acceptance and compatibility |
-|---|---|---|
-| `CV-204.identity-framing` | CV-204; existing package identity/trust owner. First assignment is an independent reproducer and compatibility proposal only | Reproduce distinct valid IMS graphs sharing the existing identity; inventory every variable collection. Manager must approve an explicit identity-domain/writer/finite-reader migration before production edits; preserve retained v1/legacy selection and signatures without relabeling |
-| `CV-204.package-bounds` | CV-204; existing application package preflight and installer state codec, private bounded codec module and tests | Reject counts/text/checked aggregate excess before allocating validators/hash/owned decoding; bounded export stops before full clone/encoding. Preserve admitted wire bytes, finite retained forms, topology and verifier behavior; focused boundary/refusal/no-mutation tests |
-| `CV-202.serialized-schema-bindings` | CV-202; existing coverage row/evidence/ledger schemas, typed projection and xtask schema mapping/tests | Reviewed Draft 2020-12 validation rejects invalid oracle-on-pass, gate keys, incomplete evidence and malformed ledger items; valid historical forms and differential failure stay accepted. Typed owner validates cross-reference/denominator relationships; no new ledger |
-| `CV-208.production-scanner` | CV-208; existing xtask dehardcoding guards and shared Rust item scanner/tests | Test-only items are excluded without dropping later production; markers in comments/strings cannot truncate a scan. Independently constructed negative fixture must fail; current zero-H1 result is reevaluated, with no product semantic change |
-| `CV-206.controller-root-validation` | CV-206; installed IMS controller admission and loader/tests | Duplicate roots, including identical duplicates, refuse before any participant effect. Root-key width beyond root-record width fails admission and preserves selection; successful/rejected-load/commit regressions remain. No new IMS operation or semantics |
-| `CV-209.journey-closure` | CV-209; existing CardDemo manifest and conformance runner/receipt/tests | Bind existing CD.J01–CD.J20 to actual route observations and derive counts from exact closure; omitted/duplicate/unknown journey or missing mandatory observations fail. Focused harness tests first; full workload remains a separate current-candidate gate, without new evidence family |
-
-Workers use isolated checkouts at this candidate and English prompts. The first
-Cargo grants are package-bounds and controller-root-validation, at most two
-build sequences at once. Other workers prepare independent regressions and
-report the required command; they do not execute Cargo until the manager grants
-it. Each completed sequence saves output externally and cleans its own target.
-The manager reviews compatibility, integrates exact owned diffs, runs affected
-gates, seals each slice separately and opens a scoped PR. Parent acceptance and
-all unavailable source/backend/client gates remain pending.
+Use implemented `cargo xtask work-package-seal` and its `--check` for bounded
+ownership; generated trailers are not execution credit. Keep logs, failed
+outcomes, producer/equivalence details and immutable raw receipts external.
+Official/licensed differentials and excluded private/unready rows retain their
+pending states. Foundation is not globally complete.

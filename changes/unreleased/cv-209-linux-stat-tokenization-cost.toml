@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Reduce allocations while selecting the Linux process-group stat token; preserve complete metadata reads, original bounded census and malformed-input refusal semantics, with differential controls. This does not establish the cause of a prior deadline refusal or grant process closure credit."

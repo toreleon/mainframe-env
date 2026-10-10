@@ -5,6 +5,20 @@
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "baseline_id", "unit_id", "row_id", "applicable_gates", "evidence_refs", "derived_state"],
+  "allOf": [{
+    "if": {"properties": {"derived_state": {"const": "complete"}}},
+    "then": {
+      "properties": {"evidence_refs": {"minProperties": 1, "additionalProperties": {"minItems": 1}}},
+      "allOf": [
+        {"if": {"properties": {"applicable_gates": {"contains": {"const": "recognized"}}}}, "then": {"properties": {"evidence_refs": {"required": ["recognized"]}}}},
+        {"if": {"properties": {"applicable_gates": {"contains": {"const": "validated"}}}}, "then": {"properties": {"evidence_refs": {"required": ["validated"]}}}},
+        {"if": {"properties": {"applicable_gates": {"contains": {"const": "executed"}}}}, "then": {"properties": {"evidence_refs": {"required": ["executed"]}}}},
+        {"if": {"properties": {"applicable_gates": {"contains": {"const": "conditioned"}}}}, "then": {"properties": {"evidence_refs": {"required": ["conditioned"]}}}},
+        {"if": {"properties": {"applicable_gates": {"contains": {"const": "recovered"}}}}, "then": {"properties": {"evidence_refs": {"required": ["recovered"]}}}},
+        {"if": {"properties": {"applicable_gates": {"contains": {"const": "differential"}}}}, "then": {"properties": {"evidence_refs": {"required": ["differential"]}}}}
+      ]
+    }
+  }],
   "properties": {
     "schema_version": {"const": "mainframe-env.coverage-row@1"},
     "baseline_id": {"type": "string", "minLength": 8},
@@ -19,8 +33,10 @@
     },
     "evidence_refs": {
       "type": "object",
+      "propertyNames": {"enum": ["recognized", "validated", "executed", "conditioned", "recovered", "differential"]},
       "additionalProperties": {
         "type": "array",
+        "uniqueItems": true,
         "items": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
       }
     },

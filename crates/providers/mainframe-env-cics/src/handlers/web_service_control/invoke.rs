@@ -317,8 +317,10 @@ pub(super) fn invoke(
         &channel,
         &channel_state,
         &response,
-        vec![write],
-        Some(next_total),
+        state::AdditionalWrites {
+            writes: vec![write],
+            replacement_transform_total: Some(next_total),
+        },
     );
     if persisted.is_ok() || persisted == Err(HostProblem::UnknownOutcome) {
         let mut state = service.lock()?;

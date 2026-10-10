@@ -8,7 +8,7 @@ Start gate: accepted JES, CICS, Db2, IMS, and MQ provider state/UOW contracts
 Completion dependencies: jes.execution, cics.system-api, db2.programming, ims.programming, mq.programming
 Estimate: 14–22 engineer-months
 
-The [common release contract](../README.md#shared-validation-contract) and
+The [shared validation contract](../README.md#shared-validation-contract) and
 [hardened slice acceptance](../../../prompts/subsystems/README.md#hardened-slice-acceptance)
 apply, including early participant-contract and licensed-harness preparation.
 These requirements do not themselves certify implementation or waive an exit gate.

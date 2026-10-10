@@ -58,7 +58,14 @@ CardDemo participant ownership and batch completion boundary.
 | [0033](0033-cobol-dli-call-boundary.md) | owned raw COBOL DL/I CALL frame, PCB entry binding and feedback contract proposal | Proposed |
 | [0030](0030-gsam-application-record-formats.md) | explicit GSAM application formats, owned U length and checkpoint format identity | Proposed |
 | [0032](0032-selected-secondary-checkpoint-position.md) | selected secondary checkpoint occurrence witnesses composed with existing local backout | Proposed |
-| [0050](0050-host-effect-envelope-layout.md) | exclusive boxed outer MQI host payloads with unchanged canonical encoding | Proposed; compatibility validation pending |
+| [0050](0050-host-effect-envelope-layout.md) | exclusive boxed outer MQI host payloads with unchanged canonical encoding | Accepted; scoped compatibility passed |
+
+| [0051](0051-package-identity-framing.md) | framed current package domain and finite trusted legacy recovery | Accepted; scoped compatibility passed |
+| [0052](0052-cics-operation-contexts.md) | borrowed CICS operation inputs and existing explicit receipt retention export | Accepted; scoped compatibility passed |
+| [0053](0053-selected-controller-publication-fence.md) | local shared admission fence and publication prevalidation | Accepted design; implementation pending |
+| [0054](0054-focused-conformance-output.md) | canonical focused JSONL output and bounded sink publication | Accepted; scoped compatibility passed |
+| [0055](0055-standard-package-mac-envelope.md) | bounded COSE_Mac0 profile and exact retained verification | Bounded production MAC implementation accepted; full Foundation pending |
+| [0056](0056-cics-first-reverse-position.md) | additive retained-position Dataset observation for the implicit CICS first reverse read | Accepted bounded design; verification pending |
 
 Parallel subsystem work allocated the same 0028 and 0029 numeric prefixes.
 Their distinct full filenames and subsystem-qualified labels identify each

@@ -11,7 +11,7 @@ Estimate: 6–9 engineer-months
 ## Outcome
 
 Make official coverage measurable and make production behavior independent of
-CardDemo identities. This version changes the way future capabilities are
+CardDemo identities. This phase changes the way future capabilities are
 declared and dispatched; it must not inflate coverage merely by adding catalog
 rows.
 
@@ -52,7 +52,7 @@ CV-201 and CV-202 must freeze first. After that, CV-204 through CV-208 can run
 in parallel behind the accepted contracts. CV-205 and CV-206 must coordinate on
 the program/package schema but need not touch the same provider state.
 
-No later version may merge public behavior before CV-203/CV-204 are accepted.
+No dependent phase may merge public behavior before CV-203/CV-204 are accepted.
 Subsystem teams may research and prepare private catalogs concurrently.
 
 ## Exit gate
@@ -62,9 +62,11 @@ Subsystem teams may research and prepare private catalogs concurrently.
 - Production H1 application-hardcode count is exactly zero.
 - Production string dispatch has no application program/table/transaction
   exception.
-- CardDemo remains 20/20 through installed package data.
+- CardDemo passes all 20 journeys, all 26 transaction requirements and all 105
+  issue acceptance requirements through installed package data. These remain
+  pending until the required real observations are bound.
 - The 260-test floor, PostgreSQL controls, full CardDemo gate, live Zowe route,
-  architecture/profile/schema/evidence gates, and release checks pass.
+  architecture/profile/schema/evidence gates, and public distribution checks pass.
 - No new official compatibility numerator is claimed solely from catalog/code
   generation.
 

@@ -55,7 +55,7 @@ impl MqHandleKernel {
                     }
                     Err(p) => return Err(problem(p)),
                     Ok(import) => {
-                        let mut next = current.clone();
+                        let mut next = (**current).clone();
                         next.descriptor = descriptor.clone();
                         for (name, pd, value) in import.properties {
                             next.set(name, pd, value, limits.message)?;
@@ -98,7 +98,7 @@ impl MqHandleKernel {
                             Some(mq_rfh2_outer_descriptor(descriptor).map_err(problem)?);
                         observation.buffer = MqRfh2BufferObservation::WrittenPrefix(bytes);
                         if options.deletes() {
-                            let mut next = current.clone();
+                            let mut next = (**current).clone();
                             if !next.delete(name)? {
                                 return Err(MqHandleKernelProblem::NotFound);
                             }

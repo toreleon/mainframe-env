@@ -163,15 +163,15 @@ fn add(
     if fault_string.is_none() && subcode.is_none() {
         return Err(HostProblem::Malformed);
     }
-    if let Some(subcode) = subcode {
-        if level == 2 {
-            if !valid_qname(&subcode) {
-                return Err(condition("INVREQ", 16, 11));
-            }
-            state
-                .fields
-                .insert("SOAP.SUBCODE".into(), subcode.into_bytes());
+    if let Some(subcode) = subcode
+        && level == 2
+    {
+        if !valid_qname(&subcode) {
+            return Err(condition("INVREQ", 16, 11));
         }
+        state
+            .fields
+            .insert("SOAP.SUBCODE".into(), subcode.into_bytes());
     }
     if let Some(fault_string) = fault_string {
         if level == 2

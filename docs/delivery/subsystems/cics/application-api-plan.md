@@ -127,7 +127,7 @@ cache-backed A/B/C projection and independent verification, and all 11 native
 PostgreSQL parity selectors. Release and licensed campaigns were not run and
 are not implied by this result.
 
-The [common release contract](../README.md#shared-validation-contract) and
+The [shared validation contract](../README.md#shared-validation-contract) and
 [hardened slice acceptance](../../../prompts/subsystems/README.md#hardened-slice-acceptance)
 apply, including early participant-contract and licensed-harness preparation.
 These requirements do not themselves certify implementation or waive an exit gate.
@@ -222,7 +222,7 @@ may begin, but its public surface cannot complete before this API is stable.
 
 PostgreSQL is an affected cics.application-api environment. Select the following tests according
 to each slice's changed boundary and run the complete affected matrix on the
-unchanged minor-integration candidate. An ignored or unavailable backend test
+unchanged phase-integration candidate. An ignored or unavailable backend test
 remains pending. Use focused tests in the inner loop; the common validation
 tiers and CI path/contract selectors determine when broader suites run.
 

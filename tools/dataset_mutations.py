@@ -9,20 +9,37 @@ mutation grants licensed IBM differential credit.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import hashlib
+import importlib.util
 import io
 import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
+import stat
 import tarfile
 import tempfile
 import time
 from dataclasses import dataclass
 
+BUILD_ENVIRONMENT_FIELDS = (
+    'CARGO_TARGET_DIR', 'CARGO_BUILD_BUILD_DIR', 'CARGO_INCREMENTAL', 'CARGO_TERM_COLOR', 'RUST_BACKTRACE',
+    'CARGO_BUILD_JOBS', 'CARGO_PROFILE_DEV_DEBUG', 'CARGO_PROFILE_TEST_DEBUG',
+)
+MAX_COMMAND_OUTPUT_BYTES = 32 * 1024 * 1024
+SUPERVISOR_SPEC = importlib.util.spec_from_file_location(
+    'dataset_mutations_supervisor', Path(__file__).with_name('ci_assurance.py')
+)
+supervisor = importlib.util.module_from_spec(SUPERVISOR_SPEC)
+SUPERVISOR_SPEC.loader.exec_module(supervisor)
+
 SOURCE = Path('crates/tooling/mainframe-env-conformance/src/dataset_reference.rs')
-CICS_FILE_SOURCE = Path('crates/providers/mainframe-env-cics/src/handlers/file_control.rs')
+CICS_FILE_SOURCE = Path(
+    'crates/providers/mainframe-env-cics/src/handlers/file_control/first_reverse.rs'
+)
 CICS_RECOVERY_SOURCE = Path('crates/providers/mainframe-env-cics/src/handlers/recovery.rs')
 CICS_SOURCES = (CICS_FILE_SOURCE, CICS_RECOVERY_SOURCE)
 CICS_SCENARIOS = Path('crates/tooling/mainframe-env-conformance/src/cics_pilot.rs')
@@ -86,12 +103,12 @@ CICS_MUTATIONS = (
         'cics-omit-rewrite',
         'Report a successful product REWRITE without invoking the dataset transition',
         '    } else {\n        service.nested(run, HostRequest::Dataset(host_request))\n'
-        '    }\n    .map_err(|problem| normalize_file_not_found(operation, problem))?;',
+        '    }\n    .map_err(',
         '    } else if operation == CicsOperation::Rewrite {\n'
         '        Ok(HostResult::Dataset(DatasetResult::Mutated { version: 1 }))\n'
         '    } else {\n'
         '        service.nested(run, HostRequest::Dataset(host_request))\n'
-        '    }\n    .map_err(|problem| normalize_file_not_found(operation, problem))?;',
+        '    }\n    .map_err(',
         CICS_FILE_SOURCE,
     ),
     Mutation(
@@ -303,6 +320,124 @@ def digest(data: bytes) -> str:
     return 'sha256:' + hashlib.sha256(data).hexdigest()
 
 
+def directory_identity(path: Path) -> dict:
+    metadata = path.lstat()
+    if not stat.S_ISDIR(metadata.st_mode):
+        raise ValueError(f'campaign-owned directory is not a plain directory: {path}')
+    return {'path': str(path), 'device': metadata.st_dev, 'inode': metadata.st_ino}
+
+
+@dataclass
+class SnapshotOwner:
+    path: Path
+    identity: dict
+    command_closed: bool = True
+    blocked_reason: str | None = None
+
+    def __fspath__(self):
+        return str(self.path)
+
+    def __truediv__(self, relative):
+        return self.path / relative
+
+    def verify(self) -> dict:
+        if not self.command_closed or self.blocked_reason:
+            raise ValueError(self.blocked_reason or 'command group closure was not established')
+        current = directory_identity(self.path)
+        if current != self.identity:
+            self.blocked_reason = f'campaign snapshot identity changed: {current}'
+            raise ValueError(self.blocked_reason)
+        return current
+
+
+@dataclass(frozen=True)
+class BuildOwner:
+    snapshot: SnapshotOwner
+    target: Path
+    build: Path
+    target_identity: dict
+    build_identity: dict
+
+    @property
+    def cwd(self):
+        return self.snapshot.path
+
+    @property
+    def cwd_identity(self):
+        return self.snapshot.identity
+
+    def verify(self) -> dict:
+        current = {'working_directory': self.snapshot.verify(),
+                   'cargo_target_directory': directory_identity(self.target),
+                   'cargo_build_directory': directory_identity(self.build)}
+        if (current['cargo_target_directory'] != self.target_identity
+                or current['cargo_build_directory'] != self.build_identity):
+            self.snapshot.blocked_reason = f'campaign build directory identity changed: {current}'
+            raise ValueError(self.snapshot.blocked_reason)
+        return current
+
+    def write_source(self, relative: Path, content: str):
+        # No mutation or restoration through an unsettled/replaced namespace.
+        # Identity checks are observations, not atomic directory containment.
+        self.verify()
+        (self.cwd / relative).write_text(content)
+
+    def restore(self, relative: Path, original: str):
+        self.write_source(relative, original)
+
+
+def claim_build_owner(snapshot: SnapshotOwner) -> BuildOwner:
+    snapshot.verify()
+    target = snapshot / 'target'
+    build = snapshot / 'build'
+    # The archived candidate must not supply or reuse this namespace.
+    target.mkdir(mode=0o700, exist_ok=False)
+    build.mkdir(mode=0o700, exist_ok=False)
+    return BuildOwner(snapshot, target, build, directory_identity(target), directory_identity(build))
+
+
+@contextmanager
+def owned_snapshot(receipt: dict, save):
+    path = Path(tempfile.mkdtemp(prefix='mainframe-dataset-mutations-')).absolute()
+    snapshot = SnapshotOwner(path, directory_identity(path))
+    receipt['snapshot_owner'] = snapshot.identity
+    try:
+        yield snapshot
+    finally:
+        root_verified = False
+        retained_before_removal = False
+        problem = snapshot.blocked_reason
+        try:
+            save()
+            retained_before_removal = True
+        except (OSError, ValueError) as error:
+            problem = 'pre-cleanup receipt retention failed: ' + str(error)
+        if retained_before_removal:
+            try:
+                snapshot.verify()
+                root_verified = True
+                shutil.rmtree(path)
+            except (OSError, ValueError) as error:
+                problem = str(error)
+        snapshot_absent = not os.path.lexists(path)
+        target_absent = not os.path.lexists(snapshot / 'target')
+        build_absent = not os.path.lexists(snapshot / 'build')
+        receipt['build_owner_cleanup'] = {
+            'snapshot': str(path), 'cargo_target_directory': str(snapshot / 'target'),
+            'cargo_build_directory': str(snapshot / 'build'),
+            'receipt_retained_before_removal': retained_before_removal,
+            'root_identity_verified_before_removal': root_verified,
+            'command_group_closed': snapshot.command_closed,
+            'snapshot_absent': snapshot_absent, 'target_absent': target_absent,
+            'build_absent': build_absent, 'error': problem,
+            'verified': retained_before_removal and root_verified and snapshot.command_closed
+                        and snapshot_absent and target_absent and build_absent,
+        }
+        save()
+        if not receipt['build_owner_cleanup']['verified']:
+            raise ValueError('campaign-owned snapshot/target cleanup was not verified: ' + str(problem))
+
+
 def split_test_code(source: str) -> tuple[str, str]:
     """Skip test-only imports and external module declarations as boundaries."""
     marker = '#[cfg(test)]'
@@ -352,24 +487,57 @@ def classify(returncode: int | None, output: str, expected: set[str]) -> tuple[s
     return 'invalid', []
 
 
-def execute(cwd: Path, log: Path, timeout: int, command: list[str] = COMMAND,
+def execute(owner: BuildOwner, log: Path, timeout: int, command: list[str] = COMMAND,
             expected: set[str] = EXPECTED_TESTS) -> dict:
     started = time.monotonic()
+    context = owner.verify()
     environment = os.environ.copy()
+    environment['CARGO_TARGET_DIR'] = str(owner.target)
+    environment['CARGO_BUILD_BUILD_DIR'] = str(owner.build)
     environment['CARGO_TERM_COLOR'] = 'never'
     environment['RUST_BACKTRACE'] = '0'
     environment['CARGO_INCREMENTAL'] = '0'
-    # Both successful and failed mutants use the exact same unmodified test command.
-    try:
-        with log.open('wb') as stream:
-            completed = subprocess.run(command, cwd=cwd, env=environment, stdout=stream,
-                                       stderr=subprocess.STDOUT, timeout=timeout, check=False)
-        code = completed.returncode
-    except subprocess.TimeoutExpired:
-        code = None
+    context['environment'] = {
+        name: environment[name] for name in BUILD_ENVIRONMENT_FIELDS if name in environment
+    }
+
+    def closed(code):
+        owner.snapshot.command_closed = True
+
+    # Linux same-group closure, not escaped-descendant or universal containment.
+    # Both successful and failed mutants retain the exact unmodified test command.
+    with log.open('wb') as stream:
+        owner.snapshot.command_closed = False
+        try:
+            code, error = supervisor._run_owned(
+                command, owner.cwd, lambda label, data: stream.write(data),
+                timeout_seconds=timeout, max_output_bytes=MAX_COMMAND_OUTPUT_BYTES,
+                env=environment, on_closed=closed,
+            )
+        except (OSError, ValueError) as problem:
+            code, error = 127, str(problem)
     content = log.read_bytes()
     classification, killed_by = classify(code, content.decode(errors='replace'), expected)
-    return {'exit_code': code, 'duration_seconds': round(time.monotonic() - started, 3),
+    if error is not None:
+        classification, killed_by = ('timed_out' if 'command deadline exceeded' in error else 'invalid'), []
+    context['process_supervision'] = {
+        'scope': 'Linux launched process group; escaped descendants outside boundary',
+        'timeout_seconds': timeout, 'max_output_bytes': MAX_COMMAND_OUTPUT_BYTES,
+        'group_closed': owner.snapshot.command_closed, 'error': error,
+    }
+    if not owner.snapshot.command_closed:
+        owner.snapshot.blocked_reason = 'command group closure was not established'
+        context['ownership_verified_after'] = False
+        classification, killed_by = 'invalid', []
+    else:
+        try:
+            owner.verify()
+            context['ownership_verified_after'] = True
+        except (OSError, ValueError) as problem:
+            owner.snapshot.blocked_reason = str(problem)
+            context.update(ownership_verified_after=False, ownership_error=str(problem))
+            classification, killed_by = 'invalid', []
+    return {**context, 'exit_code': code, 'duration_seconds': round(time.monotonic() - started, 3),
             'classification': classification, 'killing_tests': killed_by,
             'log': log.name, 'log_digest': digest(content)}
 
@@ -481,8 +649,8 @@ def campaign(root: Path, output: Path, timeout: int) -> int:
     def save() -> None:
         (output / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
 
-    with tempfile.TemporaryDirectory(prefix='mainframe-dataset-mutations-') as directory:
-        snapshot = Path(directory)
+    with owned_snapshot(receipt, save) as snapshot_owner:
+        snapshot = snapshot_owner.path
         with tarfile.open(fileobj=io.BytesIO(archive), mode='r:') as tar:
             # The extraction filter arrived in 3.11.4; the bookworm interpreter
             # that runs this gate in CI is 3.11.2. tarfile.data_filter is the
@@ -493,7 +661,10 @@ def campaign(root: Path, output: Path, timeout: int) -> int:
                 tar.extractall(snapshot, filter='data')
             else:
                 tar.extractall(snapshot)
-        receipt['baseline'] = execute(snapshot, output / 'baseline.log', timeout)
+        owner = claim_build_owner(snapshot_owner)
+        receipt['build_owner'] = owner.verify()
+        save()
+        receipt['baseline'] = execute(owner, output / 'baseline.log', timeout)
         save()
         if receipt['baseline']['classification'] != 'survived':
             raise ValueError('unchanged baseline tests did not pass; no mutant receives credit')
@@ -503,18 +674,18 @@ def campaign(root: Path, output: Path, timeout: int) -> int:
             receipt['mutants'].append(entry)
             try:
                 changed = apply_mutation(original, mutation)
-                (snapshot / SOURCE).write_text(changed)
+                owner.write_source(SOURCE, changed)
                 entry['mutated_source_digest'] = digest(changed.encode())
-                entry.update(execute(snapshot, output / (mutation.identity + '.log'), timeout))
+                entry.update(execute(owner, output / (mutation.identity + '.log'), timeout))
             except (ValueError, OSError) as error:
                 entry.update(classification='invalid', error=str(error), killing_tests=[])
             finally:
-                (snapshot / SOURCE).write_text(original)
+                owner.restore(SOURCE, original)
                 save()
             print(f"{mutation.identity}: {entry['classification']}", flush=True)
         product = receipt['product_runtime']
         product['baseline'] = execute(
-            snapshot, output / 'cics-baseline.log', timeout, CICS_COMMAND, CICS_EXPECTED_TESTS
+            owner, output / 'cics-baseline.log', timeout, CICS_COMMAND, CICS_EXPECTED_TESTS
         )
         save()
         if product['baseline']['classification'] != 'survived':
@@ -529,21 +700,21 @@ def campaign(root: Path, output: Path, timeout: int) -> int:
             product['mutants'].append(entry)
             try:
                 changed = apply_mutation(original_source, mutation)
-                (snapshot / source).write_text(changed)
+                owner.write_source(source, changed)
                 entry['mutated_source_digest'] = digest(changed.encode())
                 entry.update(execute(
-                    snapshot, output / (mutation.identity + '.log'), timeout,
+                    owner, output / (mutation.identity + '.log'), timeout,
                     CICS_COMMAND, CICS_EXPECTED_TESTS,
                 ))
             except (ValueError, OSError) as error:
                 entry.update(classification='invalid', error=str(error), killing_tests=[])
             finally:
-                (snapshot / source).write_text(original_source)
+                owner.restore(source, original_source)
                 save()
             print(f"{mutation.identity}: {entry['classification']}", flush=True)
         cobol = receipt['cobol_runtime']
         cobol['baseline'] = execute(
-            snapshot, output / 'cobol-move-baseline.log', timeout,
+            owner, output / 'cobol-move-baseline.log', timeout,
             COBOL_MOVE_COMMAND, COBOL_MOVE_EXPECTED_TESTS,
         )
         save()
@@ -555,21 +726,21 @@ def campaign(root: Path, output: Path, timeout: int) -> int:
             cobol['mutants'].append(entry)
             try:
                 changed = apply_mutation(cobol_move_original, mutation)
-                (snapshot / COBOL_MOVE_SOURCE).write_text(changed)
+                owner.write_source(COBOL_MOVE_SOURCE, changed)
                 entry['mutated_source_digest'] = digest(changed.encode())
                 entry.update(execute(
-                    snapshot, output / (mutation.identity + '.log'), timeout,
+                    owner, output / (mutation.identity + '.log'), timeout,
                     COBOL_MOVE_COMMAND, COBOL_MOVE_EXPECTED_TESTS,
                 ))
             except (ValueError, OSError) as error:
                 entry.update(classification='invalid', error=str(error), killing_tests=[])
             finally:
-                (snapshot / COBOL_MOVE_SOURCE).write_text(cobol_move_original)
+                owner.restore(COBOL_MOVE_SOURCE, cobol_move_original)
                 save()
             print(f"{mutation.identity}: {entry['classification']}", flush=True)
         arithmetic = receipt['typed_arithmetic_runtime']
         arithmetic['baseline'] = execute(
-            snapshot, output / 'typed-arithmetic-baseline.log', timeout,
+            owner, output / 'typed-arithmetic-baseline.log', timeout,
             TYPED_ARITHMETIC_COMMAND, TYPED_ARITHMETIC_EXPECTED_TESTS,
         )
         save()
@@ -583,21 +754,21 @@ def campaign(root: Path, output: Path, timeout: int) -> int:
             arithmetic['mutants'].append(entry)
             try:
                 changed = apply_mutation(typed_arithmetic_original, mutation)
-                (snapshot / TYPED_ARITHMETIC_SOURCE).write_text(changed)
+                owner.write_source(TYPED_ARITHMETIC_SOURCE, changed)
                 entry['mutated_source_digest'] = digest(changed.encode())
                 entry.update(execute(
-                    snapshot, output / (mutation.identity + '.log'), timeout,
+                    owner, output / (mutation.identity + '.log'), timeout,
                     TYPED_ARITHMETIC_COMMAND, TYPED_ARITHMETIC_EXPECTED_TESTS,
                 ))
             except (ValueError, OSError) as error:
                 entry.update(classification='invalid', error=str(error), killing_tests=[])
             finally:
-                (snapshot / TYPED_ARITHMETIC_SOURCE).write_text(typed_arithmetic_original)
+                owner.restore(TYPED_ARITHMETIC_SOURCE, typed_arithmetic_original)
                 save()
             print(f"{mutation.identity}: {entry['classification']}", flush=True)
         corresponding = receipt['cobol_corresponding_compiler']
         corresponding['baseline'] = execute(
-            snapshot, output / 'cobol-corresponding-baseline.log', timeout,
+            owner, output / 'cobol-corresponding-baseline.log', timeout,
             COBOL_CORRESPONDING_COMMAND, COBOL_CORRESPONDING_EXPECTED_TESTS,
         )
         save()
@@ -611,18 +782,16 @@ def campaign(root: Path, output: Path, timeout: int) -> int:
             corresponding['mutants'].append(entry)
             try:
                 changed = apply_mutation(cobol_corresponding_original, mutation)
-                (snapshot / COBOL_CORRESPONDING_SOURCE).write_text(changed)
+                owner.write_source(COBOL_CORRESPONDING_SOURCE, changed)
                 entry['mutated_source_digest'] = digest(changed.encode())
                 entry.update(execute(
-                    snapshot, output / (mutation.identity + '.log'), timeout,
+                    owner, output / (mutation.identity + '.log'), timeout,
                     COBOL_CORRESPONDING_COMMAND, COBOL_CORRESPONDING_EXPECTED_TESTS,
                 ))
             except (ValueError, OSError) as error:
                 entry.update(classification='invalid', error=str(error), killing_tests=[])
             finally:
-                (snapshot / COBOL_CORRESPONDING_SOURCE).write_text(
-                    cobol_corresponding_original
-                )
+                owner.restore(COBOL_CORRESPONDING_SOURCE, cobol_corresponding_original)
                 save()
             print(f"{mutation.identity}: {entry['classification']}", flush=True)
     receipt['counts'] = {state: sum(m['classification'] == state for m in receipt['mutants'])

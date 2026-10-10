@@ -5,10 +5,13 @@
 //! Lossless receipt payload composition is supplied by the owned MQI replay codec.
 
 use super::super::*;
+#[cfg(test)]
 use crate::host_context::decode_host_context;
 use crate::mqi_admission::{MqMqiAdmission, MqMqiServiceScope, admit_mqi};
 use crate::mqi_lifecycle::LogicalBatchOwner;
-use crate::mqi_lifecycle::{FrameLease, LifecycleLimits, MqLifecycleDirectory, ProcessLease};
+#[cfg(test)]
+use crate::mqi_lifecycle::ProcessLease;
+use crate::mqi_lifecycle::{FrameLease, LifecycleLimits, MqLifecycleDirectory};
 use crate::service_mqi_intent::{MqIntentProblem, bind_core_intent};
 use mainframe_env_execution_api::{AuditDecision, AuditRecord};
 use mainframe_env_host_api::mq_mqi::*;
@@ -25,6 +28,7 @@ use mainframe_env_store_api::{EffectDigestFormat, EffectState};
 mod authorization;
 #[path = "service_selected_operation/batch_child.rs"]
 mod batch_child;
+#[cfg(test)]
 #[path = "service_selected_operation/explicit_context.rs"]
 mod explicit_context;
 #[path = "service_selected_operation/ownership.rs"]
@@ -195,7 +199,7 @@ impl MqService {
                         sequence: original_sequence,
                         outcome: Ok(HostResult::MqMqi(Box::new(MqMqiHostResult {
                             limits: original_limits,
-                            result: result.clone(),
+                            result: (**result).clone(),
                         }))),
                     });
                 }
@@ -352,19 +356,21 @@ impl MqService {
                 .mq_mqi_occurrence(host_limits)?
                 .ok_or(HostProblem::Malformed)?;
             let mut candidate = match transition::prepare(
-                state,
-                &mut runtime,
-                invocation,
-                &logical,
-                owner,
+                transition::Preparation {
+                    state,
+                    runtime: &mut runtime,
+                    invocation,
+                    logical: &logical,
+                    owner,
+                    now,
+                    authorizer: &authorized,
+                    service: self,
+                    frame,
+                    admitted,
+                },
                 &admitted.envelope.request,
                 key,
-                now,
-                &authorized,
                 self.limits,
-                self,
-                frame,
-                admitted,
                 &mut || self.capture_rfh2_source(invocation, &source_original),
             ) {
                 Ok(candidate) => candidate,
@@ -519,7 +525,7 @@ impl MqService {
                 }
                 let receipt = receipt::OccurrenceReceipt::capture(
                     admitted,
-                    &reply,
+                    &preflight,
                     &candidate.control,
                     decision_tick,
                     host_limits,
@@ -558,12 +564,10 @@ impl MqService {
                     .map_err(intent_error)?
                     .publish(decision_tick)
                     .map_err(intent_error);
-                if let Err(error) = publish {
-                    return Err(error);
-                }
+                publish?;
                 // All physical rows and audit committed. Only now adopt delivery,
                 // owner/bindings and cached reply; core completion stays external.
-                *state = next;
+                **state = next;
                 if stage.is_some() && self.unknown_after_persist.swap(false, Ordering::SeqCst) {
                     // Durable receipt exists, but no live/provisional property
                     // mutation may be adopted on an uncertain publication boundary.
@@ -631,6 +635,7 @@ impl MqService {
     /// Invocation and selected its process topology. This parser/directory does
     /// not attest arbitrary application bindings. No new token is exposed until
     /// its independently retained registry incarnation is atomically published.
+    #[cfg(test)]
     pub(crate) fn mint_selected_process(
         &self,
         invocation: &Invocation,
@@ -663,6 +668,7 @@ impl MqService {
 
     /// Opaque leases have no numeric reconstruction constructor. The caller is
     /// the same independently admitted host as mint_selected_process.
+    #[cfg(test)]
     pub(crate) fn bind_selected_root(
         &self,
         process: ProcessLease,

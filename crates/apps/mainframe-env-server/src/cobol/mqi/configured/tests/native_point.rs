@@ -138,7 +138,7 @@ fn genuine_compiled_native_root_open_close_disc_on_memory_owned_sqlite() {
                 assert_eq!(done.output.bytes(), b"POINT-DONE\n");
                 assert_eq!(original, before);
                 assert!(original.parent_execution_id.is_none());
-                assert!(original.bindings.get("mq.host-context").is_none());
+                assert!(!original.bindings.contains_key("mq.host-context"));
                 assert_receipts(&f, &original, 4);
                 let execution = f
                     .store

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Resolve the pinned Python installation before exact finite-client selection and keep client tooling targets in the executing checkout; preserve canonical caller paths, all byte/tree admission checks and fixed action/time limits."

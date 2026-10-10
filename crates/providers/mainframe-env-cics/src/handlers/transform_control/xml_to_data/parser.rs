@@ -232,10 +232,11 @@ pub(super) fn parse_xml(
             continue;
         }
         let (local, namespace) = resolve_qname(name, &namespaces, false)?;
-        if local == "type" && namespace == XSI_NAMESPACE {
-            if type_value.replace(value.as_str()).is_some() {
-                return Err(XmlReadProblem::Syntax);
-            }
+        if local == "type"
+            && namespace == XSI_NAMESPACE
+            && type_value.replace(value.as_str()).is_some()
+        {
+            return Err(XmlReadProblem::Syntax);
         }
     }
     let (type_name, type_namespace) = match type_value {

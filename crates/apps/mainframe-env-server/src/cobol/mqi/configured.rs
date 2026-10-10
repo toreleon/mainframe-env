@@ -33,7 +33,7 @@ enum RootEntry {
     Retained {
         root: Arc<MqTrustedBatchRoot>,
         frame: Arc<ClosedFrame>,
-        native: Option<mainframe_env_store_api::RootDriverClaim>,
+        native: Option<Box<mainframe_env_store_api::RootDriverClaim>>,
     },
 }
 enum FrameEntry {

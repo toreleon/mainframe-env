@@ -586,7 +586,7 @@ fn recorded_call_requires_positive_bound_occurrence() {
     let (cics, _, root) = route(|cics, source, effect| {
         let (selection, payload) = tuple(effect);
         let child = target(source, selection, 1);
-        for occurrence in [0, 2, u64::from(source.limits.max_effects) + 1] {
+        for occurrence in [0, 2, source.limits.max_effects + 1] {
             {
                 let mut state = cics.lock().unwrap();
                 state

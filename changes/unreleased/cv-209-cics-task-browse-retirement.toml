@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Retire confirmed task-owned CICS file browses on normal and abnormal task end using the creating actor, retaining per-cursor progress and uncertain END ownership without automatic redispatch."

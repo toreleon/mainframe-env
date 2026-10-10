@@ -100,12 +100,18 @@
     "docs/decisions/0048-carddemo-interactive-application.md",
     "docs/decisions/0049-executable-agent-sandbox.md",
     "docs/decisions/0050-host-effect-envelope-layout.md",
+    "docs/decisions/0051-package-identity-framing.md",
+    "docs/decisions/0052-cics-operation-contexts.md",
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
     "docs/delivery/IMPLEMENTATION-ROADMAP.md",
     "docs/delivery/VERIFICATION-STRATEGY.md",
     "docs/delivery/ZOSMF-API.md",
     "docs/delivery/subsystems/mq/inquiry-source-boundary.md",
-    "docs/guides/MAINFRAME-SANDBOX.md"
+    "docs/guides/MAINFRAME-SANDBOX.md",
+    "docs/decisions/0053-selected-controller-publication-fence.md",
+    "docs/decisions/0054-focused-conformance-output.md",
+    "docs/decisions/0055-standard-package-mac-envelope.md",
+    "docs/decisions/0056-cics-first-reverse-position.md"
   ],
   "navigation": [
     {
@@ -545,6 +551,30 @@
         {
           "label": "ADR-0050: Boxed shared host-effect payloads",
           "path": "docs/decisions/0050-host-effect-envelope-layout.md"
+        },
+        {
+          "label": "ADR-0051: Framed package identity and retained compatibility",
+          "path": "docs/decisions/0051-package-identity-framing.md"
+        },
+        {
+          "label": "ADR-0052: Borrowed CICS operation inputs",
+          "path": "docs/decisions/0052-cics-operation-contexts.md"
+        },
+        {
+          "label": "ADR-0053: Selected controller publication fence",
+          "path": "docs/decisions/0053-selected-controller-publication-fence.md"
+        },
+        {
+          "label": "ADR-0054: Canonical focused conformance output",
+          "path": "docs/decisions/0054-focused-conformance-output.md"
+        },
+        {
+          "label": "ADR-0055: Standard package MAC envelope",
+          "path": "docs/decisions/0055-standard-package-mac-envelope.md"
+        },
+        {
+          "label": "ADR-0056: CICS first reverse read at a retained position",
+          "path": "docs/decisions/0056-cics-first-reverse-position.md"
         }
       ],
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."

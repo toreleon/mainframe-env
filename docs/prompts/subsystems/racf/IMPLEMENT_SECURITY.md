@@ -80,7 +80,7 @@ Scoped completion policy approved by the user on 2026-09-01: racf.security may e
 receipt is available in this development cycle. Keep the licensed differential
 numerator exactly 0/48, never fabricate or infer a pass, and retain the
 fail-closed campaign adapter. The real licensed 48-row campaign is a hard gate
-of certification.licensed `release-certify` and remains mandatory before 1.0/release
+of certification.licensed `release-certify` and remains mandatory before public distribution
 certification.
 
 At handoff, include per-family gate counts, deny-path evidence, audit/redaction

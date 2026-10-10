@@ -24,6 +24,10 @@ def parser():
     setup.add_argument("--destination", type=Path, required=True)
     setup.add_argument("--corpus", type=Path)
     setup.add_argument("--no-build", action="store_true", help="Use binaries already built in target/release")
+    setup.add_argument("--target-directory", type=Path,
+                       help="Fresh build directory below this checkout's target/; removed after retention")
+    setup.add_argument("--producer-evidence", type=Path,
+                       help="External directory for actual setup logs, artifacts and setup-receipt.json; requires a fresh target")
     serve = commands.add_parser("serve", help="Run one instance in the foreground")
     serve.add_argument("--instance", type=Path, required=True)
     serve.add_argument("--profile", choices=["cobol", "carddemo-online"], default="carddemo-online")
@@ -56,7 +60,7 @@ def run(args):
         return verify(args.bundle.resolve(), args.directory.resolve())
     if args.command == "setup":
         from .setup import setup
-        return setup(args.destination, args.corpus, args.no_build)
+        return setup(args.destination, args.corpus, args.no_build, args.target_directory, args.producer_evidence)
     if args.command == "serve":
         from .server import serve
         bundle = args.bundle.resolve()

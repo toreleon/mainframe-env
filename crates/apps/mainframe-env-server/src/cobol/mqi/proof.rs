@@ -117,7 +117,7 @@ pub(super) fn observe_parent(
         || now > i64::MAX as u64
         || effect.run_unit != parent.run_unit_id
         || effect.sequence == 0
-        || effect.sequence > u64::from(parent.limits.max_effects)
+        || effect.sequence > parent.limits.max_effects
         || !matches!(
             &effect.request,
             HostRequest::Program(ProgramRequest::Call { service: None, .. })

@@ -1,5 +1,7 @@
 use super::*;
 
+type RetrievedDocument = (Vec<DocumentSegment>, BTreeMap<String, usize>);
+
 const RETRIEVED_MAGIC: &[u8; 8] = b"MECRTV01";
 
 pub(super) fn encode_retrieved(
@@ -51,7 +53,7 @@ pub(super) fn encode_retrieved(
 pub(super) fn decode_from_buffer(
     bytes: &[u8],
     limits: CicsLimits,
-) -> Result<Option<(Vec<DocumentSegment>, BTreeMap<String, usize>)>, HostProblem> {
+) -> Result<Option<RetrievedDocument>, HostProblem> {
     if !bytes.starts_with(RETRIEVED_MAGIC) {
         return Ok(None);
     }
@@ -64,10 +66,7 @@ pub(super) fn decode_from_buffer(
         })
 }
 
-fn parse(
-    bytes: &[u8],
-    limits: CicsLimits,
-) -> Result<(Vec<DocumentSegment>, BTreeMap<String, usize>), HostProblem> {
+fn parse(bytes: &[u8], limits: CicsLimits) -> Result<RetrievedDocument, HostProblem> {
     if bytes.len() > limits.max_screen_bytes {
         return Err(HostProblem::ResourceExhausted);
     }

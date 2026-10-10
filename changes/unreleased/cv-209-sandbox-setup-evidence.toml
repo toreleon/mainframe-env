@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Added frozen offline native sandbox setup with fresh checkout-owned targets, externally retained actual producer logs and artifacts, source stability checks, and failure-aware readiness and exact cleanup."

@@ -158,7 +158,7 @@ fn load(b: &Backend) -> StoredAuthority {
 }
 fn rich(b: &Backend) -> RichStoredState {
     match load(b) {
-        StoredAuthority::Rich(r) => r,
+        StoredAuthority::Rich(r) => *r,
         _ => panic!("expected rich"),
     }
 }
@@ -337,7 +337,8 @@ fn strict_v1_rejects_missing_duplicate_unknown_schema_namespace_and_crossrefs() 
         bad.push(r.clone());
         reject(bad);
     }
-    let cases: Vec<(&str, &str, Box<dyn Fn(&mut Value)>)> = vec![
+    type CorruptionCase<'a> = (&'a str, &'a str, Box<dyn Fn(&mut Value)>);
+    let cases: Vec<CorruptionCase<'_>> = vec![
         (
             STATE_NAMESPACE,
             STATE_KEY,

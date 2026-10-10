@@ -4,141 +4,658 @@
   "title": "mainframe-env signed versioned application package",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "generation", "base_manifest_identity", "sections", "signature"],
+  "required": [
+    "base",
+    "generation",
+    "sections",
+    "signature"
+  ],
   "properties": {
-    "schema_version": {"const": "mainframe-env.application-package@2"},
-    "generation": {"type": "integer", "minimum": 1},
-    "base_manifest_identity": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "generation": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 18446744073709551615
+    },
     "sections": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["schema_version", "host_abi_libraries", "sql_tables", "sql_rows", "ims_definitions", "ims_rows", "mq_resources", "batch_controllers", "security_resources"],
+      "required": [
+        "schema_version",
+        "host_abi_libraries",
+        "sql_tables",
+        "sql_rows",
+        "ims_definitions",
+        "ims_rows",
+        "mq_resources",
+        "batch_controllers",
+        "security_resources"
+      ],
       "properties": {
-        "schema_version": {"const": "mainframe-env.application-package@2"},
-        "host_abi_libraries": {"type": "array", "maxItems": 16384, "items": {"$ref": "#/$defs/abi_library"}},
-        "sql_tables": {"type": "array", "maxItems": 16384, "items": {"$ref": "#/$defs/sql_table"}},
-        "sql_rows": {"type": "array", "maxItems": 16384, "items": {"$ref": "#/$defs/record"}},
-        "ims_definitions": {"type": "array", "maxItems": 16384, "items": {"$ref": "#/$defs/ims_definition"}},
-        "ims_rows": {"type": "array", "maxItems": 16384, "items": {"$ref": "#/$defs/record"}},
+        "schema_version": {
+          "enum": [
+            "mainframe-env.application-package@2",
+            "mainframe-env.application-package@3"
+          ]
+        },
+        "host_abi_libraries": {
+          "type": "array",
+          "maxItems": 16384,
+          "items": {
+            "$ref": "#/$defs/abi_library"
+          }
+        },
+        "sql_tables": {
+          "type": "array",
+          "maxItems": 16384,
+          "items": {
+            "$ref": "#/$defs/sql_table"
+          }
+        },
+        "sql_rows": {
+          "type": "array",
+          "maxItems": 16384,
+          "items": {
+            "$ref": "#/$defs/sql_row"
+          }
+        },
+        "ims_definitions": {
+          "type": "array",
+          "maxItems": 16384,
+          "items": {
+            "$ref": "#/$defs/ims_definition"
+          }
+        },
+        "ims_rows": {
+          "type": "array",
+          "maxItems": 16384,
+          "items": {
+            "$ref": "#/$defs/ims_row"
+          }
+        },
         "ims_metadata": {
           "oneOf": [
-            {"type": "null"},
             {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["schema_version", "databases", "psbs"],
-              "properties": {
-                "schema_version": {"const": "mainframe-env.ims-metadata@1"},
-                "databases": {"type": "array", "minItems": 1, "maxItems": 64},
-                "psbs": {"type": "array", "maxItems": 256}
-              }
+              "type": "null"
+            },
+            {
+              "$ref": "https://mainframe-env.invalid/schemas/ims-metadata@1"
             }
           ]
         },
         "ims_tm": {
           "oneOf": [
-            {"type": "null"},
+            {
+              "type": "null"
+            },
             {
               "type": "object",
               "additionalProperties": false,
-              "required": ["transactions"],
+              "required": [
+                "transactions"
+              ],
               "properties": {
-                "transactions": {"type": "array", "minItems": 1, "maxItems": 256, "items": {"$ref": "#/$defs/ims_tm_transaction"}}
+                "transactions": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 256,
+                  "items": {
+                    "$ref": "#/$defs/ims_tm_transaction"
+                  }
+                }
               }
             }
           ]
         },
-        "mq_resources": {"type": "array", "maxItems": 16384, "items": {"$ref": "#/$defs/named"}},
-        "batch_controllers": {"type": "array", "maxItems": 16384, "items": {"$ref": "#/$defs/controller"}},
-        "security_resources": {"type": "array", "maxItems": 16384, "items": {"type": "object", "maxProperties": 3}}
+        "mq_resources": {
+          "type": "array",
+          "maxItems": 16384,
+          "items": {
+            "$ref": "#/$defs/mq_resource"
+          }
+        },
+        "batch_controllers": {
+          "type": "array",
+          "maxItems": 16384,
+          "items": {
+            "$ref": "#/$defs/controller"
+          }
+        },
+        "security_resources": {
+          "type": "array",
+          "maxItems": 16384,
+          "items": {
+            "$ref": "#/$defs/security_resource"
+          }
+        }
       }
     },
     "signature": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["algorithm", "key_id", "value"],
+      "required": [
+        "algorithm",
+        "key_id",
+        "value"
+      ],
       "properties": {
-        "algorithm": {"type": "string", "minLength": 1},
-        "key_id": {"type": "string", "minLength": 1},
-        "value": {"type": "string", "minLength": 1}
+        "algorithm": {
+          "type": "string",
+          "minLength": 1
+        },
+        "key_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1
+        }
       }
+    },
+    "base": {
+      "$ref": "#/$defs/base"
     }
   },
   "$defs": {
-    "named": {
-      "type": "object",
-      "required": ["name"],
-      "properties": {"name": {"type": "string", "minLength": 1}}
-    },
     "abi_library": {
       "type": "object",
-      "required": ["id", "members"],
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "subsystem",
+        "version",
+        "members"
+      ],
       "properties": {
-        "id": {"type": "string", "minLength": 1},
-        "members": {"type": "array", "maxItems": 4096, "items": {"type": "object", "maxProperties": 2}}
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "subsystem": {
+          "enum": [
+            "Cics",
+            "Db2",
+            "Mq",
+            "Ims"
+          ]
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "members": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "$ref": "#/$defs/abi_member"
+          }
+        }
       }
     },
     "sql_table": {
       "type": "object",
-      "required": ["name", "columns", "primary_key"],
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "columns",
+        "primary_key"
+      ],
       "properties": {
-        "name": {"type": "string", "minLength": 1},
-        "columns": {"type": "array", "maxItems": 1024, "items": {"type": "object", "maxProperties": 2}},
-        "primary_key": {"type": "array", "maxItems": 64, "items": {"type": "string", "minLength": 1}}
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "columns": {
+          "type": "array",
+          "maxItems": 1024,
+          "items": {
+            "$ref": "#/$defs/sql_column"
+          }
+        },
+        "primary_key": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
       }
     },
     "ims_definition": {
       "type": "object",
-      "required": ["name", "segments"],
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "segments"
+      ],
       "properties": {
-        "name": {"type": "string", "minLength": 1},
-        "segments": {"type": "array", "maxItems": 4096, "items": {"type": "string", "minLength": 1}}
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "segments": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
       }
-    },
-    "record": {
-      "type": "object",
-      "properties": {"values": {"type": "object", "maxProperties": 1024}}
     },
     "ims_tm_transaction": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["code", "psb", "program_selector", "artifact", "required_generation", "context", "priority", "timeout_ticks", "conversational", "spa_size", "alternate_pcbs"],
+      "required": [
+        "code",
+        "psb",
+        "program_selector",
+        "artifact",
+        "required_generation",
+        "context",
+        "priority",
+        "timeout_ticks",
+        "conversational",
+        "spa_size",
+        "alternate_pcbs"
+      ],
       "properties": {
-        "code": {"type": "string", "minLength": 1, "maxLength": 8},
-        "psb": {"type": "string", "minLength": 1, "maxLength": 8},
-        "program_selector": {"type": "string", "minLength": 1, "maxLength": 256},
-        "artifact": {"type": "string", "minLength": 1, "maxLength": 256},
-        "required_generation": {"type": "string", "minLength": 1, "maxLength": 256},
-        "context": {"enum": ["message-processing", "message-driven-batch", "cpi-communications", "fast-path"]},
-        "priority": {"type": "integer", "minimum": 0, "maximum": 255},
-        "timeout_ticks": {"type": "integer", "minimum": 1, "maximum": 86400000},
-        "conversational": {"type": "boolean"},
-        "spa_size": {"type": "integer", "minimum": 0, "maximum": 32768},
-        "alternate_pcbs": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/ims_tm_alternate_pcb"}}
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8
+        },
+        "psb": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8
+        },
+        "program_selector": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "artifact": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "required_generation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "context": {
+          "enum": [
+            "message-processing",
+            "message-driven-batch",
+            "cpi-communications",
+            "fast-path"
+          ]
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "timeout_ticks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400000
+        },
+        "conversational": {
+          "type": "boolean"
+        },
+        "spa_size": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32768
+        },
+        "alternate_pcbs": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/ims_tm_alternate_pcb"
+          }
+        }
       }
     },
     "ims_tm_alternate_pcb": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "destination", "express"],
+      "required": [
+        "name",
+        "destination",
+        "express"
+      ],
       "properties": {
-        "name": {"type": "string", "minLength": 1, "maxLength": 8},
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8
+        },
         "destination": {
           "oneOf": [
-            {"const": "modifiable"},
-            {"type": "object", "additionalProperties": false, "required": ["fixed"], "properties": {"fixed": {"type": "string", "minLength": 1, "maxLength": 8}}}
+            {
+              "const": "modifiable"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "fixed"
+              ],
+              "properties": {
+                "fixed": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 8
+                }
+              }
+            }
           ]
         },
-        "express": {"type": "boolean"}
+        "express": {
+          "type": "boolean"
+        }
       }
     },
     "controller": {
       "type": "object",
-      "required": ["name", "program", "properties"],
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "program",
+        "kind",
+        "properties"
+      ],
       "properties": {
-        "name": {"type": "string", "minLength": 1},
-        "program": {"type": "string", "minLength": 1},
-        "properties": {"type": "object", "maxProperties": 1024}
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "program": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "CobolProgram",
+            "ImsMessageProcessing",
+            "DeclarativeUtility"
+          ]
+        },
+        "properties": {
+          "type": "object",
+          "maxProperties": 1024,
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "base": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manifest",
+        "blobs"
+      ],
+      "properties": {
+        "manifest": {
+          "$ref": "#/$defs/manifest"
+        },
+        "blobs": {
+          "type": "object",
+          "maxProperties": 65536,
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            }
+          }
+        }
+      }
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "target_product",
+        "entries"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_product": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entries": {
+          "type": "array",
+          "maxItems": 65536,
+          "items": {
+            "$ref": "#/$defs/entry"
+          }
+        }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "kind",
+        "sha256",
+        "bytes",
+        "depends_on"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "Source",
+            "Resource",
+            "Program",
+            "Data",
+            "Profile",
+            "Migration"
+          ]
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "depends_on": {
+          "type": "array",
+          "maxItems": 1024,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "abi_member": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "blob_sha256"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "blob_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "sql_column": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "nullable"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nullable": {
+          "type": "boolean"
+        }
+      }
+    },
+    "sql_row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "table",
+        "values"
+      ],
+      "properties": {
+        "table": {
+          "type": "string",
+          "minLength": 1
+        },
+        "values": {
+          "type": "object",
+          "maxProperties": 1024,
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ims_row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "definition",
+        "segment",
+        "values"
+      ],
+      "properties": {
+        "definition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "segment": {
+          "type": "string",
+          "minLength": 1
+        },
+        "values": {
+          "type": "object",
+          "maxProperties": 1024,
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "mq_resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "kind"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "Queue",
+            "Process",
+            "Trigger"
+          ]
+        },
+        "target": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ]
+        },
+        "controller": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ]
+        }
+      }
+    },
+    "security_resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "class",
+        "profile",
+        "owner"
+      ],
+      "properties": {
+        "class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profile": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     }
   }

@@ -10,9 +10,37 @@
     "generation": {"type": "integer", "minimum": 1},
     "catalog_index": {"const": "conformance/subsystems/coverage/catalogs/index.json"},
     "catalog_index_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
-    "evidence_records": {"type": "array"},
-    "baselines": {"type": "array", "minItems": 9, "maxItems": 9},
+    "evidence_records": {"type": "array", "items": {"$ref": "https://mainframe-env.invalid/schemas/coverage-evidence@1"}},
+    "baselines": {"type": "array", "minItems": 9, "maxItems": 9, "items": {"$ref": "#/$defs/baseline"}},
     "official_compatibility_numerator": {"type": "integer", "minimum": 0},
     "generated_catalog_credit": {"const": 0}
+  },
+  "$defs": {
+    "count": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["numerator", "denominator"],
+      "properties": {
+        "numerator": {"type": "integer", "minimum": 0},
+        "denominator": {"type": "integer", "minimum": 0}
+      }
+    },
+    "baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "catalog_sha256", "mandatory_rows", "complete_rows", "gates"],
+      "properties": {
+        "id": {"type": "string", "minLength": 8},
+        "catalog_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "mandatory_rows": {"type": "integer", "minimum": 1},
+        "complete_rows": {"type": "integer", "minimum": 0},
+        "gates": {
+          "type": "object",
+          "required": ["recognized", "validated", "executed", "conditioned", "recovered", "differential"],
+          "propertyNames": {"enum": ["recognized", "validated", "executed", "conditioned", "recovered", "differential"]},
+          "additionalProperties": {"$ref": "#/$defs/count"}
+        }
+      }
+    }
   }
 }

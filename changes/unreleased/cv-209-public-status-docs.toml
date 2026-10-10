@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Reconcile Foundation documentation with bounded implementation and pending integrated gates, replacing consumed controller history with subsystem status and a Mermaid dependency view."

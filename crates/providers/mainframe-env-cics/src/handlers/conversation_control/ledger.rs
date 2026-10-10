@@ -1151,9 +1151,11 @@ mod tests {
     #[test]
     fn v1_ledger_reopens_and_upgrades_atomically_for_peer_frames() {
         let store = MemoryStore::new(Default::default());
-        let mut old = ConversationLedger::default();
-        old.schema_version = 1;
-        old.version = 1;
+        let mut old = ConversationLedger {
+            schema_version: 1,
+            version: 1,
+            ..ConversationLedger::default()
+        };
         old.register_system(ConversationSystemDefinition {
             sysid: "SYS1".into(),
             kind: ConversationKind::AppcMapped,
@@ -1214,9 +1216,11 @@ mod tests {
     #[test]
     fn v1_extract_indicator_and_lu61_state_survive_v2_upgrade() {
         let store = MemoryStore::new(Default::default());
-        let mut old = ConversationLedger::default();
-        old.schema_version = 1;
-        old.version = 1;
+        let mut old = ConversationLedger {
+            schema_version: 1,
+            version: 1,
+            ..ConversationLedger::default()
+        };
         old.register_system(ConversationSystemDefinition {
             sysid: "LU61".into(),
             kind: ConversationKind::LuType61,

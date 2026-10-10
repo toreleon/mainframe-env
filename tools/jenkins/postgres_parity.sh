@@ -33,7 +33,12 @@ postgres_share() {
   printf '%s\n' "$share"
 }
 
-gates=(postgres-move postgres-effect postgres-stale-effect-recovery postgres-online-resume postgres-atomic-invariants postgres-work-leases postgres-storage-profile postgres-readiness postgres-retention postgres-durable postgres-carddemo-restart)
+gates=(
+  postgres-move postgres-effect postgres-stale-effect-recovery postgres-online-resume
+  postgres-atomic-invariants postgres-work-leases postgres-storage-profile
+  postgres-artifact-read-versions postgres-readiness postgres-retention postgres-durable
+  postgres-carddemo-restart
+)
 
 [[ "$action" == run || "$action" == smoke || "$action" == check || "$action" == cleanup \
   || "$action" == list ]] || { echo "usage: $0 [run|smoke|check|cleanup|list]" >&2; exit 2; }
@@ -66,7 +71,6 @@ case "$state/" in
   *) echo "unsafe PostgreSQL parity state path: $state" >&2; exit 1 ;;
 esac
 data="$state/data"
-socket="$state/socket"
 log="$state/postgres.log"
 
 cleanup() {
@@ -92,7 +96,7 @@ for tool in initdb pg_ctl pg_isready createdb dropdb psql pg_config; do
 done
 share="$(postgres_share "$bin")"
 rm -rf "$state"
-mkdir -p "$data" "$socket"
+mkdir -p "$data"
 printf '%s\n' "$bin" > "$state/bin-path"
 trap cleanup EXIT INT TERM
 
@@ -100,7 +104,7 @@ trap cleanup EXIT INT TERM
   --auth-host=trust --encoding=UTF8 --no-locale --no-instructions >/dev/null
 port=$((54000 + ${BUILD_NUMBER:-0} % 1000))
 "$bin/pg_ctl" -D "$data" -l "$log" \
-  -o "-F -k $socket -p $port -h 127.0.0.1" start -w -t 30
+  -o "-F -k '' -p $port -h 127.0.0.1" start -w -t 30
 "$bin/pg_isready" -h 127.0.0.1 -p "$port" -U hardening -d postgres
 if [[ "$action" == smoke ]]; then
   "$bin/createdb" -h 127.0.0.1 -p "$port" -U hardening mainframe_env
@@ -154,6 +158,10 @@ for gate in "${gates[@]}"; do
       command=(cargo test --locked -p mainframe-env-store --test postgres_storage_contract \
         postgres_quota_and_shared_artifact_contract -- --ignored --exact)
       ;;
+    postgres-artifact-read-versions)
+      command=(cargo test --locked -p mainframe-env-store --test postgres_storage_contract \
+        postgres_artifact_read_versions_are_compatible_and_fail_closed -- --ignored --exact)
+      ;;
     postgres-readiness)
       command=(cargo test --locked -p mainframe-env-store --lib \
         postgres::tests::writable_probe_requires_provider_state_dml_and_rolls_everything_back \
@@ -174,7 +182,7 @@ for gate in "${gates[@]}"; do
     *) echo "unknown PostgreSQL gate: $gate" >&2; exit 2 ;;
   esac
   "$python_bin" -B "$root/tools/ci_assurance.py" record --output "$out" \
-    --gate "$gate" --expect-tests -- "${command[@]}"
+    --gate "$gate" --expect-tests --min-tests 1 -- "${command[@]}"
 done
 "$python_bin" -B "$root/tools/ci_assurance.py" summary --plan "$out/plan.json" \
   --directory "$out" --output "$out/summary.json" --gates "${gates[@]}"

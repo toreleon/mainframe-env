@@ -32,7 +32,7 @@
     "evidence": "mainframe-env.evidence@1",
     "official_catalog": "mainframe-env.official-catalog@1",
     "coverage_ledger": "mainframe-env.coverage-ledger@1",
-    "application_package": "mainframe-env.application-package@2",
+    "application_package": "mainframe-env.application-package@3",
     "batch_controller_registry": "mainframe-env.batch-controller-registry@1",
     "common_program_catalog": "mainframe-env.common-program-catalog@1",
     "db2_application_catalog": "mainframe-env.db2-application-catalog@1"

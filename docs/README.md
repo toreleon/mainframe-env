@@ -188,6 +188,12 @@ explicitly names that authority as superseded.
 - [ADR-0029: COBOL storage-entry identity](decisions/0029-cobol-storage-entry-identity.md)
 - [ADR-0030: Common CICS source condition authority](decisions/0030-cics-source-condition-authority.md)
 - [ADR-0050: Boxed shared host-effect payloads](decisions/0050-host-effect-envelope-layout.md)
+- [ADR-0051: Framed package identity and retained compatibility](decisions/0051-package-identity-framing.md)
+- [ADR-0052: Borrowed CICS operation inputs](decisions/0052-cics-operation-contexts.md)
+- [ADR-0053: Selected controller publication fence](decisions/0053-selected-controller-publication-fence.md)
+- [ADR-0054: Canonical focused conformance output](decisions/0054-focused-conformance-output.md)
+- [ADR-0055: Standard package MAC envelope](decisions/0055-standard-package-mac-envelope.md)
+- [ADR-0056: CICS first reverse read at a retained position](decisions/0056-cics-first-reverse-position.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.
 
@@ -251,16 +257,15 @@ Implementation progress is organized by subsystem and phase. Contract revisions 
 [`documentation-registry.json`](documentation-registry.json) identifies every
 normative document, supplies the generated navigation above, and declares the
 checked manifest location. It also owns subsystem phases, progress records,
-prompts, target releases, and completion dependencies. Subsystem navigation and
+prompts and completion dependencies. Subsystem navigation and
 indexes are generated from that mapping. Each normative document must state its status,
-owner, scope, and first applicable mainframe-env version near its title.
+owner, scope, and applicable subsystem/contract boundary near its title.
 
 Run `cargo xtask docs` after an intentional documentation change, then run
 `cargo xtask docs --check`. The check verifies the generated
 [`documentation-manifest.json`](generated/documentation-manifest.json), relative
 links and anchors, documented xtask subcommands and options, normative metadata,
-navigation, subsystem ownership and dependency consistency, and the
-released/development version authorities.
+navigation, subsystem ownership and dependency consistency.
 
 ## Document status vocabulary
 
@@ -274,5 +279,6 @@ released/development version authorities.
 | Superseded | Replaced by a named newer authority |
 
 Every new normative document should state its status, owner or approving
-authority, scope, and the version from which it applies. Historical records
-should name their candidate and must not be rewritten as current truth.
+authority, scope, and the subsystem/contract boundary from which it applies.
+Retained compatibility and normative decision records must not be rewritten
+as current execution evidence.

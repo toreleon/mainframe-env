@@ -110,16 +110,6 @@ impl MqLifecycleDirectory {
         })
     }
 
-    /// Host-selected process topology only: never infer sharing from principal,
-    /// a string hash, an application owner assertion, or equal binding bytes.
-    pub(crate) fn mint_process(
-        &mut self,
-        admitted: &Invocation,
-        now: u64,
-    ) -> Result<ProcessLease, HostProblem> {
-        self.mint_process_in_mode(admitted, now, ContextMode::Binding)
-    }
-
     fn mint_process_in_mode(
         &mut self,
         admitted: &Invocation,
@@ -151,15 +141,6 @@ impl MqLifecycleDirectory {
             directory: self.identity,
             process,
         })
-    }
-
-    pub(crate) fn bind_root(
-        &mut self,
-        process: ProcessLease,
-        admitted: &Invocation,
-        now: u64,
-    ) -> Result<FrameLease, HostProblem> {
-        self.bind_root_in_mode(process, admitted, now, ContextMode::Binding)
     }
 
     fn bind_root_in_mode(
@@ -198,47 +179,6 @@ impl MqLifecycleDirectory {
         self.insert(process, admitted, owner, bytes)
     }
 
-    /// Only an explicitly admitted CICS child inherits its parent task. IMS and
-    /// batch subtasks are not silently merged into their parent's nonshared unit.
-    pub(crate) fn bind_cics_child(
-        &mut self,
-        parent: FrameLease,
-        child: &Invocation,
-        now: u64,
-    ) -> Result<FrameLease, HostProblem> {
-        let (bytes, context) = inspect(child, now)?;
-        let parent_frame = self.frame(parent)?;
-        inspect(&parent_frame.invocation, now)?;
-        let original = &parent_frame.invocation;
-        if context.environment != MqHostEnvironment::ZosCics
-            || child.parent_execution_id.as_ref() != Some(&original.execution_id)
-            || child.execution_id == original.execution_id
-            || child.run_unit_id != original.run_unit_id
-            || child.principal != original.principal
-            || child.provider_generations != original.provider_generations
-            || child.cancellation != original.cancellation
-            || child.cancellation_probe != original.cancellation_probe
-            || child.deadline_tick > original.deadline_tick
-            || !within(child.limits, original.limits)
-            || child.bindings.get("cics.execution-context")
-                != original.bindings.get("cics.execution-context")
-            || child.bindings.get("cics.session") != original.bindings.get("cics.session")
-            || decode_host_context(original)? != Some(context)
-        {
-            return Err(HostProblem::Unauthorized);
-        }
-        let owner = parent_frame.owner;
-        let process = ProcessLease {
-            directory: self.identity,
-            process: parent.process,
-        };
-        self.process(process, child, context)?;
-        if let Some(lease) = self.existing(process, child)? {
-            return Ok(lease);
-        }
-        self.insert(process, child, owner, bytes)
-    }
-
     pub(crate) fn owner_for(
         &self,
         lease: FrameLease,
@@ -258,32 +198,6 @@ impl MqLifecycleDirectory {
         if &frame.invocation != admitted {
             return Err(HostProblem::IdempotencyConflict);
         }
-        Ok(frame.owner)
-    }
-
-    /// Lifetime transition only, after the owning IMS coordinator resolves work.
-    /// All fallible checks precede retirement; epoch exhaustion changes neither authority.
-    pub(crate) fn advance_ims_syncpoint(
-        &mut self,
-        lease: FrameLease,
-        registry: &mut MqHandleRegistry,
-    ) -> Result<MqHandleOwner, HostProblem> {
-        let old = self.frame(lease)?.owner;
-        if old.environment != MqHostEnvironment::ZosIms {
-            return Err(HostProblem::Malformed);
-        }
-        let next = old
-            .syncpoint_epoch
-            .checked_add(1)
-            .ok_or(HostProblem::ResourceExhausted)?;
-        registry
-            .end_processing_unit(old)
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let frame = self
-            .frames
-            .get_mut(&lease.frame)
-            .expect("checked frame under owned directory borrow");
-        frame.owner.syncpoint_epoch = next;
         Ok(frame.owner)
     }
 
@@ -465,10 +379,6 @@ fn within(
         && child.max_frames <= parent.max_frames
         && child.max_effects <= parent.max_effects
         && child.max_events <= parent.max_events
-}
-
-fn inspect(invocation: &Invocation, now: u64) -> Result<(usize, AttestedHostContext), HostProblem> {
-    inspect_in_mode(invocation, now, ContextMode::Binding)
 }
 
 fn inspect_in_mode(

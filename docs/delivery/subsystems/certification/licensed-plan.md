@@ -8,7 +8,7 @@ Start gate: full z/OSMF profile and cross-resource semantics accepted
 Completion dependencies: zosmf.rest, integration.transactions
 Estimate: 12–20 engineer-months
 
-The [common release contract](../README.md#shared-validation-contract) and
+The [shared validation contract](../README.md#shared-validation-contract) and
 [hardened slice acceptance](../../../prompts/subsystems/README.md#hardened-slice-acceptance)
 apply, including early participant-contract and licensed-harness preparation.
 These requirements do not themselves certify implementation or waive an exit gate.

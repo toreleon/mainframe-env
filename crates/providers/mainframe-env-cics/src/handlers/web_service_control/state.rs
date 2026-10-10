@@ -94,9 +94,16 @@ pub(super) fn persist(
         channel,
         state,
         response,
-        Vec::new(),
-        None,
+        AdditionalWrites {
+            writes: Vec::new(),
+            replacement_transform_total: None,
+        },
     )
+}
+
+pub(super) struct AdditionalWrites {
+    pub writes: Vec<ProviderStateWrite>,
+    pub replacement_transform_total: Option<usize>,
 }
 
 pub(super) fn persist_with(
@@ -107,9 +114,12 @@ pub(super) fn persist_with(
     channel: &str,
     state: &WebState,
     response: &CicsResponse,
-    extra: Vec<ProviderStateWrite>,
-    replacement_transform_total: Option<usize>,
+    additional: AdditionalWrites,
 ) -> Result<(), HostProblem> {
+    let AdditionalWrites {
+        writes: extra,
+        replacement_transform_total,
+    } = additional;
     let payload = encode(state, run, channel, service.limits)?;
     let rows = service
         .store

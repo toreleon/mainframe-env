@@ -86,16 +86,15 @@ pub(super) fn validate_constraints(
             ));
         }
     }
-    if operation == HirCicsOperation::ReceivePartn {
-        if !clauses.contains_key("PARTN")
+    if operation == HirCicsOperation::ReceivePartn
+        && (!clauses.contains_key("PARTN")
             || clauses.contains_key("INTO") && clauses.contains_key("SET")
-            || clauses.contains_key("INTO") != clauses.contains_key("LENGTH")
-        {
-            return Err(ResolutionFailure::Invalid(
+            || clauses.contains_key("INTO") != clauses.contains_key("LENGTH"))
+    {
+        return Err(ResolutionFailure::Invalid(
                 "CICS RECEIVE PARTN requires PARTN and pairs INTO with LENGTH; INTO and SET are exclusive"
                     .into(),
-            ));
-        }
+        ));
     }
     let required: &[&str] = match operation {
         HirCicsOperation::ReceiveMap | HirCicsOperation::SendMap => &["MAP"],

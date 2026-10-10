@@ -231,12 +231,12 @@ fn late_cas_and_backend_payload_quota_roll_back_the_entire_batch_and_audit() {
             let admission = admit_mqi(&scope, &f.invocation, 10).unwrap();
             let mut bound = bind_core_intent(&admission, &*store, 20).unwrap();
             let mut late = queue("MISSING", 2, Some(1));
-            if case == 1 {
-                if let ProviderStateMutation::Put(write) = &mut late {
-                    write.record.version = 1;
-                    write.expected_version = None;
-                    write.record.payload = vec![0; 8193];
-                }
+            if case == 1
+                && let ProviderStateMutation::Put(write) = &mut late
+            {
+                write.record.version = 1;
+                write.expected_version = None;
+                write.record.payload = vec![0; 8193];
             }
             let epoch = store.provider_state_retention_epoch().unwrap();
             assert!(

@@ -5,6 +5,8 @@
 mod license_notices_cli;
 
 #[cfg(test)]
+mod batch_controller_policy_tests;
+#[cfg(test)]
 mod carddemo_base_batch_provenance;
 mod carddemo_host_integration;
 mod carddemo_readacct;
@@ -12,8 +14,11 @@ mod carddemo_serve;
 mod changelog;
 mod cics_system_families;
 mod cobol_differential;
+mod common_program_policy;
 mod conformance_catalog;
+mod conformance_output;
 mod conformance_spec_export;
+mod coverage_projection;
 mod db2_statement_catalog;
 mod dependency_licenses;
 mod docs;
@@ -24,8 +29,13 @@ mod jcl_catalog;
 mod jcl_conformance;
 mod mq_conformance;
 mod mq_status_catalog;
+#[cfg(test)]
+mod package_schema_tests;
+mod production_scanner;
 mod profile_intake;
 mod racf_catalog;
+#[cfg(test)]
+mod serialized_coverage_schema_tests;
 mod topic_manifests;
 mod work_package_seal;
 mod zosmf_contracts;
@@ -133,6 +143,12 @@ struct ConformanceArgs {
     shard: Option<u16>,
     #[arg(long)]
     replay: Option<String>,
+    #[arg(
+        long,
+        value_name = "PATH",
+        help = "Write focused canonical JSONL to one file instead of stdout"
+    )]
+    output: Option<PathBuf>,
     #[arg(
         long,
         help = "Run noncredit candidate preparation; never emit official verdicts"
@@ -293,10 +309,16 @@ fn run() -> TaskResult {
         println!();
         return Ok(());
     };
+    let focused = matches!(&command, XtaskCommand::Conformance(args) if
+        args.subsystem.is_some() || args.replay.is_some() || args.gate.is_some() || args.shard.is_some());
     let (name, check, result) = execute_command(&root, command);
     result?;
     if check {
-        println!("{name}: pass");
+        if focused {
+            conformance_output::diagnostic(format_args!("{name}: pass"))?;
+        } else {
+            println!("{name}: pass");
+        }
     }
     Ok(())
 }
@@ -545,11 +567,18 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             (
                 "conformance",
                 args.check,
-                if focused {
-                    check_focused_conformance_interface(root, &args)
-                } else {
-                    check_conformance(root)
-                },
+                conformance_output::validate_selection(
+                    args.output.as_deref(),
+                    args.subsystem.is_some() || args.replay.is_some(),
+                    args.prepare_candidates,
+                )
+                .and_then(|()| {
+                    if focused {
+                        check_focused_conformance_interface(root, &args)
+                    } else {
+                        check_conformance(root)
+                    }
+                }),
             )
         }
         XtaskCommand::Certification(args) => {
@@ -5263,6 +5292,11 @@ fn augment_cobol_arithmetic_pilot_spec(root: &Path, spec: &mut Value) -> TaskRes
 }
 
 fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> TaskResult {
+    conformance_output::validate_selection(
+        args.output.as_deref(),
+        args.subsystem.is_some() || args.replay.is_some(),
+        args.prepare_candidates,
+    )?;
     require(
         args.replay.is_none() || args.subsystem.is_none(),
         "--replay and --subsystem are mutually exclusive",
@@ -5356,32 +5390,13 @@ fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> T
     let report = ConformanceRunner::new(&spec, runtime, limits)
         .run(&selection, &context)
         .map_err(|problem| problem.to_string())?;
-    let mut passed = 0usize;
-    let mut failed = 0usize;
-    for event in report.batches.iter().flat_map(|batch| batch.events.iter()) {
-        println!(
-            "{}",
-            String::from_utf8(
-                event
-                    .canonical_json()
-                    .map_err(|problem| problem.to_string())?
-            )
-            .map_err(|error| error.to_string())?
-        );
-        match event.verdict {
-            Verdict::Pass => passed += 1,
-            Verdict::Fail => failed += 1,
-        }
-    }
-    println!(
-        "conformance-ledger spec-digest={} batches={} verdicts={} pass={} fail={}",
+    finish_focused_report(
+        &report,
+        args.output.as_deref(),
         spec.spec_digest(),
-        report.batches.len(),
-        passed + failed,
-        passed,
-        failed
-    );
-    require(failed == 0, "focused conformance produced failing verdicts")
+        "conformance-ledger",
+        "focused conformance produced failing verdicts",
+    )
 }
 
 fn run_focused_cics(root: &Path, args: &ConformanceArgs) -> TaskResult {
@@ -5437,32 +5452,40 @@ fn run_focused_cics(root: &Path, args: &ConformanceArgs) -> TaskResult {
     let report = ConformanceRunner::new(&spec, runtime, limits)
         .run(&selection, &context)
         .map_err(|problem| problem.to_string())?;
+    finish_focused_report(
+        &report,
+        args.output.as_deref(),
+        spec.spec_digest(),
+        "cics-pilot-ledger",
+        "CICS pilot produced failing verdicts",
+    )
+}
+
+fn finish_focused_report(
+    report: &mainframe_env_coverage::ConformanceRunReport,
+    output: Option<&Path>,
+    spec_digest: &str,
+    summary: &str,
+    failure: &str,
+) -> TaskResult {
+    conformance_output::emit_report(report, output)?;
     let mut passed = 0usize;
     let mut failed = 0usize;
     for event in report.batches.iter().flat_map(|batch| batch.events.iter()) {
-        println!(
-            "{}",
-            String::from_utf8(
-                event
-                    .canonical_json()
-                    .map_err(|problem| problem.to_string())?,
-            )
-            .map_err(|error| error.to_string())?
-        );
         match event.verdict {
             Verdict::Pass => passed += 1,
             Verdict::Fail => failed += 1,
         }
     }
-    println!(
-        "cics-pilot-ledger spec-digest={} batches={} verdicts={} pass={} fail={}",
-        spec.spec_digest(),
+    conformance_output::diagnostic(format_args!(
+        "{summary} spec-digest={} batches={} verdicts={} pass={} fail={}",
+        spec_digest,
         report.batches.len(),
         passed + failed,
         passed,
         failed
-    );
-    require(failed == 0, "CICS pilot produced failing verdicts")
+    ))?;
+    require(failed == 0, failure)
 }
 
 fn check_cobol_exit(root: &Path) -> TaskResult {
@@ -5709,6 +5732,7 @@ fn check_focused_dataset_or_jcl_conformance_interface(
         let report = ConformanceRunner::new(&spec, runtime, ConformanceLimits::default())
             .run(&selection, &context)
             .map_err(|problem| problem.to_string())?;
+        conformance_output::emit_report(&report, args.output.as_deref())?;
         let simulation = run_dataset_reference_simulation()?;
         let failures = report
             .batches
@@ -5726,7 +5750,7 @@ fn check_focused_dataset_or_jcl_conformance_interface(
             .iter()
             .map(|batch| batch.events.len())
             .sum::<usize>();
-        println!(
+        conformance_output::diagnostic(format_args!(
             "dataset-conformance bindings={selected} events={events} batches={} reference-organizations={} reference-commands={} reference-properties={} observation-perturbations-rejected={} differential-credit={}",
             report.batches.len(),
             simulation.organization_rows,
@@ -5734,7 +5758,7 @@ fn check_focused_dataset_or_jcl_conformance_interface(
             simulation.property_cases,
             simulation.observation_perturbations_rejected,
             simulation.differential_credit,
-        );
+        ))?;
         return Ok(());
     }
     let jcl_selected = args.subsystem.as_deref() == Some("jcl-jes2")
@@ -5785,6 +5809,7 @@ fn run_focused_racf(
     let report = ConformanceRunner::new(spec, runtime, limits)
         .run(&selection, &context)
         .map_err(|problem| problem.to_string())?;
+    conformance_output::emit_report(&report, args.output.as_deref())?;
     if let Some(failure) = report
         .batches
         .iter()
@@ -5814,7 +5839,7 @@ fn run_focused_racf(
         })
         .collect::<Vec<_>>()
         .join(" ");
-    println!("bindings={selected} {counts}");
+    conformance_output::diagnostic(format_args!("bindings={selected} {counts}"))?;
     Ok(())
 }
 
@@ -5857,6 +5882,7 @@ fn run_focused_jcl(
     let report = ConformanceRunner::new(spec, runtime, limits)
         .run(&selection, &context)
         .map_err(|problem| problem.to_string())?;
+    conformance_output::emit_report(&report, args.output.as_deref())?;
     require(
         report
             .batches
@@ -5865,35 +5891,11 @@ fn run_focused_jcl(
             .all(|event| event.verdict == Verdict::Pass),
         "focused JCL conformance emitted one or more failing verdicts",
     )?;
-    let artifact_directory = root.join("target/conformance/jcl-jes2");
-    fs::create_dir_all(&artifact_directory).map_err(|error| error.to_string())?;
     let events = report
         .batches
         .iter()
         .flat_map(|batch| batch.events.iter())
-        .map(|event| {
-            let bytes = event
-                .canonical_json()
-                .map_err(|problem| problem.to_string())?;
-            serde_json::from_slice::<Value>(&bytes).map_err(|error| error.to_string())
-        })
-        .collect::<TaskResult<Vec<_>>>()?;
-    let ledger_bytes = report
-        .ledger
-        .canonical_json()
-        .map_err(|problem| problem.to_string())?;
-    fs::write(
-        artifact_directory.join("verdicts.json"),
-        pretty_json(&json!({
-            "schema_version": "mainframe-env.conformance-verdict-stream@1",
-            "spec_digest": spec.spec_digest(),
-            "selected_bindings": selected,
-            "events": events,
-        }))?,
-    )
-    .map_err(|error| error.to_string())?;
-    fs::write(artifact_directory.join("ledger.json"), &ledger_bytes)
-        .map_err(|error| error.to_string())?;
+        .count();
     let counts = CoverageGate::ALL
         .into_iter()
         .map(|gate| {
@@ -5917,13 +5919,13 @@ fn run_focused_jcl(
             (gate.slug(), pass, fail, pending, not_applicable)
         })
         .collect::<Vec<_>>();
-    println!(
+    conformance_output::diagnostic(format_args!(
         "jcl-conformance spec={} bindings={} verdicts={} shards={} counts={counts:?}",
         spec.spec_digest(),
         selected,
-        events.len(),
+        events,
         report.batches.len(),
-    );
+    ))?;
     Ok(())
 }
 
@@ -7976,12 +7978,7 @@ fn check_cics_source_map_schemas(root: &Path) -> TaskResult {
 }
 
 fn compile_draft_2020_12_schema(schema: &Value, path: &Path) -> TaskResult<jsonschema::Validator> {
-    jsonschema::draft202012::meta::validate(schema)
-        .map_err(|error| format!("{} is not valid Draft 2020-12: {error}", path.display()))?;
-    jsonschema::draft202012::options()
-        .offline()
-        .build(schema)
-        .map_err(|error| format!("{} did not compile: {error}", path.display()))
+    coverage_projection::compile_schema(schema, path)
 }
 
 fn check_dataset_oracle(root: &Path) -> TaskResult {
@@ -8231,9 +8228,9 @@ fn validate_0_2_schema_artifacts(root: &Path) -> TaskResult {
     )?;
     artifacts.retain(|path| !path.starts_with(&schemas));
     artifacts.sort();
-    for path in artifacts {
-        let instance = json(&path)?;
-        let version = text(&instance, "schema_version", &path)?;
+    for path in &artifacts {
+        let instance = json(path)?;
+        let version = text(&instance, "schema_version", path)?;
         let schema_name = schema_for_0_2_artifact(version).ok_or_else(|| {
             format!(
                 "{} has no Draft 2020-12 schema binding for {version}",
@@ -8241,10 +8238,10 @@ fn validate_0_2_schema_artifacts(root: &Path) -> TaskResult {
             )
         })?;
         let schema_path = schemas.join(schema_name);
-        validate_schema_instance(&json(&schema_path)?, &instance, &path)?;
+        validate_schema_instance(&json(&schema_path)?, &instance, path)?;
     }
 
-    Ok(())
+    coverage_projection::validate_artifacts(root, &artifacts)
 }
 
 fn schema_for_0_2_artifact(version: &str) -> Option<&'static str> {
@@ -8253,6 +8250,8 @@ fn schema_for_0_2_artifact(version: &str) -> Option<&'static str> {
         "mainframe-env.official-catalog@1" => Some("official-catalog.schema.json"),
         "mainframe-env.topic-manifest@1" => Some("topic-manifest.schema.json"),
         "mainframe-env.coverage-ledger@1" => Some("coverage-ledger.schema.json"),
+        "mainframe-env.coverage-row@1" => Some("coverage-row.schema.json"),
+        "mainframe-env.coverage-evidence@1" => Some("coverage-evidence.schema.json"),
         "mainframe-env.coverage-program-status@1" => Some("program-status.schema.json"),
         "mainframe-env.coverage-work-package-evidence@1" => {
             Some("work-package-evidence.schema.json")
@@ -9021,6 +9020,24 @@ fn check_application_packages(root: &Path) -> TaskResult {
             &format!("application package contract artifact is missing: {path}"),
         )?;
     }
+    let package_schema = json(
+        &root.join("conformance/subsystems/coverage/schemas/application-package-v2.schema.json"),
+    )?;
+    require(
+        package_schema["required"]
+            == serde_json::json!(["base", "generation", "sections", "signature"])
+            && package_schema["properties"].get("schema_version").is_none()
+            && package_schema["properties"]
+                .get("base_manifest_identity")
+                .is_none()
+            && package_schema["properties"]["base"]["$ref"] == "#/$defs/base"
+            && package_schema["properties"]["sections"]["properties"]["schema_version"]["enum"]
+                == serde_json::json!([
+                    "mainframe-env.application-package@2",
+                    "mainframe-env.application-package@3"
+                ]),
+        "application package schema must describe the owned DTO with finite @2/@3 sections",
+    )?;
     let implementation =
         read(&root.join("crates/kernel/mainframe-env-application/src/package_v2.rs"))?;
     for required in [
@@ -9040,19 +9057,36 @@ fn check_application_packages(root: &Path) -> TaskResult {
         "max_total_retained_package_bytes",
         "validate_aggregate_bounds",
         "pub fn selected_generation",
+        "APPLICATION_PACKAGE_V3_CONTRACT",
+        "pub fn package_v2_identity",
+        "pub fn package_generation_identity",
+        "pub fn package_generation_identity_with_limits",
     ] {
         require(
             implementation.contains(required),
             &format!("application package implementation omits {required}"),
         )?;
     }
-    let product = read(&root.join("crates/apps/mainframe-env-server/src/product.rs"))?;
-    let production_product = product.split("#[cfg(test)]").next().unwrap_or(&product);
+    for path in [
+        "crates/tooling/mainframe-env-conformance/src/carddemo.rs",
+        "crates/tooling/mainframe-env-conformance/src/carddemo/ims_packages.rs",
+        "crates/tooling/mainframe-env-conformance/src/carddemo/ims_process_tests.rs",
+    ] {
+        let producer = read(&root.join(path))?;
+        require(
+            producer.contains("package_generation_identity")
+                && !producer.contains("package_v2_identity"),
+            &format!("current application package producer lacks finite identity dispatch: {path}"),
+        )?;
+    }
+    let production_product = production_scanner::read_source(
+        root,
+        &root.join("crates/apps/mainframe-env-server/src/product.rs"),
+    )?;
     for required in [
         "applications_v2: Mutex<DurableApplicationsV2>",
         "pub fn open_with_package_trust",
         "HmacSha256PackageTrust",
-        "MAINFRAME_ENV_PACKAGE_HMAC_KEY_REFS",
         "APPLICATION_PUBLICATION_CONTRACT",
         "pub fn publish_application_generation",
         "pub fn rollback_application_generation",
@@ -9063,13 +9097,29 @@ fn check_application_packages(root: &Path) -> TaskResult {
             &format!("production composition omits {required}"),
         )?;
     }
+    let production_trust = production_scanner::read_linked_source(
+        root,
+        &root.join("crates/apps/mainframe-env-server/src/product.rs"),
+        "package_authentication",
+        "HmacSha256PackageTrust",
+    )?;
+    for required in [
+        "MAINFRAME_ENV_PACKAGE_HMAC_KEY_REFS",
+        "impl PackageSignatureVerifier for HmacSha256PackageTrust",
+        "fn allows_fresh_algorithm",
+        "PACKAGE_AUTHENTICATION_ALGORITHM",
+    ] {
+        require(
+            production_trust.contains(required),
+            &format!("production trust composition omits {required}"),
+        )?;
+    }
     Ok(())
 }
 
 fn check_db2_catalog(root: &Path) -> TaskResult {
     let service_path = root.join("crates/providers/mainframe-env-db2/src/service.rs");
-    let service = read(&service_path)?;
-    let production = service.split("#[cfg(test)]").next().unwrap_or(&service);
+    let production = production_scanner::read_source(root, &service_path)?;
     let upper = production.to_ascii_uppercase();
     for forbidden in [
         "CARDDEMO",
@@ -9146,13 +9196,21 @@ fn check_db2_catalog(root: &Path) -> TaskResult {
 fn check_batch_controllers(root: &Path) -> TaskResult {
     let service_path = root.join("crates/apps/mainframe-env-batch/src/service.rs");
     let controller_path = root.join("crates/apps/mainframe-env-batch/src/controller.rs");
-    let service = read(&service_path)?;
-    let controller = read(&controller_path)?;
-    let production_service = service.split("#[cfg(test)]").next().unwrap_or(&service);
-    let production_controller = controller
-        .split("#[cfg(test)]")
-        .next()
-        .unwrap_or(&controller);
+    let mut production_service = production_scanner::read_source(root, &service_path)?;
+    production_service.push_str(&production_scanner::read_linked_source(
+        root,
+        &service_path,
+        "publication",
+        "BatchPublicationWrite",
+    )?);
+    for module in ["program_dispatch", "ims_controller"] {
+        production_service.push_str(&production_scanner::read_linked_module_source(
+            root,
+            &service_path,
+            module,
+        )?);
+    }
+    let production_controller = production_scanner::read_source(root, &controller_path)?;
     let production = format!("{production_service}\n{production_controller}").to_ascii_uppercase();
     for forbidden in [
         "COBTUPDT",
@@ -9202,15 +9260,24 @@ fn check_batch_controllers(root: &Path) -> TaskResult {
             &format!("batch controller service integration omits {required}"),
         )?;
     }
-    let product = read(&root.join("crates/apps/mainframe-env-server/src/product.rs"))?;
-    let production_product = product.split("#[cfg(test)]").next().unwrap_or(&product);
+    let product_path = root.join("crates/apps/mainframe-env-server/src/product.rs");
+    let production_product = production_scanner::read_source(root, &product_path)?;
+    let production_decoder =
+        production_scanner::read_linked_module_source(root, &product_path, "batch_controller")?;
     require(
         production_product.contains("pub fn publish_application_generation")
             && production_product.contains("selected_application_v2")
-            && production_product.contains("apply_application_batch_controllers")
+            && production_product.contains("self.prevalidate_application_publication(")
+            && production_product.contains("writer.install_controllers(plan.controllers)")
             && production_product.contains("BatchControllerProgram")
-            && production_product.contains("decode_application_batch_controller")
-            && !production_product.contains("selected_identity: &str"),
+            && production_decoder.contains("fn prevalidate_application_publication(")
+            && production_decoder.contains("selected: &SelectedApplicationGeneration")
+            && production_decoder.contains("let package = selected.package();")
+            && production_decoder
+                .contains("decode_application_batch_controller(package, controller)")
+            && production_decoder.contains("identity: selected.record().identity.clone()")
+            && !production_product.contains("selected_identity: &str")
+            && !production_decoder.contains("selected_identity: &str"),
         "composition does not derive controllers from a verified selected package handle",
     )?;
     let contracts_path = root.join("conformance/subsystems/coverage/inventory/contracts.json");
@@ -9363,11 +9430,20 @@ fn check_program_registry(root: &Path) -> TaskResult {
         fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))? == expected,
         "common program registry is stale; run cargo xtask program-registry",
     )?;
-    let implementation = read(&root.join("crates/apps/mainframe-env-batch/src/program.rs"))?;
+    let sources = production_scanner::read_sources(
+        root,
+        &[
+            root.join("crates/apps/mainframe-env-batch/src/program.rs"),
+            root.join("crates/apps/mainframe-env-batch/src/service.rs"),
+        ],
+    )?;
+    let implementation = &sources[0];
     for forbidden in [
         "match program.to_ascii_uppercase().as_str()",
         "for name in [",
         "match self.0 {",
+        "match program {",
+        "program == \"",
     ] {
         require(
             !implementation.contains(forbidden),
@@ -9385,7 +9461,7 @@ fn check_program_registry(root: &Path) -> TaskResult {
             &format!("batch program registry integration omits {required}"),
         )?;
     }
-    let service = read(&root.join("crates/apps/mainframe-env-batch/src/service.rs"))?;
+    let service = &sources[1];
     let execution_region = service
         .split("let input = ProgramInput")
         .nth(1)
@@ -9419,6 +9495,9 @@ fn check_program_registry(root: &Path) -> TaskResult {
 fn render_program_registry(root: &Path) -> TaskResult<Vec<u8>> {
     let catalog_path = root.join("conformance/subsystems/coverage/programs/common-programs.json");
     let catalog = json(&catalog_path)?;
+    let schema_path =
+        root.join("conformance/subsystems/coverage/schemas/common-program-catalog.schema.json");
+    validate_schema_instance(&json(&schema_path)?, &catalog, &catalog_path)?;
     require(
         catalog["schema_version"] == Value::String("mainframe-env.common-program-catalog@1".into())
             && catalog["target_subsystem"] == Value::String("coverage.foundation".into())
@@ -9478,6 +9557,7 @@ fn render_program_registry(root: &Path) -> TaskResult<Vec<u8>> {
             &format!("common program {name} disposition or execution is invalid"),
         )?;
         if let Some(builtin) = program["builtin"].as_str() {
+            common_program_policy::ControlPolicy::utility(program, &catalog_path)?;
             require(
                 disposition == Some("implemented")
                     && matches!(execution, "program-service" | "idcams")
@@ -9492,6 +9572,7 @@ fn render_program_registry(root: &Path) -> TaskResult<Vec<u8>> {
             )?;
         }
         if let Some(action) = program["tso_action"].as_str() {
+            common_program_policy::ControlPolicy::tso(action)?;
             require(
                 disposition.is_none()
                     && execution == "unsupported"
@@ -9550,6 +9631,22 @@ fn render_program_registry(root: &Path) -> TaskResult<Vec<u8>> {
         source.push_str(&format!("    {variant},\n"));
     }
     source.push_str("}\n\n");
+    source.push_str("impl TsoProgramExecution {\n");
+    source.push_str("    pub(super) fn control_declaration(self) -> super::ControlDeclaration {\n");
+    source.push_str("        match self {\n");
+    for program in programs {
+        if let Some(action) = program["tso_action"].as_str() {
+            let variant = rust_variant(action)?;
+            if tso_variants.contains(&variant) {
+                source.push_str(&format!("            Self::{variant} => "));
+                common_program_policy::ControlPolicy::tso(action)?
+                    .render(&mut source, "            ");
+                source.push_str(",\n");
+                tso_variants.retain(|value| *value != variant);
+            }
+        }
+    }
+    source.push_str("        }\n    }\n}\n\n");
     system_service_variants.sort();
     source.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
     source.push_str("pub enum SystemServiceProgram {\n");
@@ -9586,6 +9683,10 @@ fn render_program_registry(root: &Path) -> TaskResult<Vec<u8>> {
             "        execution: super::ProgramExecution::{execution},\n"
         ));
         source.push_str(&format!("        builtin: {builtin},\n"));
+        source.push_str("        control: ");
+        common_program_policy::ControlPolicy::utility(program, &catalog_path)?
+            .render(&mut source, "        ");
+        source.push_str(",\n");
         source.push_str("    },\n");
     }
     source.push_str("];\n");
@@ -9884,54 +9985,26 @@ fn check_dehardcoding(root: &Path) -> TaskResult {
     collect_extension(&root.join("crates"), OsStr::new("rs"), &mut rust_files)?;
     rust_files.sort();
     let conformance = root.join("crates/tooling/mainframe-env-conformance");
-    let forbidden_application_identities = [
-        "CARDDEMO",
-        "COBTUPDT",
-        "CBPAUP0C",
-        "PAUDBLOD",
-        "PAUDBUNL",
-        "DBPAUTP0",
-        "PSBPAUTB",
-        "PAUTSUM0",
-        "PAUTDTL1",
-        "AUTHFRDS",
-        "TRANSACTION_TYPE",
-        "TRANSACTION_TYPE_CATEGORY",
-    ];
-    let mut hits = Vec::new();
-    for rust_file in rust_files {
-        if rust_file.starts_with(&conformance)
+    rust_files.retain(|rust_file| {
+        !(rust_file.starts_with(&conformance)
             || rust_file.file_name() == Some(OsStr::new("tests.rs"))
             || rust_file
                 .components()
-                .any(|part| part.as_os_str() == OsStr::new("tests"))
-        {
-            continue;
-        }
-        let source = read(&rust_file)?;
-        let production_end = ["#[cfg(test)]", "#![cfg(test)]"]
-            .iter()
-            .filter_map(|marker| source.find(marker))
-            .min()
-            .unwrap_or(source.len());
-        let production = &source[..production_end];
-        let upper = production.to_ascii_uppercase();
-        for identity in forbidden_application_identities {
-            if upper.contains(identity) {
-                hits.push(format!(
-                    "{}:{identity}",
-                    rust_file.strip_prefix(root).unwrap_or(&rust_file).display()
-                ));
-            }
-        }
-    }
-    require(
-        hits.is_empty(),
-        &format!("production application hardcode scan found {hits:?}"),
+                .any(|part| part.as_os_str() == OsStr::new("tests")))
+    });
+    production_scanner::check_application_hardcodes(root, &rust_files)?;
+    let program = production_scanner::read_source(
+        root,
+        &root.join("crates/apps/mainframe-env-batch/src/program.rs"),
     )?;
-    let program = read(&root.join("crates/apps/mainframe-env-batch/src/program.rs"))?;
-    let batch = read(&root.join("crates/apps/mainframe-env-batch/src/service.rs"))?;
-    let server = read(&root.join("crates/apps/mainframe-env-server/src/cobol.rs"))?;
+    let batch = production_scanner::read_source(
+        root,
+        &root.join("crates/apps/mainframe-env-batch/src/service.rs"),
+    )?;
+    let server = production_scanner::read_source(
+        root,
+        &root.join("crates/apps/mainframe-env-server/src/cobol.rs"),
+    )?;
     for (scope, source, forbidden) in [
         (
             "common program registry",
@@ -9944,7 +10017,7 @@ fn check_dehardcoding(root: &Path) -> TaskResult {
         ),
         (
             "batch execution",
-            batch.split("#[cfg(test)]").next().unwrap_or(&batch),
+            batch.as_str(),
             vec![
                 "match program.as_str()",
                 "step.program.eq_ignore_ascii_case(\"",
@@ -9952,7 +10025,7 @@ fn check_dehardcoding(root: &Path) -> TaskResult {
         ),
         (
             "installed system services",
-            server.split("#[cfg(test)]").next().unwrap_or(&server),
+            server.as_str(),
             vec!["program.eq_ignore_ascii_case(\""],
         ),
     ] {
@@ -10152,7 +10225,7 @@ fn check_coverage(root: &Path) -> TaskResult {
         "official catalog global denominator must remain 1506",
     )?;
 
-    topic_manifests::check(root)?;
+    conformance_catalog::check_catalog_locator_membership(root, &index, &index_path)?;
     check_publication_bytes(root)?;
     check_probe_record_figures(root)?;
 
@@ -11533,4 +11606,250 @@ fn runtime_server_sqlite_smoke(root: &Path, binary: &Path) -> TaskResult {
             .map_err(|error| format!("{}: {error}", directory.display()))?;
     }
     result
+}
+#[cfg(test)]
+mod common_program_policy_tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    const CATALOG: &str = "conformance/subsystems/coverage/programs/common-programs.json";
+    const PROGRAM: &str = "crates/apps/mainframe-env-batch/src/program.rs";
+    const GENERATED: &str = "crates/apps/mainframe-env-batch/src/generated/common_programs.rs";
+    const SCHEMA: &str =
+        "conformance/subsystems/coverage/schemas/common-program-catalog.schema.json";
+
+    struct Fixture {
+        root: PathBuf,
+    }
+
+    impl Fixture {
+        fn new() -> Self {
+            let source = repository_root().unwrap();
+            let nonce = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let root =
+                env::temp_dir().join(format!("common-policy-{}-{nonce}", std::process::id()));
+            for relative in [
+                CATALOG,
+                SCHEMA,
+                PROGRAM,
+                "crates/apps/mainframe-env-batch/src/service.rs",
+                "conformance/subsystems/coverage/inventory/contracts.json",
+                "docs/architecture/PROGRAM-AND-ROUTE-REGISTRIES.md",
+                "tools/check_typed_semantic_boundaries.py",
+            ] {
+                let target = root.join(relative);
+                fs::create_dir_all(target.parent().unwrap()).unwrap();
+                fs::copy(source.join(relative), target).unwrap();
+            }
+            let fixture = Self { root };
+            fixture.regenerate();
+            fixture
+        }
+        fn regenerate(&self) {
+            let generated = render_program_registry(&self.root).unwrap();
+            let path = self.root.join(GENERATED);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, generated).unwrap();
+        }
+        fn mutate(&self, mutate: impl FnOnce(&mut Value)) {
+            let path = self.root.join(CATALOG);
+            let mut catalog = json(&path).unwrap();
+            mutate(&mut catalog);
+            assert_eq!(catalog["programs"].as_array().unwrap().len(), 21);
+            assert_eq!(catalog["generated_coverage_credit"], 0);
+            fs::write(path, serde_json::to_vec_pretty(&catalog).unwrap()).unwrap();
+        }
+        fn append_program_source(&self, extra: &str) {
+            let path = self.root.join(PROGRAM);
+            let original = read(&path).unwrap();
+            fs::write(path, format!("{original}\n{extra}\n")).unwrap();
+        }
+    }
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
+
+    #[test]
+    fn common_program_policy_actual_registry_control_is_current_and_deterministic() {
+        let fixture = Fixture::new();
+        let first = render_program_registry(&fixture.root).unwrap();
+        assert_eq!(render_program_registry(&fixture.root).unwrap(), first);
+        assert_eq!(fs::read(fixture.root.join(GENERATED)).unwrap(), first);
+        check_program_registry(&fixture.root).unwrap();
+    }
+
+    #[test]
+    fn common_program_policy_actual_registry_rejects_production_name_policy() {
+        let fixture = Fixture::new();
+        fixture.append_program_source(
+            "fn cv208_policy_mutant(program: &str) -> bool {\n\
+             match program { \"IEBCOPY\" => true, _ => false }\n}",
+        );
+        // Generated bytes/digest remain coherent; no stale-output refusal may count.
+        assert_eq!(
+            render_program_registry(&fixture.root).unwrap(),
+            fs::read(fixture.root.join(GENERATED)).unwrap()
+        );
+        let refusal = check_program_registry(&fixture.root);
+        assert!(
+            refusal.is_err(),
+            "handwritten production control policy passed: {refusal:?}"
+        );
+        assert!(
+            refusal.unwrap_err().contains("dispatch"),
+            "the declared policy boundary, not unrelated metadata, must refuse"
+        );
+    }
+
+    #[test]
+    fn common_program_policy_actual_registry_keeps_independent_test_expectations() {
+        let fixture = Fixture::new();
+        fixture.append_program_source(
+            "#[cfg(test)] mod cv208_expected_route {\n\
+             fn literal_expectation(program: &str) -> bool {\n\
+             match program { \"IEBCOPY\" => true, _ => false }\n}}\n\
+             fn cv208_production_tail() -> bool { true }\n",
+        );
+        // Reuse the sealed production scanner; literal test expectations are legitimate.
+        check_program_registry(&fixture.root).unwrap();
+    }
+
+    #[test]
+    fn common_program_policy_generator_refuses_unbound_builtin_in_one_utility() {
+        let fixture = Fixture::new();
+        fixture.mutate(|catalog| {
+            let row = catalog["programs"]
+                .as_array_mut()
+                .unwrap()
+                .iter_mut()
+                .find(|row| row["name"] == "IEBCOPY")
+                .unwrap();
+            row["builtin"] = json!("cv208_unknown");
+        });
+        // Count, names, lower-case spelling and unique builtin cardinality remain valid.
+        // A policyless identity must be refused by the owner before Rust compilation.
+        let rendered = render_program_registry(&fixture.root);
+        assert!(rendered.is_err(), "unbound builtin generated successfully");
+    }
+
+    #[test]
+    fn common_program_policy_frozen_v1_does_not_silently_accept_new_policy_fields() {
+        let fixture = Fixture::new();
+        fixture.mutate(|catalog| {
+            let row = catalog["programs"]
+                .as_array_mut()
+                .unwrap()
+                .iter_mut()
+                .find(|row| row["name"] == "IEBCOPY")
+                .unwrap();
+            row["control"] = json!({"grammar":"ignore-input","sources":[]});
+        });
+        let schema = json(&fixture.root.join(SCHEMA)).unwrap();
+        let catalog = json(&fixture.root.join(CATALOG)).unwrap();
+        let compiled = compile_draft_2020_12_schema(&schema, &fixture.root.join(SCHEMA)).unwrap();
+        assert!(
+            !compiled.is_valid(&catalog),
+            "frozen @1 unexpectedly permits policy fields"
+        );
+        assert!(
+            render_program_registry(&fixture.root).is_err(),
+            "generator silently ignored a schema-invalid @1 policy override"
+        );
+    }
+
+    #[test]
+    fn common_program_policy_generator_keeps_missing_utility_binding_refusal() {
+        let fixture = Fixture::new();
+        fixture.mutate(|catalog| {
+            let row = catalog["programs"]
+                .as_array_mut()
+                .unwrap()
+                .iter_mut()
+                .find(|row| row["name"] == "IEBCOPY")
+                .unwrap();
+            row["builtin"] = Value::Null;
+        });
+        assert!(render_program_registry(&fixture.root).is_err());
+    }
+
+    #[test]
+    fn common_program_policy_generator_keeps_missing_nested_tso_binding_refusal() {
+        let fixture = Fixture::new();
+        fixture.mutate(|catalog| {
+            let row = catalog["programs"]
+                .as_array_mut()
+                .unwrap()
+                .iter_mut()
+                .find(|row| row["name"] == "DSNTIAD")
+                .unwrap();
+            row["tso_action"] = Value::Null;
+        });
+        assert!(render_program_registry(&fixture.root).is_err());
+    }
+
+    #[test]
+    fn common_program_policy_pairing_refuses_idcams_builtin_with_program_service() {
+        let fixture = Fixture::new();
+        fixture.mutate(|catalog| {
+            let row = catalog["programs"]
+                .as_array_mut()
+                .unwrap()
+                .iter_mut()
+                .find(|row| row["name"] == "IDCAMS")
+                .unwrap();
+            assert_eq!(row["builtin"], "idcams");
+            assert_eq!(row["execution"], "idcams");
+            row["execution"] = json!("program-service");
+        });
+        let schema = json(&fixture.root.join(SCHEMA)).unwrap();
+        let catalog = json(&fixture.root.join(CATALOG)).unwrap();
+        validate_schema_instance(&schema, &catalog, &fixture.root.join(CATALOG)).unwrap();
+        let rendered = render_program_registry(&fixture.root);
+        assert!(
+            rendered.is_err(),
+            "native-valid Idcams builtin with ProgramService execution generated successfully"
+        );
+        assert!(rendered.unwrap_err().contains("builtin/execution pairing"));
+    }
+
+    #[test]
+    fn common_program_policy_pairing_refuses_other_builtins_with_idcams() {
+        for (name, builtin) in [
+            ("IEBCOMPR", "iebcompr"),
+            ("IEBCOPY", "iebcopy"),
+            ("IEBDG", "iebdg"),
+            ("IEBEDIT", "iebedit"),
+            ("IEBGENER", "iebgener"),
+            ("IEBUPDTE", "iebupdte"),
+            ("IEFBR14", "iefbr14"),
+            ("SORT", "sort"),
+        ] {
+            let fixture = Fixture::new();
+            fixture.mutate(|catalog| {
+                let row = catalog["programs"]
+                    .as_array_mut()
+                    .unwrap()
+                    .iter_mut()
+                    .find(|row| row["name"] == name)
+                    .unwrap();
+                assert_eq!(row["builtin"], builtin);
+                assert_eq!(row["execution"], "program-service");
+                row["execution"] = json!("idcams");
+            });
+            let schema = json(&fixture.root.join(SCHEMA)).unwrap();
+            let catalog = json(&fixture.root.join(CATALOG)).unwrap();
+            validate_schema_instance(&schema, &catalog, &fixture.root.join(CATALOG)).unwrap();
+            let rendered = render_program_registry(&fixture.root);
+            assert!(
+                rendered.is_err(),
+                "native-valid {builtin} builtin with Idcams execution generated successfully"
+            );
+            assert!(rendered.unwrap_err().contains("builtin/execution pairing"));
+        }
+    }
 }

@@ -12,6 +12,64 @@ SPEC.loader.exec_module(typed_boundaries)
 
 
 class TypedSemanticBoundaryTests(unittest.TestCase):
+    def test_linked_private_module_preserves_ownership_without_public_export(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory) / "product.rs"
+            child = Path(directory) / "product" / "dispatch.rs"
+            child.parent.mkdir()
+            child.write_text('fn execute() {}\n#[cfg(test)] mod fixtures { const NAME: &str = "COBTUPDT"; }')
+            parent.write_text("mod dispatch;")
+            production = typed_boundaries.linked_module_production(parent, "dispatch")
+            self.assertIn("fn execute()", production)
+            self.assertNotIn("COBTUPDT", production)
+            for source in (
+                "// mod dispatch;",
+                'const NAME: &str = "mod dispatch;";',
+                "#[cfg(test)] mod dispatch;",
+                "mod fixtures { mod dispatch; }",
+                '#[path = "other.rs"] mod dispatch;',
+            ):
+                with self.subTest(source=source):
+                    parent.write_text(source)
+                    with self.assertRaises(typed_boundaries.BoundaryError):
+                        typed_boundaries.linked_module_production(parent, "dispatch")
+
+    def test_linked_production_requires_real_top_level_module_and_export(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory) / "product.rs"
+            child = Path(directory) / "product" / "trust.rs"
+            child.parent.mkdir()
+            child.write_text('pub struct Authority;\n#[cfg(test)] mod tests { const KEY: &str = "SECRET"; }')
+            parent.write_text("mod trust;\npub use trust::Authority;")
+            self.assertIn("pub struct Authority", typed_boundaries.linked_production(parent, "trust", "Authority"))
+            self.assertNotIn("SECRET", typed_boundaries.linked_production(parent, "trust", "Authority"))
+            for source in (
+                "pub use trust::Authority;",
+                "mod trust;",
+                "// mod trust;\npub use trust::Authority;",
+                'const TEXT: &str = "mod trust;";\npub use trust::Authority;',
+                "#[cfg(test)] mod trust;\npub use trust::Authority;",
+                "mod trust;\n#[cfg(test)] pub use trust::Authority;",
+                "mod nested { mod trust; }\npub use trust::Authority;",
+                'fn fixture() { let text = "mod trust;"; }\npub use trust::Authority;',
+                '/* mod trust; */\npub use trust::Authority;',
+                '#[path = "other.rs"] mod trust;\npub use trust::Authority;',
+            ):
+                with self.subTest(source=source):
+                    parent.write_text(source)
+                    with self.assertRaises(typed_boundaries.BoundaryError):
+                        typed_boundaries.linked_production(parent, "trust", "Authority")
+
+    def test_linked_production_refuses_missing_child_and_path_identifiers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory) / "product.rs"
+            parent.write_text("mod trust;\npub use trust::Authority;")
+            with self.assertRaises(FileNotFoundError):
+                typed_boundaries.linked_production(parent, "trust", "Authority")
+            for module, exported in (("../trust", "Authority"), ("trust", "Authority;")):
+                with self.assertRaises(typed_boundaries.BoundaryError):
+                    typed_boundaries.linked_production(parent, module, exported)
+
     def test_production_keeps_code_after_inline_cfg_test_method(self):
         source = (
             "impl Pilot {\n"
@@ -168,6 +226,182 @@ class TypedSemanticBoundaryTests(unittest.TestCase):
                 ["\n    arguments("],
                 "typed CICS runtime",
             )
+
+
+class ProductArtifactAdmissionOwnerTests(unittest.TestCase):
+    def fixture(self, root):
+        paths = {
+            "model": "crates/contracts/mainframe-env-store-api/src/model.rs",
+            "cobol": "crates/apps/mainframe-env-server/src/cobol.rs",
+            "artifact": "crates/apps/mainframe-env-server/src/cobol/artifact.rs",
+            "product": "crates/apps/mainframe-env-server/src/product.rs",
+            "machine": "crates/apps/mainframe-env-server/src/product/online_machine.rs",
+        }
+        sources = {
+            "model": "pub struct ExecutableArtifactMetadata;\n"
+                     "pub struct ArtifactRecord { pub executable: Option<ExecutableArtifactMetadata> }\n",
+            "cobol": "fn execute() {}\n",
+            "artifact": "pub(crate) fn admit_executable_artifact() { ValidatedArtifact::read(); }\n",
+            "product": "mod online_machine;\nimpl ProductServer { fn launch() { self.run_online_exchange(); } }\n",
+            "machine": "impl ProductServer { fn run_online_exchange() {\n"
+                       "    let executable = admit_executable_artifact(&record)?;\n"
+                       "    ReferenceMachine::from_binary(executable.payload(), invocation, limits);\n"
+                       "    machine.restore_checkpoint(&checkpoint);\n"
+                       "} }\n",
+        }
+        actual = {}
+        for key, relative in paths.items():
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(sources[key])
+            actual[key] = path
+        return actual, sources
+
+    def test_actual_plain_online_owner_satisfies_original_admission_predicates(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.fixture(root)
+            typed_boundaries.check_product_artifact_admission(root)
+
+    def test_original_metadata_admission_and_raw_payload_refusals_remain_live(self):
+        cases = [
+            ("model", "pub struct ExecutableArtifactMetadata", "pub struct MissingMetadata"),
+            ("model", "pub executable: Option<ExecutableArtifactMetadata>", "pub executable: bool"),
+            ("artifact", "pub(crate) fn admit_executable_artifact", "fn missing_admission"),
+            ("artifact", "ValidatedArtifact::read", "unchecked_payload"),
+            ("machine", "admit_executable_artifact(&record)?", "unchecked_payload(&record)?"),
+        ]
+        for key, old, new in cases:
+            with self.subTest(owner=key, refused=old), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                paths, sources = self.fixture(root)
+                paths[key].write_text(sources[key].replace(old, new))
+                with self.assertRaises(typed_boundaries.BoundaryError):
+                    typed_boundaries.check_product_artifact_admission(root)
+        for key in ("cobol", "product", "machine"):
+            with self.subTest(raw_payload_owner=key), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                paths, sources = self.fixture(root)
+                paths[key].write_text(
+                    sources[key] + "fn bypass() { ReferenceMachine::from_binary(\n"
+                    "                &record.payload, invocation, limits); }\n"
+                )
+                with self.assertRaises(typed_boundaries.BoundaryError):
+                    typed_boundaries.check_product_artifact_admission(root)
+
+    def test_only_an_actual_production_private_owner_can_supply_admission(self):
+        for declaration in (
+            "// mod online_machine;",
+            'const SHADOW: &str = "mod online_machine;";',
+            "#[cfg(test)] mod online_machine;",
+            "mod nested { mod online_machine; }",
+            '#[path = "other.rs"] mod online_machine;',
+        ):
+            with self.subTest(declaration=declaration), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                paths, _ = self.fixture(root)
+                paths["product"].write_text(declaration)
+                with self.assertRaises(typed_boundaries.BoundaryError):
+                    typed_boundaries.check_product_artifact_admission(root)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths, _ = self.fixture(root)
+            paths["machine"].unlink()
+            with self.assertRaises(FileNotFoundError):
+                typed_boundaries.check_product_artifact_admission(root)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths, _ = self.fixture(root)
+            paths["machine"].write_text(
+                "fn unchecked() {}\n#[cfg(test)] fn shadow() { admit_executable_artifact(&record)?; }\n"
+            )
+            with self.assertRaises(typed_boundaries.BoundaryError):
+                typed_boundaries.check_product_artifact_admission(root)
+
+
+    def flat_fixture(self, root):
+        paths, sources = self.fixture(root)
+        sources["product"] = sources["product"].replace("mod online_machine;\n", "") + sources["machine"]
+        paths["product"].write_text(sources["product"])
+        paths["machine"].unlink()
+        return paths, sources
+
+    def test_genuine_flat_owner_without_child_satisfies_original_admission(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths, _ = self.flat_fixture(root)
+            self.assertFalse(paths["machine"].exists())
+            typed_boundaries.check_product_artifact_admission(root)
+
+    def test_flat_owner_retains_all_five_admission_and_both_raw_payload_refusals(self):
+        cases = [
+            ("model", "pub struct ExecutableArtifactMetadata", "pub struct MissingMetadata"),
+            ("model", "pub executable: Option<ExecutableArtifactMetadata>", "pub executable: bool"),
+            ("artifact", "pub(crate) fn admit_executable_artifact", "fn missing_admission"),
+            ("artifact", "ValidatedArtifact::read", "unchecked_payload"),
+            ("product", "admit_executable_artifact(&record)?", "unchecked_payload(&record)?"),
+        ]
+        for key, old, new in cases:
+            with self.subTest(owner=key, refused=old), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                paths, sources = self.flat_fixture(root)
+                paths[key].write_text(sources[key].replace(old, new))
+                with self.assertRaises(typed_boundaries.BoundaryError):
+                    typed_boundaries.check_product_artifact_admission(root)
+        for key in ("cobol", "product"):
+            with self.subTest(raw_payload_owner=key), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                paths, sources = self.flat_fixture(root)
+                paths[key].write_text(
+                    sources[key] + "fn bypass() { ReferenceMachine::from_binary(\n"
+                    "                &record.payload, invocation, limits); }\n"
+                )
+                with self.assertRaises(typed_boundaries.BoundaryError):
+                    typed_boundaries.check_product_artifact_admission(root)
+
+    def test_unlinked_or_shadow_child_cannot_supply_admission(self):
+        for declaration in (
+            "",
+            "/* mod online_machine; */",
+            'const SHADOW: &str = r#"mod online_machine;"#;',
+            '#[doc = "mod online_machine;"] fn unrelated() {}',
+            "#[cfg(test)] mod online_machine;",
+            "mod nested { mod online_machine; }",
+        ):
+            with self.subTest(declaration=declaration), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                paths, sources = self.fixture(root)
+                paths["product"].write_text(
+                    declaration + "\n" + sources["product"].replace("mod online_machine;\n", "")
+                )
+                with self.assertRaises(typed_boundaries.BoundaryError):
+                    typed_boundaries.check_product_artifact_admission(root)
+
+    def test_declared_nonplain_file_owner_is_refused_even_with_valid_flat_body(self):
+        for declaration in (
+            '#[path = "other.rs"] mod online_machine;',
+            '#[cfg(feature = "shadow")] mod online_machine;',
+            "pub mod online_machine;",
+            "pub(crate) mod online_machine;",
+            "mod online_machine; mod online_machine;",
+            'mod online_machine; #[path = "other.rs"] mod online_machine;',
+        ):
+            with self.subTest(declaration=declaration), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                paths, sources = self.flat_fixture(root)
+                paths["product"].write_text(declaration + "\n" + sources["product"])
+                # A genuine file declaration cannot fall back to the admitted flat body.
+                paths["machine"].write_text(sources["machine"])
+                with self.assertRaises(typed_boundaries.BoundaryError):
+                    typed_boundaries.check_product_artifact_admission(root)
+
+    def test_declared_missing_file_cannot_fall_back_to_valid_flat_owner(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths, sources = self.flat_fixture(root)
+            paths["product"].write_text("mod online_machine;\n" + sources["product"])
+            with self.assertRaises(FileNotFoundError):
+                typed_boundaries.check_product_artifact_admission(root)
 
 
 if __name__ == "__main__":

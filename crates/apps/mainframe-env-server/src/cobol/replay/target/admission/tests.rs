@@ -1,6 +1,6 @@
 //! Compiled constructor expectations are independent of retained digest claims.
 #[cfg(test)]
-mod tests {
+mod controls {
     use super::super::*;
     use crate::cobol::hardening::{Fixture, TestRoot, parent};
     use mainframe_env_execution_api::CancellationProbe;

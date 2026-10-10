@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Repair conformance journey observation, local launcher, and selected MQ lint diagnostics through equivalent short circuits and borrows while preserving public signatures and independent expectations."

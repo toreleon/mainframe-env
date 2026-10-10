@@ -1,9 +1,9 @@
+mod package_authentication;
+pub use package_authentication::HmacSha256PackageTrust;
+
 mod dataset_helpers;
-use dataset_helpers::{
-    dataset_attributes, dataset_mutation, join_records, member_name, records_for_write,
-};
+use dataset_helpers::{dataset_attributes, join_records, member_name, records_for_write};
 mod batch_controller;
-use batch_controller::decode_application_batch_controller;
 mod system_providers;
 use system_providers::*;
 mod dataset_input;
@@ -22,22 +22,21 @@ use crate::jes_worker::{
     clear_worker_progress, heartbeat_durable_work,
 };
 use crate::retention_maintenance::provider::RetentionPlanner;
-use crate::{
-    ArtifactProfile, DefaultProgramRouter, EnvironmentSecretResolver, ServerConfig,
-    default_program_router,
-};
+use crate::{ArtifactProfile, DefaultProgramRouter, ServerConfig, default_program_router};
 use axum::http::StatusCode;
 use base64::Engine;
 use mainframe_env_application::{
+    APPLICATION_PUBLICATION_CONTRACT, APPLICATION_PUBLICATION_NAMESPACE,
     ApplicationGenerationRecord, ApplicationInstaller, ApplicationInstallerV2,
-    ApplicationPackageV2, BatchController as ApplicationBatchController, BatchControllerKind,
-    EntryKind, InstallProblem, InstallState, PackageLimits, PackageSignatureVerifier,
-    SelectedApplicationGeneration,
+    ApplicationPackageV2, ApplicationPublicationState,
+    BatchController as ApplicationBatchController, BatchControllerKind, EntryKind, InstallProblem,
+    InstallState, MAX_APPLICATION_PUBLICATION_BYTES, PackageLimits, PackageSignatureVerifier,
+    PublicationAction, PublicationSectionState, SelectedApplicationGeneration,
 };
 use mainframe_env_batch::{
     BATCH_CONTROLLER_REGISTRY_CONTRACT, BatchControllerDefinition, BatchControllerGeneration,
-    BatchControllerInstallReceipt, BatchControllerPlan, BatchControllerProgram,
-    BatchControllerSelector, BatchLimits, BatchService, JclBundle,
+    BatchControllerPlan, BatchControllerProgram, BatchControllerSelector, BatchLimits,
+    BatchPublicationWrite, BatchService, JclBundle,
 };
 use mainframe_env_cics::{
     BmsMapDefinition, CicsReplayClock, CicsService, CicsTerminalExecution, CicsTerminalSnapshot,
@@ -87,7 +86,6 @@ use mainframe_env_zosmf::{
     Authentication, GatewayCallContext, GatewayProblem, GatewayRequest, GatewayResponse,
     ZosmfBackend, ZosmfLimits,
 };
-use ring::hmac;
 use ring::rand::{SecureRandom, SystemRandom};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use serde::{Deserialize, Serialize};
@@ -97,7 +95,7 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex, RwLock, RwLockWriteGuard, TryLockError, Weak};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio_rustls::TlsAcceptor;
 use zeroize::Zeroizing;
@@ -204,41 +202,6 @@ pub struct ApplicationPublicationReceipt {
     pub db2_catalog: bool,
     pub ims_metadata: bool,
     pub replayed: bool,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "kebab-case")]
-enum PublicationSectionState {
-    NotApplicable,
-    Pending,
-    Applying,
-    Applied,
-    Failed,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "kebab-case")]
-enum PublicationAction {
-    Install,
-    Rollback,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-struct ApplicationPublicationState {
-    schema_version: String,
-    package: String,
-    generation: u64,
-    identity: String,
-    action: PublicationAction,
-    controllers: PublicationSectionState,
-    db2: PublicationSectionState,
-    #[serde(default = "publication_not_applicable")]
-    ims: PublicationSectionState,
-    complete: bool,
-}
-
-const fn publication_not_applicable() -> PublicationSectionState {
-    PublicationSectionState::NotApplicable
 }
 
 struct DurableApplicationPublication {
@@ -393,6 +356,9 @@ impl SpoolRetentionClock for EnterpriseReplayClock {
     }
 }
 
+/// Composes one publishing server per store. The shared exclusion fences local
+/// selected-controller dispatch; raw writers and cross-process concurrency remain
+/// the trusted embedding's responsibility.
 pub struct ProductServer {
     config: ServerConfig,
     pub(crate) store: Arc<dyn PlatformStore>,
@@ -411,7 +377,7 @@ pub struct ProductServer {
     program: Arc<DefaultProgramRouter>,
     applications: ApplicationInstaller,
     applications_v2: Mutex<DurableApplicationsV2>,
-    application_publication: Mutex<()>,
+    application_publication: Arc<RwLock<()>>,
     job_submission: Mutex<()>,
     online_programs: Mutex<BTreeMap<String, ArtifactRef>>,
     online_transactions: Mutex<BTreeMap<String, String>>,
@@ -479,8 +445,6 @@ impl ArtifactStore for ProductArtifactStore {
 
 const APPLICATION_V2_STATE_NAMESPACE: &str = "application-package-v2";
 const APPLICATION_V2_STATE_KEY: &str = "registry";
-const APPLICATION_PUBLICATION_NAMESPACE: &str = "application-publication-v2";
-const APPLICATION_PUBLICATION_CONTRACT: &str = "mainframe-env.application-publication@1";
 const AUTH_SESSION_NAMESPACE: &str = "auth-session-v2";
 const AUTH_SESSION_INDEX_NAMESPACE: &str = "auth-session-index-v2";
 const AUTH_SESSION_INDEX_KEY: &str = "global";
@@ -539,76 +503,6 @@ struct DurableApplicationsV2 {
     installer: ApplicationInstallerV2,
     store_version: u64,
     verifier: Arc<dyn PackageSignatureVerifier>,
-}
-
-pub struct HmacSha256PackageTrust {
-    references: BTreeMap<String, SecretRef>,
-    secrets: Arc<dyn SecretResolver>,
-}
-
-impl HmacSha256PackageTrust {
-    pub fn new(
-        references: BTreeMap<String, SecretRef>,
-        secrets: Arc<dyn SecretResolver>,
-    ) -> Result<Self, HostProblem> {
-        if references.len() > 1_024
-            || references.iter().any(|(key_id, _)| {
-                key_id.is_empty() || key_id.len() > 128 || key_id.chars().any(char::is_control)
-            })
-        {
-            return Err(HostProblem::Malformed);
-        }
-        Ok(Self {
-            references,
-            secrets,
-        })
-    }
-
-    pub fn from_environment(
-        environment: &BTreeMap<String, String>,
-        secrets: Arc<dyn SecretResolver>,
-    ) -> Result<Self, HostProblem> {
-        let Some(encoded) = environment.get("MAINFRAME_ENV_PACKAGE_HMAC_KEY_REFS") else {
-            return Self::new(BTreeMap::new(), secrets);
-        };
-        let encoded: BTreeMap<String, String> =
-            serde_json::from_str(encoded).map_err(|_| HostProblem::Malformed)?;
-        let references = encoded
-            .into_iter()
-            .map(|(key_id, reference)| {
-                EnvironmentSecretResolver::parse_reference(&reference)
-                    .map(|reference| (key_id, reference))
-            })
-            .collect::<Result<BTreeMap<_, _>, _>>()?;
-        Self::new(references, secrets)
-    }
-}
-
-impl PackageSignatureVerifier for HmacSha256PackageTrust {
-    fn verify(&self, key_id: &str, algorithm: &str, identity: &str, signature: &str) -> bool {
-        if algorithm != "hmac-sha256@1" {
-            return false;
-        }
-        let Some(reference) = self.references.get(key_id) else {
-            return false;
-        };
-        let Ok(key) = self.secrets.resolve(reference) else {
-            return false;
-        };
-        if key.len() < 32 || key.len() > 4_096 {
-            return false;
-        }
-        let Ok(signature) = base64::engine::general_purpose::STANDARD_NO_PAD.decode(signature)
-        else {
-            return false;
-        };
-        hmac::verify(
-            &hmac::Key::new(hmac::HMAC_SHA256, &key),
-            identity.as_bytes(),
-            &signature,
-        )
-        .is_ok()
-    }
 }
 
 struct RejectPackageTrust;
@@ -802,7 +696,8 @@ impl ProductServer {
         let program_artifacts: Arc<dyn ArtifactStore> = artifacts.clone();
         program.bind_product_runtime(host.clone(), store.clone(), program_artifacts, &cics)?;
         let checkpoint_store: Arc<dyn CheckpointStore> = store.clone();
-        let batch = BatchService::open_with_checkpoint_store(
+        let application_publication = Arc::new(RwLock::new(()));
+        let batch = BatchService::open_with_checkpoint_store_and_publication_exclusion(
             host.clone(),
             provider_store,
             checkpoint_store,
@@ -811,6 +706,7 @@ impl ProductServer {
                 max_active: JES_WORKER_COUNT,
                 ..BatchLimits::default()
             },
+            application_publication.clone(),
         )?;
         let (application_store_version, applications_v2) = match store
             .get_provider_state(APPLICATION_V2_STATE_NAMESPACE, APPLICATION_V2_STATE_KEY)
@@ -927,7 +823,7 @@ impl ProductServer {
                 store_version: application_store_version,
                 verifier: package_trust,
             }),
-            application_publication: Mutex::new(()),
+            application_publication,
             job_submission: Mutex::new(()),
             online_programs: Mutex::new(online_programs),
             online_transactions: Mutex::new(online_transactions),
@@ -1087,6 +983,7 @@ impl ProductServer {
         &self,
         definitions: Vec<BatchProgramDefinition>,
     ) -> Result<BatchInstallReceipt, HostProblem> {
+        let _publication = self.publication_write()?;
         if definitions.is_empty() || definitions.len() > 4096 {
             return Err(HostProblem::Malformed);
         }
@@ -1162,10 +1059,7 @@ impl ProductServer {
         &self,
         package: &ApplicationPackageV2,
     ) -> Result<ApplicationGenerationRecord, HostProblem> {
-        let _publication = self
-            .application_publication
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let _publication = self.publication_write()?;
         let mut durable = self
             .applications_v2
             .lock()
@@ -1196,27 +1090,49 @@ impl ProductServer {
         &self,
         expected: &ApplicationGenerationRecord,
     ) -> Result<ApplicationPublicationReceipt, HostProblem> {
-        let _publication = self
-            .application_publication
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        self.batch.with_publication_write(|writer| {
+            self.publish_application_generation_locked(expected, writer)
+        })
+    }
+
+    fn publish_application_generation_locked(
+        &self,
+        expected: &ApplicationGenerationRecord,
+        writer: &BatchPublicationWrite<'_>,
+    ) -> Result<ApplicationPublicationReceipt, HostProblem> {
         let selected = self.application_generation_v2(expected)?;
+        // A Ready commit retry preserves selection; only explicit retained rollback
+        // can reselect another Ready generation. Refuse before provider publication.
+        if selected.record().state == InstallState::Ready {
+            self.selected_application_v2(expected)?;
+        }
         let package = selected.package().clone();
         let key = package.base.manifest.name.to_ascii_uppercase();
-        let db2_applicable = package
-            .base
-            .manifest
-            .entries
-            .iter()
-            .any(|entry| entry.kind == EntryKind::Data && entry.path == "data/db2/catalog");
         let existing = self
             .store
             .get_provider_state(APPLICATION_PUBLICATION_NAMESPACE, &key)
             .map_err(store_error)?;
+        let completed = existing
+            .as_ref()
+            .map(|row| self.decode_application_publication(row))
+            .transpose()?
+            .is_some_and(|state| {
+                state.action == PublicationAction::Install
+                    && state.matches_complete(
+                        &expected.package,
+                        expected.generation,
+                        &expected.identity,
+                    )
+            });
+        let plan = self.prevalidate_application_publication(
+            &selected,
+            PublicationAction::Install,
+            completed,
+        )?;
+        let db2_applicable = plan.db2.is_some();
         let mut durable = match existing {
             Some(record) => {
-                let state: ApplicationPublicationState = serde_json::from_slice(&record.payload)
-                    .map_err(|_| HostProblem::InfrastructureFailure)?;
+                let state = self.decode_application_publication(&record)?;
                 if state.schema_version != APPLICATION_PUBLICATION_CONTRACT
                     || state.package.to_ascii_uppercase() != key
                 {
@@ -1251,6 +1167,18 @@ impl ProductServer {
             }
         };
         if durable.state.complete {
+            if !durable.state.matches_complete(
+                &expected.package,
+                expected.generation,
+                &expected.identity,
+            ) || db2_applicable && durable.state.db2 != PublicationSectionState::Applied
+                || !package.sections.batch_controllers.is_empty()
+                    && durable.state.controllers != PublicationSectionState::Applied
+                || (package.sections.ims_metadata.is_some() || package.sections.ims_tm.is_some())
+                    && durable.state.ims != PublicationSectionState::Applied
+            {
+                return Err(HostProblem::InfrastructureFailure);
+            }
             self.selected_application_v2(expected)?;
             return Ok(ApplicationPublicationReceipt {
                 package: package.base.manifest.name,
@@ -1268,7 +1196,7 @@ impl ProductServer {
         } else {
             durable.state.controllers = PublicationSectionState::Applying;
             self.persist_application_publication(&mut durable)?;
-            match self.apply_application_batch_controllers(&selected) {
+            match writer.install_controllers(plan.controllers) {
                 Ok(receipt) => {
                     durable.state.controllers = PublicationSectionState::Applied;
                     self.persist_application_publication(&mut durable)?;
@@ -1285,7 +1213,10 @@ impl ProductServer {
         if db2_applicable && durable.state.db2 != PublicationSectionState::Applied {
             durable.state.db2 = PublicationSectionState::Applying;
             self.persist_application_publication(&mut durable)?;
-            if let Err(problem) = self.apply_application_db2_catalog(&selected) {
+            if let Err(problem) = self
+                .db2
+                .install_catalog(plan.db2.ok_or(HostProblem::InfrastructureFailure)?)
+            {
                 durable.state.db2 = PublicationSectionState::Failed;
                 self.persist_application_publication(&mut durable)?;
                 return Err(problem);
@@ -1324,10 +1255,16 @@ impl ProductServer {
         &self,
         expected: &ApplicationGenerationRecord,
     ) -> Result<ApplicationPublicationReceipt, HostProblem> {
-        let _publication = self
-            .application_publication
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        self.batch.with_publication_write(|writer| {
+            self.rollback_application_generation_locked(expected, writer)
+        })
+    }
+
+    fn rollback_application_generation_locked(
+        &self,
+        expected: &ApplicationGenerationRecord,
+        writer: &BatchPublicationWrite<'_>,
+    ) -> Result<ApplicationPublicationReceipt, HostProblem> {
         let selected = self
             .applications_v2
             .lock()
@@ -1341,19 +1278,30 @@ impl ProductServer {
         }
         let package = selected.package().clone();
         let key = package.base.manifest.name.to_ascii_uppercase();
-        let db2_applicable = package
-            .base
-            .manifest
-            .entries
-            .iter()
-            .any(|entry| entry.kind == EntryKind::Data && entry.path == "data/db2/catalog");
         let existing = self
             .store
             .get_provider_state(APPLICATION_PUBLICATION_NAMESPACE, &key)
             .map_err(store_error)?;
+        let completed = existing
+            .as_ref()
+            .map(|row| self.decode_application_publication(row))
+            .transpose()?
+            .is_some_and(|state| {
+                state.action == PublicationAction::Rollback
+                    && state.matches_complete(
+                        &expected.package,
+                        expected.generation,
+                        &expected.identity,
+                    )
+            });
+        let plan = self.prevalidate_application_publication(
+            &selected,
+            PublicationAction::Rollback,
+            completed,
+        )?;
+        let db2_applicable = plan.db2.is_some();
         let mut durable = if let Some(record) = existing {
-            let state: ApplicationPublicationState = serde_json::from_slice(&record.payload)
-                .map_err(|_| HostProblem::InfrastructureFailure)?;
+            let state = self.decode_application_publication(&record)?;
             if state.action == PublicationAction::Rollback
                 && state.generation == expected.generation
                 && state.identity == expected.identity
@@ -1375,6 +1323,18 @@ impl ProductServer {
             }
         };
         if durable.state.complete {
+            if !durable.state.matches_complete(
+                &expected.package,
+                expected.generation,
+                &expected.identity,
+            ) || db2_applicable && durable.state.db2 != PublicationSectionState::Applied
+                || !package.sections.batch_controllers.is_empty()
+                    && durable.state.controllers != PublicationSectionState::Applied
+                || (package.sections.ims_metadata.is_some() || package.sections.ims_tm.is_some())
+                    && durable.state.ims != PublicationSectionState::Applied
+            {
+                return Err(HostProblem::InfrastructureFailure);
+            }
             self.selected_application_v2(expected)?;
             return Ok(ApplicationPublicationReceipt {
                 package: package.base.manifest.name,
@@ -1391,9 +1351,8 @@ impl ProductServer {
         if durable.state.controllers != PublicationSectionState::Applied {
             durable.state.controllers = PublicationSectionState::Applying;
             self.persist_application_publication(&mut durable)?;
-            if let Err(problem) = self
-                .batch
-                .rollback_controllers(&package.base.manifest.name, package.generation)
+            if let Err(problem) =
+                writer.rollback_controllers(&package.base.manifest.name, package.generation)
             {
                 durable.state.controllers = PublicationSectionState::Failed;
                 self.persist_application_publication(&mut durable)?;
@@ -1438,107 +1397,6 @@ impl ProductServer {
             db2_catalog: db2_applicable,
             ims_metadata: package.sections.ims_metadata.is_some(),
             replayed: false,
-        })
-    }
-
-    fn apply_application_batch_controllers(
-        &self,
-        selected: &SelectedApplicationGeneration,
-    ) -> Result<BatchControllerInstallReceipt, HostProblem> {
-        let package = selected.package();
-        let controllers = package
-            .sections
-            .batch_controllers
-            .iter()
-            .map(|controller| decode_application_batch_controller(package, controller))
-            .collect::<Result<Vec<_>, _>>()?;
-        self.batch.install_controllers(BatchControllerGeneration {
-            schema_version: BATCH_CONTROLLER_REGISTRY_CONTRACT.into(),
-            application: package.base.manifest.name.clone(),
-            generation: package.generation,
-            identity: selected.record().identity.clone(),
-            controllers,
-        })
-    }
-
-    fn apply_application_db2_catalog(
-        &self,
-        selected: &SelectedApplicationGeneration,
-    ) -> Result<(), HostProblem> {
-        let package = selected.package();
-        let catalog_entry = package
-            .base
-            .manifest
-            .entries
-            .iter()
-            .find(|entry| entry.kind == EntryKind::Data && entry.path == "data/db2/catalog")
-            .ok_or(HostProblem::Malformed)?;
-        let catalog_blob = package
-            .base
-            .blobs
-            .get(&catalog_entry.sha256)
-            .ok_or(HostProblem::Malformed)?;
-        let tables = decode_table_definitions_bounded(catalog_blob, Db2Limits::default())?;
-        let declared = package
-            .sections
-            .sql_tables
-            .iter()
-            .map(|table| {
-                (
-                    table.name.to_ascii_uppercase(),
-                    table
-                        .columns
-                        .iter()
-                        .map(|column| (column.name.to_ascii_uppercase(), column.nullable))
-                        .collect::<Vec<_>>(),
-                    table
-                        .primary_key
-                        .iter()
-                        .map(|column| column.to_ascii_uppercase())
-                        .collect::<Vec<_>>(),
-                )
-            })
-            .collect::<BTreeSet<_>>();
-        let signed = tables
-            .iter()
-            .map(|table| {
-                (
-                    table.name.to_ascii_uppercase(),
-                    table
-                        .columns
-                        .iter()
-                        .map(|column| (column.name.to_ascii_uppercase(), column.nullable))
-                        .collect::<Vec<_>>(),
-                    table
-                        .primary_key
-                        .iter()
-                        .map(|column| column.to_ascii_uppercase())
-                        .collect::<Vec<_>>(),
-                )
-            })
-            .collect::<BTreeSet<_>>();
-        if declared != signed {
-            return Err(HostProblem::Malformed);
-        }
-        let rows = package
-            .sections
-            .sql_rows
-            .iter()
-            .map(|row| Db2SeedRow {
-                table: row.table.clone(),
-                values: row
-                    .values
-                    .iter()
-                    .map(|(name, value)| (name.clone(), value.as_bytes().to_vec()))
-                    .collect(),
-            })
-            .collect();
-        self.db2.install_catalog(Db2CatalogGeneration {
-            application: package.base.manifest.name.clone(),
-            generation: package.generation,
-            identity: selected.record().identity.clone(),
-            tables,
-            rows,
         })
     }
 
@@ -1656,7 +1514,7 @@ impl ProductServer {
     ) -> Result<(), HostProblem> {
         let payload =
             serde_json::to_vec(&durable.state).map_err(|_| HostProblem::InfrastructureFailure)?;
-        if payload.len() > 64 * 1024 {
+        if payload.len() > MAX_APPLICATION_PUBLICATION_BYTES {
             return Err(HostProblem::ResourceExhausted);
         }
         let version = durable
@@ -1679,16 +1537,23 @@ impl ProductServer {
     }
 
     fn recover_application_publications(&self) -> Result<(), HostProblem> {
+        self.batch
+            .with_publication_write(|writer| self.recover_application_publications_locked(writer))
+    }
+
+    fn recover_application_publications_locked(
+        &self,
+        writer: &BatchPublicationWrite<'_>,
+    ) -> Result<(), HostProblem> {
         for record in self
             .store
             .list_provider_state(APPLICATION_PUBLICATION_NAMESPACE, 1_024)
             .map_err(store_error)?
         {
-            if record.payload.len() > 64 * 1024 {
+            if record.payload.len() > MAX_APPLICATION_PUBLICATION_BYTES {
                 return Err(HostProblem::ResourceExhausted);
             }
-            let state: ApplicationPublicationState = serde_json::from_slice(&record.payload)
-                .map_err(|_| HostProblem::InfrastructureFailure)?;
+            let state = self.decode_application_publication(&record)?;
             if state.schema_version != APPLICATION_PUBLICATION_CONTRACT
                 || state.package.to_ascii_uppercase() != record.key
             {
@@ -1707,14 +1572,32 @@ impl ProductServer {
             if !state.complete {
                 match state.action {
                     PublicationAction::Install => {
-                        self.publish_application_generation(&expected)?;
+                        self.publish_application_generation_locked(&expected, writer)?;
                     }
                     PublicationAction::Rollback => {
-                        self.rollback_application_generation(&expected)?;
+                        self.rollback_application_generation_locked(&expected, writer)?;
                     }
                 }
             } else {
+                if !state.matches_complete(
+                    &expected.package,
+                    expected.generation,
+                    &expected.identity,
+                ) {
+                    return Err(HostProblem::InfrastructureFailure);
+                }
                 let selected = self.selected_application_v2(&expected)?;
+                let plan =
+                    self.prevalidate_application_publication(&selected, state.action, true)?;
+                if plan.db2.is_some() && state.db2 != PublicationSectionState::Applied
+                    || !plan.controllers.controllers.is_empty()
+                        && state.controllers != PublicationSectionState::Applied
+                    || (selected.package().sections.ims_metadata.is_some()
+                        || selected.package().sections.ims_tm.is_some())
+                        && state.ims != PublicationSectionState::Applied
+                {
+                    return Err(HostProblem::InfrastructureFailure);
+                }
                 self.apply_application_ims_metadata(&selected)?;
             }
         }
@@ -4317,176 +4200,6 @@ impl ProductServer {
             .ok_or(HostProblem::NotFound)
     }
 
-    fn dataset_call(
-        &self,
-        principal: &str,
-        request: DatasetRequest,
-    ) -> Result<DatasetResult, GatewayProblem> {
-        if let DatasetRequest::ReadConcatenation { datasets, .. } = &request {
-            for dataset in datasets {
-                self.authorize_resource(
-                    principal,
-                    "DATASET",
-                    dataset.as_str(),
-                    AccessIntent::Read,
-                )?;
-            }
-        }
-        if let DatasetRequest::DefineAlias { target, .. } = &request {
-            self.authorize_resource(principal, "DATASET", target.as_str(), AccessIntent::Read)?;
-        }
-        if let DatasetRequest::BuildAlternateIndex { base, .. } = &request {
-            self.authorize_resource(principal, "DATASET", base.as_str(), AccessIntent::Read)?;
-        }
-        if let DatasetRequest::TvsStatus { owner, .. }
-        | DatasetRequest::AcquireLock { owner, .. }
-        | DatasetRequest::ReleaseLock { owner, .. }
-        | DatasetRequest::BeginTvs { owner, .. }
-        | DatasetRequest::StageTvs { owner, .. }
-        | DatasetRequest::CompleteTvs { owner, .. }
-        | DatasetRequest::ReconcileTvs { owner, .. } = &request
-            && owner.as_str() != principal
-        {
-            return Err(gateway_problem(HostProblem::Unauthorized));
-        }
-        let dataset = match &request {
-            DatasetRequest::Capabilities
-            | DatasetRequest::List { .. }
-            | DatasetRequest::TvsStatus { .. }
-            | DatasetRequest::BeginTvs { .. }
-            | DatasetRequest::CompleteTvs { .. }
-            | DatasetRequest::ReconcileTvs { .. } => None,
-            DatasetRequest::ListCatalog { pattern, .. } => Some(pattern.as_str()),
-            DatasetRequest::ListVolumes { .. } => Some("VOLUME.**"),
-            DatasetRequest::ReadConcatenation { .. } => None,
-            DatasetRequest::Rename { from, .. } => Some(from.as_str()),
-            DatasetRequest::ResolveCatalog { name } => Some(name.as_str()),
-            DatasetRequest::DefineCatalog { catalog, .. }
-            | DatasetRequest::SetCatalogConnection { catalog, .. } => Some(catalog.as_str()),
-            DatasetRequest::DefineAlias { alias, .. } => Some(alias.as_str()),
-            DatasetRequest::Attributes { dataset }
-            | DatasetRequest::Describe { dataset }
-            | DatasetRequest::Diagnose { dataset }
-            | DatasetRequest::ListLocks { dataset, .. }
-            | DatasetRequest::ListMembers { dataset, .. }
-            | DatasetRequest::Read { dataset, .. }
-            | DatasetRequest::ReadGeneric { dataset, .. }
-            | DatasetRequest::ReadRelative { dataset, .. }
-            | DatasetRequest::ReadRba { dataset, .. }
-            | DatasetRequest::ReadSequential { dataset, .. }
-            | DatasetRequest::Snapshot { dataset, .. }
-            | DatasetRequest::ReadMemberGeneration { dataset, .. }
-            | DatasetRequest::Create { dataset, .. }
-            | DatasetRequest::Define { dataset, .. }
-            | DatasetRequest::Alter { dataset, .. }
-            | DatasetRequest::SetLifecycle { dataset, .. }
-            | DatasetRequest::RecordBackup { dataset, .. }
-            | DatasetRequest::Restore { dataset, .. }
-            | DatasetRequest::DefineMemberAlias { dataset, .. }
-            | DatasetRequest::WriteMemberGeneration { dataset, .. }
-            | DatasetRequest::DeleteMemberGeneration { dataset, .. }
-            | DatasetRequest::AcquireLock { dataset, .. }
-            | DatasetRequest::ReleaseLock { dataset, .. }
-            | DatasetRequest::Write { dataset, .. }
-            | DatasetRequest::Append { dataset, .. }
-            | DatasetRequest::Truncate { dataset, .. }
-            | DatasetRequest::RewriteRecord { dataset, .. }
-            | DatasetRequest::DeleteRecord { dataset, .. }
-            | DatasetRequest::WriteRelative { dataset, .. }
-            | DatasetRequest::DeleteRelative { dataset, .. }
-            | DatasetRequest::WriteRba { dataset, .. }
-            | DatasetRequest::Delete { dataset, .. }
-            | DatasetRequest::StartBrowse { dataset, .. }
-            | DatasetRequest::ResetBrowse { dataset, .. }
-            | DatasetRequest::ReadNext { dataset, .. }
-            | DatasetRequest::EndBrowse { dataset, .. }
-            | DatasetRequest::Close { dataset, .. } => Some(dataset.as_str()),
-            DatasetRequest::DefinePath { path, .. } => Some(path.as_str()),
-            DatasetRequest::BuildAlternateIndex { index, .. } => Some(index.as_str()),
-            DatasetRequest::StageTvs { operation, .. } => Some(match operation {
-                mainframe_env_host_api::TvsRecordOperation::Insert { dataset, .. }
-                | mainframe_env_host_api::TvsRecordOperation::Rewrite { dataset, .. }
-                | mainframe_env_host_api::TvsRecordOperation::Delete { dataset, .. } => {
-                    dataset.as_str()
-                }
-            }),
-            DatasetRequest::DefineAlternateIndex { base, .. }
-            | DatasetRequest::DefineGenerationGroup { base, .. }
-            | DatasetRequest::CreateGeneration { base, .. }
-            | DatasetRequest::ResolveGeneration { base, .. } => Some(base.as_str()),
-        };
-        if let Some(dataset) = dataset {
-            self.authorize_resource(
-                principal,
-                "DATASET",
-                dataset,
-                if matches!(
-                    request,
-                    DatasetRequest::Attributes { .. }
-                        | DatasetRequest::Describe { .. }
-                        | DatasetRequest::Diagnose { .. }
-                        | DatasetRequest::ListLocks { .. }
-                        | DatasetRequest::TvsStatus { .. }
-                        | DatasetRequest::ListMembers { .. }
-                        | DatasetRequest::Read { .. }
-                        | DatasetRequest::ReadGeneric { .. }
-                        | DatasetRequest::ReadRelative { .. }
-                        | DatasetRequest::ReadRba { .. }
-                        | DatasetRequest::ReadSequential { .. }
-                        | DatasetRequest::Snapshot { .. }
-                        | DatasetRequest::ReadMemberGeneration { .. }
-                        | DatasetRequest::ResolveCatalog { .. }
-                        | DatasetRequest::ResolveGeneration { .. }
-                        | DatasetRequest::ListCatalog { .. }
-                        | DatasetRequest::ListVolumes { .. }
-                        | DatasetRequest::StartBrowse { .. }
-                        | DatasetRequest::ResetBrowse { .. }
-                        | DatasetRequest::ReadNext { .. }
-                        | DatasetRequest::EndBrowse { .. }
-                ) {
-                    AccessIntent::Read
-                } else {
-                    AccessIntent::Update
-                },
-            )?;
-        }
-        let capability = if dataset_mutation(&request).is_some() {
-            "host.dataset.write"
-        } else {
-            "host.dataset.read"
-        };
-        let invocation = self
-            .invocation(
-                principal,
-                "zosmf:dataset",
-                ServiceClass::System,
-                &[capability],
-            )
-            .map_err(gateway_problem)?;
-        let sequence = self.next_sequence().map_err(gateway_problem)?;
-        let mutation = dataset_mutation(&request);
-        let idempotency_key = mutation.map(|mutation| mutation.idempotency_key.clone());
-        let result = self
-            .host
-            .invoke(
-                &invocation,
-                self.jes_tick().map_err(gateway_problem)?,
-                invocation.cancellation_requested(),
-                EffectRequest {
-                    run_unit: invocation.run_unit_id.clone(),
-                    sequence: mutation.map_or(sequence, |mutation| mutation.sequence),
-                    deadline_tick: invocation.deadline_tick,
-                    idempotency_key,
-                    request: HostRequest::Dataset(request),
-                },
-            )
-            .persist_with(|audit| self.store.record_audit(audit).map_err(store_error));
-        match result.outcome.map_err(gateway_problem)? {
-            HostResult::Dataset(result) => Ok(result),
-            _ => Err(gateway_problem(HostProblem::ProviderFailure)),
-        }
-    }
-
     fn jcl_bundle(&self, principal: &str, jcl: Vec<u8>) -> Result<JclBundle, GatewayProblem> {
         let primary =
             String::from_utf8(jcl).map_err(|_| gateway_problem(HostProblem::Malformed))?;
@@ -5655,10 +5368,15 @@ fn install_publication_state(
 
 #[cfg(test)]
 mod tests {
+    #[path = "package_state_schema_tests.rs"]
+    mod package_state_schema_tests;
     include!("product/bts_browse.rs");
+    include!("product/cics_first_reverse_tests.rs");
     use super::*;
     #[path = "ims_package_tests.rs"]
     mod ims_package_tests;
+    #[path = "publication_fencing_tests.rs"]
+    mod publication_fencing_tests;
     #[path = "sequential_layout_admission_tests.rs"]
     mod sequential_layout_admission_tests;
     #[path = "shisam_fixed_admission_tests.rs"]
@@ -5702,6 +5420,7 @@ mod tests {
     };
     use mainframe_env_store::{PostgresArtifactStore, PostgresStateStore, SqliteStateStore};
     use mainframe_env_store_api::{RetentionRequest, RetentionStore, WorkStore};
+    use ring::hmac;
     use std::sync::Barrier;
     use tower::ServiceExt;
 
@@ -10128,8 +9847,41 @@ mod tests {
         .unwrap()
     }
 
-    fn sign_test_package_identity(identity: &str) -> String {
-        sign_package_identity_with_key(TEST_PACKAGE_KEY, identity)
+    #[test]
+    fn package_trust_cose_mac0_accepts_independent_vector() {
+        // Independent stdlib HMAC fixture; bytes are not produced by the package codec.
+        let resolver = Arc::new(MemorySecretResolver::default());
+        let reference = SecretRef::new("secret:independent-key", HostLimits::default()).unwrap();
+        resolver.insert(reference.as_str(), (0_u8..32).collect());
+        let trust = HmacSha256PackageTrust::new(
+            BTreeMap::from([("review-key".into(), reference)]),
+            resolver,
+        )
+        .unwrap();
+        assert!(trust.verify(
+            "review-key",
+            "cose-mac0-hmac256@1",
+            "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            concat!(
+                "0YRPogEFBEpyZXZpZXcta2V5oFhHc2hhMjU2OmUzYjBjNDQyOThmYzFjMTQ5YWZiZjRj",
+                "ODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTVYIInc9L64UV87",
+                "fn2kbI1Vc4PWZ1JF0/G+Fe9JLfxR84E8"
+            ),
+        ));
+    }
+
+    fn sign_test_package_identity(identity: &str) -> mainframe_env_application::PackageSignature {
+        mainframe_env_application::encode_package_authentication(
+            "test-production-key",
+            identity,
+            |data| {
+                hmac::sign(&hmac::Key::new(hmac::HMAC_SHA256, TEST_PACKAGE_KEY), data)
+                    .as_ref()
+                    .try_into()
+                    .unwrap()
+            },
+        )
+        .unwrap()
     }
 
     fn sign_package_identity_with_key(key: &[u8], identity: &str) -> String {
@@ -10188,7 +9940,7 @@ mod tests {
         _trust: &HmacSha256PackageTrust,
     ) -> mainframe_env_application::ApplicationPackageV2 {
         use mainframe_env_application::{
-            APPLICATION_PACKAGE_V2_CONTRACT, ApplicationManifest, ApplicationPackage,
+            APPLICATION_PACKAGE_V3_CONTRACT, ApplicationManifest, ApplicationPackage,
             ApplicationSections, BatchController, EntryKind, PackageEntry, PackageSignature,
         };
         let definitions = [
@@ -10228,7 +9980,7 @@ mod tests {
             },
             generation: 1,
             sections: ApplicationSections {
-                schema_version: APPLICATION_PACKAGE_V2_CONTRACT.into(),
+                schema_version: APPLICATION_PACKAGE_V3_CONTRACT.into(),
                 host_abi_libraries: Vec::new(),
                 sql_tables: Vec::new(),
                 sql_rows: Vec::new(),
@@ -10250,13 +10002,13 @@ mod tests {
                 security_resources: Vec::new(),
             },
             signature: PackageSignature {
-                algorithm: "hmac-sha256@1".into(),
+                algorithm: mainframe_env_application::PACKAGE_AUTHENTICATION_ALGORITHM.into(),
                 key_id: "test-production-key".into(),
                 value: "invalid".into(),
             },
         };
-        let identity = mainframe_env_application::package_v2_identity(&package).unwrap();
-        package.signature.value = sign_test_package_identity(&identity);
+        let identity = mainframe_env_application::package_generation_identity(&package).unwrap();
+        package.signature = sign_test_package_identity(&identity);
         package
     }
 
@@ -10264,8 +10016,8 @@ mod tests {
         package: &mut mainframe_env_application::ApplicationPackageV2,
         _trust: &HmacSha256PackageTrust,
     ) {
-        let identity = mainframe_env_application::package_v2_identity(package).unwrap();
-        package.signature.value = sign_test_package_identity(&identity);
+        let identity = mainframe_env_application::package_generation_identity(package).unwrap();
+        package.signature = sign_test_package_identity(&identity);
     }
 
     fn signed_db2_package(
@@ -10367,8 +10119,8 @@ mod tests {
         entry.sha256 = sha256.clone();
         entry.bytes = bytes.len();
         package.base.blobs.insert(sha256, bytes);
-        let identity = mainframe_env_application::package_v2_identity(&package).unwrap();
-        package.signature.value = sign_test_package_identity(&identity);
+        let identity = mainframe_env_application::package_generation_identity(&package).unwrap();
+        package.signature = sign_test_package_identity(&identity);
         (package, definitions)
     }
 
@@ -10461,8 +10213,12 @@ mod tests {
             .install_application_package_v2(&first_package)
             .unwrap();
         let retained = server.application_generation_v2(&first).unwrap();
+        let plan = server
+            .prevalidate_application_publication(&retained, PublicationAction::Install, false)
+            .unwrap();
         server
-            .apply_application_batch_controllers(&retained)
+            .batch
+            .with_publication_write(|writer| writer.install_controllers(plan.controllers))
             .unwrap();
         store
             .put_provider_state(
@@ -14475,11 +14231,13 @@ mod tests {
                 .mutate_process(
                     "TYPE",
                     "ORDER",
-                    uow,
-                    execution,
-                    "IBMUSER",
-                    "activate",
-                    [1; 32],
+                    mainframe_env_cics::bts_lifecycle::BtsReplayContext {
+                        run_unit: uow,
+                        owner_execution: execution,
+                        owner_principal: "IBMUSER",
+                        replay_key: "activate",
+                        request_digest: [1; 32],
+                    },
                     |process| {
                         process.start(&root_id, None, true)?;
                         process.checkpoint(&root_id, 1, 7, "selected-checkpoint")?;
@@ -14499,11 +14257,13 @@ mod tests {
                         transid: "BT01".into(),
                         userid: "IBMUSER".into(),
                     },
-                    uow,
-                    execution,
-                    "IBMUSER",
-                    "child",
-                    [2; 32],
+                    mainframe_env_cics::bts_lifecycle::BtsReplayContext {
+                        run_unit: uow,
+                        owner_execution: execution,
+                        owner_principal: "IBMUSER",
+                        replay_key: "child",
+                        request_digest: [2; 32],
+                    },
                 )
                 .unwrap();
             server
@@ -21415,7 +21175,7 @@ mod tests {
     #[test]
     fn online_link_updates_typed_commarea_through_selected_program_route() {
         let limits = SourceLimits::default();
-        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. LINKER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 LINK-AREA PIC X(160) VALUE X'7B22706172616D65746572223A6E756C6C2C22646473223A5B5D7D'.\n01 LINK-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS LINK PROGRAM('IEFBR14') COMMAREA(LINK-AREA) LENGTH(LENGTH OF LINK-AREA) DATALENGTH(1) END-EXEC.\nMOVE EIBFN TO LINK-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. LINKER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 LINK-AREA PIC X(160) VALUE X'7B22706172616D65746572223A6E756C6C2C22646473223A5B5D7D'.\n01 LINK-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS LINK PROGRAM('LINKCAL') COMMAREA(LINK-AREA) LENGTH(LENGTH OF LINK-AREA) DATALENGTH(1) END-EXEC.\nMOVE EIBFN TO LINK-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
         let path = LogicalPath::new("LINKER.cbl", limits.max_path_bytes).unwrap();
         let bundle = SourceBundle::new(
             &path,
@@ -21446,17 +21206,21 @@ mod tests {
             CompilerResult::Published { artifact, .. } => artifact,
             other => panic!("LINK fixture did not publish: {other:?}"),
         };
+        let child_artifact = published_source_fixture(
+            "LINKCAL",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. LINKCAL.\nDATA DIVISION.\nLINKAGE SECTION.\n01 DFHCOMMAREA PIC X(160).\nPROCEDURE DIVISION USING DFHCOMMAREA.\nMOVE '{\"return_code\":0}' TO DFHCOMMAREA.\nGOBACK.\n",
+        );
         let server = ProductServer::memory(config()).unwrap();
         server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
         server
             .racf
-            .define_profile("FACILITY", "CICS.PROGRAM.IEFBR14", "IBMUSER", None)
+            .define_profile("FACILITY", "CICS.PROGRAM.LINKCAL", "IBMUSER", None)
             .unwrap();
         server
             .racf
             .permit(
                 "FACILITY",
-                "CICS.PROGRAM.IEFBR14",
+                "CICS.PROGRAM.LINKCAL",
                 "IBMUSER",
                 AccessIntent::Execute,
             )
@@ -21466,15 +21230,29 @@ mod tests {
             InvocationLimits::default(),
         )
         .unwrap();
+        let child_artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(child_artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
         server
             .install_online_application(OnlineApplicationDefinition {
-                programs: vec![OnlineProgramDefinition {
-                    name: "LINKER".into(),
-                    artifact: artifact_ref.clone(),
-                    payload: artifact.payload().to_vec(),
-                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
-                    semantic_identity: artifact.semantic_id().to_reference(),
-                }],
+                programs: vec![
+                    OnlineProgramDefinition {
+                        name: "LINKER".into(),
+                        artifact: artifact_ref.clone(),
+                        payload: artifact.payload().to_vec(),
+                        manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                        semantic_identity: artifact.semantic_id().to_reference(),
+                    },
+                    OnlineProgramDefinition {
+                        name: "LINKCAL".into(),
+                        artifact: child_artifact_ref.clone(),
+                        payload: child_artifact.payload().to_vec(),
+                        manifest: VersionedArtifactManifest::V3(child_artifact.manifest().clone()),
+                        semantic_identity: child_artifact.semantic_id().to_reference(),
+                    },
+                ],
                 transactions: BTreeMap::from([("LK00".into(), "LINKER".into())]),
                 maps: vec![BmsMapDefinition {
                     mapset: "LINKER".into(),
@@ -21486,6 +21264,20 @@ mod tests {
                     fields: Vec::new(),
                 }],
             })
+            .unwrap();
+        server
+            .cics
+            .register_program_definitions(&[CicsProgramDefinition {
+                name: "LINKCAL".into(),
+                generation: 1,
+                artifact: child_artifact_ref,
+                semantic_identity: child_artifact.semantic_id().to_reference(),
+                entry_offset: 0,
+                enabled: true,
+                remote: false,
+                reload: false,
+                java_status: CicsJavaStatus::NotJava,
+            }])
             .unwrap();
         let session = SessionId::new("typed-link", 64).unwrap();
         let invocation = server
@@ -25989,10 +25781,12 @@ mod tests {
                 &session,
                 &principal,
                 "partition-receive-selected-csrf",
-                0x7d,
-                "P",
-                b"lower",
-                17,
+                mainframe_env_cics::CicsPartitionInput {
+                    aid: 0x7d,
+                    partition: "P",
+                    data: b"lower",
+                    cursor: 17,
+                },
                 3,
             )
             .unwrap();

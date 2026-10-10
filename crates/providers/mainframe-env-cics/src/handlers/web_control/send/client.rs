@@ -85,13 +85,12 @@ pub(super) fn invoke(
     let mut headers = stage
         .as_ref()
         .map_or_else(Vec::new, |stage| stage.headers.clone());
-    if let Some(media_type) = input.media_type {
-        if !headers
+    if let Some(media_type) = input.media_type
+        && !headers
             .iter()
             .any(|(name, _)| name.eq_ignore_ascii_case("Content-Type"))
-        {
-            headers.push(("Content-Type".into(), media_type));
-        }
+    {
+        headers.push(("Content-Type".into(), media_type));
     }
     if !input.body.is_empty()
         && !headers

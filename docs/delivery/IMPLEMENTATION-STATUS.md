@@ -14,7 +14,7 @@ inputs; it does not establish a fresh full-suite pass or licensed equivalence.
 <!-- BEGIN GENERATED SUBSYSTEM INDEX -->
 | Subsystem | Phase | Recorded progress |
 |---|---|---|
-| Coverage and conformance | Coverage authority | [Implementation candidate; acceptance pending](subsystems/coverage/foundation-status.md) |
+| Coverage and conformance | Coverage authority | [Bounded implementation accepted; integrated acceptance pending](subsystems/coverage/foundation-status.md) |
 | COBOL | Grammar and types | [CB-306 complete; full-phase acceptance next](subsystems/cobol/structure-status.md) |
 | COBOL | Execution semantics | [CB-401 through CB-406 locally complete — pass-with-licensed-differential-pending](subsystems/cobol/execution-status.md) |
 | RACF / SAF | Commands and authorization | [Implementation candidate; pass with licensed differential pending](subsystems/racf/security-status.md) |
@@ -31,6 +31,12 @@ inputs; it does not establish a fresh full-suite pass or licensed equivalence.
 | Cross-resource integration | Transactions and recovery | [Early INT-1601 participant boundary sealed; integration.transactions is not complete](subsystems/integration/transactions-status.md) |
 | Licensed certification | Differential certification | [Shared harness foundation implemented; licensed environments and campaigns pending](subsystems/certification/licensed-status.md) |
 <!-- END GENERATED SUBSYSTEM INDEX -->
+
+The [Foundation progress record](subsystems/coverage/foundation-status.md)
+separates qualified supervisor, MQ and selected navigation results from pending
+strict/application and final-candidate gates. Full CardDemo closure still requires
+20 journeys with 114 observations and 26 selected issue rows with 105 acceptance
+requirements; scoped passes do not complete these obligations.
 
 Use the [plans](subsystems/README.md), [dependencies](subsystems/DEPENDENCIES.md),
 and [implementation prompts](../prompts/subsystems/README.md) to select work.

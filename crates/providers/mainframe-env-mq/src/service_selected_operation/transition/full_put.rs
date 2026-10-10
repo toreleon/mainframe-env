@@ -93,19 +93,22 @@ fn target(
     Ok((queue, path))
 }
 pub(super) fn prepare(
-    state: &rich_state::RichStoredState,
-    runtime: &mut SelectedRuntime,
-    invocation: &Invocation,
-    logical: &LogicalBatchOwner,
-    owner: MqHandleOwner,
+    context: Preparation<'_, '_>,
     request: &MqMqiRequest,
-    now: u64,
-    authorizer: &dyn EnterpriseAuthorizer,
     next: &mut Candidate,
-    service: &MqService,
-    frame: FrameLease,
-    admitted: &crate::mqi_admission::MqMqiAdmitted<'_>,
 ) -> Result<(), HostProblem> {
+    let Preparation {
+        state,
+        runtime,
+        invocation,
+        logical,
+        owner,
+        now,
+        authorizer,
+        service,
+        frame,
+        admitted,
+    } = context;
     if owner.environment != MqHostEnvironment::ZosBatch {
         return Err(HostProblem::Unsupported);
     }

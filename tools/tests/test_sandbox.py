@@ -5,6 +5,7 @@ import base64
 import http.client
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import os
 from pathlib import Path
 import select
 import struct
@@ -22,6 +23,7 @@ from tools.sandbox.operations import decode_fields, validate, Operations, TOOLS
 from tools.sandbox.server import Server
 from tools.sandbox.runtime import Runtime
 from tools.sandbox.setup import prepare_reference, setup
+from tools.sandbox.setup_evidence import digest, source_state
 
 
 class ReferenceSetupTests(unittest.TestCase):
@@ -96,6 +98,292 @@ class ReferenceSetupTests(unittest.TestCase):
             self.assertEqual(len(commands), 2)
             self.assertEqual(sentinel.read_text(), "unrelated artifacts")
             self.assertFalse(json.loads((root / "bundle/bundle.json").read_text())["ready"])
+
+
+class SetupBoundaryTests(unittest.TestCase):
+    """Transaction controls use a synthetic build; they supply no runtime acceptance."""
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.checkout = self.root / "checkout"
+        self.checkout.mkdir()
+        for directory in ("bin", "tools/sandbox", "LICENSES", "conformance/profiles/carddemo/inventory"):
+            (self.checkout / directory).mkdir(parents=True)
+        for name in ("Cargo.lock", "LICENSE", "NOTICE", "bin/mainframe-sandbox", "tools/sandbox/__init__.py", "LICENSES/test.txt"):
+            (self.checkout / name).write_text("test fixture\n")
+        (self.checkout / ".gitignore").write_text("target/\n")
+        self.identity = {"commit": "a" * 40}
+        write_json(self.checkout / "conformance/profiles/carddemo/inventory/carddemo-corpus.json", self.identity)
+        command = ["git", "-C", str(self.checkout)]
+        subprocess.run(command + ["init", "--quiet"], check=True)
+        subprocess.run(command + ["add", "."], check=True)
+        subprocess.run(command + ["-c", "user.name=Sandbox test", "-c", "user.email=sandbox@example.invalid",
+                                  "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "fixture"], check=True)
+        self.bundle = self.root / "bundle"
+        self.target = self.checkout / "target/setup-test"
+        self.evidence = self.root / "evidence"
+        self.shared = self.root / "shared-target"
+        self.shared.mkdir()
+        (self.shared / "keep").write_text("shared producer")
+        sibling = self.checkout / "target/other-producer"
+        sibling.mkdir(parents=True)
+        (sibling / "keep").write_text("sibling producer")
+        self.actual_run = subprocess.run
+        self.commands = []
+
+    def run_command(self, command, **kwargs):
+        if command[0] in ("git", "rustc") or command == ["cargo", "--version"]:
+            return self.actual_run(command, **kwargs)
+        self.commands.append(command)
+        self.assertFalse(json.loads((self.bundle / "bundle.json").read_text())["ready"])
+        self.assertEqual(kwargs["env"]["CARGO_TARGET_DIR"], str(self.target))
+        self.assertEqual(kwargs["env"]["CARGO_NET_OFFLINE"], "true")
+        if command[:2] == ["cargo", "build"]:
+            self.assertIn("--frozen", command)
+            self.assertIn("--offline", command)
+            release = self.target / "release"
+            release.mkdir()
+            for name in ("mainframe-env", "mainframe-sandbox-runtime", "xtask"):
+                (release / name).write_bytes(("synthetic " + name).encode())
+                (release / name).chmod(0o700)
+        elif "license-notices" in command:
+            Path(command[-1]).write_text("synthetic notice text\n")
+        else:
+            self.assertEqual(command, [str(self.bundle / "bin/mainframe-sandbox-runtime"), "--help"])
+        kwargs["stdout"].write(b"synthetic command output\n")
+        return subprocess.CompletedProcess(command, 0)
+
+    def invoke(self, runner=None):
+        with patch("tools.sandbox.setup.ROOT", self.checkout), \
+                patch("tools.sandbox.setup.subprocess.run", side_effect=runner or self.run_command), \
+                patch("tools.sandbox.setup.prepare_reference"), \
+                patch.dict(os.environ, {"CARGO_TARGET_DIR": str(self.shared)}):
+            return setup(self.bundle, None, False, self.target, self.evidence)
+
+    def receipt(self):
+        return json.loads((self.evidence / "setup-receipt.json").read_text())
+
+    def assert_cleanup(self):
+        self.assertFalse(self.target.exists())
+        self.assertEqual((self.shared / "keep").read_text(), "shared producer")
+        self.assertEqual((self.checkout / "target/other-producer/keep").read_text(), "sibling producer")
+
+    def test_fresh_setup_retains_actual_commands_and_artifacts_before_exact_cleanup(self):
+        source = source_state(self.checkout)
+        result = self.invoke()
+        receipt = self.receipt()
+        self.assertEqual(receipt["source_start"], source)
+        self.assertEqual(receipt["source_end"], source)
+        self.assertEqual(receipt["status"], "passed")
+        self.assertTrue(receipt["ready"])
+        self.assertTrue(receipt["cleanup"]["passed"])
+        self.assertTrue(json.loads((self.bundle / "bundle.json").read_text())["ready"])
+        self.assertEqual(result["producer_evidence"], str(self.evidence / "setup-receipt.json"))
+        self.assertEqual([entry["name"] for entry in receipt["commands"]], ["build", "license-notices", "runtime-help"])
+        for entry in receipt["commands"]:
+            self.assertEqual(entry["returncode"], 0)
+            self.assertEqual(Path(entry["log"]).read_bytes(), b"synthetic command output\n")
+        self.assertEqual(set(receipt["artifacts"]), {"mainframe-env", "mainframe-sandbox-runtime", "xtask", "THIRD-PARTY-NOTICES.md"})
+        for artifact in receipt["artifacts"].values():
+            self.assertEqual(digest(Path(artifact["path"])), artifact["sha256"])
+        self.assert_cleanup()
+
+    def test_build_failure_preserves_partial_producer_and_error_then_cleans_exact_target(self):
+        def run(command, **kwargs):
+            result = self.run_command(command, **kwargs)
+            if command[:2] == ["cargo", "build"]:
+                raise subprocess.CalledProcessError(17, command)
+            return result
+        with self.assertRaises(subprocess.CalledProcessError) as raised:
+            self.invoke(run)
+        self.assertEqual(raised.exception.returncode, 17)
+        receipt = self.receipt()
+        self.assertEqual(receipt["status"], "failed")
+        self.assertFalse(receipt["ready"])
+        self.assertEqual(receipt["commands"][0]["returncode"], 17)
+        self.assertEqual(set(receipt["artifacts"]), {"mainframe-env", "mainframe-sandbox-runtime", "xtask"})
+        self.assertFalse(json.loads((self.bundle / "bundle.json").read_text())["ready"])
+        self.assert_cleanup()
+
+    def test_runtime_probe_failure_retains_outputs_without_publishing_ready(self):
+        def run(command, **kwargs):
+            result = self.run_command(command, **kwargs)
+            if command[-1] == "--help":
+                raise subprocess.CalledProcessError(9, command)
+            return result
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.invoke(run)
+        self.assertFalse(self.receipt()["ready"])
+        self.assertEqual(self.receipt()["commands"][-1]["returncode"], 9)
+        self.assertIn("THIRD-PARTY-NOTICES.md", self.receipt()["artifacts"])
+        self.assertFalse(json.loads((self.bundle / "bundle.json").read_text())["ready"])
+        self.assert_cleanup()
+
+    def test_source_change_is_recorded_and_refuses_ready(self):
+        def run(command, **kwargs):
+            result = self.run_command(command, **kwargs)
+            if command[-1] == "--help":
+                (self.checkout / "LICENSE").write_text("changed during setup\n")
+            return result
+        with self.assertRaisesRegex(ValueError, "source changed"):
+            self.invoke(run)
+        self.assertNotEqual(self.receipt()["source_start"], self.receipt()["source_end"])
+        self.assertFalse(self.receipt()["ready"])
+        self.assert_cleanup()
+
+    def test_failed_final_manifest_publication_keeps_receipt_and_bundle_nonready(self):
+        from tools.sandbox.instance import write_json as actual_write
+        def write(path, value):
+            if path == self.bundle / "bundle.json" and value["ready"]:
+                raise OSError("injected publication failure")
+            return actual_write(path, value)
+        with patch("tools.sandbox.setup.write_json", side_effect=write):
+            with self.assertRaisesRegex(OSError, "publication failure"):
+                self.invoke()
+        self.assertFalse(json.loads((self.bundle / "bundle.json").read_text())["ready"])
+        self.assertFalse(self.receipt()["ready"])
+        self.assertEqual(self.receipt()["errors"][-1]["stage"], "publication")
+        self.assert_cleanup()
+
+    def test_prebuild_manifest_failure_records_failure_and_cleans_claimed_target(self):
+        with patch("tools.sandbox.setup.write_json", side_effect=OSError("initial manifest failed")):
+            with self.assertRaisesRegex(OSError, "initial manifest"):
+                self.invoke()
+        self.assertEqual(self.receipt()["status"], "failed")
+        self.assertEqual(self.receipt()["commands"], [])
+        self.assertEqual(self.receipt()["artifacts"], {})
+        self.assert_cleanup()
+
+    def test_prebuild_bin_directory_failure_is_finalized_and_cleaned(self):
+        actual_mkdir = Path.mkdir
+        def mkdir(path, *args, **kwargs):
+            if path == self.bundle / "bin":
+                raise OSError("injected bin directory failure")
+            return actual_mkdir(path, *args, **kwargs)
+        with patch.object(Path, "mkdir", new=mkdir):
+            with self.assertRaisesRegex(OSError, "bin directory"):
+                self.invoke()
+        self.assertEqual(self.receipt()["status"], "failed")
+        self.assertFalse(json.loads((self.bundle / "bundle.json").read_text())["ready"])
+        self.assertEqual(self.receipt()["commands"], [])
+        self.assert_cleanup()
+
+    def test_evidence_output_allocation_failure_finalizes_without_claiming_target(self):
+        actual_mkdir = Path.mkdir
+        def mkdir(path, *args, **kwargs):
+            if path.parent == self.evidence and path.name.startswith("setup-"):
+                raise OSError("injected evidence allocation failure")
+            return actual_mkdir(path, *args, **kwargs)
+        with patch.object(Path, "mkdir", new=mkdir):
+            with self.assertRaisesRegex(OSError, "evidence allocation"):
+                self.invoke()
+        self.assertEqual(self.receipt()["status"], "failed")
+        self.assertFalse(self.receipt()["ready"])
+        self.assertEqual(self.receipt()["errors"][0]["stage"], "evidence-allocation")
+        self.assert_cleanup()
+
+    def test_failed_notice_command_retains_its_partial_output_without_ready_credit(self):
+        def run(command, **kwargs):
+            result = self.run_command(command, **kwargs)
+            if "license-notices" in command:
+                raise subprocess.CalledProcessError(6, command)
+            return result
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.invoke(run)
+        receipt = self.receipt()
+        self.assertFalse(receipt["ready"])
+        self.assertEqual(receipt["commands"][-1]["returncode"], 6)
+        retained = Path(receipt["artifacts"]["THIRD-PARTY-NOTICES.md"]["path"])
+        self.assertEqual(retained.read_text(), "synthetic notice text\n")
+        self.assert_cleanup()
+
+    def test_replaced_target_is_neither_retained_nor_deleted(self):
+        retained_target = self.checkout / "target/original-owned-target"
+        def run(command, **kwargs):
+            result = self.run_command(command, **kwargs)
+            if command[-1] == "--help":
+                self.target.rename(retained_target)
+                self.target.mkdir()
+                (self.target / "keep").write_text("replacement producer")
+            return result
+        with self.assertRaisesRegex(ValueError, "ownership changed"):
+            self.invoke(run)
+        self.assertEqual((self.target / "keep").read_text(), "replacement producer")
+        self.assertTrue((retained_target / "release/xtask").exists())
+        self.assertEqual(self.receipt()["artifacts"], {})
+        self.assertFalse(self.receipt()["ready"])
+        self.assertFalse(json.loads((self.bundle / "bundle.json").read_text())["ready"])
+
+    def test_symlinked_release_output_is_refused_and_owned_target_retained_for_recovery(self):
+        original_release = self.checkout / "target/original-release"
+        def run(command, **kwargs):
+            result = self.run_command(command, **kwargs)
+            if command[:2] == ["cargo", "build"]:
+                (self.target / "release").rename(original_release)
+                (self.target / "release").symlink_to(original_release, target_is_directory=True)
+            return result
+        with self.assertRaisesRegex(ValueError, "regular file"):
+            self.invoke(run)
+        self.assertTrue((self.target / "release").is_symlink())
+        self.assertTrue((original_release / "xtask").exists())
+        self.assertFalse(self.receipt()["ready"])
+        self.assertEqual(self.receipt()["artifacts"], {})
+        self.assertFalse(json.loads((self.bundle / "bundle.json").read_text())["ready"])
+
+    def test_atomic_target_claim_failure_never_retains_or_cleans_another_producer(self):
+        actual_mkdir = Path.mkdir
+        def mkdir(path, *args, **kwargs):
+            if path == self.target:
+                actual_mkdir(path)
+                release = path / "release"
+                actual_mkdir(release)
+                (release / "mainframe-env").write_text("another producer")
+                raise FileExistsError("another producer won target claim")
+            return actual_mkdir(path, *args, **kwargs)
+        with patch.object(Path, "mkdir", new=mkdir):
+            with self.assertRaises(FileExistsError):
+                self.invoke()
+        self.assertEqual((self.target / "release/mainframe-env").read_text(), "another producer")
+        self.assertEqual(self.receipt()["artifacts"], {})
+        self.assertFalse(self.receipt()["cleanup"]["passed"])
+        self.assertFalse(self.receipt()["cleanup"]["claimed"])
+
+    def test_targets_evidence_and_reused_receipts_are_admitted_before_build(self):
+        with patch("tools.sandbox.setup.ROOT", self.checkout):
+            for target in (self.root, self.shared, self.checkout / "target", self.checkout / "crates/target", self.checkout / "target/other-producer"):
+                with self.subTest(target=target), self.assertRaises(ValueError):
+                    setup(self.bundle, None, False, target, self.evidence)
+            for evidence in (self.checkout / "evidence", self.target / "evidence", self.bundle / "evidence", self.root):
+                with self.subTest(evidence=evidence), self.assertRaises(ValueError):
+                    setup(self.bundle, None, False, self.target, evidence)
+            for target, evidence in ((self.target, None), (None, self.evidence)):
+                with self.assertRaisesRegex(ValueError, "no-build"):
+                    setup(self.bundle, None, True, target, evidence)
+            with self.assertRaisesRegex(ValueError, "explicit fresh"):
+                setup(self.bundle, None, False, None, self.evidence)
+        self.assertFalse(self.bundle.exists())
+        self.assertFalse(self.evidence.exists())
+        self.invoke()
+        previous = (self.evidence / "setup-receipt.json").read_bytes()
+        with self.assertRaisesRegex(ValueError, "already contains"):
+            self.invoke()
+        self.assertEqual((self.evidence / "setup-receipt.json").read_bytes(), previous)
+        self.assertFalse(self.target.exists())
+
+    def test_symlink_target_or_evidence_ancestors_are_rejected_without_writes(self):
+        link = self.checkout / "target/linked"
+        link.symlink_to(self.shared, target_is_directory=True)
+        dangling = self.root / "dangling"
+        dangling.symlink_to(self.root / "missing", target_is_directory=True)
+        with patch("tools.sandbox.setup.ROOT", self.checkout):
+            with self.assertRaisesRegex(ValueError, "symlink"):
+                setup(self.bundle, None, False, link / "build", self.evidence)
+            with self.assertRaisesRegex(ValueError, "symlink"):
+                setup(self.bundle, None, False, self.target, dangling / "evidence")
+        self.assertFalse(self.bundle.exists())
+        self.assertFalse(self.evidence.exists())
+        self.assertFalse((self.shared / "build").exists())
 
 
 class CompilerProcessTests(unittest.TestCase):

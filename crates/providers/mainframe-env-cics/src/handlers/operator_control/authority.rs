@@ -42,20 +42,37 @@ pub(in crate::service::handlers) struct OperatorMessage {
     pub version: u64,
 }
 
+pub(super) struct MessageOwner<'a> {
+    pub execution: &'a str,
+    pub run_unit: &'a str,
+    pub principal: &'a str,
+}
+
+pub(super) struct MessageEffect<'a> {
+    pub key: &'a str,
+    pub request_digest: [u8; 32],
+}
+
 impl OperatorMessage {
     pub(super) fn new(
-        execution: &str,
-        run_unit: &str,
-        principal: &str,
+        owner: MessageOwner<'_>,
         text: Vec<u8>,
         console: Option<String>,
         routes: Vec<u8>,
         action: Option<u8>,
         maximum_reply: Option<usize>,
         deadline_tick: Option<u64>,
-        effect_key: &str,
-        request_digest: [u8; 32],
+        effect: MessageEffect<'_>,
     ) -> Result<Self, HostProblem> {
+        let MessageOwner {
+            execution,
+            run_unit,
+            principal,
+        } = owner;
+        let MessageEffect {
+            key: effect_key,
+            request_digest,
+        } = effect;
         let hash = Sha256::digest([effect_key.as_bytes(), &request_digest].concat());
         let record = Self {
             schema: SCHEMA.into(),
@@ -336,17 +353,21 @@ mod tests {
 
     fn message(maximum_reply: Option<usize>) -> OperatorMessage {
         OperatorMessage::new(
-            "execution-1",
-            "run-1",
-            "ALICE",
+            MessageOwner {
+                execution: "execution-1",
+                run_unit: "run-1",
+                principal: "ALICE",
+            },
             b"READY FOR OPERATOR".to_vec(),
             Some("OPER".into()),
             vec![],
             Some(2),
             maximum_reply,
             maximum_reply.map(|_| 50),
-            "effect-1",
-            [7; 32],
+            MessageEffect {
+                key: "effect-1",
+                request_digest: [7; 32],
+            },
         )
         .unwrap()
     }

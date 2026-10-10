@@ -269,11 +269,13 @@ impl RootRoute {
             .mutate_process(
                 "TYPE",
                 "SETROOT",
-                invocation.run_unit_id.as_str(),
-                invocation.execution_id.as_str(),
-                "IBMUSER",
-                "activate-set-root",
-                [0x51; 32],
+                mainframe_env_cics::bts_lifecycle::BtsReplayContext {
+                    run_unit: invocation.run_unit_id.as_str(),
+                    owner_execution: invocation.execution_id.as_str(),
+                    owner_principal: "IBMUSER",
+                    replay_key: "activate-set-root",
+                    request_digest: [0x51; 32],
+                },
                 |process| {
                     process.start(&root_id, None, true)?;
                     process.checkpoint(&root_id, 1, 7, "root-set-checkpoint")?;

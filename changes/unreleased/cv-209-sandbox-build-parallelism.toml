@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Bound sandbox Rust and Git build parallelism to two jobs inside the existing Docker build owners."

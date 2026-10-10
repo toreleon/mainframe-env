@@ -28,6 +28,7 @@ impl HostRequest {
                 | DatasetRequest::ReadSequential { .. }
                 | DatasetRequest::Snapshot { .. }
                 | DatasetRequest::ResolveGeneration { .. }
+                | DatasetRequest::ReadBrowsePosition { .. }
                 | DatasetRequest::ReadNext { .. }
                 | DatasetRequest::StartBrowse { .. }
                 | DatasetRequest::ResetBrowse { .. }

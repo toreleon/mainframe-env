@@ -24,7 +24,7 @@
     },
     {
       "path": "crates/apps/mainframe-env-batch/src/service.rs",
-      "max_production_lines": 6827,
+      "max_production_lines": 6803,
       "responsibility": "The batch service coordinates submission, DD allocation, program execution, spool state, and recovery transitions.",
       "split_boundary": "Split submission and routing, DD allocation, step execution, and completion/recovery into state-machine command families."
     },
@@ -36,7 +36,7 @@
     },
     {
       "path": "crates/apps/mainframe-env-server/src/product.rs",
-      "max_production_lines": 5655,
+      "max_production_lines": 5368,
       "responsibility": "Product construction, dependency assembly, application publication, JES control, and HTTP route behavior converge here.",
       "split_boundary": "Extract bootstrap/construction, publication, JES operations, and route-family adapters around the Product state owner."
     },
@@ -48,7 +48,7 @@
     },
     {
       "path": "crates/contracts/mainframe-env-host-api/src/canonical/generated.rs",
-      "max_production_lines": 2668,
+      "max_production_lines": 2634,
       "responsibility": "This frozen exhaustive host wire encoder keeps every request and result field explicit for protocol review.",
       "split_boundary": "Partition exhaustive encoders by dataset, CICS, security, Db2, IMS, and MQ families under one canonical codec facade."
     },
@@ -90,25 +90,25 @@
     },
     {
       "path": "crates/kernel/mainframe-env-interpreter/src/machine.rs",
-      "max_production_lines": 11752,
+      "max_production_lines": 11453,
       "responsibility": "The deterministic COBOL machine executes all operations, control flow, calls, host effects, and conditions.",
       "split_boundary": "Extract operation handlers by control, numeric/data, call, file/host-effect, and condition families around one machine state."
     },
     {
       "path": "crates/providers/mainframe-env-cics/src/service.rs",
-      "max_production_lines": 3361,
+      "max_production_lines": 3308,
       "responsibility": "The CICS pilot service owns session, BMS, file, queue, program, and unit-of-work semantics and persistence.",
       "split_boundary": "Freeze this pilot and route future catalog descriptors through generated modules and semantics through handler-family modules."
     },
     {
       "path": "crates/providers/mainframe-env-dataset/src/service.rs",
-      "max_production_lines": 9411,
+      "max_production_lines": 9392,
       "responsibility": "Dataset allocation, catalog state, sequential and VSAM I/O, AMS behavior, transactions, and replay meet here.",
       "split_boundary": "Split catalog/allocation, record I/O, VSAM access, AMS commands, and persistence/recovery command families."
     },
     {
       "path": "crates/providers/mainframe-env-db2/src/service.rs",
-      "max_production_lines": 3279,
+      "max_production_lines": 3214,
       "responsibility": "Db2 catalog resolution, SQL interpretation, DDL/DML effects, transaction state, and replay are co-located.",
       "split_boundary": "Separate catalog/name resolution, DDL, DML/query, and unit-of-work/replay handlers behind the service."
     },
@@ -168,7 +168,7 @@
     },
     {
       "path": "crates/tooling/mainframe-env-conformance/src/carddemo.rs",
-      "max_production_lines": 12796,
+      "max_production_lines": 12033,
       "responsibility": "CardDemo conformance provisions the full fixture, drives online and batch journeys, and checks persistence and failures.",
       "split_boundary": "Separate fixture provisioning, online transactions, batch jobs, authorization, and durability/failure scenario families."
     },
@@ -370,6 +370,10 @@
       "crates/providers/mainframe-env-cics/src/handlers/event_control/state_validation.rs",
       "crates/providers/mainframe-env-cics/src/handlers/event_control/timer.rs",
       "crates/providers/mainframe-env-cics/src/handlers/file_control.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/file_control/first_reverse.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/file_control/first_reverse/tests.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/file_control/task_retirement.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/file_control/task_retirement/tests.rs",
       "crates/providers/mainframe-env-cics/src/handlers/file_tokens.rs",
       "crates/providers/mainframe-env-cics/src/handlers/file_unlock.rs",
       "crates/providers/mainframe-env-cics/src/handlers/handle_state.rs",

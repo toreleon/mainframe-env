@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Exercise typed CICS LINK through an installed compiled callee, preserving COMMAREA copyback, EIBFN, suspension and SAF assertions while retaining wrong-schema reply refusal."

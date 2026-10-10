@@ -3,7 +3,7 @@ use crate::{MqLocalQueueUsage, MqObjectDefinition, MqObjectName, MqQueueManagerD
 use mainframe_env_execution_api::{
     ArtifactRef, AuditDecision, AuditRecord, ExecutionId, PrincipalId, RunUnitId, Selector,
 };
-use mainframe_env_host_api::{MqExpiry, MqGetContract, MqGetMode, MqTruncation, MqWait};
+use mainframe_env_host_api::{MqGetContract, MqGetMode, MqTruncation, MqWait};
 use mainframe_env_store::{MemoryStore, SqliteStateStore, StoreLimits};
 use mainframe_env_store_api::{
     AuditedProviderPublication, EffectDigestFormat, EffectIntentMetadata, EffectRecord,
@@ -146,7 +146,7 @@ fn loaded(b: &Backend, fence: u64) -> RichStoredState {
     let StoredAuthority::Rich(r) = read(b.store(), 3, fence, Default::default()).unwrap() else {
         panic!("rich expected")
     };
-    r
+    *r
 }
 fn request(mode: MqGetMode) -> MqGetContract {
     MqGetContract {
@@ -165,13 +165,6 @@ fn candidate(r: &RichStoredState) -> MqDeliveryKernel {
 }
 fn records(b: &Backend) -> Vec<ProviderStateRecord> {
     b.store().list_provider_state_prefix("mq-", 2048).unwrap()
-}
-fn rich_from(records: Vec<ProviderStateRecord>, fence: u64) -> RichStoredState {
-    let StoredAuthority::Rich(r) = decode_records(records, 3, fence, Default::default()).unwrap()
-    else {
-        panic!("rich expected")
-    };
-    r
 }
 fn audit_fixture(b: &Backend) -> AuditedProviderPublication {
     let l = InvocationLimits::default();
@@ -334,7 +327,9 @@ fn full_upgrade_memory_sqlite_cas_reopen_and_retained_corpus() {
         let mut k = r.delivery.clone();
         let m = crate::delivery::full_message::tests::full(2, true, true);
         k.put_full(&r.catalog, &name("B"), m.clone(), None).unwrap();
-        let plan = r.plan_delivery(&k, Default::default()).unwrap();
+        let plan = r
+            .plan_selected_delivery(&k, Vec::new(), Default::default())
+            .unwrap();
         let (batch, next) = plan.into_parts();
         b.store().mutate_provider_states_atomic(batch).unwrap();
         b.reopen();
@@ -393,7 +388,7 @@ fn full_upgrade_memory_sqlite_cas_reopen_and_retained_corpus() {
             .unwrap();
         b.store()
             .mutate_provider_states_atomic(
-                r.plan_delivery(&staged, Default::default())
+                r.plan_selected_delivery(&staged, Vec::new(), Default::default())
                     .unwrap()
                     .into_parts()
                     .0,
@@ -426,7 +421,7 @@ fn full_upgrade_memory_sqlite_cas_reopen_and_retained_corpus() {
         b.store()
             .mutate_provider_states_atomic(
                 pending
-                    .plan_delivery(&settled, Default::default())
+                    .plan_selected_delivery(&settled, Vec::new(), Default::default())
                     .unwrap()
                     .into_parts()
                     .0,
@@ -453,7 +448,9 @@ fn full_upgrade_stale_writer_both_orderings_and_last_dependency_rollback() {
             let upgrade = r
                 .plan_profile_upgrade(&BTreeMap::new(), Default::default())
                 .unwrap();
-            let ordinary = r.plan_delivery(&candidate(&r), Default::default()).unwrap();
+            let ordinary = r
+                .plan_selected_delivery(&candidate(&r), Vec::new(), Default::default())
+                .unwrap();
             let (winner, loser) = if upgrade_first {
                 (upgrade, ordinary)
             } else {
@@ -592,7 +589,8 @@ fn full_upgrade_actual_audit_or_physical_quota_failure_never_adopts_candidate() 
         let r = publish(
             &b,
             p.clone(),
-            r.plan_delivery(&r.delivery, Default::default()).unwrap(),
+            r.plan_selected_delivery(&r.delivery, Vec::new(), Default::default())
+                .unwrap(),
         );
         if sqlite {
             for i in 0..64 {

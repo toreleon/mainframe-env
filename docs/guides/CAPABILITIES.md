@@ -49,10 +49,12 @@ See [Conformance IR](../architecture/CONFORMANCE-IR.md).
 
 ## CardDemo workload boundary
 
-The framework's CardDemo conformance composition covers 20 owned local journeys across
-base CICS, the batch cycle, Db2, IMS, and MQ authorization. The complete gate
-also exercises memory isolation and overload, SQLite backup/restore, and
-PostgreSQL restart. Use the optimized runner described in the
+The framework's CardDemo conformance profile declares 20 local journeys across
+base CICS, the batch cycle, Db2, IMS, and MQ authorization, plus 26 transaction
+requirements and 105 issue acceptance requirements. Full current-candidate
+closure remains pending; selected local comparisons do not complete it. The
+complete gate also requires memory isolation/overload, SQLite backup/restore,
+and PostgreSQL restart. Use the optimized runner described in the
 [operator runbook](../runbooks/CARDDEMO-OPERATOR.md); the unoptimized statement
 cycle can exceed the job deadline.
 

@@ -53,6 +53,7 @@ axum-server = { version = "0.8", default-features = false, features = ["tls-rust
 tower = { version = "0.5", default-features = false, features = ["limit", "timeout", "util"] }
 tower-http = { version = "0.6", default-features = false, features = ["limit", "trace", "request-id", "timeout"] }
 base64 = "0.22"
+coset = { version = "=0.4.2", default-features = false }
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 in_toto_attestation = "=0.1.0"
 protobuf-json-mapping = "=3.7.2"

@@ -1,0 +1,92 @@
+{
+  "generation": 1,
+  "sections": {
+    "batch_controllers": [
+      {
+        "kind": "CobolProgram",
+        "name": "APP-CONTROLLER",
+        "program": "program/2",
+        "properties": {
+          "commit": "step"
+        }
+      }
+    ],
+    "host_abi_libraries": [
+      {
+        "id": "CICS-ABI",
+        "members": [
+          {
+            "blob_sha256": "sha256:d449acb92215ed502901c9e6f6a4dc6d28e6856fb6754892becd148dee1b3e85",
+            "name": "DFHAID"
+          }
+        ],
+        "subsystem": "Cics",
+        "version": "1"
+      }
+    ],
+    "ims_definitions": [
+      {
+        "name": "APPDB",
+        "segments": [
+          "ROOT"
+        ]
+      }
+    ],
+    "ims_rows": [
+      {
+        "definition": "APPDB",
+        "segment": "ROOT",
+        "values": {
+          "ID": "1"
+        }
+      }
+    ],
+    "mq_resources": [
+      {
+        "controller": "APP-CONTROLLER",
+        "kind": "Queue",
+        "name": "APP.QUEUE",
+        "target": null
+      }
+    ],
+    "schema_version": "mainframe-env.application-package@3",
+    "security_resources": [
+      {
+        "class": "FACILITY",
+        "owner": "APPADMIN",
+        "profile": "APP.EXECUTE"
+      }
+    ],
+    "sql_rows": [
+      {
+        "table": "APP.TABLE",
+        "values": {
+          "ID": "1"
+        }
+      }
+    ],
+    "sql_tables": [
+      {
+        "columns": [
+          {
+            "name": "ID",
+            "nullable": false
+          },
+          {
+            "name": "VALUE",
+            "nullable": true
+          }
+        ],
+        "name": "APP.TABLE",
+        "primary_key": [
+          "ID"
+        ]
+      }
+    ]
+  },
+  "signature": {
+    "algorithm": "test-signature@1",
+    "key_id": "test-key",
+    "value": "signed:sha256:ff0e89bdae619359988a6cabd159341a6a08a026ff76d25deac0655d556f9100"
+  }
+}

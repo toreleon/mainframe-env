@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Mount the finite public client as a local scoped package and admit its exact bounded startup debug log."

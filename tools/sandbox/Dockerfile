@@ -18,7 +18,7 @@ RUN --mount=type=bind,source=Cargo.toml,target=/build/Cargo.toml \
       export CARGO_HTTP_CAINFO=/run/secrets/proxy_ca CURL_CA_BUNDLE=/run/secrets/proxy_ca GIT_SSL_CAINFO=/run/secrets/proxy_ca; \
     fi; \
     cd /build; \
-    cargo +1.98.0 build --locked --release -p mainframe-env-cli -p mainframe-env-conformance -p xtask \
+    cargo +1.98.0 build --locked --release --jobs 2 -p mainframe-env-cli -p mainframe-env-conformance -p xtask \
       --bin mainframe-env --bin mainframe-sandbox-runtime --bin xtask; \
     mkdir -p /out/bin; \
     cp target/release/mainframe-env target/release/mainframe-sandbox-runtime /out/bin/; \
@@ -34,7 +34,7 @@ RUN --mount=type=secret,id=proxy_ca \
     curl --fail --show-error --location https://www.kernel.org/pub/software/scm/git/git-2.50.1.tar.xz -o /tmp/git.tar.xz; \
     echo '7e3e6c36decbd8f1eedd14d42db6674be03671c2204864befa2a41756c5c8fc4  /tmp/git.tar.xz' | sha256sum --check; \
     tar -xJf /tmp/git.tar.xz -C /tmp; \
-    make -C /tmp/git-2.50.1 -j4 prefix=/opt/mainframe-sandbox/git CFLAGS=-O2 LDFLAGS=-s NO_GETTEXT=YesPlease NO_TCLTK=YesPlease install; \
+    make -C /tmp/git-2.50.1 -j2 prefix=/opt/mainframe-sandbox/git CFLAGS=-O2 LDFLAGS=-s NO_GETTEXT=YesPlease NO_TCLTK=YesPlease install; \
     mkdir -p /out/git/lib /out/git/runtime-licenses /out/reference; \
     cp -a /opt/mainframe-sandbox/git/. /out/git/; \
     cp /tmp/git.tar.xz /out/git/git-source.tar.xz; \

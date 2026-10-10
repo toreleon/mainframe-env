@@ -199,7 +199,7 @@ pub(super) fn write_context(
             "EIBRCODE",
             &[
                 first,
-                u8::from(eoc) * 0x20 | u8::from(fmh) * 0x40,
+                (u8::from(eoc) * 0x20) | (u8::from(fmh) * 0x40),
                 condition,
                 0,
                 0,

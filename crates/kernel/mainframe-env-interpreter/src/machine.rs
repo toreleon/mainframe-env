@@ -46,6 +46,7 @@ mod completion;
 mod normal_return;
 pub use normal_return::{InstalledProgramReturn, InstalledProgramReturnKind};
 mod condition_literals;
+mod condition_ops;
 mod corresponding;
 mod decimal_capacity;
 mod decimal_commit;
@@ -57,6 +58,7 @@ mod layout_resolution;
 mod legacy_mq;
 mod observability;
 mod snapshot_codec;
+mod string_ops;
 mod typed_cics;
 pub(crate) mod typed_mq;
 pub use typed_mq::{MqMqiAbiScope, MqMqiConnxProfile, MqMqiProgramFrame, MqMqiProgramProfile};
@@ -371,7 +373,7 @@ enum PendingKind {
         completion_code: Option<String>,
         reason_code: Option<String>,
     },
-    MqMqi(typed_mq::Targets),
+    MqMqi(Box<typed_mq::Targets>),
     Cics {
         operation: CicsOperation,
         storage64_intent: Option<typed_cics::Storage64Intent>,
@@ -762,7 +764,7 @@ impl ReferenceMachine {
             }
             for (formal, value) in formals.iter().zip(values) {
                 let layout = layouts
-                    .get(&normalize(&formal))
+                    .get(&normalize(formal))
                     .ok_or(MachineProblem::UnknownStorage)?;
                 if !layout.linkage || layout.parent.is_some() || layout.length == 0 {
                     return Err(MachineProblem::InvalidArtifact(
@@ -1954,7 +1956,7 @@ impl ReferenceMachine {
                 }
             }
             (PendingKind::MqMqi(targets), HostResult::MqMqi(result)) => {
-                self.finish_typed_mq(targets, *result)
+                self.finish_typed_mq(*targets, *result)
                     .map_err(|_| MachineProblem::Host(HostProblem::UnknownOutcome))?;
             }
             (PendingKind::MqMqi(_), _) => {
@@ -2058,59 +2060,14 @@ impl ReferenceMachine {
                     &outputs,
                     &response,
                 )?;
-                if let Some(target) = into
-                    && matches!(
-                        typed_cics::into_payload_schema(operation, &response),
-                        Some("mainframe-env.cics.into@1" | "mainframe-env.cics.payload@1")
-                    )
-                {
-                    typed_cics::write_target(
-                        self,
-                        &target,
-                        &CobolValue::Bytes(response.payload.bytes().to_vec()),
-                    )?;
-                }
-                let mut container_set_base = None;
-                for (name, value) in &response.outputs {
-                    if typed_cics::write_runtime_output(self, operation, name, value)? {
-                        continue;
-                    }
-                    if let Some(field) = name.strip_prefix("BMS.") {
-                        if let Some(field) = field.strip_suffix(".LENGTH") {
-                            let target = format!("{field}L");
-                            if self.layout(&target).is_some() {
-                                let coefficient = String::from_utf8_lossy(value.bytes())
-                                    .parse::<i128>()
-                                    .map_err(|_| MachineProblem::UnexpectedHostResult)?;
-                                self.write_decimal(
-                                    &target,
-                                    Decimal {
-                                        coefficient,
-                                        scale: 0,
-                                    },
-                                )?;
-                            }
-                        } else {
-                            let target = format!("{field}I");
-                            if self.layout(&target).is_some() {
-                                self.write(&target, value.bytes())?;
-                            }
-                        }
-                        continue;
-                    }
-                    let Some(target) = outputs.get(name) else {
-                        continue;
-                    };
-                    let base = self.bases.len();
-                    typed_cics::write_output(self, operation, name, target, value, load_base)?;
-                    if operation == CicsOperation::GetContainer
-                        && name == "SET"
-                        && value.schema() == "mainframe-env.cics.payload@1"
-                        && self.bases.len() == base + 1
-                    {
-                        container_set_base = Some(base);
-                    }
-                }
+                let container_set_base = typed_cics::apply_payload_outputs(
+                    self,
+                    operation,
+                    into.as_ref(),
+                    &outputs,
+                    &response,
+                    load_base,
+                )?;
                 typed_cics::finish(
                     self,
                     operation,
@@ -5759,76 +5716,6 @@ impl ReferenceMachine {
             Ok(())
         }
     }
-    fn string_op(&mut self, args: &[String]) -> Result<bool, MachineProblem> {
-        let into = position(args, "INTO").ok_or(MachineProblem::InvalidOperation)?;
-        let mut value = Vec::new();
-        let mut index = 0usize;
-        while index < into {
-            let mut source = self.resolve(&args[index])?;
-            index += 1;
-            if args.get(index).is_some_and(|token| token == "DELIMITED") {
-                if args.get(index + 1).is_none_or(|token| token != "BY") {
-                    return Err(MachineProblem::InvalidOperation);
-                }
-                let delimiter = args
-                    .get(index + 2)
-                    .ok_or(MachineProblem::InvalidOperation)?;
-                if delimiter != "SIZE" {
-                    let delimiter = self.resolve(delimiter)?;
-                    if delimiter.is_empty() {
-                        return Err(MachineProblem::InvalidOperation);
-                    }
-                    if let Some(position) = find_bytes(&source, &delimiter) {
-                        source.truncate(position);
-                    }
-                }
-                index += 3;
-            }
-            value.extend(source);
-        }
-        let target_end = position(&args[into + 1..], "WITH")
-            .or_else(|| position(&args[into + 1..], "ON"))
-            .map(|offset| into + 1 + offset)
-            .unwrap_or(args.len());
-        let target = self.reference(&args[into + 1..target_end])?;
-        let pointer = position(args, "POINTER")
-            .and_then(|at| args.get(at + 1))
-            .cloned();
-        let start = pointer
-            .as_deref()
-            .map(|name| self.decimal(name))
-            .transpose()?
-            .map_or(1, |value| {
-                if value.scale == 0 {
-                    usize::try_from(value.coefficient).unwrap_or(0)
-                } else {
-                    0
-                }
-            });
-        if start == 0 {
-            return Err(MachineProblem::DataException);
-        }
-        let mut target_bytes = self.read_reference(&target)?;
-        let offset = start - 1;
-        let available = target_bytes.len().saturating_sub(offset);
-        let copied = available.min(value.len());
-        if copied > 0 {
-            target_bytes[offset..offset + copied].copy_from_slice(&value[..copied]);
-            self.write_reference(&target, &target_bytes)?;
-        }
-        if let Some(pointer) = pointer {
-            self.write_decimal(
-                &pointer,
-                Decimal {
-                    coefficient: i128::try_from(start.saturating_add(copied))
-                        .map_err(|_| MachineProblem::ResourceExhausted)?,
-                    scale: 0,
-                },
-            )?;
-        }
-        let overflow = offset > target_bytes.len() || copied < value.len();
-        Ok(overflow)
-    }
     fn unstring_op(&mut self, args: &[String]) -> Result<bool, MachineProblem> {
         let into = position(args, "INTO").ok_or(MachineProblem::InvalidOperation)?;
         let source = self.resolve(args.first().ok_or(MachineProblem::InvalidOperation)?)?;
@@ -7551,192 +7438,6 @@ impl ReferenceMachine {
             _ => Err(MachineProblem::InvalidArtifact(format!(
                 "intrinsic {name} has no selected runtime route"
             ))),
-        }
-    }
-
-    fn eval_condition(&self, tokens: &[String]) -> Result<bool, MachineProblem> {
-        let normalized;
-        let tokens = if tokens.windows(2).any(comparison_pair) {
-            normalized = normalize_comparison_tokens(tokens);
-            normalized.as_slice()
-        } else {
-            tokens
-        };
-        let tokens = strip_condition_parentheses(tokens);
-        let tokens = if tokens.last().is_some_and(|token| token == "THEN") {
-            &tokens[..tokens.len() - 1]
-        } else {
-            tokens
-        };
-        if let Some(or) = top_level_position(tokens, "OR") {
-            let left = &tokens[..or];
-            let right_tokens = &tokens[or + 1..];
-            let right = if self.is_standalone_condition(right_tokens)? {
-                right_tokens.to_vec()
-            } else {
-                abbreviated_condition(left, right_tokens)
-            };
-            return Ok(self.eval_condition(left)? || self.eval_condition(&right)?);
-        }
-        if let Some(and) = top_level_position(tokens, "AND") {
-            let left = &tokens[..and];
-            let right_tokens = &tokens[and + 1..];
-            let right = if self.is_standalone_condition(right_tokens)? {
-                right_tokens.to_vec()
-            } else {
-                abbreviated_condition(left, right_tokens)
-            };
-            return Ok(self.eval_condition(left)? && self.eval_condition(&right)?);
-        }
-        if tokens.first().is_some_and(|token| token == "NOT") {
-            return Ok(!self.eval_condition(&tokens[1..])?);
-        }
-        if let Some(matched) = self.condition_name_matches(tokens)? {
-            return Ok(matched);
-        }
-        if tokens.len() >= 2
-            && !tokens.iter().any(|token| {
-                matches!(
-                    token.as_str(),
-                    "=" | "<>" | ">" | "<" | ">=" | "<=" | "EQUAL" | "GREATER" | "LESS"
-                )
-            })
-        {
-            let class = tokens.last().map(String::as_str).unwrap_or_default();
-            if matches!(
-                class,
-                "NUMERIC" | "ALPHABETIC" | "POSITIVE" | "NEGATIVE" | "ZERO"
-            ) {
-                let is = tokens
-                    .iter()
-                    .position(|token| token == "IS")
-                    .unwrap_or(tokens.len() - 1);
-                let negate = tokens[..tokens.len() - 1]
-                    .iter()
-                    .any(|token| token == "NOT");
-                let value_end =
-                    is - usize::from(tokens[..is].last().is_some_and(|token| token == "NOT"));
-                let value = self.eval_value(&tokens[..value_end])?;
-                let matched = match class {
-                    "NUMERIC" => match value {
-                        CobolValue::Decimal(_) => true,
-                        CobolValue::Bytes(bytes) => {
-                            decimal_text(&String::from_utf8_lossy(&bytes)).is_some()
-                        }
-                    },
-                    "ALPHABETIC" => value_bytes(value)?
-                        .iter()
-                        .all(|byte| byte.is_ascii_alphabetic() || *byte == b' '),
-                    "POSITIVE" => value_decimal(value)?.coefficient > 0,
-                    "NEGATIVE" => value_decimal(value)?.coefficient < 0,
-                    "ZERO" => value_decimal(value)?.coefficient == 0,
-                    _ => false,
-                };
-                return Ok(matched != negate);
-            }
-        }
-        if tokens.len() < 3 {
-            return Err(MachineProblem::UnsupportedForm);
-        }
-        let operator_index = tokens
-            .iter()
-            .position(|token| {
-                matches!(
-                    token.as_str(),
-                    "=" | "<>" | ">" | "<" | ">=" | "<=" | "EQUAL" | "GREATER" | "LESS"
-                )
-            })
-            .ok_or(MachineProblem::UnsupportedForm)?;
-        let mut operator = tokens[operator_index].as_str();
-        let negate = tokens[..operator_index]
-            .last()
-            .is_some_and(|token| token == "NOT");
-        let mut left_end = operator_index - usize::from(negate);
-        if tokens[..left_end].last().is_some_and(|token| token == "IS") {
-            left_end -= 1;
-        }
-        let mut right_start = operator_index + 1;
-        if tokens.get(right_start).is_some_and(|token| token == "TO") {
-            right_start += 1;
-        }
-        if operator == "EQUAL" {
-            operator = "=";
-        } else if operator == "GREATER" {
-            operator = ">";
-            if tokens.get(right_start).is_some_and(|token| token == "THAN") {
-                right_start += 1;
-            }
-        } else if operator == "LESS" {
-            operator = "<";
-            if tokens.get(right_start).is_some_and(|token| token == "THAN") {
-                right_start += 1;
-            }
-        }
-        let left = self.eval_value(&tokens[..left_end])?;
-        let right = if matches!(left, CobolValue::Decimal(_))
-            && tokens[right_start..].len() == 1
-            && matches!(tokens[right_start].as_str(), "ZERO" | "ZEROS" | "ZEROES")
-        {
-            CobolValue::Decimal(Decimal {
-                coefficient: 0,
-                scale: 0,
-            })
-        } else {
-            self.eval_value(&tokens[right_start..])?
-        };
-        match (left, right) {
-            (CobolValue::Decimal(left), CobolValue::Decimal(right)) => {
-                let (left, right) = decimal_aligned(left, right)?;
-                Ok(compare(left.coefficient, operator, right.coefficient) != negate)
-            }
-            (CobolValue::Bytes(left), CobolValue::Bytes(right)) => {
-                let (left, right) = padded_bytes(left, right);
-                let left = cobol_collation_key(&left);
-                let right = cobol_collation_key(&right);
-                let matched = match operator {
-                    "=" => left == right,
-                    "<>" => left != right,
-                    ">" => left > right,
-                    "<" => left < right,
-                    ">=" => left >= right,
-                    "<=" => left <= right,
-                    _ => false,
-                };
-                Ok(matched != negate)
-            }
-            (CobolValue::Decimal(left), CobolValue::Bytes(right))
-                if matches!(operator, "=" | "<>") =>
-            {
-                let left = self
-                    .reference(&tokens[..left_end])
-                    .and_then(|reference| self.read_reference(&reference))
-                    .unwrap_or_else(|_| decimal_string(left).into_bytes());
-                let (left, right) = padded_bytes(left, right);
-                let left = cobol_collation_key(&left);
-                let right = cobol_collation_key(&right);
-                Ok((if operator == "=" {
-                    left == right
-                } else {
-                    left != right
-                }) != negate)
-            }
-            (CobolValue::Bytes(left), CobolValue::Decimal(right))
-                if matches!(operator, "=" | "<>") =>
-            {
-                let right = self
-                    .reference(&tokens[right_start..])
-                    .and_then(|reference| self.read_reference(&reference))
-                    .unwrap_or_else(|_| decimal_string(right).into_bytes());
-                let (left, right) = padded_bytes(left, right);
-                let left = cobol_collation_key(&left);
-                let right = cobol_collation_key(&right);
-                Ok((if operator == "=" {
-                    left == right
-                } else {
-                    left != right
-                }) != negate)
-            }
-            _ => Err(MachineProblem::DataException),
         }
     }
 
@@ -12266,7 +11967,10 @@ mod tests {
             })
             .unwrap();
         assert_eq!(machine.last_file_status, "00");
-        let Step::Effect(read) = machine.dataset_effect("read", &[file.clone()]).unwrap() else {
+        let Step::Effect(read) = machine
+            .dataset_effect("read", std::slice::from_ref(&file))
+            .unwrap()
+        else {
             panic!("READ did not call the dataset provider");
         };
         assert!(matches!(

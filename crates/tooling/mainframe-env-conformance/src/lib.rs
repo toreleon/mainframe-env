@@ -50,3 +50,6 @@ pub use licensed_harness::{
     OracleHarnessValidationKind, validate_oracle_harness_receipt, validate_oracle_harness_registry,
 };
 pub use mq_selected::bind_mq_selected;
+
+#[cfg(test)]
+mod public_client_compatibility;

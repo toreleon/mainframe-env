@@ -43,7 +43,7 @@ use names::SlotUse;
 use registry::operation_schema;
 use registry::{expected_effects, expected_operation};
 pub(super) use registry::{operation_identities, validate_module_operations};
-pub(super) use response::{finish, write_response_state, write_runtime_output};
+pub(super) use response::{apply_payload_outputs, finish, write_response_state};
 use runtime_validation::validate_runtime_plan;
 use slot_access::{plan_slots, read_integer_slot, read_slot};
 pub(super) use storage64::Storage64Intent;

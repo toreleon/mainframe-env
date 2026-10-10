@@ -77,6 +77,133 @@ different installed version fails before it can receive assurance
 credit.
 
 
+## Optional public client byte admission
+
+The same CI input lock uses `mainframe-env.ci-input-lock@2` to add one explicitly
+selected development profile, `public-client-linux-x86_64`. The validator also
+retains the strict six-field @1 reader: @1 cannot carry development profiles.
+The eight standard tools, existing runtime scopes, Jenkins selection and
+cross-platform repository checks retain their requirements. Plain `check`
+validates optional pin grammar without reading external profile files. Selected
+profile checks require Linux x86_64; missing selected inputs fail.
+
+Use `check --development-profile public-client-linux-x86_64`, one repeated
+`--profile-file ROLE=/absolute/resolved/file` for each required role, and
+`--profile-tree /absolute/resolved/root-above-package`. File roles are exactly
+`node-archive`, `node`, `zowe-archive`, `bubblewrap`, `loader`, `libdl`,
+`libstdcxx`, `libm`, `libgcc`, `libpthread`, `libc`, and `libnss_files`.
+The tree contains `package/lib/main.js`; it is not the `package/` directory
+itself. Transient paths stay in invocation arguments and external receipts.
+There is no implicit PATH/environment discovery, download, installation,
+extraction, native command or alternate input fallback. Adding an explicit
+`--runtime` retains that scope's existing execution behavior; profile selection
+alone does not select a runtime scope.
+
+The byte validator checks nonsymlink regular inputs, stable read metadata,
+ownership, write/privilege modes and file capabilities. It checks official Node
+archive identity and the selected binary and LICENSE pins, and Zowe SHA-256
+plus SHA-512 SRI before bounded archive parsing. Exact Zowe archive/tree
+membership, modes, payloads, directory ancestry and canonical paths are required.
+Empty regular leaves are valid. The retained Zowe digest uses path-component-sorted
+`path`, `bytes`, `sha256`, `mode` rows, compact JSON with sorted keys, default
+ASCII escaping and no newline. This preserves the historical producer's `Path`
+ordering, including directory names that are prefixes of sibling filenames;
+lexical ordering of complete path strings produces a different digest.
+It is distinct from the existing framed
+`mainframe-env.offline-tree@1` identity, which remains unchanged. The Node
+LICENSE pin is in the optional lock alongside its binary pin; validator source
+does not duplicate input digests.
+
+The in-process `validate_development_inputs` entry returns only validated source
+roles, the tree root and observed identities for the later fixed CI launcher.
+Profile data cannot supply mount destinations, argv, host directories, plugins
+or package resolution. The complete client tree stays intact. Byte admission
+does not grant native launch or job execution and contributes no test workload,
+official coverage, licensed, release or Foundation acceptance credit.
+
+These pins preserve reviewed bytes, not a hermetic source build. Node release
+signatures have no verified release-key trust anchor here. Zowe SRI/bundled
+bytes do not establish upstream signature or deterministic source-build
+equivalence. Bubblewrap and library pins are retained host observations;
+bubblewrap starts outside containment and its host loader/library bootstrap
+remains qualified. Namespace admission and any future native requirements need
+their separately authorized existing launcher checks. No host filesystem
+widening or additional library is implied by this profile.
+
+## Finite public client command
+
+The optional Linux test launcher is `tools/ci_assurance.py public-client-command`.
+Supply `--development-profile public-client-linux-x86_64`, the same twelve
+explicit `--profile-file ROLE=/absolute/resolved/file` bindings and
+`--profile-tree` described above. Add a fresh `--run-dir` beneath a private owned
+parent, `--action`, the real fixture listener's `--port`, and
+`--timeout-seconds` greater than zero and at most ten. Selected inputs must match
+the existing lock. The optional global `--root` must name the executing source
+root; duplicate scalars, root options, abbreviations and surplus arguments refuse.
+
+| Action | Additional scalars |
+| --- | --- |
+| `submit`, `owner-list`, `bad-password`, `other-owner-list` | none |
+| `status`, `files`, `other-status`, `other-files` | `--job-id` |
+| `content`, `other-content` | `--job-id`, `--file-id` |
+
+Ports are canonical ASCII decimals 1..65535, file IDs 0..63, and job IDs use the
+batch owner's canonical `JOB` plus five to eight decimal digits for a nonzero
+value. No arbitrary command, credential, host, environment or mount configuration
+is accepted. The fixture owns the listener and semantic assertions; this command
+does not start a server or poll jobs. It uses fixed synthetic principals and JCL,
+fresh owned settings and an empty child environment.
+
+```mermaid
+flowchart LR
+    Inputs[Explicit locked inputs] --> Validate[Validate bytes and owned state]
+    Validate --> Launch[Run one fixed client action]
+    Launch --> Capture[Capture raw output and actual wait exit]
+    Capture --> Recheck[Revalidate inputs and owned state]
+    Recheck --> Fixture[Rust fixture checks HTTP and job semantics]
+```
+
+The accepted package has one readonly bind at
+`/opt/client/node_modules/@zowe/cli`, with its fixed `lib/main.js` entry. This local
+installation layout supports ordinary package self-resolution; the child still
+disables global module lookup and native addons. Owned logs may contain only
+`imperative.log`, `zowe.log` and `imperative_debug.log`, each at most 1MiB and
+at most 2MiB combined. The latter is a source-proven startup-error log; its
+presence never turns a failed client command into semantic success.
+
+Each fresh run leaf retains `stdout.bin`, `stderr.bin`, `child-exit.txt` and
+`supervision-error.txt`. Transport exit zero means the command completed its
+capture and postchecks; the actual child can have a nonzero exit. A spawn/wait
+failure has no completed child exit. Never treat launcher exit alone, a vendor
+message or nonzero child exit as an authentication/job pass. Raw streams have
+65536-byte individual and 131072-byte combined ceilings; infrastructure
+diagnostics are separately bounded printable ASCII. Rust owns eventual cleanup.
+
+Each action performs full input admission before launch and fresh byte/state
+admission after the actual wait. Its private single-use context reuses only the
+first archive parse's semantic conclusions: POST fully rehashes current archives,
+checks SRI and all role/tree/manifest bytes, and holds both archive state fences
+through completion. Changed inputs refuse. No proof is accepted from CLI or a
+file, and no admission cache survives across commands. Standalone input validation
+still performs the complete archive parses.
+The command path also walks the admitted tree relative to a depth-bounded stack
+of held directory descriptors. It freshly hashes every leaf, reads the manifest,
+and checks descriptor/relative/absolute namespaces before closing. Root/package
+remain held through the manifest and final fences; no directory admission survives
+the phase. Ordinary standalone tree validation keeps its original path. These
+checks do not provide a continuous atomic snapshot against outside writers or
+establish that a complete client action meets its time allowance.
+
+
+Admission requires Linux x86_64, uid/gid 1000, the reviewed supplementary groups
+and zero effective/permitted/ambient capabilities. The launcher mounts accepted
+inputs readonly and owns only its finite writable state. Loopback uses inherited
+network; it does not isolate egress or prove listener ownership. Bubblewrap's
+host bootstrap and unverified upstream signature/source-build trust remain
+qualified. Synchronous byte validation has no separate watchdog; bounded log
+inspection is not a hard filesystem quota. Missing inputs fail without fallback.
+The real public-client application/HTTP fixture remains a separate pending gate.
+
 ## Reviewed updates
 
 Every input update is a normal reviewed repository change:

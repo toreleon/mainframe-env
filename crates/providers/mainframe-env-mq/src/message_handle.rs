@@ -62,7 +62,7 @@ struct Properties {
 #[derive(Debug)]
 enum PropertyContents {
     Legacy(Vec<MqMessageProperty>),
-    Reviewed(associated_descriptor::AssociatedProperties),
+    Reviewed(Box<associated_descriptor::AssociatedProperties>),
 }
 impl Properties {
     fn legacy(&self) -> Result<&Vec<MqMessageProperty>, MqHandleKernelProblem> {

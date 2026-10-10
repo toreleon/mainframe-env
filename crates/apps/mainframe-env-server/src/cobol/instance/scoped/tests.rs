@@ -122,7 +122,7 @@ fn exact_busy_member_versions_payloads_and_charges_agree() {
     );
     ScopedRun::decode(&root_row(&root, &key))
         .unwrap()
-        .validate_members(&key, &[row.clone()])
+        .validate_members(&key, std::slice::from_ref(&row))
         .unwrap();
     assert!(root.validate_members(&key, &[]).is_err());
     assert!(

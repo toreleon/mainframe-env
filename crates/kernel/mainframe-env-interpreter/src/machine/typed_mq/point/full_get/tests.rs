@@ -825,7 +825,7 @@ fn stale_wrong_family_wrong_parent_cold_and_late_retired_aliases_never_revive() 
     reply(&mut parent, &conn, ok(MqMqiOutput::Connected(other))).unwrap();
     assert_eq!(parent.read("HCONN").unwrap(), 3_i32.to_be_bytes());
     assert!(call(&mut parent).is_err());
-    assert_eq!(frame.scope.object(2, c).is_ok(), true);
+    assert!(frame.scope.object(2, c).is_ok());
 }
 
 #[test]

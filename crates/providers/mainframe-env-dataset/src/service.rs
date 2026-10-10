@@ -4599,46 +4599,17 @@ impl DatasetService {
                 key,
                 relation,
             } => browse_ops::reset(state, dataset, cursor, key, *relation, self.limits),
+            DatasetRequest::ReadBrowsePosition {
+                dataset,
+                cursor,
+                expected_key,
+            } => browse_ops::read_position(state, dataset, cursor, expected_key),
             DatasetRequest::ReadNext {
                 dataset,
                 cursor,
                 reverse,
                 ..
-            } => {
-                let identity = {
-                    let state_cursor = state
-                        .cursors
-                        .get_mut(cursor)
-                        .ok_or_else(|| condition("INVREQ", 16))?;
-                    if state_cursor.dataset != dataset.as_str() {
-                        return Err(condition("INVREQ", 16));
-                    }
-                    if *reverse {
-                        state_cursor.index -= 1;
-                    }
-                    let current = state_cursor.index;
-                    if !*reverse {
-                        state_cursor.index += 1;
-                    }
-                    if current < 0 {
-                        None
-                    } else {
-                        state_cursor.identities.get(current as usize).cloned()
-                    }
-                };
-                let record = match identity.as_ref() {
-                    Some((_, identity)) => record_for_identity(state, dataset, identity)?.cloned(),
-                    None => None,
-                };
-                let logical_key = identity.as_ref().map(|(logical, _)| logical.clone());
-                let base_identity = identity.map(|(_, identity)| identity);
-                Ok(DatasetResult::Browse {
-                    cursor: cursor.clone(),
-                    record,
-                    identity: base_identity,
-                    key: logical_key,
-                })
-            }
+            } => browse_ops::read_next(state, dataset, cursor, *reverse),
             DatasetRequest::EndBrowse { dataset, cursor } => {
                 let removed = state
                     .cursors
@@ -8461,6 +8432,16 @@ fn request_digest(request: &DatasetRequest) -> Result<[u8; 32], HostProblem> {
             digest_field(&mut digest, cursor.as_bytes());
             digest_field(&mut digest, key);
             digest_field(&mut digest, &[key_relation_tag(*relation)]);
+        }
+        DatasetRequest::ReadBrowsePosition {
+            dataset,
+            cursor,
+            expected_key,
+        } => {
+            digest_field(&mut digest, b"read-browse-position");
+            digest_field(&mut digest, dataset.as_str().as_bytes());
+            digest_field(&mut digest, cursor.as_bytes());
+            digest_field(&mut digest, expected_key);
         }
         DatasetRequest::ReadNext {
             dataset,

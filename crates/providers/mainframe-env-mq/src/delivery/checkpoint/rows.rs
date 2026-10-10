@@ -8,8 +8,10 @@
 
 use super::*;
 use crate::service::{OBJECT_ROW_SCHEMA, ObjectRow, encode_object_row};
+#[cfg(test)]
+use mainframe_env_store_api::ProviderStateStore;
 use mainframe_env_store_api::{
-    ProviderStateMutation, ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
+    ProviderStateMutation, ProviderStateRecord, ProviderStateWrite, StoreError,
 };
 use serde::de::DeserializeOwned;
 use sha2::{Digest, Sha256};
@@ -25,6 +27,8 @@ const SCHEMA: &str = "mainframe-env.mq-delivery-rows@1";
 const SCHEMA_TWO: &str = "mainframe-env.mq-delivery-rows@2";
 /// Exact existing modeled row families; not a prefix mutation permission.
 pub(crate) const TERMINAL_NAMESPACES: [&str; 5] = [META, QUEUE, PENDING, FINAL, CURSOR];
+#[cfg(test)]
+mod fixtures;
 mod upgrade;
 type Key = (String, String);
 type Records = BTreeMap<Key, ProviderStateRecord>;
@@ -167,6 +171,7 @@ pub(crate) struct DeliveryRowDelta {
 }
 
 impl DeliveryRowDelta {
+    #[cfg(test)]
     pub(crate) fn mutations(&self) -> &[ProviderStateMutation] {
         &self.mutations
     }
@@ -225,47 +230,6 @@ impl DeliveryRows {
             },
         })
     }
-    /// Explicit creation only. The service must authorize creating/migrating this
-    /// authority and reconcile legacy state before calling this. Never falls back
-    /// from failed restore. Orphan rich rows prohibit initialization.
-    pub(crate) fn initialize(
-        store: &dyn ProviderStateStore,
-        kernel: &MqDeliveryKernel,
-        catalog: &MqObjectCatalog,
-        identity: DeliveryRowIdentity,
-        limits: DeliveryRowLimits,
-    ) -> Result<DeliveryRowDelta, DeliveryRowError> {
-        limits.validate()?;
-        if !store.list_provider_state_prefix(PREFIX, 1)?.is_empty() {
-            return Err(DeliveryRowError::Corrupt);
-        }
-        prepare(None, kernel, catalog, identity, limits)
-    }
-
-    /// A single prefix scan is a backend snapshot across all row families.
-    /// `expected` must come from the service's current catalog/lease authority.
-    pub(crate) fn load(
-        store: &dyn ProviderStateStore,
-        catalog: &MqObjectCatalog,
-        expected: DeliveryRowIdentity,
-        limits: DeliveryRowLimits,
-        kernel_limits: MqDeliveryLimits,
-        message_limits: MqMessageLimits,
-        default_persistence: MqPersistence,
-    ) -> Result<(Self, MqDeliveryKernel), DeliveryRowError> {
-        limits.validate()?;
-        let records = store.list_provider_state_prefix(PREFIX, limits.rows + 1)?;
-        Self::restore(
-            records,
-            catalog,
-            expected,
-            limits,
-            kernel_limits,
-            message_limits,
-            default_persistence,
-        )
-    }
-
     /// Pure restore of an already captured physical snapshot. No store reads.
     pub(crate) fn restore(
         records: Vec<ProviderStateRecord>,
@@ -797,3 +761,5 @@ fn encode_current(snapshot: &Checkpoint, limit: usize) -> Result<Vec<u8>, MqDeli
 mod full_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+pub(crate) use tests::load_fixture;

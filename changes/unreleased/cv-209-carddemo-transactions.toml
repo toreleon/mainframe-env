@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Bound CardDemo transaction date and duplicate observations to actual installed-route comparisons, with graceful fixture shutdown and optional external synthetic debug capture; incomplete full closure still refuses."

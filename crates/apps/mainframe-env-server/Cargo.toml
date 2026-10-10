@@ -45,3 +45,4 @@ tower.workspace = true
 zeroize.workspace = true
 
 [dev-dependencies]
+jsonschema.workspace = true

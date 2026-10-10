@@ -76,7 +76,7 @@ fn whole_enabled_and_disabled_definitions_are_owned_snapshots() {
     let (cics, store) = fixture();
     for (name, generation, enabled) in [("ONPGM", 3, true), ("OFFPGM", 9, false)] {
         let expected = definition(store.as_ref(), name, generation, enabled);
-        cics.register_program_definitions(&[expected.clone()])
+        cics.register_program_definitions(std::slice::from_ref(&expected))
             .unwrap();
         assert_eq!(
             observe_named_status(&cics, name),
@@ -112,7 +112,7 @@ fn legacy_name_membership_is_distinct_from_catalog_absence_and_typed_wins() {
         Ok(ProgramStatusObservation::NotCatalogued)
     );
     let expected = definition(store.as_ref(), "LEGACY", 4, false);
-    cics.register_program_definitions(&[expected.clone()])
+    cics.register_program_definitions(std::slice::from_ref(&expected))
         .unwrap();
     assert!(cics.lock().unwrap().programs.contains("LEGACY"));
     assert_eq!(
@@ -125,7 +125,7 @@ fn legacy_name_membership_is_distinct_from_catalog_absence_and_typed_wins() {
 fn existing_project_name_policy_handles_eight_characters_and_rejects_invalid_inputs() {
     let (cics, store) = fixture();
     let expected = definition(store.as_ref(), "A1$@#XYZ", 1, true);
-    cics.register_program_definitions(&[expected.clone()])
+    cics.register_program_definitions(std::slice::from_ref(&expected))
         .unwrap();
     assert_eq!(
         observe_named_status(&cics, " a1$@#xyz "),
@@ -198,13 +198,14 @@ fn latest_definition_is_selected_without_replacing_old_loaded_or_application_ref
         application_identity: format!("sha256:{:064x}", 1),
         available: true,
     };
-    cics.register_application_entries(&[entry.clone()]).unwrap();
+    cics.register_application_entries(std::slice::from_ref(&entry))
+        .unwrap();
     let saved = observe_named_status(&cics, "SNAPSHOT").unwrap();
     let newest = definition(store.as_ref(), "SNAPSHOT", 11, false);
-    cics.register_program_definitions(&[newest.clone()])
+    cics.register_program_definitions(std::slice::from_ref(&newest))
         .unwrap();
     let middle = definition(store.as_ref(), "SNAPSHOT", 7, true);
-    cics.register_program_definitions(&[middle.clone()])
+    cics.register_program_definitions(std::slice::from_ref(&middle))
         .unwrap();
     assert_eq!(
         observe_named_status(&cics, "SNAPSHOT"),
@@ -334,7 +335,7 @@ fn registration_and_observation_share_one_live_owner_and_never_mix_generations()
             start.wait();
             for value in &definitions[1..] {
                 writer
-                    .register_program_definitions(&[value.clone()])
+                    .register_program_definitions(std::slice::from_ref(value))
                     .unwrap();
                 std::thread::yield_now();
             }
@@ -474,7 +475,7 @@ fn observation_needs_no_host_authority_store_access_load_or_uow_change() {
         CicsService::open(host, store.clone(), crate::service::CicsLimits::default()).unwrap();
     cics.bind_artifact_store(store.clone()).unwrap();
     let expected = definition(store.as_ref(), "NOLOAD", 6, false);
-    cics.register_program_definitions(&[expected.clone()])
+    cics.register_program_definitions(std::slice::from_ref(&expected))
         .unwrap();
     cics.register_programs(&BTreeSet::from(["LEGACY".into()]))
         .unwrap();

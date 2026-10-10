@@ -1350,8 +1350,12 @@ fn applying_ims_metadata_recovers_after_provider_commit() {
     let package = signed_ims_package(&trust, 1, 1);
     let staged = server.install_application_package_v2(&package).unwrap();
     let retained = server.application_generation_v2(&staged).unwrap();
+    let plan = server
+        .prevalidate_application_publication(&retained, PublicationAction::Install, false)
+        .unwrap();
     server
-        .apply_application_batch_controllers(&retained)
+        .batch
+        .with_publication_write(|writer| writer.install_controllers(plan.controllers))
         .unwrap();
     server.apply_application_ims_metadata(&retained).unwrap();
     store
@@ -1556,4 +1560,224 @@ fn sqlite_reopen_clears_absent_metadata_and_restores_retained_generation() {
     }
     std::fs::remove_file(path).unwrap();
     std::fs::remove_dir(directory).unwrap();
+}
+// Independent selected-route and completed-record expectations for signed IMS obligations.
+mod publication_ims_applicability {
+    use super::*;
+
+    fn fixture(
+        tm: bool,
+    ) -> (
+        Arc<ProductServer>,
+        Arc<MemoryStore>,
+        Arc<HmacSha256PackageTrust>,
+        ApplicationGenerationRecord,
+    ) {
+        let trust = Arc::new(test_package_trust());
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let server = ProductServer::open_with_package_trust(
+            config(),
+            store.clone(),
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+            trust.clone(),
+        )
+        .unwrap();
+        let package = if tm {
+            signed_tm_package(&trust, 1, "FENCE")
+        } else {
+            signed_ims_package(&trust, 1, 1)
+        };
+        let first = server.install_application_package_v2(&package).unwrap();
+        server.publish_application_generation(&first).unwrap();
+        (server, store, trust, first)
+    }
+
+    fn set_ims(store: &MemoryStore, field: Option<&str>) {
+        let mut row = store
+            .get_provider_state(APPLICATION_PUBLICATION_NAMESPACE, "SIGNED-IMS-APPLICATION")
+            .unwrap()
+            .unwrap();
+        let expected = row.version;
+        let mut state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        assert_eq!(state["complete"], true);
+        if let Some(value) = field {
+            state["ims"] = value.into();
+        } else {
+            state.as_object_mut().unwrap().remove("ims");
+        }
+        row.version += 1;
+        row.payload = serde_json::to_vec(&state).unwrap();
+        store.put_provider_state(row, Some(expected)).unwrap();
+    }
+
+    fn rows(store: &MemoryStore) -> Vec<ProviderStateRecord> {
+        ["application-", "batch-controller-state", "db2-", "ims-"]
+            .into_iter()
+            .flat_map(|prefix| store.list_provider_state_prefix(prefix, 256).unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn publication_ims_applicability_selected_database_requires_applied() {
+        let (server, store, _, _) = fixture(false);
+        permit_tm(&server, &[]);
+        server
+            .racf
+            .define_profile("IMSDB", "AUTHDB", "IBMUSER", Some(AccessIntent::Control))
+            .unwrap();
+        let schedule = |sequence| ImsRequest {
+            operation: ImsOperation::Schedule,
+            psb: Some("AUTHPSB".into()),
+            pcb: 1,
+            segments: vec![],
+            data: vec![],
+            qualifiers: vec![],
+            checkpoint_id: None,
+            max_segments: 16,
+            system: None,
+            q_class: None,
+            mutation: Some(Mutation {
+                sequence,
+                idempotency_key: IdempotencyKey::new(
+                    format!("ims-fence-{sequence}"),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+                transaction: None,
+            }),
+        };
+        let positive = server
+            .ims_execute_selected(
+                "SIGNED-IMS-APPLICATION",
+                &tm_invocation("ims-fence-positive", "ims-positive"),
+                &schedule(1),
+            )
+            .unwrap();
+        assert_eq!(positive.status, "  ");
+        let mut observed = Vec::new();
+        for (index, field) in [Some("not-applicable"), None].into_iter().enumerate() {
+            set_ims(&store, field);
+            let before = rows(&store);
+            let result = server.ims_execute_selected(
+                "SIGNED-IMS-APPLICATION",
+                &tm_invocation("ims-fence-negative", &format!("ims-negative-{index}")),
+                &schedule(index as u64 + 2),
+            );
+            observed.push((result, rows(&store) == before));
+        }
+        assert!(
+            observed
+                .iter()
+                .all(|(result, unchanged)| *result == Err(HostProblem::NotFound) && *unchanged),
+            "selected database observations: {observed:?}"
+        );
+    }
+
+    #[test]
+    fn publication_ims_applicability_selected_tm_requires_applied() {
+        let (server, store, _, _) = fixture(true);
+        permit_tm(&server, &["FENCE"]);
+        server
+            .ims_tm_enqueue(
+                "SIGNED-IMS-APPLICATION",
+                &tm_invocation("tm-fence", "tm-positive"),
+                tm_message("tm-positive", "FENCE", None),
+            )
+            .unwrap();
+        let mut observed = Vec::new();
+        for (index, field) in [Some("not-applicable"), None].into_iter().enumerate() {
+            set_ims(&store, field);
+            let before = rows(&store);
+            let id = format!("tm-negative-{index}");
+            let result = server.ims_tm_enqueue(
+                "SIGNED-IMS-APPLICATION",
+                &tm_invocation("tm-fence", &id),
+                tm_message(&id, "FENCE", None),
+            );
+            observed.push((
+                result,
+                rows(&store) == before,
+                server.ims_tm.message_state(&id).unwrap(),
+            ));
+        }
+        assert!(
+            observed.iter().all(|(result, unchanged, message)| *result
+                == Err(HostProblem::NotFound)
+                && *unchanged
+                && message.is_none()),
+            "selected TM observations: {observed:?}"
+        );
+    }
+
+    #[test]
+    fn publication_ims_applicability_completed_install_and_rollback_retry_refuse() {
+        let mut observed = Vec::new();
+        for tm in [false, true] {
+            let (server, store, _, first) = fixture(tm);
+            assert!(
+                server
+                    .publish_application_generation(&first)
+                    .unwrap()
+                    .replayed
+            );
+            for field in [Some("not-applicable"), None] {
+                set_ims(&store, field);
+                let before = rows(&store);
+                observed.push((
+                    server.publish_application_generation(&first),
+                    rows(&store) == before,
+                ));
+            }
+            set_ims(&store, Some("applied"));
+            server.rollback_application_generation(&first).unwrap();
+            assert!(
+                server
+                    .rollback_application_generation(&first)
+                    .unwrap()
+                    .replayed
+            );
+            for field in [Some("not-applicable"), None] {
+                set_ims(&store, field);
+                let before = rows(&store);
+                observed.push((
+                    server.rollback_application_generation(&first),
+                    rows(&store) == before,
+                ));
+            }
+        }
+        assert!(
+            observed.iter().all(|(result, unchanged)| *result
+                == Err(HostProblem::InfrastructureFailure)
+                && *unchanged),
+            "completed retry observations: {observed:?}"
+        );
+    }
+
+    #[test]
+    fn publication_ims_applicability_completed_recovery_refuses_before_restore() {
+        let mut observed = Vec::new();
+        for tm in [false, true] {
+            for field in [Some("not-applicable"), None] {
+                let (server, store, trust, _) = fixture(tm);
+                drop(server);
+                set_ims(&store, field);
+                let before = rows(&store);
+                let result = ProductServer::open_with_package_trust(
+                    config(),
+                    store.clone(),
+                    Arc::new(MemorySecretResolver::default()),
+                    default_program_router(),
+                    trust,
+                );
+                observed.push((result.err(), rows(&store) == before));
+            }
+        }
+        assert!(
+            observed.iter().all(|(error, unchanged)| *error
+                == Some(HostProblem::InfrastructureFailure)
+                && *unchanged),
+            "completed recovery observations: {observed:?}"
+        );
+    }
 }

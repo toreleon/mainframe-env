@@ -280,11 +280,13 @@ mod tests {
             .mutate_process(
                 "TYPE",
                 "ORDER",
-                "UOW2",
-                "EXEC2",
-                "USER",
-                "start",
-                [1; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "start",
+                    request_digest: [1; 32],
+                },
                 |p| {
                     p.start(&root, None, false)?;
                     p.checkpoint(&root, 1, 7, "checkpoint-1")?;
@@ -322,11 +324,13 @@ mod tests {
             .mutate_process(
                 "TYPE",
                 "ORDER",
-                "UOW2",
-                "EXEC2",
-                "USER",
-                "promote",
-                [2; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "promote",
+                    request_digest: [2; 32],
+                },
                 |p| {
                     p.checkpoint(&root, 1, 8, "checkpoint-2")?;
                     Ok(BtsReply::normal())
@@ -382,11 +386,13 @@ mod tests {
                 .mutate_process(
                     "TYPE",
                     "ORDER",
-                    "UOW2",
-                    "EXEC2",
-                    "USER",
-                    "start",
-                    [1; 32],
+                    crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                        run_unit: "UOW2",
+                        owner_execution: "EXEC2",
+                        owner_principal: "USER",
+                        replay_key: "start",
+                        request_digest: [1; 32],
+                    },
                     |p| {
                         p.start(&root, None, false)?;
                         p.checkpoint(&root, 1, 7, "checkpoint-1")?;

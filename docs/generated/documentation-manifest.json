@@ -1,9 +1,9 @@
 {
   "counts": {
-    "markdown_documents": 237,
+    "markdown_documents": 243,
     "navigation_groups": 8,
-    "normative_documents": 98,
-    "xtask_commands": 163
+    "normative_documents": 104,
+    "xtask_commands": 162
   },
   "documents": [
     {
@@ -162,7 +162,7 @@
       "normative": false,
       "path": "crates/contracts/mainframe-env-coverage/README.md",
       "relative_links": 4,
-      "sha256": "sha256:b007a69b0d2d31294ad319d4abe1bd0b6892a64e1cf84274057d590631400467",
+      "sha256": "sha256:e30319a03ddf6a4dc4996de94f9c9601622f23237d002f6dc72fc74e2351f59c",
       "title": "mainframe-env-coverage",
       "xtask_commands": 2
     },
@@ -233,8 +233,8 @@
     {
       "normative": false,
       "path": "crates/kernel/mainframe-env-application/README.md",
-      "relative_links": 4,
-      "sha256": "sha256:4cd0d64c1ddbb1984491fd47dd50b30423e1bc0f0ddffae1b146a31a0d61aea6",
+      "relative_links": 5,
+      "sha256": "sha256:00e4f845a9d3de4f61c1d635733dbb6c014f1a0aaf05c352cd415d88dd8c9957",
       "title": "mainframe-env-application",
       "xtask_commands": 1
     },
@@ -341,8 +341,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 179,
-      "sha256": "sha256:310973c140115d2e72f0a1b32e26fd7f0f538c994e8636c72b53538c15b13a0e",
+      "relative_links": 185,
+      "sha256": "sha256:e5ffaa12d83b41891d4816a07d52d2e202a605d8667322709d0e57f493649546",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -351,9 +351,9 @@
       "normative": true,
       "owner": "application-package maintainers",
       "path": "docs/architecture/APPLICATION-PACKAGES.md",
-      "relative_links": 0,
+      "relative_links": 3,
       "scope": "application package generation and installation contract",
-      "sha256": "sha256:837c3d7abb312eedaadfc4f412052d91a6ea490b634704fd5dbddf6b660fd6cc",
+      "sha256": "sha256:ce26a82908ee259576c71b27042705977825124a7feca83e202d9b9c9e63ed18",
       "status": "Frozen for mainframe-env coverage.foundation",
       "title": "Application package generation contract",
       "xtask_commands": 0
@@ -423,9 +423,9 @@
       "normative": true,
       "owner": "conformance maintainers",
       "path": "docs/architecture/CONFORMANCE-IR.md",
-      "relative_links": 0,
+      "relative_links": 1,
       "scope": "conformance catalog, binding, execution, and evidence authority",
-      "sha256": "sha256:312aba6e4f0d4dc977a4f6d9550ce6e26b427472618ad6d4b0e3c37e1ac57c77",
+      "sha256": "sha256:0bb4df0298bc6373bdd27fabc39fda9d1453ef0d9526da83bd34a17c1bbe01cf",
       "status": "Normative from cobol.structure",
       "title": "Conformance IR and executable coverage",
       "xtask_commands": 4
@@ -1447,10 +1447,82 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env current public package hardening",
+      "normative": true,
+      "owner": "Application-package and shared trust maintainers",
+      "path": "docs/decisions/0051-package-identity-framing.md",
+      "relative_links": 0,
+      "scope": "Package identity, fresh admission and trusted retained-state compatibility",
+      "sha256": "sha256:4e71c5d1648eea37c1b54ac9155e04ad4ff1e342d762aeb5ef21ded184b31c1d",
+      "status": "Accepted design; implementation pending",
+      "title": "ADR-0051: Frame current package identities and retain explicit legacy readers",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current public provider hardening",
+      "normative": true,
+      "owner": "CICS runtime and embedding maintainers",
+      "path": "docs/decisions/0052-cics-operation-contexts.md",
+      "relative_links": 0,
+      "scope": "BTS mutation inputs, partition submission and explicit receipt retention",
+      "sha256": "sha256:909970afc28c76f18afde884727bfc09a28ca4b3c4f7abd56c955bab5a6c40a0",
+      "status": "Accepted design; implementation pending",
+      "title": "ADR-0052: Group borrowed CICS operation inputs before public release",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current public provider hardening",
+      "normative": true,
+      "owner": "application publication and batch maintainers",
+      "path": "docs/decisions/0053-selected-controller-publication-fence.md",
+      "relative_links": 0,
+      "scope": "same-process selected controller admission and publication prevalidation",
+      "sha256": "sha256:0627d171504febe1db0b5588fe318700f0096e887e6fddb9d012c51f9594bcf9",
+      "status": "Accepted design; implementation pending",
+      "title": "ADR-0053: Fence selected controller execution against publication",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current public tooling hardening",
+      "normative": true,
+      "owner": "conformance tooling maintainers",
+      "path": "docs/decisions/0054-focused-conformance-output.md",
+      "relative_links": 0,
+      "scope": "focused xtask output transport",
+      "sha256": "sha256:5718f4b3530405a3737eade1585342521d31835967e2820e44706cfce02e57d5",
+      "status": "Accepted design; implementation pending",
+      "title": "ADR-0054: Emit focused conformance through the canonical report owners",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current public package hardening",
+      "normative": true,
+      "owner": "application trust and embedding maintainers",
+      "path": "docs/decisions/0055-standard-package-mac-envelope.md",
+      "relative_links": 0,
+      "scope": "current package MAC envelope and finite retained verification",
+      "sha256": "sha256:1956f6c95ad8844460cea1ebf551e7bf0bb2ac2feed4d5ad65ae607d440203eb",
+      "status": "Accepted design; bounded production MAC implementation accepted; full Foundation acceptance pending",
+      "title": "ADR-0055: Use a bounded COSE_Mac0 profile for current package authentication",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env current public source checkout",
+      "normative": true,
+      "owner": "CICS, Dataset and shared host-contract maintainers",
+      "path": "docs/decisions/0056-cics-first-reverse-position.md",
+      "relative_links": 0,
+      "scope": "ordinary full-key first reverse read in an implicit owned browse",
+      "sha256": "sha256:1339126c04979c1dd148c61b2213e6ebe99aedf4d52cb785c6581b6d31908bbc",
+      "status": "Accepted bounded design; scoped implementation verified.",
+      "title": "ADR-0056: CICS first reverse read at a retained browse position",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 53,
-      "sha256": "sha256:43f9927331159d83f380ef579a56c577b54c4fcdc6aae56121dc8a9ebb8b086b",
+      "relative_links": 59,
+      "sha256": "sha256:f961ab57a4472f9bb5c333e55104916bc4012bee7709957035c87f466d7f33aa",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1481,8 +1553,8 @@
     {
       "normative": false,
       "path": "docs/delivery/IMPLEMENTATION-STATUS.md",
-      "relative_links": 20,
-      "sha256": "sha256:97682531fc04d54e83ad4fbaa52f9aea058a6b774bc2780774d57f76633640d4",
+      "relative_links": 21,
+      "sha256": "sha256:a9d597a697bf8602936917c1d9aebb1cb5a10bb62d8b9331ab3289df0dd485d4",
       "title": "Subsystem implementation status",
       "xtask_commands": 1
     },
@@ -1562,7 +1634,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/certification/licensed-plan.md",
       "relative_links": 2,
-      "sha256": "sha256:23998b81f00b6180e3feb1d5ce30442af843216af9570c63bd9ad13ff93fca65",
+      "sha256": "sha256:53c9b56d6258df065e74941f06ae9af7e207233b25a21bb9bc7e9d11e307cecd",
       "title": "Licensed certification — Differential certification",
       "xtask_commands": 0
     },
@@ -1594,7 +1666,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cics/application-api-plan.md",
       "relative_links": 10,
-      "sha256": "sha256:f33ae012037ff77c7be0bb35934689f82e306b92b92ff699b27909875fc26d3f",
+      "sha256": "sha256:9e00704a189706be416672bf9f0b1c8efa3cdc21865e06a5784f5610d36870cb",
       "title": "CICS — Application API",
       "xtask_commands": 0
     },
@@ -1618,7 +1690,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cics/system-api-plan.md",
       "relative_links": 2,
-      "sha256": "sha256:7468973478dda74b4870cfe6552411cf180255cc449b3104dbeab10393a5cc1e",
+      "sha256": "sha256:26685eb319592e36c1d0e74eef3de42a2f6ecb392f96ace25ac3af5eb8cdb219",
       "title": "CICS — SPI and FEPI",
       "xtask_commands": 0
     },
@@ -1674,7 +1746,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cobol/structure-plan.md",
       "relative_links": 0,
-      "sha256": "sha256:a05875169583531fd4127ec872630602b40cfb0b2b29d6fc658f14a9b6d19ebf",
+      "sha256": "sha256:86cd3a3c1e58fe16bff7a8e2959ba8b1c945d32d406701ab1bc0b30c6874cd94",
       "title": "COBOL — Grammar and types",
       "xtask_commands": 0
     },
@@ -1690,7 +1762,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/coverage/foundation-plan.md",
       "relative_links": 0,
-      "sha256": "sha256:cf9dca2ba8f63e9d973506ffc9eb43e310c3a95ef7f8723eb67fe50b55630795",
+      "sha256": "sha256:aa211ddc4f810677e788716ae03309e7174a8318241aaf7283fc2910934a4739",
       "title": "Coverage and conformance — Coverage authority",
       "xtask_commands": 0
     },
@@ -1698,9 +1770,9 @@
       "normative": false,
       "path": "docs/delivery/subsystems/coverage/foundation-status.md",
       "relative_links": 2,
-      "sha256": "sha256:459692406df692caf81f4df5d572ceda0a88f6cefdad60cb2af0e2fec6a377f5",
+      "sha256": "sha256:080c3fa00d31ef05a5071cc9cce1551d2230dc866de7c531416c86d8a17c1780",
       "title": "Coverage and conformance — Coverage authority progress",
-      "xtask_commands": 6
+      "xtask_commands": 5
     },
     {
       "normative": false,
@@ -1722,7 +1794,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/db2/core-plan.md",
       "relative_links": 3,
-      "sha256": "sha256:77e58fcf77c539a895a7af277225bd6e0a04deca4ef8fc7e88ae69035f1a5f5d",
+      "sha256": "sha256:5d42b8bf135abbf5b3a817665b971c070d54498b61fe11ddf813a4ef36ad232e",
       "title": "Db2 — Engine and common SQL",
       "xtask_commands": 0
     },
@@ -1746,7 +1818,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/db2/programming-plan.md",
       "relative_links": 2,
-      "sha256": "sha256:d86095ad9ce96cb1426217e5451de37a3649616d89146362497719735a86707e",
+      "sha256": "sha256:f6d32a2b9de7c342a3fcb563e91a75a2368709bd4734b9dc728b7c2487ae3586",
       "title": "Db2 — Complete programming surface",
       "xtask_commands": 0
     },
@@ -1778,7 +1850,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-plan.md",
       "relative_links": 2,
-      "sha256": "sha256:9e00f37822ba6d38e7e862e78ed7192b5297a41c2afbb054dc5c9879fb4b1034",
+      "sha256": "sha256:c3891679e72cf7e1515613e33a51d1c600ce774419d467e8acef3c01ea647307",
       "title": "IMS — DB / TM programming surface",
       "xtask_commands": 0
     },
@@ -1802,7 +1874,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/integration/transactions-plan.md",
       "relative_links": 2,
-      "sha256": "sha256:6fb997d6567fc2a1588360ca35c36a2add76f7ab71e07533af1ab71a92c9abf4",
+      "sha256": "sha256:7f210981668c08b6fa811204895a6a30170550b41e359388937b05f86665faf3",
       "title": "Cross-resource integration — Transactions and recovery",
       "xtask_commands": 0
     },
@@ -1870,7 +1942,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-plan.md",
       "relative_links": 3,
-      "sha256": "sha256:dca02036dda520579fb57b00c2485137e367a3e33f45bc863169e1610e4986b6",
+      "sha256": "sha256:47712306706b3a784e2b4e16830cf00e9e37716cd5c5c5fd659f0ecc2623b68c",
       "title": "IBM MQ — MQI programming surface",
       "xtask_commands": 0
     },
@@ -1902,7 +1974,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/zosmf/rest-plan.md",
       "relative_links": 2,
-      "sha256": "sha256:628d09ba07812a797171294e451175e4622f807ef27c9e7a3abd2c3ad05aa95c",
+      "sha256": "sha256:36f0555ebbc4c0057b312b6483392ac527a2ca6f4df14af63bbb74c3fadb03d8",
       "title": "z/OSMF — REST portfolio",
       "xtask_commands": 0
     },
@@ -1926,7 +1998,7 @@
       "normative": false,
       "path": "docs/guides/CAPABILITIES.md",
       "relative_links": 32,
-      "sha256": "sha256:5b9b3986d493c7d5fda28775a057e6284309a38618584cca848fc242d8da0fd7",
+      "sha256": "sha256:691929c5243a6836030fbf4ccbf1d2e484b7d30cc0731b8e2c33b9d83ebe26d6",
       "title": "Capabilities and limitations",
       "xtask_commands": 0
     },
@@ -1969,7 +2041,7 @@
       "path": "docs/guides/MAINFRAME-SANDBOX.md",
       "relative_links": 4,
       "scope": "Executable profiles, lifecycle and agent access",
-      "sha256": "sha256:5d58f6ac9a489cd20e123f26eea4948daaee21f653b4854e9086a4ef3a08f41a",
+      "sha256": "sha256:2ada695e5fc2211c0027214c55785350bc75986c0d614328316c1e2d22c16fc5",
       "status": "Implemented for native and container execution; Cube VM validation pending",
       "title": "Mainframe Sandbox",
       "xtask_commands": 0
@@ -1994,7 +2066,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/README.md",
       "relative_links": 25,
-      "sha256": "sha256:cd1eba434d1cedee3e864cbabe8ea16b54c09a0d3ec75e3598e29f534772e357",
+      "sha256": "sha256:de7ab8537451ca1e7c469b9350cbde40a705649dcc4dd0ee7d13fb9a33f9ec4a",
       "title": "Subsystem implementation prompts",
       "xtask_commands": 0
     },
@@ -2002,7 +2074,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/certification/IMPLEMENT_LICENSED.md",
       "relative_links": 4,
-      "sha256": "sha256:42229b8a3a3bb8c916fd8a71152fc6e4bbd31680f4601888b2651b0b91b074c5",
+      "sha256": "sha256:8d611b6e4216527f7786cdcb911570d0da444bbc6f9ba620890cf615e18bb58f",
       "title": "Execution Prompt — Licensed certification — Differential certification",
       "xtask_commands": 0
     },
@@ -2010,7 +2082,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/cics/IMPLEMENT_APPLICATION_API.md",
       "relative_links": 6,
-      "sha256": "sha256:8f89eb40d718abad38d46ecbffbdda81ee40c7fa9505b6b99d48d7c2df6c32d2",
+      "sha256": "sha256:70113c4a80268fbb44cbf8bc5164b5e1c64175fb98a2623b68a983821b56f569",
       "title": "Execution Prompt — CICS — Application API",
       "xtask_commands": 0
     },
@@ -2018,7 +2090,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/cics/IMPLEMENT_SYSTEM_API.md",
       "relative_links": 4,
-      "sha256": "sha256:94a984b58c71dbd49c998ca84babb7dc87e5fe584d0b177dc02d664a540c10e1",
+      "sha256": "sha256:e2ee789ae4bcc9233212f545e6ba0fe761522628e9579e87e11b21aa15514ae0",
       "title": "Execution Prompt — CICS — SPI and FEPI",
       "xtask_commands": 0
     },
@@ -2034,7 +2106,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/cobol/IMPLEMENT_STRUCTURE.md",
       "relative_links": 1,
-      "sha256": "sha256:2b3e3e76a6a77c3aa97c8cd69fd51dc8c61f5480fbd2ef96d59bd12811da8a92",
+      "sha256": "sha256:a39015a67c28e0419facac1f1bc81ef8969b533995da9ee9a35ae06e459dc014",
       "title": "Execution Prompt — COBOL — Grammar and types",
       "xtask_commands": 1
     },
@@ -2042,7 +2114,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/coverage/IMPLEMENT_FOUNDATION.md",
       "relative_links": 1,
-      "sha256": "sha256:f45192d9d732d4d0ce706632027875c8f4de635ed4505f3dbe3de789b3b28566",
+      "sha256": "sha256:477604622fec94796af4db55f2e2e80ea6fd99cd58ac9393cd5332a303f9e43a",
       "title": "Execution Prompt — Coverage and conformance — Coverage authority",
       "xtask_commands": 0
     },
@@ -2058,7 +2130,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/db2/IMPLEMENT_CORE.md",
       "relative_links": 5,
-      "sha256": "sha256:854bf3698f202ef1408de158f60e86153873f83ff0cd6defe7b00f7f7c7fdbbb",
+      "sha256": "sha256:55eda9510ea317fe3c9ebd78a64ec9c8077371c84a08accb6d51ee7b129ad42c",
       "title": "Execution Prompt — Db2 — Engine and common SQL",
       "xtask_commands": 0
     },
@@ -2066,7 +2138,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/db2/IMPLEMENT_PROGRAMMING.md",
       "relative_links": 4,
-      "sha256": "sha256:53380b9187b1925fc63dcba89541ada8534662f6c0123dde783a1059aadf4b98",
+      "sha256": "sha256:235eb6c3b42eef379c86615a1e8643371760a4d5e5609b7270dc0815c0366fc3",
       "title": "Execution Prompt — Db2 — Complete programming surface",
       "xtask_commands": 0
     },
@@ -2074,7 +2146,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/ims/IMPLEMENT_PROGRAMMING.md",
       "relative_links": 4,
-      "sha256": "sha256:c4055d861eff193c488f77481a55486e570cddd8a97f252d339bd35df9d0ec2e",
+      "sha256": "sha256:120e315f16e544db7bfa8e909691003d855dfe8fbe43eb74417c1056266e8a18",
       "title": "Execution Prompt — IMS — DB / TM programming surface",
       "xtask_commands": 0
     },
@@ -2082,7 +2154,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/integration/IMPLEMENT_TRANSACTIONS.md",
       "relative_links": 4,
-      "sha256": "sha256:3dad0a123dfa511a60e62c0f54a35e14e4a98392faa586ef51441b815eb8d305",
+      "sha256": "sha256:07c8ad33e8fa61977d3c33f93118cb4dac3e6992015e4d303cb6601b63785f63",
       "title": "Execution Prompt — Cross-resource integration — Transactions and recovery",
       "xtask_commands": 0
     },
@@ -2106,7 +2178,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/mq/IMPLEMENT_PROGRAMMING.md",
       "relative_links": 4,
-      "sha256": "sha256:1aab7d2d480d4eccbde9a3d74b111802691fa0d347bae7635d848b82d150a737",
+      "sha256": "sha256:c9a2771a381ceef4aabcb73962834b9bcc8f8b24d8ad04bc8c60c0437fe96b12",
       "title": "Execution Prompt — IBM MQ — MQI programming surface",
       "xtask_commands": 0
     },
@@ -2114,7 +2186,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/racf/IMPLEMENT_SECURITY.md",
       "relative_links": 1,
-      "sha256": "sha256:6d1fd7d2c3ad0e12853c3233736ff5c5b55f6b6ef28ef2ee7141be9327b4c9da",
+      "sha256": "sha256:a4d5d72fe1acfd55c0aafbcc4ebbfcaa9d3eb0effe04d8042c536bf4a2507c03",
       "title": "Execution Prompt — RACF / SAF — Commands and authorization",
       "xtask_commands": 0
     },
@@ -2122,7 +2194,7 @@
       "normative": false,
       "path": "docs/prompts/subsystems/zosmf/IMPLEMENT_REST.md",
       "relative_links": 4,
-      "sha256": "sha256:d57f3a10ea15a2b126a91c0ece6609bd4526d1d414e0d30092892941d64118b7",
+      "sha256": "sha256:6a4ea2ca1983c8bf6280c6009d22145421a6f1b1da9a4326b0a0e6059687f4c9",
       "title": "Execution Prompt — z/OSMF — REST portfolio",
       "xtask_commands": 0
     },
@@ -2154,7 +2226,7 @@
       "normative": false,
       "path": "docs/research/publication-source-probe.md",
       "relative_links": 0,
-      "sha256": "sha256:1072431b2e885c84a5a683fd4c4ac55698ad7830f88ca5352595563c9c528112",
+      "sha256": "sha256:95af43cc39bca9678db3d9af17ea173aa4338b65f92b277362f83c0e4679c44b",
       "title": "Publication source probe",
       "xtask_commands": 0
     },
@@ -2202,7 +2274,7 @@
       "normative": false,
       "path": "docs/runbooks/CARDDEMO-OPERATOR.md",
       "relative_links": 2,
-      "sha256": "sha256:23f04110bd69bd50279efbedc4cf3c0da0c76cb3f0a1929670e832ffeb4544a6",
+      "sha256": "sha256:3cbd5593d24dd74a7d1f0936f80dc8182d46e91314c2af10ce4031561490fa2c",
       "title": "CardDemo operator compatibility",
       "xtask_commands": 4
     },
@@ -2218,7 +2290,7 @@
       "normative": false,
       "path": "docs/runbooks/CI-SUPPLY-CHAIN.md",
       "relative_links": 0,
-      "sha256": "sha256:157a880c64008d45b099782a6ec1c5218b15b1224062aa791857ba2e58dcab34",
+      "sha256": "sha256:d94767e9e6db8151de621fa36c807888ef9ed07de5a877d1fa75e61e9a83dddf",
       "title": "CI supply-chain inputs",
       "xtask_commands": 1
     },
@@ -2274,7 +2346,7 @@
       "normative": false,
       "path": "docs/runbooks/VERIFICATION-WORKFLOW.md",
       "relative_links": 1,
-      "sha256": "sha256:ed0c332c80c2105c2c770f7af68f9101b86af63d644693b4f89d6aeb0ef70df9",
+      "sha256": "sha256:9e4d1b59e244b6a049a7efd6ed1992802ee9dd1deb418f47782b3bcc84875644",
       "title": "Verification workflow",
       "xtask_commands": 1
     },
@@ -2738,6 +2810,30 @@
         {
           "label": "ADR-0050: Boxed shared host-effect payloads",
           "path": "docs/decisions/0050-host-effect-envelope-layout.md"
+        },
+        {
+          "label": "ADR-0051: Framed package identity and retained compatibility",
+          "path": "docs/decisions/0051-package-identity-framing.md"
+        },
+        {
+          "label": "ADR-0052: Borrowed CICS operation inputs",
+          "path": "docs/decisions/0052-cics-operation-contexts.md"
+        },
+        {
+          "label": "ADR-0053: Selected controller publication fence",
+          "path": "docs/decisions/0053-selected-controller-publication-fence.md"
+        },
+        {
+          "label": "ADR-0054: Canonical focused conformance output",
+          "path": "docs/decisions/0054-focused-conformance-output.md"
+        },
+        {
+          "label": "ADR-0055: Standard package MAC envelope",
+          "path": "docs/decisions/0055-standard-package-mac-envelope.md"
+        },
+        {
+          "label": "ADR-0056: CICS first reverse read at a retained position",
+          "path": "docs/decisions/0056-cics-first-reverse-position.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -2960,7 +3056,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:95ac25532cbc184708b38511837822158295432cd22aa8f47003e7df3aeeeb6a",
+  "registry_sha256": "sha256:5b20d0b4dae429dbc36e44d4f80807d1b7dd97b1317ec90e35b37aa38037e20c",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {
