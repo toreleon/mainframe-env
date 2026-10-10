@@ -365,11 +365,12 @@ fn physical_reopen_genuine_cold_connect_fences_old_native_points_and_aliases() {
             let mut effect = cold.call_effect(1, "MQCOLD", &[vec![b' '; 8]]);
             effect.idempotency_key =
                 Some(IdempotencyKey::new("cold-point-original-call", Default::default()).unwrap());
-            let (outcome, reply) = cold.run(effect);
+            let (outcome, reply) = cold.run_raw(effect);
             assert!(
                 matches!(outcome, ExecutionOutcome::Completed(_)),
-                "{outcome:?}"
+                "genuine cold CONNECT coordinator failed before a host reply: {outcome:?}"
             );
+            let reply = reply.expect("completed cold CONNECT must return its original host reply");
             assert_eq!(
                 reply.outcome,
                 Ok(mainframe_env_host_api::HostResult::Program(
