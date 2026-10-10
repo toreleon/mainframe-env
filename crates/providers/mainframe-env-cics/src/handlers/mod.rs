@@ -505,7 +505,8 @@ pub(super) fn invoke_interval_or_spool_control(
     }
 }
 
-pub(super) fn release_task_state(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
+pub(super) fn release_task_state(service: &CicsService, run: &mut Run) -> Result<(), HostProblem> {
+    file_control::release_task(service, run)?;
     bts_browse::release_task(service, run)?;
     bts_child_link::release_task(service, run)?;
     bts_link::release_task(service, run)?;
@@ -522,6 +523,32 @@ pub(super) fn release_task_state(service: &CicsService, run: &Run) -> Result<(),
     security_control::release_task_token_key(service, run)?;
     network_context::release_task(service, run)?;
     web_service_control::release_task(service, run)
+}
+
+/// Retain confirmed per-cursor progress before returning from an idle terminal cleanup.
+/// The caller holds SessionCleanupLease, so no command or actor replacement can interleave.
+pub(super) fn release_terminal_task_state(
+    service: &CicsService,
+    run: &mut Run,
+) -> Result<(), HostProblem> {
+    let result = release_task_state(service, run);
+    let mut state = service.lock()?;
+    let saved = state
+        .runs
+        .get_mut(&run.invocation.run_unit_id)
+        .ok_or(HostProblem::IdempotencyConflict)?;
+    if saved.session != run.session
+        || saved.invocation != run.invocation
+        || saved.current_program.effect_invocation != run.current_program.effect_invocation
+    {
+        return Err(HostProblem::IdempotencyConflict);
+    }
+    saved.host_sequence = run.host_sequence;
+    saved.browses = run.browses.clone();
+    saved.initial_browse_positions = run.initial_browse_positions.clone();
+    saved.file_updates = run.file_updates.clone();
+    saved.current_records = run.current_records.clone();
+    result
 }
 
 pub(super) fn discard_task_starts(

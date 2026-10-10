@@ -372,6 +372,8 @@
       "crates/providers/mainframe-env-cics/src/handlers/file_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/file_control/first_reverse.rs",
       "crates/providers/mainframe-env-cics/src/handlers/file_control/first_reverse/tests.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/file_control/task_retirement.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/file_control/task_retirement/tests.rs",
       "crates/providers/mainframe-env-cics/src/handlers/file_tokens.rs",
       "crates/providers/mainframe-env-cics/src/handlers/file_unlock.rs",
       "crates/providers/mainframe-env-cics/src/handlers/handle_state.rs",

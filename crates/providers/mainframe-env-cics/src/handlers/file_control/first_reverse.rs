@@ -78,15 +78,25 @@ impl Completion {
 // These record only validated known provider effects; neither claims response atomicity.
 fn record_start_owner(run: &mut Run, dataset: &str, cursor: &str) {
     // A known cursor replacement invalidates the previous seed even if later outputs fail.
-    // Retirement of the replaced provider cursor remains a separate pre-existing gap.
     run.initial_browse_positions.remove(dataset);
     run.browses.insert(dataset.into(), cursor.into());
+    run.file_updates.task_browses.insert(
+        (dataset.into(), cursor.into()),
+        file_tokens::FileBrowseOwner {
+            actor: run.current_program.effect_invocation.clone(),
+            retirement_unknown: false,
+        },
+    );
 }
 
 fn record_end_owner(run: &mut Run, dataset: &str) {
     // A bound fully empty ENDBR reply proves known retirement independently of later outputs.
     run.initial_browse_positions.remove(dataset);
-    run.browses.remove(dataset);
+    if let Some(cursor) = run.browses.remove(dataset) {
+        run.file_updates
+            .task_browses
+            .remove(&(dataset.into(), cursor));
+    }
 }
 
 fn ordinary_mode(request: &CicsRequest) -> bool {
@@ -251,6 +261,11 @@ pub(super) fn file(
     request: &CicsRequest,
     completion: &mut Completion,
 ) -> Result<CicsResponse, HostProblem> {
+    if request.operation == CicsOperation::StartBrowse
+        && run.file_updates.task_browses.len() >= service.limits.max_file_aliases
+    {
+        return Err(HostProblem::ResourceExhausted);
+    }
     let logical_name = argument_text(request, "DATASET")
         .or_else(|_| argument_text(request, "FILE"))?
         .trim()
@@ -637,10 +652,25 @@ pub(super) fn file(
                     control: Default::default(),
                 })
         }
-        CicsOperation::EndBrowse => DatasetRequest::EndBrowse {
-            dataset: dataset.clone(),
-            cursor: owned_browse_cursor(run, request, &dataset_key, 0)?,
-        },
+        CicsOperation::EndBrowse => {
+            let cursor = owned_browse_cursor(run, request, &dataset_key, 0)?;
+            if run
+                .file_updates
+                .task_browses
+                .get(&(dataset_key.clone(), cursor.clone()))
+                .is_some_and(|owner| owner.retirement_unknown)
+            {
+                return Err(HostProblem::UnknownOutcome);
+            }
+            super::task_retirement::validate_generation(
+                service,
+                &run.current_program.effect_invocation,
+            )?;
+            DatasetRequest::EndBrowse {
+                dataset: dataset.clone(),
+                cursor,
+            }
+        }
         _ => return Err(HostProblem::Malformed),
     };
     let plan = BrowsePlan::new(request, &host_request, &dataset_key);
@@ -680,7 +710,15 @@ pub(super) fn file(
     } else {
         service.nested(run, HostRequest::Dataset(host_request))
     }
-    .map_err(|problem| normalize_file_not_found(operation, problem))?;
+    .map_err(|problem| {
+        if operation == CicsOperation::EndBrowse
+            && super::task_retirement::ambiguous(&problem)
+            && let Some(cursor) = &plan.cursor
+        {
+            super::task_retirement::mark_unknown(run, &dataset_key, cursor);
+        }
+        normalize_file_not_found(operation, problem)
+    })?;
     if matches!(
         operation,
         CicsOperation::StartBrowse
@@ -690,17 +728,11 @@ pub(super) fn file(
             | CicsOperation::EndBrowse
     ) && !matches!(&result, HostResult::Dataset(DatasetResult::Browse { .. }))
     {
-        return Err(HostProblem::ProviderFailure);
-    }
-    if matches!(
-        operation,
-        CicsOperation::StartBrowse
-            | CicsOperation::ResetBrowse
-            | CicsOperation::EndBrowse
-            | CicsOperation::ReadNext
-            | CicsOperation::ReadPrev
-    ) && !matches!(&result, HostResult::Dataset(DatasetResult::Browse { .. }))
-    {
+        if operation == CicsOperation::EndBrowse
+            && let Some(cursor) = &plan.cursor
+        {
+            super::task_retirement::mark_unknown(run, &dataset_key, cursor);
+        }
         return Err(HostProblem::ProviderFailure);
     }
     let mut browse_key = None;
@@ -740,7 +772,14 @@ pub(super) fn file(
             identity,
             key,
         }) => {
-            plan.validate(&cursor, &record, &identity, &key)?;
+            if let Err(problem) = plan.validate(&cursor, &record, &identity, &key) {
+                if operation == CicsOperation::EndBrowse
+                    && let Some(cursor) = &plan.cursor
+                {
+                    super::task_retirement::mark_unknown(run, &dataset_key, cursor);
+                }
+                return Err(problem);
+            }
             validated_cursor = Some(cursor.clone());
             if operation == CicsOperation::StartBrowse {
                 record_start_owner(run, &dataset_key, &cursor);

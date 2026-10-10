@@ -1,5 +1,5 @@
 // Source-frozen public CICS API -> real ProductServer Dataset/RACF controls.
-// No terminal map, compiled application, implicit task retirement, or IBM execution claim.
+// No terminal map, compiled application, or IBM execution claim.
 #[cfg(test)]
 mod cics_first_reverse_tests {
     use super::*;
@@ -235,7 +235,11 @@ mod cics_first_reverse_tests {
 
         fn command(&mut self, operation: CicsOperation, key: Option<&[u8]>, equal: bool) -> usize {
             self.sequence += 1;
-            let mut arguments = BTreeMap::from([("FILE".into(), literal(FILE))]);
+            let mut arguments = if operation == CicsOperation::Return {
+                BTreeMap::new()
+            } else {
+                BTreeMap::from([("FILE".into(), literal(FILE))])
+            };
             if let Some(key) = key {
                 arguments.insert("RIDFLD".into(), literal(key));
             }
@@ -448,6 +452,68 @@ mod cics_first_reverse_tests {
             );
         }
 
+        fn abort(&mut self) {
+            let owned = self
+                .owned
+                .clone()
+                .expect("public abort owns a real STARTBR cursor");
+            let before = self.observations.lock().unwrap().len();
+            self.cics
+                .as_ref()
+                .unwrap()
+                .abort_terminal_run(
+                    &self.session,
+                    self.invocation.as_ref().unwrap().principal.id(),
+                    self.now_tick,
+                )
+                .expect("known abnormal task completion");
+            self.launched = false;
+            let calls = self.observations.lock().unwrap()[before..].to_vec();
+            println!(
+                "CICS_TASK_BROWSE_RETIREMENT_ABORT {}",
+                json!({
+                    "captured_dataset": owned.0.as_str(),
+                    "captured_cursor": owned.1,
+                    "actual_dataset_delegates": calls.iter().map(|call| json!({
+                        "request": format!("{:?}", call.request),
+                        "result": format!("{:?}", call.result),
+                    })).collect::<Vec<_>>(),
+                })
+            );
+            assert_eq!(calls.len(), 1, "public abort issues exactly one real END");
+            assert!(matches!(&calls[0].request.request,
+                HostRequest::Dataset(DatasetRequest::EndBrowse { dataset, cursor })
+                if dataset == &owned.0 && cursor == &owned.1));
+            assert!(matches!(&calls[0].result.outcome,
+                Ok(HostResult::Dataset(DatasetResult::Browse { cursor, record: None, identity: None, key: None }))
+                if cursor == &owned.1));
+            self.owned = None;
+        }
+
+        fn retired_probe(&self, cursor: &str) {
+            let result = self.server.dataset_call(
+                "IBMUSER",
+                DatasetRequest::ReadNext {
+                    dataset: self.selected_dataset.as_ref().unwrap().clone(),
+                    cursor: cursor.into(),
+                    reverse: false,
+                    control: Default::default(),
+                },
+            );
+            println!(
+                "CICS_TASK_BROWSE_RETIREMENT_PROBE {}",
+                json!({
+                    "captured_cursor": cursor,
+                    "actual_result": format!("{result:?}"),
+                })
+            );
+            assert!(
+                matches!(result, Err(HostProblem::Condition { ref name, response: 16, .. })
+                if name == "INVREQ"),
+                "real captured cursor must be absent: {result:?}"
+            );
+        }
+
         fn insert_duplicate(&mut self) {
             let mutation = self.seed_mutation();
             self.server
@@ -591,6 +657,37 @@ mod cics_first_reverse_tests {
         }
         assert!(shutdown, "actual ProductServer shutdown refused");
         files.expect("owned fixture artifact cleanup");
+    }
+
+    #[tokio::test]
+    async fn cics_task_browse_retirement_root_return_ends_real_dataset_cursor() {
+        run("task-return", false, |fixture| {
+            let cursor = fixture.start(b"AA", false);
+            let first = fixture.read(CicsOperation::ReadPrev, b"AA");
+            fixture.record(first, b"AA01", b"AA", b"AA");
+            let at = fixture.command(CicsOperation::Return, None, false);
+            let response = fixture.normal(at);
+            assert_eq!(response.disposition, CicsDisposition::Returned);
+            assert!(
+                fixture.owned.is_none(),
+                "root RETURN must retire the captured cursor"
+            );
+            assert_eq!(fixture.commands[at].delegates.len(), 1);
+            fixture.retired_probe(&cursor);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn cics_task_browse_retirement_public_abort_ends_real_dataset_cursor() {
+        run("task-abort", false, |fixture| {
+            let cursor = fixture.start(b"AA", false);
+            let first = fixture.read(CicsOperation::ReadPrev, b"AA");
+            fixture.record(first, b"AA01", b"AA", b"AA");
+            fixture.abort();
+            fixture.retired_probe(&cursor);
+        })
+        .await;
     }
 
     #[tokio::test]

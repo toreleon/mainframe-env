@@ -7,7 +7,7 @@ use mainframe_env_host_api::{
 
 pub(in crate::service) fn invoke(
     service: &CicsService,
-    run: &Run,
+    run: &mut Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     validate_request(request)?;

@@ -236,10 +236,10 @@ impl CicsService {
                 .continuations
                 .insert(session.as_str().into(), released);
         }
-        let run = state.runs.get(&run_id).cloned();
+        let mut run = state.runs.get(&run_id).cloned();
         drop(state);
-        if let Some(run) = &run {
-            handlers::release_task_state(self, run)?;
+        if let Some(run) = &mut run {
+            handlers::release_terminal_task_state(self, run)?;
         }
         let mut state = self.lock()?;
         if state.runs.get(&run_id).is_some_and(|current| {
@@ -266,7 +266,7 @@ impl CicsService {
         let _cleanup = handlers::SessionCleanupLease::acquire(self, session.as_str())?;
         let run_id = RunUnitId::new(&current.run_unit, InvocationLimits::default())
             .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let run = {
+        let mut run = {
             let state = self.lock()?;
             if state
                 .sessions
@@ -320,7 +320,7 @@ impl CicsService {
                 .insert(session.as_str().into(), released);
         }
         drop(state);
-        handlers::release_task_state(self, &run)?;
+        handlers::release_terminal_task_state(self, &mut run)?;
         let mut state = self.lock()?;
         if state.runs.get(&run_id).is_none_or(|current| {
             current.session != run.session

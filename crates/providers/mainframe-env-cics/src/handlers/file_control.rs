@@ -26,6 +26,8 @@ use mainframe_env_store_api::{ProviderStateRecord, ProviderStateWrite};
 use std::collections::BTreeMap;
 
 mod first_reverse;
+mod task_retirement;
+pub(super) use task_retirement::release_task;
 
 pub(in crate::service) fn invoke(
     service: &CicsService,
