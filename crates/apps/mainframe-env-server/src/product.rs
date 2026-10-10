@@ -21247,7 +21247,7 @@ mod tests {
                     },
                     OnlineProgramDefinition {
                         name: "LINKCAL".into(),
-                        artifact: child_artifact_ref,
+                        artifact: child_artifact_ref.clone(),
                         payload: child_artifact.payload().to_vec(),
                         manifest: VersionedArtifactManifest::V3(child_artifact.manifest().clone()),
                         semantic_identity: child_artifact.semantic_id().to_reference(),
@@ -21264,6 +21264,20 @@ mod tests {
                     fields: Vec::new(),
                 }],
             })
+            .unwrap();
+        server
+            .cics
+            .register_program_definitions(&[CicsProgramDefinition {
+                name: "LINKCAL".into(),
+                generation: 1,
+                artifact: child_artifact_ref,
+                semantic_identity: child_artifact.semantic_id().to_reference(),
+                entry_offset: 0,
+                enabled: true,
+                remote: false,
+                reload: false,
+                java_status: CicsJavaStatus::NotJava,
+            }])
             .unwrap();
         let session = SessionId::new("typed-link", 64).unwrap();
         let invocation = server
