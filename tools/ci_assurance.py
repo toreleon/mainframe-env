@@ -312,7 +312,7 @@ def _linux_group_has_members(pgid: int) -> bool:
             try:
                 if trace is not None:
                     trace['stage'] = 'stat_parse'
-                group = int(raw.rsplit(b')', 1)[1].split()[2])
+                group = int(raw.rsplit(b')', 1)[1].split(None, 3)[2])
             except (IndexError, ValueError) as problem:
                 raise OSError('invalid Linux process-group metadata') from problem
             if group == pgid:
