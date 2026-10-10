@@ -1,5 +1,5 @@
 // Source-frozen public CICS API -> real ProductServer Dataset/RACF controls.
-// No terminal map, compiled application, implicit task retirement, or IBM execution claim.
+// Task-end controls probe cursor retirement before shutdown; no IBM execution claim.
 #[cfg(test)]
 mod cics_first_reverse_tests {
     use super::*;
@@ -235,7 +235,11 @@ mod cics_first_reverse_tests {
 
         fn command(&mut self, operation: CicsOperation, key: Option<&[u8]>, equal: bool) -> usize {
             self.sequence += 1;
-            let mut arguments = BTreeMap::from([("FILE".into(), literal(FILE))]);
+            let mut arguments = if operation == CicsOperation::Return {
+                BTreeMap::new()
+            } else {
+                BTreeMap::from([("FILE".into(), literal(FILE))])
+            };
             if let Some(key) = key {
                 arguments.insert("RIDFLD".into(), literal(key));
             }
@@ -591,6 +595,69 @@ mod cics_first_reverse_tests {
         }
         assert!(shutdown, "actual ProductServer shutdown refused");
         files.expect("owned fixture artifact cleanup");
+    }
+
+    #[tokio::test]
+    async fn cics_task_end_browse_root_return_retires_cursor() {
+        task_end_browse("task-end-return", false).await;
+    }
+
+    #[tokio::test]
+    async fn cics_task_end_browse_public_abort_retires_cursor() {
+        task_end_browse("task-end-abort", true).await;
+    }
+
+    async fn task_end_browse(name: &'static str, abort: bool) {
+        let mut fixture = Fixture::new(name);
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            fixture.prepare(false);
+            // Install the observing same-store Dataset/RACF service in the real product.
+            Arc::get_mut(&mut fixture.server).unwrap().cics = fixture.cics.clone().unwrap();
+            fixture.start(b"AA", false);
+            let (dataset, cursor) = fixture.owned.clone().unwrap();
+            if abort {
+                fixture
+                    .server
+                    .cics
+                    .abort_terminal_run(
+                        &fixture.session,
+                        fixture.invocation.as_ref().unwrap().principal.id(),
+                        fixture.now_tick,
+                    )
+                    .expect("public abort completes");
+            } else {
+                let returned = fixture.command(CicsOperation::Return, None, false);
+                assert_eq!(
+                    fixture.normal(returned).disposition,
+                    mainframe_env_host_api::CicsDisposition::Returned
+                );
+            }
+            let probe = fixture.server.dataset.invoke(DatasetRequest::ReadNext {
+                dataset,
+                cursor,
+                reverse: false,
+                control: Default::default(),
+            });
+            assert!(
+                matches!(probe, Err(HostProblem::Condition { ref name, response: 16, .. }) if name == "INVREQ"),
+                "task end must retire the captured cursor; cursor still live or unexpected refusal: {probe:?}"
+            );
+        }));
+        // No ENDBR or fixture teardown: only the task-end path may retire the cursor.
+        let shutdown = fixture.server.graceful_shutdown().await;
+        let artifact_root = fixture.artifact_root.clone();
+        drop(fixture);
+        let files = if artifact_root.exists() {
+            std::fs::remove_dir_all(artifact_root)
+        } else {
+            Ok(())
+        };
+        eprintln!("CICS_TASK_END_BROWSE_CLEANUP {name} shutdown={shutdown} files={files:?}");
+        if let Err(original) = result {
+            resume_unwind(original);
+        }
+        assert!(shutdown, "actual ProductServer shutdown refused");
+        files.expect("owned artifact cleanup");
     }
 
     #[tokio::test]

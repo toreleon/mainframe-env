@@ -505,7 +505,8 @@ pub(super) fn invoke_interval_or_spool_control(
     }
 }
 
-pub(super) fn release_task_state(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
+pub(super) fn release_task_state(service: &CicsService, run: &mut Run) -> Result<(), HostProblem> {
+    file_control::release_task(service, run)?;
     bts_browse::release_task(service, run)?;
     bts_child_link::release_task(service, run)?;
     bts_link::release_task(service, run)?;

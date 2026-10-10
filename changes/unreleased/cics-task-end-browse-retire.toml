@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Retired task-owned CICS file browse cursors when a task ends by root RETURN or public abort, through the original scoped host authority with SAF, grant, generation, cancellation and deadline checks preserved (#394)."

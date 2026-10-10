@@ -1121,7 +1121,7 @@ fn logical_frame_bare_return_preserves_claimed_task_continuation() {
     let loan = ProgramLease::acquire(&service, &mut caller, "CHILD", Some(actor.artifact.clone()))
         .unwrap();
     service.ensure_run(&actor).unwrap();
-    let child_command = CommandLease::acquire(&service, &root.run_unit_id).unwrap();
+    let mut child_command = CommandLease::acquire(&service, &root.run_unit_id).unwrap();
     assert_eq!(child_command.session, "FRAME-SESSION");
     assert_eq!(
         service.lock().unwrap().continuations["FRAME-SESSION"]
@@ -1140,7 +1140,8 @@ fn logical_frame_bare_return_preserves_claimed_task_continuation() {
             transaction: Some("MENU".into()),
         }),
     };
-    let response = super::super::task_return::invoke(&service, &child_command, &request).unwrap();
+    let response =
+        super::super::task_return::invoke(&service, &mut child_command, &request).unwrap();
     assert_eq!(response.disposition, CicsDisposition::Returned);
     assert_eq!(
         service
@@ -1160,7 +1161,7 @@ fn logical_frame_bare_return_preserves_claimed_task_continuation() {
     loan.finish().unwrap();
     // Root RETURN, unlike child RETURN, retires the claimed task continuation.
     assert_eq!(caller.session, "FRAME-SESSION");
-    super::super::task_return::invoke(&service, &caller, &request).unwrap();
+    super::super::task_return::invoke(&service, &mut caller, &request).unwrap();
     assert_eq!(
         service
             .store

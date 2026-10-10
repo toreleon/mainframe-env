@@ -12,19 +12,181 @@ use std::sync::{Arc, Mutex};
 type Replies = Arc<Mutex<VecDeque<Result<DatasetResult, HostProblem>>>>;
 type Calls = Arc<Mutex<Vec<DatasetRequest>>>;
 
+#[test]
+fn task_end_browse_uses_original_actor_and_honors_saf_denial() {
+    let mut f = Fixture::new();
+    f.seed();
+    let original = f.run.current_program.effect_invocation.clone();
+    f.deny.store(true, std::sync::atomic::Ordering::SeqCst);
+    assert_eq!(
+        super::super::task_end::release_task(&f.service, &mut f.run),
+        Err(HostProblem::Unauthorized)
+    );
+    f.pending(b"BB");
+    assert!(f.calls.lock().unwrap().is_empty());
+    f.deny.store(false, std::sync::atomic::Ordering::SeqCst);
+    f.queue(Ok(empty("CURSOR-1")));
+    super::super::task_end::release_task(&f.service, &mut f.run).unwrap();
+    assert!(
+        f.actors
+            .lock()
+            .unwrap()
+            .iter()
+            .all(|actor| actor == &original)
+    );
+}
+
+#[test]
+fn task_end_browse_checks_deadline_before_and_after_saf() {
+    struct Clock(Mutex<VecDeque<u64>>);
+    impl crate::service::CicsReplayClock for Clock {
+        fn now_tick(&self) -> Result<u64, HostProblem> {
+            Ok(self.0.lock().unwrap().pop_front().unwrap())
+        }
+    }
+    for after_saf in [false, true] {
+        let mut f = Fixture::new();
+        f.seed();
+        let deadline = f.run.current_program.effect_invocation.deadline_tick;
+        assert_eq!(
+            super::super::task_end::check_cleanup_deadline(&f.run, deadline),
+            Err(HostProblem::TimedOut)
+        );
+        super::super::task_end::check_cleanup_deadline(&f.run, deadline - 1).unwrap();
+        let ticks = if after_saf {
+            vec![1, deadline]
+        } else {
+            vec![deadline]
+        };
+        Arc::get_mut(&mut f.service).unwrap().replay_clock =
+            Some(Arc::new(Clock(Mutex::new(ticks.into()))));
+        assert_eq!(
+            super::super::task_end::release_task(&f.service, &mut f.run),
+            Err(HostProblem::TimedOut)
+        );
+        assert!(f.calls.lock().unwrap().is_empty());
+        f.pending(b"BB");
+    }
+}
+
+#[test]
+fn task_end_browse_retains_per_cursor_progress_after_refusal() {
+    let mut f = Fixture::new();
+    f.seed();
+    f.run.browses.insert("ZZFILE".into(), "CURSOR-2".into());
+    f.service
+        .lock()
+        .unwrap()
+        .runs
+        .insert(f.run.invocation.run_unit_id.clone(), f.run.clone());
+    f.queue(Ok(empty("CURSOR-1")));
+    f.queue(Err(HostProblem::ProviderFailure));
+    assert_eq!(
+        super::super::task_end::release_task(&f.service, &mut f.run),
+        Err(HostProblem::ProviderFailure)
+    );
+    assert_eq!(f.run.browses.len(), 1);
+    assert_eq!(f.run.browses["ZZFILE"], "CURSOR-2");
+    assert!(f.run.initial_browse_positions.is_empty());
+    assert_eq!(
+        f.service.lock().unwrap().runs[&f.run.invocation.run_unit_id].browses,
+        f.run.browses
+    );
+    f.queue(Ok(empty("CURSOR-2")));
+    super::super::task_end::release_task(&f.service, &mut f.run).unwrap();
+    assert!(f.run.browses.is_empty());
+    let calls = f.calls.lock().unwrap();
+    assert_eq!(calls.len(), 3);
+    assert!(matches!(&calls[2], DatasetRequest::EndBrowse { cursor, .. } if cursor == "CURSOR-2"));
+}
+
+#[test]
+fn task_end_browse_unknown_or_unbound_reply_preserves_owner() {
+    for reply in [
+        Err(HostProblem::UnknownOutcome),
+        Ok(empty("FOREIGN")),
+        Ok(full("CURSOR-1", b"AA01", b"AA", b"AA")),
+        Ok(DatasetResult::Attributes {
+            attributes: attributes(),
+            version: 1,
+        }),
+    ] {
+        let mut f = Fixture::new();
+        f.seed();
+        f.queue(reply);
+        assert_eq!(
+            super::super::task_end::release_task(&f.service, &mut f.run),
+            Err(HostProblem::UnknownOutcome)
+        );
+        f.pending(b"BB");
+        assert_eq!(
+            f.service
+                .lock()
+                .unwrap()
+                .task_dispatch
+                .require_available_session("session"),
+            Err(HostProblem::UnknownOutcome)
+        );
+    }
+}
+
+#[test]
+fn task_end_browse_cannot_widen_grants_generations_or_cancellation() {
+    for case in 0..3 {
+        let mut f = Fixture::new();
+        f.seed();
+        let actor = &mut f.run.current_program.effect_invocation;
+        match case {
+            0 => {
+                actor.principal = mainframe_env_execution_api::Principal::new(
+                    actor.principal.id().clone(),
+                    Default::default(),
+                    InvocationLimits::default(),
+                )
+                .unwrap()
+            }
+            1 => {
+                actor.provider_generations.insert(
+                    CapabilityId::new("host.dataset.read", InvocationLimits::default()).unwrap(),
+                    "stale".into(),
+                );
+            }
+            _ => {
+                let probe = mainframe_env_execution_api::CancellationProbe::new();
+                probe.request();
+                actor.cancellation_probe = Some(probe);
+            }
+        }
+        let original = actor.clone();
+        assert!(super::super::task_end::release_task(&f.service, &mut f.run).is_err());
+        assert_eq!(f.run.current_program.effect_invocation, original);
+        assert!(f.calls.lock().unwrap().is_empty());
+        f.pending(b"BB");
+    }
+}
+
 struct Authority {
     descriptor: CapabilityDescriptor,
     replies: Replies,
     calls: Calls,
+    deny: Arc<std::sync::atomic::AtomicBool>,
+    actors: Arc<Mutex<Vec<Invocation>>>,
 }
 
 impl HostProvider for Authority {
     fn descriptor(&self) -> &CapabilityDescriptor {
         &self.descriptor
     }
-    fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
+    fn invoke(&self, actor: &Invocation, effect: EffectRequest) -> EffectResult {
+        self.actors.lock().unwrap().push(actor.clone());
         let outcome = match effect.request {
-            HostRequest::Security(_) => Ok(HostResult::Security(SecurityDecision::Allow)),
+            HostRequest::Security(_) => Ok(HostResult::Security(
+                if self.deny.load(std::sync::atomic::Ordering::SeqCst) {
+                    SecurityDecision::Deny
+                } else {
+                    SecurityDecision::Allow
+                },
+            )),
             HostRequest::Dataset(request) => {
                 self.calls.lock().unwrap().push(request.clone());
                 if matches!(request, DatasetRequest::Attributes { .. }) {
@@ -106,12 +268,16 @@ struct Fixture {
     run: Run,
     replies: Replies,
     calls: Calls,
+    deny: Arc<std::sync::atomic::AtomicBool>,
+    actors: Arc<Mutex<Vec<Invocation>>>,
 }
 
 impl Fixture {
     fn new() -> Self {
         let replies = Arc::new(Mutex::new(VecDeque::new()));
         let calls = Arc::new(Mutex::new(Vec::new()));
+        let deny = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let actors = Arc::new(Mutex::new(Vec::new()));
         let limits = InvocationLimits::default();
         let providers = ["host.security.authorize", "host.dataset.read"]
             .into_iter()
@@ -129,6 +295,8 @@ impl Fixture {
                     },
                     replies: replies.clone(),
                     calls: calls.clone(),
+                    deny: deny.clone(),
+                    actors: actors.clone(),
                 }) as Arc<dyn HostProvider>
             })
             .collect();
@@ -149,6 +317,8 @@ impl Fixture {
             run,
             replies,
             calls,
+            deny,
+            actors,
         }
     }
     fn seed(&mut self) {

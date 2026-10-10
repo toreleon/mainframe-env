@@ -20,14 +20,15 @@ impl CicsService {
         {
             return Err(HostProblem::IdempotencyConflict);
         }
-        let runs = state
+        let mut runs = state
             .runs
             .values()
             .filter(|run| run.session == session.as_str())
             .cloned()
             .collect::<Vec<_>>();
         drop(state);
-        for run in &runs {
+        for run in &mut runs {
+            super::file_control::check_cleanup_deadline(run, now_tick)?;
             handlers::release_task_state(self, run)?;
         }
         let mut state = self.lock()?;
@@ -87,7 +88,7 @@ impl CicsService {
             .task_dispatch
             .require_available_session(session.as_str())?;
         if now_tick >= current.expires_at_tick {
-            let runs = state
+            let mut runs = state
                 .runs
                 .values()
                 .filter(|run| run.session == session.as_str())
@@ -96,7 +97,8 @@ impl CicsService {
             let _cleanup =
                 handlers::SessionCleanupLease::acquire_locked(self, &mut state, session.as_str())?;
             drop(state);
-            for run in &runs {
+            for run in &mut runs {
+                super::file_control::check_cleanup_deadline(run, now_tick)?;
                 handlers::release_task_state(self, run)?;
             }
             let mut state = self.lock()?;

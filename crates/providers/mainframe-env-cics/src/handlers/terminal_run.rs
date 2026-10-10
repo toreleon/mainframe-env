@@ -236,9 +236,10 @@ impl CicsService {
                 .continuations
                 .insert(session.as_str().into(), released);
         }
-        let run = state.runs.get(&run_id).cloned();
+        let mut run = state.runs.get(&run_id).cloned();
         drop(state);
-        if let Some(run) = &run {
+        if let Some(run) = &mut run {
+            super::file_control::check_cleanup_deadline(run, now_tick)?;
             handlers::release_task_state(self, run)?;
         }
         let mut state = self.lock()?;
@@ -266,7 +267,7 @@ impl CicsService {
         let _cleanup = handlers::SessionCleanupLease::acquire(self, session.as_str())?;
         let run_id = RunUnitId::new(&current.run_unit, InvocationLimits::default())
             .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let run = {
+        let mut run = {
             let state = self.lock()?;
             if state
                 .sessions
@@ -284,6 +285,7 @@ impl CicsService {
         if run.session != session.as_str() || run.invocation.principal.id() != principal {
             return Err(HostProblem::Unauthorized);
         }
+        super::file_control::check_cleanup_deadline(&run, now_tick)?;
         if let Some(outcome) = outcome {
             super::interval_control::finish_protected_starts(self, &run, outcome)?;
             super::issue_device::finish_task(self, &run, outcome)?;
@@ -320,7 +322,7 @@ impl CicsService {
                 .insert(session.as_str().into(), released);
         }
         drop(state);
-        handlers::release_task_state(self, &run)?;
+        handlers::release_task_state(self, &mut run)?;
         let mut state = self.lock()?;
         if state.runs.get(&run_id).is_none_or(|current| {
             current.session != run.session

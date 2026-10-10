@@ -5313,8 +5313,8 @@ mod tests {
         let token = *b"1234567890ABCDEF";
         cics.register_bts_child(&invocation.run_unit_id, token, Some("REPLY"))
             .unwrap();
-        let run = cics.lock().unwrap().runs[&invocation.run_unit_id].clone();
-        handlers::release_task_state(&cics, &run).unwrap();
+        let mut run = cics.lock().unwrap().runs[&invocation.run_unit_id].clone();
+        handlers::release_task_state(&cics, &mut run).unwrap();
         cics.complete_bts_child(
             &invocation.run_unit_id,
             token,
@@ -8291,8 +8291,8 @@ mod tests {
             .invoke(&effect(&invocation.run_unit_id, load.clone(), 1), load)
             .unwrap();
         assert_eq!(replay, response);
-        let run = cics.lock().unwrap().runs[&invocation.run_unit_id].clone();
-        handlers::release_task_state(&cics, &run).unwrap();
+        let mut run = cics.lock().unwrap().runs[&invocation.run_unit_id].clone();
+        handlers::release_task_state(&cics, &mut run).unwrap();
         assert_eq!(
             cics.lock().unwrap().program_loads["LOADPGM"].events.len(),
             1
@@ -8335,8 +8335,8 @@ mod tests {
                 .len(),
             2
         );
-        let run = reopened.lock().unwrap().runs[&nonhold_invocation.run_unit_id].clone();
-        handlers::release_task_state(&reopened, &run).unwrap();
+        let mut run = reopened.lock().unwrap().runs[&nonhold_invocation.run_unit_id].clone();
+        handlers::release_task_state(&reopened, &mut run).unwrap();
         let state = reopened.lock().unwrap();
         assert_eq!(state.program_loads["LOADPGM"].events.len(), 1);
         assert!(state.program_loads["LOADPGM"].events[0].hold);
@@ -8647,8 +8647,8 @@ mod tests {
             cics.lock().unwrap().program_loads["RELPGM"].events[1].artifact,
             latest
         );
-        let run = cics.lock().unwrap().runs[&owner.run_unit_id].clone();
-        handlers::release_task_state(&cics, &run).unwrap();
+        let mut run = cics.lock().unwrap().runs[&owner.run_unit_id].clone();
+        handlers::release_task_state(&cics, &mut run).unwrap();
         assert_eq!(cics.lock().unwrap().program_loads["RELPGM"].events.len(), 2);
 
         let releaser = invocation_for("release-releaser", BTreeMap::new());
@@ -16330,8 +16330,8 @@ mod tests {
             reopened.lock().unwrap().web.urimaps["MAPA"].path,
             "/example"
         );
-        let run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
-        handlers::release_task_state(&service, &run).unwrap();
+        let mut run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
+        handlers::release_task_state(&service, &mut run).unwrap();
         assert!(
             store
                 .list_provider_state("cics-web-session-v1", 8)
@@ -17002,8 +17002,8 @@ mod tests {
                 .cursor,
             6
         );
-        let run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
-        handlers::release_task_state(&service, &run).unwrap();
+        let mut run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
+        handlers::release_task_state(&service, &mut run).unwrap();
         assert!(
             store
                 .list_provider_state("cics-web-body-cursor-v1", 8)
@@ -17499,8 +17499,8 @@ mod tests {
             ),
             ("INVREQ", 16, 19)
         );
-        let run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
-        handlers::release_task_state(&service, &run).unwrap();
+        let mut run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
+        handlers::release_task_state(&service, &mut run).unwrap();
         assert!(
             store
                 .list_provider_state("cics-web-header-stage-v1", 8)
@@ -17735,8 +17735,8 @@ mod tests {
             (absent.condition.as_str(), absent.response, absent.response2),
             ("INVREQ", 16, 4)
         );
-        let run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
-        handlers::release_task_state(&service, &run).unwrap();
+        let mut run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
+        handlers::release_task_state(&service, &mut run).unwrap();
         assert!(
             store
                 .list_provider_state("cics-web-browse-v1", 8)
@@ -18136,8 +18136,8 @@ mod tests {
             )
             .unwrap();
         assert_eq!(alias.outputs["REQUESTTYPE"].bytes(), b"1");
-        let run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
-        handlers::release_task_state(&service, &run).unwrap();
+        let mut run = service.lock().unwrap().runs[&invocation.run_unit_id].clone();
+        handlers::release_task_state(&service, &mut run).unwrap();
         assert!(service.lock().unwrap().web.inbound.is_empty());
     }
 
@@ -34611,14 +34611,14 @@ mod tests {
             ),
             ("INVREQ", 16, 2)
         );
-        let run = service
+        let mut run = service
             .lock()
             .unwrap()
             .runs
             .get(&invocation.run_unit_id)
             .unwrap()
             .clone();
-        handlers::release_task_state(&service, &run).unwrap();
+        handlers::release_task_state(&service, &mut run).unwrap();
         assert!(
             store
                 .list_provider_state("cics-task-wait-v1", 2)
@@ -34746,14 +34746,14 @@ mod tests {
         assert_eq!(complete.disposition, CicsDisposition::Complete);
         assert_eq!(complete.outputs["EVENT.POSTED"].bytes(), b"1");
 
-        let run = service
+        let mut run = service
             .lock()
             .unwrap()
             .runs
             .get(&invocation.run_unit_id)
             .unwrap()
             .clone();
-        handlers::release_task_state(&service, &run).unwrap();
+        handlers::release_task_state(&service, &mut run).unwrap();
         let wait = request(
             CicsOperation::WaitExternal,
             wait_external_arguments(&events, None, 2, false),
@@ -34789,7 +34789,7 @@ mod tests {
             .unwrap();
         assert_eq!(purged.disposition, CicsDisposition::Abended);
         assert_eq!(purged.condition, "AEXY");
-        handlers::release_task_state(&service, &run).unwrap();
+        handlers::release_task_state(&service, &mut run).unwrap();
         drop(service);
         drop(store);
         std::fs::remove_dir_all(root).unwrap();

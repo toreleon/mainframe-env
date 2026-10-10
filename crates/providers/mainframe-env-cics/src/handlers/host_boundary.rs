@@ -113,6 +113,10 @@ pub(in crate::service) struct TaskDispatch {
 }
 
 impl TaskDispatch {
+    pub(in crate::service) fn mark_uncertain_session(&mut self, session: &str) {
+        self.uncertain_sessions.insert(session.into());
+    }
+
     pub(in crate::service) fn absent_runs(&self, runs: &BTreeMap<RunUnitId, Run>) -> usize {
         self.claims
             .keys()
