@@ -277,7 +277,7 @@ def _linux_group_observation(pgid: int, deadline: float) -> bool:
 
 def _run_owned(command: list[str], root: Path, on_output, *, timeout_seconds,
                max_output_bytes: int | None = None, separate_stderr: bool = False,
-               env=None, on_reaped=None) -> tuple[int, str | None]:
+               env=None, on_reaped=None, on_closed=None) -> tuple[int, str | None]:
     """Run one Linux session; retain its leader until every group operation ends.
 
     The callback must return promptly. Merged output retains pipe byte order;
@@ -285,6 +285,8 @@ def _run_owned(command: list[str], root: Path, on_output, *, timeout_seconds,
     Only the launched group is signalled. Descendants escaping that group are
     outside this primitive's containment boundary. An output ceiling is shared
     by both streams; admitted partial bytes survive failure and never imply pass.
+    on_closed requires the non-reaped leader's exit, then a final negative group
+    census and the sole successful leader wait; it does not imply test success.
     """
     child_options = {}
     if env is not None:
@@ -306,6 +308,7 @@ def _run_owned(command: list[str], root: Path, on_output, *, timeout_seconds,
     observing = True
     overflowing = False
     cancelled = None
+    group_closed = False
     pipes = []
     previous = {}
     selector = selectors.DefaultSelector()
@@ -452,9 +455,16 @@ def _run_owned(command: list[str], root: Path, on_output, *, timeout_seconds,
                     fail(str(problem) or type(problem).__name__)
             if fence:
                 try:
-                    if group_has_members(deadline if error is None else end):
+                    # A live leader can spawn after a census that excludes it.
+                    # Establish its non-reaped exit before admitting emptiness.
+                    if observe_exit() is None:
+                        fail('launcher exit not established before final group census')
+                        signal_group(signal.SIGKILL)
+                    elif group_has_members(deadline if error is None else end):
                         fail('owned process group remains after cleanup')
                         signal_group(signal.SIGKILL)
+                    else:
+                        group_closed = True
                 except OSError as problem:
                     fail('owned group cleanup uncertain: ' + str(problem))
                     try:
@@ -476,6 +486,11 @@ def _run_owned(command: list[str], root: Path, on_output, *, timeout_seconds,
                     on_reaped(code)
                 except BaseException as problem:
                     fail('exit capture failed: ' + (str(problem) or type(problem).__name__))
+            if group_closed and reaped and on_closed is not None:
+                try:
+                    on_closed(code)
+                except BaseException as problem:
+                    fail('closure capture failed: ' + (str(problem) or type(problem).__name__))
         if cancelled is not None and error is None:
             fail(f'command cancelled by signal {cancelled}')
         try:

@@ -871,7 +871,8 @@ class CommandSupervisionReviewTests(unittest.TestCase):
             self.assertEqual(receipt['status'],'failed')
 
     def lifetime(self, *, members=False, wait_error=None, observation_error=None,
-                 callback_error=False, membership_error=None, inherited_pipe=False):
+                 callback_error=False, membership_error=None, inherited_pipe=False,
+                 capture_closure=False, leader_live=False):
         from types import SimpleNamespace
         read_fd,write_fd=os.pipe()
         os.write(write_fd,b'actual partial')
@@ -893,6 +894,7 @@ class CommandSupervisionReviewTests(unittest.TestCase):
             self.assertTrue(flags & os.WNOWAIT)
             self.assertFalse(reaped)
             if observation_error: raise observation_error
+            if leader_live: return None
             return SimpleNamespace(si_pid=pid,si_code=os.CLD_EXITED,si_status=0)
         def group(pgid):
             events.append('group-probe')
@@ -923,7 +925,8 @@ class CommandSupervisionReviewTests(unittest.TestCase):
                     patch.object(ci.os,'waitid',side_effect=observe), \
                     patch.object(ci,'_linux_group_has_members',side_effect=group,create=True), \
                     patch.object(ci.os,'killpg',side_effect=kill):
-                result=ci._run_owned(['fixture'],ROOT,output,timeout_seconds=.15)
+                result=ci._run_owned(['fixture'],ROOT,output,timeout_seconds=.15,
+                                     on_closed=(lambda code: events.append('closed')) if capture_closure else None)
         finally:
             process.stdout.close()
             if inherited_pipe: os.close(write_fd)
@@ -982,6 +985,38 @@ class CommandSupervisionReviewTests(unittest.TestCase):
         (code,error),events,chunks=self.lifetime(membership_error=OSError('incomplete membership census'))
         self.assertIn('incomplete membership census',error)
         self.assertIn('group-signal',events)
+
+    def test_group_closure_notification_requires_negative_census_then_successful_wait(self):
+        (code,error),events,chunks=self.lifetime(capture_closure=True)
+        self.assertEqual(code,0); self.assertIsNone(error)
+        self.assertEqual(events.count('closed'),1)
+        self.assertGreater(events.index('closed'),events.index('wait'))
+        self.assertIn('group-probe',events[:events.index('wait')])
+
+    def test_uncertain_census_cannot_notify_group_closure_after_leader_wait(self):
+        (code,error),events,chunks=self.lifetime(
+            membership_error=OSError('incomplete membership census'),capture_closure=True)
+        self.assertEqual(code,0)
+        self.assertIn('owned group cleanup uncertain',error)
+        self.assertEqual(events.count('wait'),1)
+        self.assertNotIn('closed',events)
+
+    def test_failed_leader_wait_cannot_notify_group_closure_after_negative_census(self):
+        (code,error),events,chunks=self.lifetime(
+            wait_error=ChildProcessError('sole wait failed'),capture_closure=True)
+        self.assertEqual(code,127)
+        self.assertIn('launcher wait failed',error)
+        self.assertIn('group-probe',events)
+        self.assertEqual(events.count('wait'),1)
+        self.assertNotIn('closed',events)
+
+    def test_live_leader_cannot_admit_final_negative_census_or_closure_notification(self):
+        (code,error),events,chunks=self.lifetime(leader_live=True,capture_closure=True)
+        self.assertEqual(code,0)
+        self.assertIn('launcher exit not established before final group census',error)
+        self.assertEqual(events.count('wait'),1)
+        self.assertNotIn('group-probe',events)
+        self.assertNotIn('closed',events)
 
     def test_linux_census_excludes_only_retained_leader_and_detects_zombie_member(self):
         from contextlib import contextmanager
