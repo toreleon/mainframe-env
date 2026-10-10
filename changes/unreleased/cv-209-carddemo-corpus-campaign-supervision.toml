@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Add a bounded CardDemo corpus campaign driver that verifies the complete owned copy and compiled inputs, retains actual command closure before writes or disposal, and refuses cleanup when evidence retention or ownership is uncertain."
