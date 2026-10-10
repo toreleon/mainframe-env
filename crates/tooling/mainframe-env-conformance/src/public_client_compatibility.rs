@@ -840,7 +840,6 @@ mod controls {
     const OWNER_QUERY: &str = "/zosmf/restjobs/jobs?owner=IBMUSER&prefix=PBCLNT01";
     const PROFILE: &str = "public-client-linux-x86_64";
     const TOOLCHAIN: &str = "/workspace/scratch/sandbox-toolchain";
-    const TARGET: &str = "/workspace/mainframe-env-foundation-public-client-fixture/target/cv209-public-client-fixture";
 
     fn require(condition: bool, message: &str) -> Check {
         if condition {
@@ -1433,7 +1432,9 @@ mod controls {
         fn load() -> Check<Self> {
             let python = selected_path("CV209_PUBLIC_CLIENT_PYTHON")?;
             require(
-                python == Path::new(TOOLCHAIN).join("python/bin/python3.12"),
+                python
+                    == fs::canonicalize(Path::new(TOOLCHAIN).join("python/bin/python3.12"))
+                        .map_err(problem)?,
                 "selected Python is not the pinned tool",
             )?;
             let source = selected_path("CV209_PUBLIC_CLIENT_SOURCE_ROOT")?;
@@ -1514,7 +1515,10 @@ mod controls {
                 .env("CARGO_HOME", format!("{TOOLCHAIN}/cargo"))
                 .env("RUSTUP_HOME", format!("{TOOLCHAIN}/rustup"))
                 .env("LD_LIBRARY_PATH", format!("{TOOLCHAIN}/python/lib"))
-                .env("CARGO_TARGET_DIR", TARGET)
+                .env(
+                    "CARGO_TARGET_DIR",
+                    self.source.join("target/cv209-public-client-fixture"),
+                )
                 .env("CARGO_BUILD_JOBS", "2")
                 .env("CARGO_INCREMENTAL", "0")
                 .env("CARGO_PROFILE_DEV_DEBUG", "0")
