@@ -564,7 +564,7 @@ def _validate_zowe_tree_command(tree: Path, rows: dict[str, dict], zowe: dict) -
     directory_states = {}
     total = 0
 
-    def entries(descriptor, path):
+    def entries(descriptor, path, relative):
         children = []
         # Close scandir before descending, so only the depth-bounded authority
         # stack is held; an untrusted directory cannot grow an unbounded list.
@@ -573,7 +573,10 @@ def _validate_zowe_tree_command(tree: Path, rows: dict[str, dict], zowe: dict) -
                 require(len(children) < zowe["tree"]["files"] + ZOWE_DIRECTORIES,
                         "Zowe directory entries exceed bound")
                 child = path / entry.name
-                name = child.relative_to(tree).as_posix()
+                # scandir supplies one leaf, and relative is built only from
+                # admitted ancestor leaves. Avoid reparsing the absolute root
+                # for every file while preserving the same relative name.
+                name = relative + "/" + entry.name if relative else entry.name
                 metadata = entry.stat(follow_symlinks=False)
                 archive_name(name, "package", stat.S_ISDIR(metadata.st_mode))
                 require(len(PurePosixPath(name).parts) <= zowe["tree"]["max_depth"], "Zowe tree depth exceeds bound")
@@ -581,16 +584,16 @@ def _validate_zowe_tree_command(tree: Path, rows: dict[str, dict], zowe: dict) -
                 children.append((entry.name, child, name, metadata))
         return children
 
-    def visit(descriptor, path):
+    def visit(descriptor, path, relative):
         nonlocal total
-        for leaf, child, name, metadata in entries(descriptor, path):
+        for leaf, child, name, metadata in entries(descriptor, path, relative):
             if stat.S_ISDIR(metadata.st_mode):
                 require(name in parents and name not in directories and len(directories) < ZOWE_DIRECTORIES,
                         "unexpected Zowe tree directory")
                 directories.add(name)
                 directory_states[child] = file_state(metadata)
                 with _tree_directory(child, metadata, descriptor, leaf) as child_descriptor:
-                    visit(child_descriptor, child)
+                    visit(child_descriptor, child, name)
             else:
                 require(stat.S_ISREG(metadata.st_mode) and name in rows and name not in found
                         and len(found) < zowe["tree"]["files"], "unexpected Zowe tree file")
@@ -602,7 +605,7 @@ def _validate_zowe_tree_command(tree: Path, rows: dict[str, dict], zowe: dict) -
                 found.add(name)
 
     with _tree_directory(tree, root_before) as root_descriptor:
-        children = entries(root_descriptor, tree)
+        children = entries(root_descriptor, tree, "")
         require(len(children) == 1 and children[0][2] == "package" and stat.S_ISDIR(children[0][3].st_mode)
                 and "package" in parents, "Zowe tree root membership differs")
         leaf, package, name, metadata = children[0]
@@ -611,7 +614,7 @@ def _validate_zowe_tree_command(tree: Path, rows: dict[str, dict], zowe: dict) -
         # Root and package stay held across the fresh manifest and ALL final
         # namespace checks, including already processed descendant directories.
         with _tree_directory(package, metadata, root_descriptor, leaf) as package_descriptor:
-            visit(package_descriptor, package)
+            visit(package_descriptor, package, name)
             require(found == set(rows) and directories == parents, "Zowe tree membership differs")
             canonical = json.dumps([rows[key] for key in sorted(rows, key=PurePosixPath)],
                                    sort_keys=True, separators=(",", ":")).encode("utf-8")

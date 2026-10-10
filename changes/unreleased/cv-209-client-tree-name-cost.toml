@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Construct command-local Zowe tree names from admitted directory leaves instead of repeatedly reparsing the absolute root; retain fresh byte reads, descriptor and namespace fences, full membership and all fixed client limits."
