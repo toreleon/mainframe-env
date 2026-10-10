@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Required explicit CV209_PUBLIC_CLIENT_TOOLCHAIN and CV209_PUBLIC_CLIENT_EVIDENCE_PARENT roots for the finite public-client fixture instead of host-specific /workspace paths, and moved its disposable artifacts to owned per-run directories with verified cleanup; the real-client fixture stays ignored and earns no credit."
