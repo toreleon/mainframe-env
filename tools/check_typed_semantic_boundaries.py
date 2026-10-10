@@ -257,13 +257,7 @@ def linked_module_production(parent: Path, module: str) -> str:
     return _linked_production(parent, module, None)
 
 
-def _linked_production(parent: Path, module: str, exported: str | None) -> str:
-    names = (module,) if exported is None else (module, exported)
-    require(
-        all(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) for name in names),
-        "linked production source expects Rust identifiers",
-    )
-    source = production(parent.read_text(encoding="utf-8"))
+def _production_statements(source: str) -> list[str]:
     # Use the same lexer and cfg(test) exclusion as every production check.
     code = list(source)
     cursor = 0
@@ -287,6 +281,38 @@ def _linked_production(parent: Path, module: str, exported: str | None) -> str:
         elif char == ";" and depth == 0:
             statements.append(code[start:position + 1])
             start = position + 1
+    return statements
+
+
+def linked_module_production_if_declared(parent: Path, module: str) -> str:
+    """Follow an authenticated file module when declared; keep a flat owner valid."""
+    require(
+        re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", module) is not None,
+        "linked production source expects Rust identifiers",
+    )
+    source = production(parent.read_text(encoding="utf-8"))
+    declarations = [
+        item for item in _production_statements(source)
+        if re.search(rf"\bmod\s+{module}\s*;\s*$", item)
+    ]
+    if not declarations:
+        return ""
+    require(
+        len(declarations) == 1
+        and re.fullmatch(rf"\s*mod\s+{module}\s*;\s*", declarations[0]) is not None,
+        f"production parent requires one plain private module {module}",
+    )
+    return linked_module_production(parent, module)
+
+
+def _linked_production(parent: Path, module: str, exported: str | None) -> str:
+    names = (module,) if exported is None else (module, exported)
+    require(
+        all(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) for name in names),
+        "linked production source expects Rust identifiers",
+    )
+    source = production(parent.read_text(encoding="utf-8"))
+    statements = _production_statements(source)
     require(
         any(re.fullmatch(rf"\s*mod\s+{module}\s*;\s*", item) for item in statements),
         f"production parent omits plain private module {module}",
@@ -342,7 +368,7 @@ def check_product_artifact_admission(root: Path) -> None:
         read(root, "crates/apps/mainframe-env-server/src/cobol/artifact.rs")
     )
     server_product = production(read(root, "crates/apps/mainframe-env-server/src/product.rs"))
-    server_product += "\n" + linked_module_production(
+    server_product += "\n" + linked_module_production_if_declared(
         root / "crates/apps/mainframe-env-server/src/product.rs", "online_machine"
     )
     require(

@@ -319,5 +319,90 @@ class ProductArtifactAdmissionOwnerTests(unittest.TestCase):
                 typed_boundaries.check_product_artifact_admission(root)
 
 
+    def flat_fixture(self, root):
+        paths, sources = self.fixture(root)
+        sources["product"] = sources["product"].replace("mod online_machine;\n", "") + sources["machine"]
+        paths["product"].write_text(sources["product"])
+        paths["machine"].unlink()
+        return paths, sources
+
+    def test_genuine_flat_owner_without_child_satisfies_original_admission(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths, _ = self.flat_fixture(root)
+            self.assertFalse(paths["machine"].exists())
+            typed_boundaries.check_product_artifact_admission(root)
+
+    def test_flat_owner_retains_all_five_admission_and_both_raw_payload_refusals(self):
+        cases = [
+            ("model", "pub struct ExecutableArtifactMetadata", "pub struct MissingMetadata"),
+            ("model", "pub executable: Option<ExecutableArtifactMetadata>", "pub executable: bool"),
+            ("artifact", "pub(crate) fn admit_executable_artifact", "fn missing_admission"),
+            ("artifact", "ValidatedArtifact::read", "unchecked_payload"),
+            ("product", "admit_executable_artifact(&record)?", "unchecked_payload(&record)?"),
+        ]
+        for key, old, new in cases:
+            with self.subTest(owner=key, refused=old), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                paths, sources = self.flat_fixture(root)
+                paths[key].write_text(sources[key].replace(old, new))
+                with self.assertRaises(typed_boundaries.BoundaryError):
+                    typed_boundaries.check_product_artifact_admission(root)
+        for key in ("cobol", "product"):
+            with self.subTest(raw_payload_owner=key), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                paths, sources = self.flat_fixture(root)
+                paths[key].write_text(
+                    sources[key] + "fn bypass() { ReferenceMachine::from_binary(\n"
+                    "                &record.payload, invocation, limits); }\n"
+                )
+                with self.assertRaises(typed_boundaries.BoundaryError):
+                    typed_boundaries.check_product_artifact_admission(root)
+
+    def test_unlinked_or_shadow_child_cannot_supply_admission(self):
+        for declaration in (
+            "",
+            "/* mod online_machine; */",
+            'const SHADOW: &str = r#"mod online_machine;"#;',
+            '#[doc = "mod online_machine;"] fn unrelated() {}',
+            "#[cfg(test)] mod online_machine;",
+            "mod nested { mod online_machine; }",
+        ):
+            with self.subTest(declaration=declaration), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                paths, sources = self.fixture(root)
+                paths["product"].write_text(
+                    declaration + "\n" + sources["product"].replace("mod online_machine;\n", "")
+                )
+                with self.assertRaises(typed_boundaries.BoundaryError):
+                    typed_boundaries.check_product_artifact_admission(root)
+
+    def test_declared_nonplain_file_owner_is_refused_even_with_valid_flat_body(self):
+        for declaration in (
+            '#[path = "other.rs"] mod online_machine;',
+            '#[cfg(feature = "shadow")] mod online_machine;',
+            "pub mod online_machine;",
+            "pub(crate) mod online_machine;",
+            "mod online_machine; mod online_machine;",
+            'mod online_machine; #[path = "other.rs"] mod online_machine;',
+        ):
+            with self.subTest(declaration=declaration), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                paths, sources = self.flat_fixture(root)
+                paths["product"].write_text(declaration + "\n" + sources["product"])
+                # A genuine file declaration cannot fall back to the admitted flat body.
+                paths["machine"].write_text(sources["machine"])
+                with self.assertRaises(typed_boundaries.BoundaryError):
+                    typed_boundaries.check_product_artifact_admission(root)
+
+    def test_declared_missing_file_cannot_fall_back_to_valid_flat_owner(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths, sources = self.flat_fixture(root)
+            paths["product"].write_text("mod online_machine;\n" + sources["product"])
+            with self.assertRaises(FileNotFoundError):
+                typed_boundaries.check_product_artifact_admission(root)
+
+
 if __name__ == "__main__":
     unittest.main()
