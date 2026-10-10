@@ -20,17 +20,29 @@ const TWO: &str = "FENCETWO";
 const MARKER_ONE: &[u8] = b"PUBLICATION G1";
 const MARKER_TWO: &[u8] = b"PUBLICATION G2";
 
-fn test_config() -> ServerConfig {
+struct TestDirectory(std::path::PathBuf);
+
+impl Drop for TestDirectory {
+    fn drop(&mut self) {
+        if let Err(error) = std::fs::remove_dir_all(&self.0) {
+            eprintln!(
+                "failed to remove test directory {}: {error}",
+                self.0.display()
+            );
+        }
+    }
+}
+
+fn test_config() -> (ServerConfig, TestDirectory) {
     let mut result = config();
-    result.artifact_root = std::path::PathBuf::from(
-        "/workspace/scratch/unreleased-workers/foundation/next/publication-fencing/runtime",
-    )
-    .join(format!(
-        "{}-{}",
+    let directory = TestDirectory(std::env::temp_dir().join(format!(
+        "publication-fencing-{}-{}",
         std::process::id(),
         CASE_SEQUENCE.fetch_add(1, Ordering::SeqCst)
-    ));
-    result
+    )));
+    std::fs::create_dir_all(&directory.0).unwrap();
+    result.artifact_root = directory.0.clone();
+    (result, directory)
 }
 
 fn replace_blob(package: &mut ApplicationPackageV2, path: &str, bytes: Vec<u8>) {
@@ -125,6 +137,7 @@ struct Harness {
     trust: Arc<HmacSha256PackageTrust>,
     config: ServerConfig,
     first: ApplicationGenerationRecord,
+    _directory: TestDirectory,
 }
 
 impl Harness {
@@ -133,7 +146,7 @@ impl Harness {
         let store = Arc::new(FaultStore::new(Arc::new(MemoryStore::new(
             Default::default(),
         ))));
-        let config = test_config();
+        let (config, directory) = test_config();
         let server = ProductServer::open_with_package_trust(
             config.clone(),
             store.clone(),
@@ -153,6 +166,7 @@ impl Harness {
             trust,
             config,
             first,
+            _directory: directory,
         }
     }
     fn stage_second(&self) -> ApplicationGenerationRecord {
@@ -169,6 +183,7 @@ impl Harness {
             trust,
             config,
             first,
+            _directory: directory,
         } = self;
         assert!(server.graceful_shutdown().await);
         drop(server);
@@ -186,6 +201,7 @@ impl Harness {
             trust,
             config,
             first,
+            _directory: directory,
         }
     }
 }
