@@ -2003,10 +2003,82 @@ class LinuxStatReaderTests(unittest.TestCase):
         stream = Mock()
         stream.__enter__ = Mock(return_value=stream)
         stream.__exit__ = Mock(side_effect=OSError(5, 'metadata close failed'))
-        stream.read.return_value = b'42 (other) S 1 1 0'
+        stream.read.side_effect = [b'42 (other) S 1 1 0', b'']
         with patch('builtins.open', return_value=stream), \
                 self.assertRaisesRegex(OSError, 'metadata close failed'):
             ci._linux_stat_bytes('/proc/42/stat')
+
+
+    def test_short_nonuniform_reads_require_true_eof_and_preserve_all_bytes(self):
+        stream = Mock()
+        stream.__enter__ = Mock(return_value=stream)
+        stream.__exit__ = Mock(return_value=False)
+        offered = [b'42 (a )', b'\xff name) Z ', b'1 987654321 0\n', b'']
+        stream.read.side_effect = offered
+        with patch('builtins.open', return_value=stream):
+            self.assertEqual(ci._linux_stat_bytes('/proc/42/stat'),
+                             b'42 (a )\xff name) Z 1 987654321 0\n')
+        self.assertEqual(stream.read.call_count, 4)
+        stream.__exit__.assert_called_once()
+
+    def test_complete_nonuniform_multipage_bytes_keep_order_and_tail(self):
+        expected = bytes(range(256)) * 49 + b'complete-final-tail\x00\xff'
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'stat'
+            path.write_bytes(expected)
+            self.assertEqual(ci._linux_stat_bytes(str(path)), expected)
+
+    def test_mid_read_failure_after_short_bytes_cannot_become_eof(self):
+        stream = Mock()
+        stream.__enter__ = Mock(return_value=stream)
+        stream.__exit__ = Mock(return_value=False)
+        problem = OSError(5, 'metadata failed after short read')
+        stream.read.side_effect = [b'42 (other) S 1 1 0', problem]
+        with patch('builtins.open', return_value=stream), self.assertRaises(OSError) as caught:
+            ci._linux_stat_bytes('/proc/42/stat')
+        self.assertIs(caught.exception, problem)
+        self.assertEqual(stream.read.call_count, 2)
+        stream.__exit__.assert_called_once()
+
+    def test_open_error_is_not_converted_to_empty_metadata(self):
+        problem = PermissionError(13, 'metadata open unavailable')
+        with patch('builtins.open', side_effect=problem), self.assertRaises(OSError) as caught:
+            ci._linux_stat_bytes('/proc/42/stat')
+        self.assertIs(caught.exception, problem)
+
+    def test_interrupted_read_preserves_original_failure_without_retry(self):
+        stream = Mock()
+        stream.__enter__ = Mock(return_value=stream)
+        stream.__exit__ = Mock(return_value=False)
+        problem = InterruptedError(4, 'metadata read interrupted')
+        stream.read.side_effect = problem
+        with patch('builtins.open', return_value=stream), self.assertRaises(OSError) as caught:
+            ci._linux_stat_bytes('/proc/42/stat')
+        self.assertIs(caught.exception, problem)
+        self.assertEqual(stream.read.call_count, 1)
+        stream.__exit__.assert_called_once()
+
+    def test_read_and_close_failure_diagnostics_retain_exact_stage(self):
+        for failing_stage in ('stat_read', 'stat_close'):
+            with self.subTest(failing_stage=failing_stage):
+                stream = Mock()
+                stream.__enter__ = Mock(return_value=stream)
+                stream.__exit__ = Mock(return_value=False)
+                problem = OSError(5, 'actual metadata stage failed')
+                if failing_stage == 'stat_read':
+                    stream.read.side_effect = [b'42 (other) S 1 1 0', problem]
+                else:
+                    stream.read.side_effect = [b'42 (other) S 1 1 0', b'']
+                    stream.__exit__.side_effect = problem
+                trace = {'stage': None}
+                token = ci._LINUX_CENSUS_TRACE.set(trace)
+                try:
+                    with patch('builtins.open', return_value=stream), self.assertRaises(OSError) as caught:
+                        ci._linux_stat_bytes('/proc/42/stat')
+                    self.assertIs(caught.exception, problem)
+                    self.assertEqual(trace['stage'], failing_stage)
+                finally:
+                    ci._LINUX_CENSUS_TRACE.reset(token)
 
 
 class GroupCensusRescanTests(unittest.TestCase):
@@ -2362,7 +2434,7 @@ class CensusFailureDiagnosticTests(unittest.TestCase):
         stream.__enter__ = Mock(return_value=stream)
         original = OSError(5, 'metadata close failed')
         stream.__exit__ = Mock(side_effect=original)
-        stream.read.return_value = b'42 (other) S 1 1 0'
+        stream.read.side_effect = [b'42 (other) S 1 1 0', b'']
         from contextlib import contextmanager
         from types import SimpleNamespace
         @contextmanager

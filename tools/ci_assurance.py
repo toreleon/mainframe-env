@@ -254,7 +254,10 @@ def _linux_stat_bytes(path: str) -> bytes:
     with open(path, 'rb') as stream:
         if trace is not None:
             trace['stage'] = 'stat_read'
-        raw = stream.read()
+        chunks = []
+        while chunk := stream.read(4096):
+            chunks.append(chunk)
+        raw = b''.join(chunks)
         if trace is not None:
             trace['stage'] = 'stat_close'
     return raw
