@@ -201,6 +201,42 @@ class _LinuxCensusVanished(OSError):
 
 
 _LINUX_CENSUS_UNTIL = ContextVar('_linux_census_until', default=None)
+_LINUX_CENSUS_TRACE = ContextVar('_linux_census_trace', default=None)
+_LINUX_CENSUS_OWNER = ContextVar('_linux_census_owner', default=None)
+_LINUX_CENSUS_DIAGNOSTICS = ContextVar('_linux_census_diagnostics', default=None)
+
+
+def _census_cpu_time():
+    try:
+        return time.thread_time()
+    except Exception:
+        # Optional diagnostics never replace the existing census result/error.
+        return None
+
+
+def _retain_census_failure(trace, problem, collector):
+    try:
+        finished = time.monotonic()
+    except Exception:
+        finished = None
+    cpu_finished = _census_cpu_time()
+    started = trace['started_monotonic_seconds']
+    cpu_started = trace.pop('cpu_started_seconds')
+    trace.update({
+        'finished_monotonic_seconds': finished,
+        'elapsed_seconds': None if finished is None else finished - started,
+        'thread_cpu_seconds': None if cpu_started is None or cpu_finished is None
+            else cpu_finished - cpu_started,
+        'error_type': type(problem).__name__[:80],
+        'errno': problem.errno if type(problem.errno) is int else None,
+        'retry_count': max(0, len(trace['numeric_entries_per_scan']) - 1),
+    })
+    # These are failure diagnostics, never membership evidence or closure credit.
+    # Bound retained rows independently from the unchanged census/command limits.
+    if len(collector['observations']) < 8:
+        collector['observations'].append(trace)
+    else:
+        collector['omitted_observations'] += 1
 
 
 def _check_linux_census_deadline(until) -> None:
@@ -212,8 +248,16 @@ def _linux_stat_bytes(path: str) -> bytes:
     # scandir already supplies the absolute path. Avoid rebuilding pathlib
     # objects for every PID within the fixed census allowance; still read the
     # entire stat and propagate open/read/close failures.
+    trace = _LINUX_CENSUS_TRACE.get()
+    if trace is not None:
+        trace['stage'] = 'stat_open'
     with open(path, 'rb') as stream:
-        return stream.read()
+        if trace is not None:
+            trace['stage'] = 'stat_read'
+        raw = stream.read()
+        if trace is not None:
+            trace['stage'] = 'stat_close'
+    return raw
 
 
 def _linux_group_has_members(pgid: int) -> bool:
@@ -226,31 +270,62 @@ def _linux_group_has_members(pgid: int) -> bool:
     not an atomic containment barrier against concurrent group changes/forking.
     """
     until = _LINUX_CENSUS_UNTIL.get()
+    trace = _LINUX_CENSUS_TRACE.get()
     count = 0
+    if trace is not None:
+        trace['stage'] = 'scandir_open'
     with os.scandir('/proc') as entries:
+        if trace is not None:
+            trace['stage'] = 'scandir_iterate'
         for entry in entries:
+            if trace is not None:
+                trace['entries_seen'] += 1
             if not entry.name.isdecimal() or int(entry.name) == pgid:
                 continue
+            if trace is not None:
+                trace['stage'] = 'numeric_entry_deadline'
             _check_linux_census_deadline(until)
             count += 1
+            if trace is not None:
+                trace['numeric_entries_per_scan'][-1] = count
+                trace['last_numeric_pid'] = entry.name[:20]
+                trace['stage'] = 'numeric_entry_limit'
             if count > 65536:
                 raise OSError('owned group membership census exceeds 65536 processes')
             # Do not ignore vanished entries: a disappearing parent might have
             # forked an unlisted child. Unknown membership cannot earn success.
+            if trace is not None:
+                trace['stage'] = 'stat_read_deadline'
             _check_linux_census_deadline(until)
             try:
+                if trace is not None:
+                    trace['stage'] = 'stat_read_call'
+                    trace['stat_reads_started'] += 1
                 raw = _linux_stat_bytes(entry.path + '/stat')
+                if trace is not None:
+                    trace['stat_reads_completed'] += 1
             except OSError as problem:
                 if problem.errno in (errno.ENOENT, errno.ESRCH):
                     raise _LinuxCensusVanished(
                         problem.errno, problem.strerror, problem.filename) from problem
                 raise
             try:
+                if trace is not None:
+                    trace['stage'] = 'stat_parse'
                 group = int(raw.rsplit(b')', 1)[1].split()[2])
             except (IndexError, ValueError) as problem:
                 raise OSError('invalid Linux process-group metadata') from problem
             if group == pgid:
+                if trace is not None:
+                    trace['member_observed'] = True
+                    trace['stage'] = 'positive_scandir_close'
                 return True
+            if trace is not None:
+                trace['stage'] = 'scandir_iterate'
+        if trace is not None:
+            trace['stage'] = 'scandir_close'
+    if trace is not None:
+        trace['stage'] = 'scan_complete_deadline'
     _check_linux_census_deadline(until)
     return False
 
@@ -262,24 +337,57 @@ def _linux_group_observation(pgid: int, deadline: float) -> bool:
     numeric stat aborts the whole scan; at most two fresh scans may follow. This
     does not make procfs atomic or preempt a blocked metadata syscall.
     """
-    until = min(deadline, time.monotonic() + 0.05)
+    started = time.monotonic()
+    until = min(deadline, started + 0.05)
     token = _LINUX_CENSUS_UNTIL.set(until)
+    collector = _LINUX_CENSUS_DIAGNOSTICS.get()
+    trace = None
+    if collector is not None:
+        owner = _LINUX_CENSUS_OWNER.get()
+        trace = {
+            'stage': 'observation_deadline',
+            'started_monotonic_seconds': started,
+            'deadline_monotonic_seconds': until,
+            'cpu_started_seconds': _census_cpu_time(),
+            'owned_leader_pid': None if owner is None else owner[0],
+            'owned_pgid': None if owner is None else owner[1],
+            'owner_phase': None if owner is None else owner[2],
+            'leader_retained': owner is not None,
+            'numeric_entries_per_scan': [], 'entries_seen': 0,
+            'stat_reads_started': 0, 'stat_reads_completed': 0,
+            'vanished_scans': 0, 'last_numeric_pid': None,
+            'member_observed': False,
+        }
+    trace_token = _LINUX_CENSUS_TRACE.set(trace)
     try:
         for attempt in range(3):
+            if trace is not None:
+                trace['stage'] = 'observation_deadline'
             _check_linux_census_deadline(until)
             try:
+                if trace is not None:
+                    trace['numeric_entries_per_scan'].append(0)
                 members = _linux_group_has_members(pgid)
             except _LinuxCensusVanished:
+                if trace is not None:
+                    trace['vanished_scans'] += 1
                 if attempt == 2:
                     raise
                 continue
             if members:
                 # Positive evidence cannot be replaced by a later empty scan.
                 return True
+            if trace is not None:
+                trace['stage'] = 'observation_complete_deadline'
             _check_linux_census_deadline(until)
             return False
         raise AssertionError('unreachable census observation state')
+    except OSError as problem:
+        if trace is not None:
+            _retain_census_failure(trace, problem, collector)
+        raise
     finally:
+        _LINUX_CENSUS_TRACE.reset(trace_token)
         _LINUX_CENSUS_UNTIL.reset(token)
 
 
@@ -360,13 +468,20 @@ def _run_owned(command: list[str], root: Path, on_output, *, timeout_seconds,
             return -state.si_status
         raise OSError('non-reaping observation returned an unexpected child state')
 
-    def group_has_members(observation_deadline):
-        return _linux_group_observation(owned_group(), observation_deadline)
+    def group_has_members(observation_deadline, phase='monitor'):
+        pgid = owned_group()
+        if _LINUX_CENSUS_DIAGNOSTICS.get() is None:
+            return _linux_group_observation(pgid, observation_deadline)
+        token = _LINUX_CENSUS_OWNER.set((process.pid, pgid, phase))
+        try:
+            return _linux_group_observation(pgid, observation_deadline)
+        finally:
+            _LINUX_CENSUS_OWNER.reset(token)
 
     def still_owned_work(observation_deadline):
         # The zombie leader itself keeps killpg(0) successful. It is not a
         # leftover descendant and must not turn every zero exit into failure.
-        return observe_exit() is None or group_has_members(observation_deadline)
+        return observe_exit() is None or group_has_members(observation_deadline, 'cleanup_grace')
 
     def signal_group(sig):
         try:
@@ -468,7 +583,7 @@ def _run_owned(command: list[str], root: Path, on_output, *, timeout_seconds,
                     if observe_exit() is None:
                         fail('launcher exit not established before final group census')
                         signal_group(signal.SIGKILL)
-                    elif group_has_members(deadline if error is None else end):
+                    elif group_has_members(deadline if error is None else end, 'final_cleanup'):
                         fail('owned process group remains after cleanup')
                         signal_group(signal.SIGKILL)
                     else:
@@ -552,6 +667,8 @@ def record(root: Path, output: Path, gate: str, command: list[str], expect_tests
             if match: tests = int(match.group(1))
 
     try:
+        # A reused output/gate must not retain a previous attempt's diagnostics.
+        (output / (gate + '.census.json')).unlink(missing_ok=True)
         if not clean_before:
             raise ValueError('CI candidate must be clean before execution, including untracked source')
         with log.open('wb') as file:
@@ -589,12 +706,32 @@ def record(root: Path, output: Path, gate: str, command: list[str], expect_tests
                             pending.clear()
                             oversized = False
 
-                code, problem = _run_owned(command, root, observe, timeout_seconds=timeout_seconds,
-                                           max_output_bytes=max_output_bytes)
+                diagnostics = {'observations': [], 'omitted_observations': 0}
+                token = _LINUX_CENSUS_DIAGNOSTICS.set(diagnostics)
+                try:
+                    code, problem = _run_owned(command, root, observe, timeout_seconds=timeout_seconds,
+                                               max_output_bytes=max_output_bytes)
+                finally:
+                    _LINUX_CENSUS_DIAGNOSTICS.reset(token)
                 if problem is not None:
                     error = problem if error is None else error + '; ' + problem
                 elif pending and not oversized:
                     count_line(bytes(pending))
+                if diagnostics['observations']:
+                    try:
+                        write_json(output / (gate + '.census.json'), {
+                            'schema_version': 'mainframe-env.ci-census-diagnostic@1',
+                            **before, 'gate': gate, **diagnostics,
+                            'scope': 'Bounded failed procfs observations only; no closure or test credit.',
+                        })
+                    except OSError:
+                        # The command already failed its census. Keep that exact
+                        # error authoritative even if its sidecar cannot be saved.
+                        try:
+                            file.write(b'CI census diagnostic retention failed\n')
+                        except OSError:
+                            pass
+
     except (OSError, ValueError) as problem:
         error = str(problem)
         if isinstance(problem, ValueError):

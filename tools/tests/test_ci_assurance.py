@@ -2264,4 +2264,238 @@ class GroupCensusRescanTests(unittest.TestCase):
         self.assertEqual(b''.join(chunks), b'actual partial')
 
 
+class CensusFailureDiagnosticTests(unittest.TestCase):
+    snapshots = GroupCensusRescanTests.snapshots
+    owner = GroupCensusRescanTests.owner
+    ERROR = 'owned group membership census observation deadline exceeded'
+
+    def trace_context(self):
+        from contextlib import contextmanager
+        @contextmanager
+        def context():
+            collector = {'observations': [], 'omitted_observations': 0}
+            token = ci._LINUX_CENSUS_DIAGNOSTICS.set(collector)
+            owner_token = ci._LINUX_CENSUS_OWNER.set((987654321, 987654321, 'final_cleanup'))
+            try:
+                yield collector
+            finally:
+                ci._LINUX_CENSUS_OWNER.reset(owner_token)
+                ci._LINUX_CENSUS_DIAGNOSTICS.reset(token)
+        return context()
+
+    def test_late_negative_records_own_cost_counts_stage_and_original_error(self):
+        clock = [0.0]
+        def late():
+            clock[0] = .051
+            return b'42 (other process) S 1 1 0'
+        with self.trace_context() as collector, \
+                patch.object(ci.time, 'monotonic', side_effect=lambda: clock[0]), \
+                patch.object(ci.time, 'thread_time', side_effect=[1.0, 1.003]), \
+                self.snapshots([[('42', late)]]) as (scans, reads):
+            with self.assertRaisesRegex(OSError, '^' + self.ERROR + '$'):
+                ci._linux_group_observation(987654321, 1)
+        self.assertEqual((scans, reads), ([('42',)], ['42']))
+        self.assertEqual(len(collector['observations']), 1)
+        row = collector['observations'][0]
+        self.assertEqual(row['stage'], 'scan_complete_deadline')
+        self.assertEqual(row['deadline_monotonic_seconds'], .05)
+        self.assertEqual(row['elapsed_seconds'], .051)
+        self.assertAlmostEqual(row['thread_cpu_seconds'], .003)
+        self.assertEqual(row['numeric_entries_per_scan'], [1])
+        self.assertEqual((row['stat_reads_started'], row['stat_reads_completed']), (1, 1))
+        self.assertEqual((row['retry_count'], row['vanished_scans']), (0, 0))
+        self.assertEqual((row['owned_leader_pid'], row['owned_pgid']), (987654321, 987654321))
+        self.assertTrue(row['leader_retained'])
+        self.assertFalse(row['member_observed'])
+
+    def test_vanished_rescan_cost_keeps_original_fifty_millisecond_deadline(self):
+        clock = [0.0]
+        def vanished():
+            clock[0] = .04
+            raise OSError(2, 'vanished')
+        def late():
+            clock[0] = .051
+            return b'44 (other process) S 1 1 0'
+        with self.trace_context() as collector, \
+                patch.object(ci.time, 'monotonic', side_effect=lambda: clock[0]), \
+                patch.object(ci.time, 'thread_time', return_value=1), \
+                self.snapshots([[('42', vanished)], [('44', late)]]) as (scans, reads):
+            with self.assertRaisesRegex(OSError, '^' + self.ERROR + '$'):
+                ci._linux_group_observation(987654321, 1)
+        row = collector['observations'][0]
+        self.assertEqual(row['deadline_monotonic_seconds'], .05)
+        self.assertEqual(row['numeric_entries_per_scan'], [1, 1])
+        self.assertEqual((row['retry_count'], row['vanished_scans']), (1, 1))
+        self.assertEqual((row['stat_reads_started'], row['stat_reads_completed']), (2, 1))
+        self.assertEqual((len(scans), reads), (2, ['42', '44']))
+
+    def test_late_positive_still_wins_without_diagnostic_or_another_scan(self):
+        clock = [0.0]
+        def positive():
+            clock[0] = .051
+            return b'42 (owned zombie) Z 1 987654321 0'
+        with self.trace_context() as collector, \
+                patch.object(ci.time, 'monotonic', side_effect=lambda: clock[0]), \
+                patch.object(ci.time, 'thread_time', return_value=1) as cpu, \
+                self.snapshots([[('42', positive)], []]) as (scans, reads):
+            self.assertTrue(ci._linux_group_observation(987654321, 1))
+        self.assertEqual((scans, reads), ([('42',)], ['42']))
+        self.assertEqual(collector, {'observations': [], 'omitted_observations': 0})
+        self.assertEqual(cpu.call_count, 1)
+
+    def test_expired_caller_boundary_records_zero_scans_without_refresh(self):
+        with self.trace_context() as collector, \
+                patch.object(ci.time, 'monotonic', return_value=.02), \
+                patch.object(ci.time, 'thread_time', return_value=1), \
+                patch.object(ci.os, 'scandir') as scan:
+            with self.assertRaisesRegex(OSError, '^' + self.ERROR + '$'):
+                ci._linux_group_observation(987654321, .01)
+        scan.assert_not_called()
+        row = collector['observations'][0]
+        self.assertEqual(row['stage'], 'observation_deadline')
+        self.assertEqual(row['deadline_monotonic_seconds'], .01)
+        self.assertEqual(row['numeric_entries_per_scan'], [])
+        self.assertEqual((row['stat_reads_started'], row['retry_count']), (0, 0))
+
+    def test_reader_close_failure_and_unavailable_cpu_preserve_exact_oserror(self):
+        stream = Mock()
+        stream.__enter__ = Mock(return_value=stream)
+        original = OSError(5, 'metadata close failed')
+        stream.__exit__ = Mock(side_effect=original)
+        stream.read.return_value = b'42 (other) S 1 1 0'
+        from contextlib import contextmanager
+        from types import SimpleNamespace
+        @contextmanager
+        def scan(root):
+            yield iter([SimpleNamespace(name='42', path='/proc/42')])
+        with self.trace_context() as collector, \
+                patch.object(ci.time, 'monotonic', return_value=0), \
+                patch.object(ci.time, 'thread_time', side_effect=OSError('CPU clock unavailable')), \
+                patch.object(ci.os, 'scandir', scan), patch('builtins.open', return_value=stream):
+            with self.assertRaises(OSError) as stopped:
+                ci._linux_group_observation(987654321, 1)
+        self.assertIs(stopped.exception, original)
+        row = collector['observations'][0]
+        self.assertEqual((row['stage'], row['errno']), ('stat_close', 5))
+        self.assertIsNone(row['thread_cpu_seconds'])
+        self.assertEqual((row['stat_reads_started'], row['stat_reads_completed']), (1, 0))
+
+    def test_diagnostics_bound_rows_and_restore_context_after_failures(self):
+        from contextvars import Context
+        with self.trace_context() as collector, \
+                patch.object(ci.time, 'monotonic', return_value=.1), \
+                patch.object(ci.time, 'thread_time', return_value=1):
+            for _ in range(9):
+                with self.assertRaisesRegex(OSError, '^' + self.ERROR + '$'):
+                    ci._linux_group_observation(987654321, .01)
+            self.assertEqual(len(collector['observations']), 8)
+            self.assertEqual(collector['omitted_observations'], 1)
+            self.assertIsNone(ci._LINUX_CENSUS_TRACE.get())
+            self.assertIsNone(ci._LINUX_CENSUS_UNTIL.get())
+            self.assertIsNone(Context().run(ci._LINUX_CENSUS_DIAGNOSTICS.get))
+        self.assertIsNone(ci._LINUX_CENSUS_DIAGNOSTICS.get())
+        self.assertIsNone(ci._LINUX_CENSUS_OWNER.get())
+
+    def test_mocked_owner_failure_records_actual_retained_identity_before_sole_wait(self):
+        clock = [0.0]
+        def metadata():
+            owner = ci._LINUX_CENSUS_OWNER.get()
+            self.assertEqual(owner[:2], (987654321, 987654321))
+            if owner[2] == 'final_cleanup':
+                clock[0] = .051
+            return b'42 (other process) S 1 1 0'
+        collector = {'observations': [], 'omitted_observations': 0}
+        token = ci._LINUX_CENSUS_DIAGNOSTICS.set(collector)
+        try:
+            with patch.object(ci.time, 'monotonic', side_effect=lambda: clock[0]), \
+                    patch.object(ci.time, 'thread_time', return_value=1):
+                (code, error), events, scans, reads, chunks = self.owner([[('42', metadata)]])
+        finally:
+            ci._LINUX_CENSUS_DIAGNOSTICS.reset(token)
+        self.assertEqual(code, 0)
+        self.assertEqual(error, 'owned group cleanup uncertain: ' + self.ERROR)
+        self.assertEqual(events.count('wait'), 1)
+        self.assertEqual(events[events.index('wait') + 1:], [])
+        row = collector['observations'][0]
+        self.assertEqual((row['owned_leader_pid'], row['owned_pgid']), (987654321, 987654321))
+        self.assertTrue(row['leader_retained'])
+        self.assertEqual(row['owner_phase'], 'final_cleanup')
+        self.assertEqual(b''.join(chunks), b'actual partial')
+        self.assertIsNone(ci._LINUX_CENSUS_OWNER.get())
+
+    def record_failure(self, output, *, retain_failure=False):
+        error = 'owned group cleanup uncertain: ' + self.ERROR
+        def run(command, root, observe, **kwargs):
+            observe('stdout', b'test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n')
+            owner_token = ci._LINUX_CENSUS_OWNER.set((42, 42, 'final_cleanup'))
+            try:
+                with patch.object(ci.time, 'monotonic', return_value=.1), \
+                        patch.object(ci.time, 'thread_time', return_value=1):
+                    with self.assertRaisesRegex(OSError, '^' + self.ERROR + '$'):
+                        ci._linux_group_observation(42, .01)
+            finally:
+                ci._LINUX_CENSUS_OWNER.reset(owner_token)
+            return 0, error
+        original = ci.write_json
+        def save(path, value):
+            if retain_failure and path.name.endswith('.census.json'):
+                raise OSError('synthetic diagnostic retention refusal')
+            return original(path, value)
+        with patch.object(ci, '_validate_limits'), patch.object(ci, 'identity', return_value={'candidate': 'a'*40, 'tree': 'b'*40}), \
+                patch.object(ci.subprocess, 'check_output', return_value=b''), \
+                patch.object(ci.shutil, 'which', return_value=None), \
+                patch.object(ci, '_run_owned', side_effect=run), \
+                patch.object(ci, 'write_json', side_effect=save), \
+                patch.object(ci.sys, 'stdout', Mock(buffer=io.BytesIO())), \
+                patch.object(ci.subprocess, 'Popen') as spawn:
+            status = ci.record(ROOT, output, 'diagnostic', ['never-executed'], True, 1,
+                               timeout_seconds=1, max_output_bytes=4096)
+        spawn.assert_not_called()
+        self.assertEqual(status, 1)
+        receipt = json.loads((output/'diagnostic.json').read_text())
+        self.assertEqual(receipt['schema_version'], 'mainframe-env.ci-command@1')
+        self.assertEqual((receipt['status'], receipt['exit_code'], receipt['observed_passed_tests']), ('failed', 0, 1))
+        self.assertEqual(receipt['error'], error)
+        self.assertNotIn('census', receipt)
+        self.assertIsNone(ci._LINUX_CENSUS_DIAGNOSTICS.get())
+        return receipt
+
+    def test_record_retains_separate_diagnostics_without_changing_receipt_or_raw_log(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            self.record_failure(output)
+            sidecar = json.loads((output/'diagnostic.census.json').read_text())
+            self.assertEqual(sidecar['schema_version'], 'mainframe-env.ci-census-diagnostic@1')
+            self.assertEqual(sidecar['candidate'], 'a'*40)
+            self.assertEqual(sidecar['observations'][0]['owned_pgid'], 42)
+            self.assertLess((output/'diagnostic.census.json').stat().st_size, 8192)
+            self.assertEqual((output/'diagnostic.log').read_bytes(), b'test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n')
+
+    def test_failed_sidecar_retention_cannot_mask_census_error_or_grant_pass(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            self.record_failure(output, retain_failure=True)
+            self.assertFalse((output/'diagnostic.census.json').exists())
+            self.assertTrue((output/'diagnostic.log').read_bytes().endswith(b'CI census diagnostic retention failed\n'))
+
+    def test_reused_gate_clears_old_diagnostics_before_prelaunch_refusal(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            sidecar = output/'diagnostic.census.json'
+            sidecar.write_text('{"stale_observation":true}\n')
+            with patch.object(ci, '_validate_limits'), \
+                    patch.object(ci, 'identity', return_value={'candidate': 'a'*40, 'tree': 'b'*40}), \
+                    patch.object(ci.subprocess, 'check_output', return_value=b'dirty tracked source'), \
+                    patch.object(ci.shutil, 'which', return_value=None), \
+                    patch.object(ci.subprocess, 'Popen') as spawn:
+                status = ci.record(ROOT, output, 'diagnostic', ['never-executed'],
+                                   timeout_seconds=1, max_output_bytes=4096)
+            spawn.assert_not_called()
+            self.assertNotEqual(status, 0)
+            self.assertFalse(sidecar.exists())
+            receipt = json.loads((output/'diagnostic.json').read_text())
+            self.assertEqual(receipt['error'], 'CI candidate must be clean before execution, including untracked source')
+
+
+
 if __name__=='__main__':unittest.main()
