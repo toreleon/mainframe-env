@@ -104,7 +104,8 @@ impl Fixture {
         )
         .unwrap();
         let actor = crate::service::tests::invocation();
-        let run = handlers::new_run(actor, "retirement-session", "MENU", "ME01", "S001");
+        let session = SessionId::new("retirement-session", 128).unwrap();
+        let run = handlers::new_run(actor, session.as_str(), "MENU", "ME01", "S001");
         Self {
             service,
             run,
@@ -380,8 +381,30 @@ fn task_browse_retirement_does_not_redispatch_uncertain_ordinary_end() {
     ] {
         let mut fixture = Fixture::new();
         fixture.start("DATA", "cursor");
+        let malformed = matches!(&reply, Err(HostProblem::Malformed));
         fixture.queue(reply);
-        assert!(fixture.end(None).is_err());
+        let first = fixture.end(None);
+        if malformed {
+            // The existing NOHANDLE policy reports Malformed as ERROR, never NORMAL.
+            let response = first.unwrap();
+            assert_eq!(
+                (
+                    response.condition.as_str(),
+                    response.response,
+                    response.response2
+                ),
+                ("ERROR", 1, 0),
+            );
+        } else {
+            assert!(
+                first.is_err(),
+                "uncertain ordinary END diagnostic: {first:?}"
+            );
+        }
+        assert!(
+            fixture.run.file_updates.task_browses[&("DATA".into(), "cursor".into())]
+                .retirement_unknown
+        );
         assert_eq!(fixture.end_calls().len(), 1);
         assert_eq!(fixture.end(None), Err(HostProblem::UnknownOutcome));
         assert_eq!(
