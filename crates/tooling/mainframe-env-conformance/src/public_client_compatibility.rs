@@ -1,4 +1,15 @@
 //! Finite first-party API compatibility controls; no official or licensed row credit.
+//!
+//! Explicit invocation of the ignored fixture requires `CV209_PUBLIC_CLIENT_RUN` (a fresh leaf)
+//! beneath `CV209_PUBLIC_CLIENT_EVIDENCE_PARENT` (the retained evidence owner), plus
+//! `CV209_PUBLIC_CLIENT_TOOLCHAIN` (the admitted toolchain root) and `CV209_PUBLIC_CLIENT_TARGET`
+//! (the external build target). These three roots must already exist and be canonical paths.
+//! Also supply the existing `CV209_PUBLIC_CLIENT_PYTHON`, `CV209_PUBLIC_CLIENT_SOURCE_ROOT`, and
+//! `CV209_PUBLIC_CLIENT_BINDINGS`. Python must be the selected toolchain's `python/bin/python3.12`.
+//! Invoke `cargo test --frozen --offline -p mainframe-env-conformance --lib
+//! public_client_compatibility::finite_public_client_compatibility -- --ignored --exact`.
+//! Product artifacts use a fresh owned directory under `TMPDIR`, outside source/client inputs.
+//! Command trees contain receipts and remain under the evidence owner until retention succeeds.
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore = "explicit finite fixture requires accepted external bindings, pinned Python, source and fresh run leaf"]
@@ -12,6 +23,185 @@ async fn finite_public_client_compatibility() {
 
 #[cfg(test)]
 mod controls {
+    #[test]
+    fn public_client_roots_require_explicit_configuration() {
+        let owner = ScratchDirectory::create(None).unwrap();
+        let selected = owner.path.clone().into_os_string();
+        let alias = owner.path.join("alias");
+        std::os::unix::fs::symlink(&owner.path, &alias).unwrap();
+        for variable in [
+            "CV209_PUBLIC_CLIENT_TOOLCHAIN",
+            "CV209_PUBLIC_CLIENT_TARGET",
+            "CV209_PUBLIC_CLIENT_EVIDENCE_PARENT",
+        ] {
+            for missing in [None, Some(std::ffi::OsString::new())] {
+                let result = Roots::load_with(|name| {
+                    if name == variable {
+                        missing.clone()
+                    } else {
+                        Some(selected.clone())
+                    }
+                });
+                assert_eq!(result.err().unwrap(), format!("{variable} is required"));
+            }
+            for invalid in [
+                PathBuf::from("relative"),
+                owner.path.join("missing-root"),
+                alias.clone(),
+            ] {
+                let result = Roots::load_with(|name| {
+                    Some(if name == variable {
+                        invalid.clone().into_os_string()
+                    } else {
+                        selected.clone()
+                    })
+                });
+                assert!(result.err().unwrap().starts_with(variable));
+            }
+        }
+        let roots = Roots::load_with(|_| Some(selected.clone())).unwrap();
+        assert_eq!(roots.toolchain.as_os_str(), selected);
+        assert_eq!(roots.target.as_os_str(), selected);
+        assert_eq!(roots.evidence_parent.as_os_str(), selected);
+    }
+
+    fn test_inputs(parent: &Path) -> Inputs {
+        Inputs {
+            roots: Roots {
+                toolchain: parent.join("admitted-toolchain"),
+                target: parent.join("external-target"),
+                evidence_parent: parent.join("evidence-owner"),
+            },
+            python: parent.join("admitted-toolchain/python/bin/python3.12"),
+            source: parent.join("source"),
+            tree: parent.join("client-tree"),
+            files: BTreeMap::new(),
+            bindings: b"synthetic unit-test bindings; no execution credit".to_vec(),
+        }
+    }
+
+    #[test]
+    fn public_client_configured_evidence_owner_and_input_exclusion() {
+        let owner = ScratchDirectory::create(None).unwrap();
+        let mut inputs = test_inputs(&owner.path);
+        for parent in [&inputs.roots.evidence_parent, &inputs.source, &inputs.tree] {
+            private_directory(parent).unwrap();
+        }
+        let roots = Roots::load_with(|name| {
+            Some(
+                match name {
+                    "CV209_PUBLIC_CLIENT_EVIDENCE_PARENT" => inputs.roots.evidence_parent.clone(),
+                    _ => owner.path.clone(),
+                }
+                .into_os_string(),
+            )
+        })
+        .unwrap();
+        inputs.roots = roots;
+        let root = inputs.roots.evidence_parent.join("retained-run");
+        let mut run = Run::create_at(&inputs, root.clone()).unwrap();
+        assert!(run.root.starts_with(&inputs.roots.evidence_parent));
+        assert!(!run.artifacts.starts_with(&run.root));
+        assert_eq!(fs::metadata(&run.artifacts).unwrap().mode() & 0o777, 0o700);
+        assert!(Run::create_at(&inputs, root.clone()).is_err());
+        assert!(Run::create_at(&inputs, owner.path.join("outside-owner")).is_err());
+        assert!(Run::create_at(&inputs, PathBuf::from("relative-run")).is_err());
+        let alias = owner.path.join("owner-alias");
+        std::os::unix::fs::symlink(&inputs.roots.evidence_parent, &alias).unwrap();
+        assert!(Run::create_at(&inputs, alias.join("aliased-run")).is_err());
+        for excluded in [inputs.source.clone(), inputs.tree.clone()] {
+            // Even selecting an input as the evidence owner cannot bypass input exclusion.
+            inputs.roots.evidence_parent = excluded.clone();
+            let rejected = excluded.join("rejected-run");
+            assert!(Run::create_at(&inputs, rejected.clone()).is_err());
+            assert!(!rejected.exists());
+        }
+        run.artifact_owner.cleanup().unwrap();
+        assert!(!run.artifacts.exists());
+        drop(run);
+        assert_eq!(
+            fs::read(root.join("receipts/explicit-bindings.json")).unwrap(),
+            inputs.bindings
+        );
+        assert!(
+            root.join("receipts/final-artifacts/inventory.txt")
+                .is_file()
+        );
+    }
+
+    #[test]
+    fn public_client_disposable_artifacts_cleanup_on_success_and_failure() {
+        let evidence = ScratchDirectory::create(None).unwrap();
+        let mut paths = Vec::new();
+        for fail in [false, true] {
+            let retained = evidence.path.join(if fail { "failed" } else { "success" });
+            let result: Check = (|| {
+                let scratch = ScratchDirectory::create(Some(retained.clone()))?;
+                paths.push(scratch.path.clone());
+                write_new(&scratch.path.join("object"), b"retained artifact")?;
+                require(!fail, "deterministic body failure")?;
+                Ok(())
+            })();
+            assert_eq!(result.is_err(), fail);
+            assert!(!paths.last().unwrap().exists());
+            assert_eq!(
+                fs::read(retained.join("object")).unwrap(),
+                b"retained artifact"
+            );
+            assert!(retained.join("inventory.txt").is_file());
+        }
+        assert_ne!(paths[0], paths[1]);
+    }
+
+    #[test]
+    fn public_client_retention_failure_preserves_artifacts() {
+        let evidence = ScratchDirectory::create(None).unwrap();
+        let occupied = evidence.path.join("occupied");
+        private_directory(&occupied).unwrap();
+        write_new(&occupied.join("existing-receipt"), b"preserve receipt").unwrap();
+        let mut scratch = ScratchDirectory::create(Some(occupied.clone())).unwrap();
+        write_new(&scratch.path.join("object"), b"preserve artifact").unwrap();
+        let path = scratch.path.clone();
+        assert!(scratch.cleanup().is_err());
+        drop(scratch);
+        assert_eq!(
+            fs::read(occupied.join("existing-receipt")).unwrap(),
+            b"preserve receipt"
+        );
+        assert_eq!(fs::read(path.join("object")).unwrap(), b"preserve artifact");
+        // This synthetic unit-test tree has no real receipts and is explicitly owned by the test.
+        canonical(&path).unwrap();
+        fs::remove_dir_all(&path).unwrap();
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn public_client_command_uses_selected_roots() {
+        let selected = std::env::temp_dir();
+        let inputs = Inputs {
+            python: selected.join("admitted-toolchain/python/bin/python3.12"),
+            source: selected.clone(),
+            tree: selected.join("client-tree"),
+            files: BTreeMap::new(),
+            bindings: Vec::new(),
+            roots: Roots {
+                toolchain: selected.join("admitted-toolchain"),
+                target: selected.join("external-target"),
+                evidence_parent: selected.join("evidence-owner"),
+            },
+        };
+        let command = inputs.python_command();
+        let environment: BTreeMap<_, _> = command.get_envs().collect();
+        assert_eq!(
+            environment[std::ffi::OsStr::new("CARGO_TARGET_DIR")],
+            Some(selected.join("external-target").as_os_str())
+        );
+        assert_eq!(
+            environment[std::ffi::OsStr::new("CARGO_HOME")],
+            Some(selected.join("admitted-toolchain/cargo").as_os_str())
+        );
+    }
+
     // These literals and mutations were frozen before implementing the assertion helpers.
     #[test]
     fn pure_json_and_transport_controls() {
@@ -807,7 +997,10 @@ mod controls {
         os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt},
         path::{Path, PathBuf},
         process::{Command, Stdio},
-        sync::{Arc, Mutex},
+        sync::{
+            Arc, Mutex,
+            atomic::{AtomicU64, Ordering},
+        },
         time::{Duration, Instant},
     };
 
@@ -839,8 +1032,6 @@ mod controls {
     const JOBS: &str = "/zosmf/restjobs/jobs";
     const OWNER_QUERY: &str = "/zosmf/restjobs/jobs?owner=IBMUSER&prefix=PBCLNT01";
     const PROFILE: &str = "public-client-linux-x86_64";
-    const TOOLCHAIN: &str = "/workspace/scratch/sandbox-toolchain";
-    const TARGET: &str = "/workspace/mainframe-env-foundation-public-client-fixture/target/cv209-public-client-fixture";
 
     fn require(condition: bool, message: &str) -> Check {
         if condition {
@@ -1397,11 +1588,41 @@ mod controls {
     }
 
     fn selected_path(variable: &str) -> Check<PathBuf> {
+        selected_path_value(variable, std::env::var_os(variable))
+    }
+
+    fn selected_path_value(variable: &str, value: Option<std::ffi::OsString>) -> Check<PathBuf> {
         let path = PathBuf::from(
-            std::env::var_os(variable).ok_or_else(|| format!("{variable} is required"))?,
+            value
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| format!("{variable} is required"))?,
         );
-        canonical(&path)?;
+        canonical(&path).map_err(|error| format!("{variable}: {error}"))?;
         Ok(path)
+    }
+
+    struct Roots {
+        toolchain: PathBuf,
+        target: PathBuf,
+        evidence_parent: PathBuf,
+    }
+    impl Roots {
+        fn load_with(mut lookup: impl FnMut(&str) -> Option<std::ffi::OsString>) -> Check<Self> {
+            Ok(Self {
+                toolchain: selected_path_value(
+                    "CV209_PUBLIC_CLIENT_TOOLCHAIN",
+                    lookup("CV209_PUBLIC_CLIENT_TOOLCHAIN"),
+                )?,
+                target: selected_path_value(
+                    "CV209_PUBLIC_CLIENT_TARGET",
+                    lookup("CV209_PUBLIC_CLIENT_TARGET"),
+                )?,
+                evidence_parent: selected_path_value(
+                    "CV209_PUBLIC_CLIENT_EVIDENCE_PARENT",
+                    lookup("CV209_PUBLIC_CLIENT_EVIDENCE_PARENT"),
+                )?,
+            })
+        }
     }
 
     fn write_new(path: &Path, bytes: &[u8]) -> Check {
@@ -1423,6 +1644,7 @@ mod controls {
     }
 
     struct Inputs {
+        roots: Roots,
         python: PathBuf,
         source: PathBuf,
         tree: PathBuf,
@@ -1431,9 +1653,10 @@ mod controls {
     }
     impl Inputs {
         fn load() -> Check<Self> {
+            let roots = Roots::load_with(|variable| std::env::var_os(variable))?;
             let python = selected_path("CV209_PUBLIC_CLIENT_PYTHON")?;
             require(
-                python == Path::new(TOOLCHAIN).join("python/bin/python3.12"),
+                python == roots.toolchain.join("python/bin/python3.12"),
                 "selected Python is not the pinned tool",
             )?;
             let source = selected_path("CV209_PUBLIC_CLIENT_SOURCE_ROOT")?;
@@ -1491,6 +1714,7 @@ mod controls {
                 files.insert(role.into(), path);
             }
             Ok(Self {
+                roots,
                 python,
                 source,
                 tree,
@@ -1501,20 +1725,21 @@ mod controls {
 
         fn python_command(&self) -> Command {
             let mut command = Command::new(&self.python);
+            let mut search_path = self.roots.toolchain.join("python/bin").into_os_string();
+            for directory in ["cargo/bin", "git/bin"] {
+                search_path.push(":");
+                search_path.push(self.roots.toolchain.join(directory));
+            }
+            search_path.push(":");
+            search_path.push(std::env::var_os("PATH").unwrap_or_default());
             command
                 .current_dir(&self.source)
                 .arg("-B")
-                .env(
-                    "PATH",
-                    format!(
-                        "{TOOLCHAIN}/python/bin:{TOOLCHAIN}/cargo/bin:{TOOLCHAIN}/git/bin:{}",
-                        std::env::var("PATH").unwrap_or_default()
-                    ),
-                )
-                .env("CARGO_HOME", format!("{TOOLCHAIN}/cargo"))
-                .env("RUSTUP_HOME", format!("{TOOLCHAIN}/rustup"))
-                .env("LD_LIBRARY_PATH", format!("{TOOLCHAIN}/python/lib"))
-                .env("CARGO_TARGET_DIR", TARGET)
+                .env("PATH", search_path)
+                .env("CARGO_HOME", self.roots.toolchain.join("cargo"))
+                .env("RUSTUP_HOME", self.roots.toolchain.join("rustup"))
+                .env("LD_LIBRARY_PATH", self.roots.toolchain.join("python/lib"))
+                .env("CARGO_TARGET_DIR", &self.roots.target)
                 .env("CARGO_BUILD_JOBS", "2")
                 .env("CARGO_INCREMENTAL", "0")
                 .env("CARGO_PROFILE_DEV_DEBUG", "0")
@@ -1690,7 +1915,70 @@ mod controls {
         }
     }
 
+    // Only disposable artifacts are owned here; admitted inputs and evidence roots are never removed.
+    struct ScratchDirectory {
+        path: PathBuf,
+        retain_at: Option<PathBuf>,
+        cleanup_attempted: bool,
+    }
+    impl ScratchDirectory {
+        fn create(retain_at: Option<PathBuf>) -> Check<Self> {
+            static NEXT: AtomicU64 = AtomicU64::new(0);
+            let parent = std::env::temp_dir();
+            canonical(&parent)?;
+            for _ in 0..64 {
+                let path = parent.join(format!(
+                    "cv209-public-client-{}-{}",
+                    std::process::id(),
+                    NEXT.fetch_add(1, Ordering::Relaxed),
+                ));
+                match fs::DirBuilder::new().mode(0o700).create(&path) {
+                    Ok(()) => {
+                        let owned = Self {
+                            path,
+                            retain_at,
+                            cleanup_attempted: false,
+                        };
+                        canonical(&owned.path)?;
+                        return Ok(owned);
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => (),
+                    Err(error) => return Err(problem(error)),
+                }
+            }
+            Err("could not allocate fresh public client artifacts".into())
+        }
+
+        fn cleanup(&mut self) -> Check {
+            self.cleanup_attempted = true;
+            canonical(&self.path)?;
+            if let Some(destination) = &self.retain_at {
+                // Preserve the owned tree on retention failure; never discard unretained evidence.
+                retain_inventory(&self.path, destination, 3)?;
+                self.retain_at = None;
+            }
+            fs::remove_dir_all(&self.path).map_err(problem)?;
+            require(
+                !self.path.exists(),
+                "exact owned artifact directory deletion failed",
+            )
+        }
+    }
+    impl Drop for ScratchDirectory {
+        fn drop(&mut self) {
+            if !self.cleanup_attempted
+                && let Err(error) = self.cleanup()
+            {
+                eprintln!(
+                    "public client artifact cleanup failed at {}: {error}",
+                    self.path.display()
+                );
+            }
+        }
+    }
+
     struct Run {
+        artifact_owner: ScratchDirectory,
         root: PathBuf,
         receipts: PathBuf,
         artifacts: PathBuf,
@@ -1704,26 +1992,37 @@ mod controls {
                 std::env::var_os("CV209_PUBLIC_CLIENT_RUN")
                     .ok_or("CV209_PUBLIC_CLIENT_RUN is required")?,
             );
+            Self::create_at(inputs, root)
+        }
+
+        fn create_at(inputs: &Inputs, root: PathBuf) -> Check<Self> {
             require(
                 root.file_name().is_some() && !root.exists(),
                 "fixture run leaf must be fresh",
             )?;
             canonical(root.parent().ok_or("fixture run parent missing")?)?;
-            let evidence_parent = Path::new(
-                "/workspace/scratch/unreleased-workers/foundation/CV-209.public-client-compatibility",
-            );
+            let evidence_parent = &inputs.roots.evidence_parent;
             require(
                 root.starts_with(evidence_parent)
                     && !root.starts_with(&inputs.source)
                     && !root.starts_with(&inputs.tree),
                 "fixture run must be in its external evidence owner",
             )?;
+            let temporary_parent = std::env::temp_dir();
+            canonical(&temporary_parent)?;
+            require(
+                !temporary_parent.starts_with(&inputs.source)
+                    && !temporary_parent.starts_with(&inputs.tree),
+                "disposable artifacts must be outside source and client inputs",
+            )?;
             private_directory(&root)?;
             let receipts = root.join("receipts");
             private_directory(&receipts)?;
             write_new(&receipts.join("explicit-bindings.json"), &inputs.bindings)?;
+            let artifact_owner = ScratchDirectory::create(Some(receipts.join("final-artifacts")))?;
             Ok(Self {
-                artifacts: root.join("artifacts"),
+                artifacts: artifact_owner.path.clone(),
+                artifact_owner,
                 commands: root.join("commands"),
                 root,
                 receipts,
@@ -2043,7 +2342,6 @@ mod controls {
             Option<JoinHandle<std::io::Result<()>>>,
         ) = (None, None);
         let body: Check = async {
-            private_directory(&run.artifacts)?;
             private_directory(&run.commands)?;
             let mut version = inputs.python_command();
             version.arg("--version");
@@ -2222,10 +2520,17 @@ mod controls {
             }
             Err(error) => failures.push(problem(error)),
         }
-        for (directory, name, depth) in [
-            (&run.artifacts, "final-artifacts", 3),
-            (&run.commands, "final-commands", 5),
-        ] {
+        match run.artifact_owner.cleanup() {
+            Ok(()) => cleanup.push_str(&format!(
+                "retained and removed exact owned directory {}\n",
+                run.artifacts.display()
+            )),
+            Err(error) => failures.push(format!(
+                "artifact retention/cleanup failed at {}: {error}",
+                run.artifacts.display()
+            )),
+        }
+        for (directory, name, depth) in [(&run.commands, "final-commands", 5)] {
             if directory.exists() {
                 // Commands are retained individually, avoiding a whole-run inventory overflow.
                 let retained = if name == "final-commands" {
