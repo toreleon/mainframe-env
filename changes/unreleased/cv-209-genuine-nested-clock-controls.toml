@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Exercise actual ScopedHostService CICS admission with the live ProductServer clock and genuine SystemClockProvider replies; verify root RETURN browse retirement, live cancellation and elapsed deadline refusals with exact dispatch and cleanup oracles."

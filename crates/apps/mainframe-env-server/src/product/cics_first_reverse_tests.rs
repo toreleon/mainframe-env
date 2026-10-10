@@ -3,7 +3,8 @@
 #[cfg(test)]
 mod cics_first_reverse_tests {
     use super::*;
-    use mainframe_env_host_api::{CicsDisposition, CicsResponse};
+    use mainframe_env_execution_api::CancellationProbe;
+    use mainframe_env_host_api::{CicsDisposition, CicsResponse, ClockRequest};
     use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
 
     const FILE: &[u8] = b"REVFILE";
@@ -49,6 +50,7 @@ mod cics_first_reverse_tests {
         server: Arc<ProductServer>,
         artifact_root: std::path::PathBuf,
         cics: Option<Arc<CicsService>>,
+        command_host: Option<Arc<ScopedHostService>>,
         selected_dataset: Option<DatasetName>,
         invocation: Option<Invocation>,
         session: SessionId,
@@ -56,6 +58,8 @@ mod cics_first_reverse_tests {
         sequence: u64,
         seed_sequence: u64,
         observations: Arc<Mutex<Vec<DatasetObservation>>>,
+        clock_observations: Arc<Mutex<Vec<DatasetObservation>>>,
+        deadline_millis: Option<u64>,
         commands: Vec<CommandObservation>,
         owned: Option<(DatasetName, String)>,
         launched: bool,
@@ -87,6 +91,7 @@ mod cics_first_reverse_tests {
                 server: ProductServer::memory(settings).unwrap(),
                 artifact_root,
                 cics: None,
+                command_host: None,
                 selected_dataset: None,
                 invocation: None,
                 session: SessionId::new(format!("first-reverse-{name}"), 128).unwrap(),
@@ -94,6 +99,8 @@ mod cics_first_reverse_tests {
                 sequence: 0,
                 seed_sequence: 0,
                 observations: Arc::new(Mutex::new(Vec::new())),
+                clock_observations: Arc::new(Mutex::new(Vec::new())),
+                deadline_millis: None,
                 commands: Vec::new(),
                 owned: None,
                 launched: false,
@@ -203,19 +210,43 @@ mod cics_first_reverse_tests {
                     })
                     .collect();
             providers.extend(racf_providers(self.server.racf.clone(), limits));
+            providers.push(Arc::new(ObservingDataset {
+                inner: Arc::new(SystemClockProvider::new(limits)),
+                observations: self.clock_observations.clone(),
+            }));
             let host = Arc::new(ScopedHostService::new(
                 Arc::new(RegistrySnapshot::new(1, providers, limits).unwrap()),
                 HostLimits::default(),
             ));
             let store: Arc<dyn ProviderStateStore> = self.server.store.clone();
-            let cics = CicsService::open(host, store, Default::default()).unwrap();
+            let work_store: Arc<dyn WorkStore> = self.server.store.clone();
+            let cics = CicsService::open_with_runtime(
+                host,
+                store,
+                work_store,
+                Default::default(),
+                Arc::new(EnterpriseReplayClock(self.server.jes_clock.clone())),
+            )
+            .unwrap();
             cics.register_file_aliases(&BTreeMap::from([("REVFILE".into(), selected.clone())]))
                 .unwrap();
+            self.command_host = Some(Arc::new(ScopedHostService::new(
+                Arc::new(
+                    RegistrySnapshot::new(1, vec![cics_provider(cics.clone(), limits)], limits)
+                        .unwrap(),
+                ),
+                HostLimits::default(),
+            )));
             self.selected_dataset = Some(selected);
-            let invocation = self
+            let mut invocation = self
                 .server
                 .cics_invocation("IBMUSER", "RF01", None)
                 .unwrap();
+            invocation.cancellation_probe = Some(CancellationProbe::new());
+            if let Some(millis) = self.deadline_millis {
+                invocation.deadline_tick =
+                    self.server.jes_tick().unwrap().checked_add(millis).unwrap();
+            }
             self.now_tick = self.server.jes_tick().unwrap();
             cics.launch_terminal(
                 invocation.clone(),
@@ -235,11 +266,12 @@ mod cics_first_reverse_tests {
 
         fn command(&mut self, operation: CicsOperation, key: Option<&[u8]>, equal: bool) -> usize {
             self.sequence += 1;
-            let mut arguments = if operation == CicsOperation::Return {
-                BTreeMap::new()
-            } else {
-                BTreeMap::from([("FILE".into(), literal(FILE))])
-            };
+            let mut arguments =
+                if matches!(operation, CicsOperation::Return | CicsOperation::AsktimeEib) {
+                    BTreeMap::new()
+                } else {
+                    BTreeMap::from([("FILE".into(), literal(FILE))])
+                };
             if let Some(key) = key {
                 arguments.insert("RIDFLD".into(), literal(key));
             }
@@ -278,7 +310,17 @@ mod cics_first_reverse_tests {
                 request: HostRequest::Cics(request.clone()),
             };
             let before = self.observations.lock().unwrap().len();
-            let result = self.cics.as_ref().unwrap().invoke(&effect, request);
+            let result = self
+                .command_host
+                .as_ref()
+                .unwrap()
+                .invoke(invocation, self.server.jes_tick().unwrap(), false, effect)
+                .persist_with(|audit| self.server.store.record_audit(audit).map_err(store_error));
+            let result = match result.outcome {
+                Ok(HostResult::Cics(response)) => Ok(response),
+                Ok(_) => panic!("actual CICS host returned another result domain"),
+                Err(problem) => Err(problem),
+            };
             let delegates = self.observations.lock().unwrap()[before..].to_vec();
             // Preserve actual cursor ownership before any source assertion can panic.
             for call in &delegates {
@@ -593,7 +635,7 @@ mod cics_first_reverse_tests {
                 .collect::<Vec<_>>();
             json!({
                 "control": self.name,
-                "scope": "public CICS API with real same-store ProductServer Dataset/RACF; no compiled application",
+                "scope": "actual ScopedHostService CICS admission with live ProductServer clock and real same-store Dataset/RACF/SystemClock; no compiled application",
                 "comparison_passed": comparison_failure.is_none(),
                 "comparison_failure": comparison_failure,
                 "explicit_endbr_and_completion_passed": teardown_failure.is_none(),
@@ -616,7 +658,17 @@ mod cics_first_reverse_tests {
     }
 
     async fn run(name: &'static str, aix: bool, check: impl FnOnce(&mut Fixture)) {
+        run_with_deadline(name, aix, None, check).await;
+    }
+
+    async fn run_with_deadline(
+        name: &'static str,
+        aix: bool,
+        deadline_millis: Option<u64>,
+        check: impl FnOnce(&mut Fixture),
+    ) {
         let mut fixture = Fixture::new(name);
+        fixture.deadline_millis = deadline_millis;
         let result = catch_unwind(AssertUnwindSafe(|| {
             fixture.prepare(aix);
             check(&mut fixture);
@@ -661,6 +713,97 @@ mod cics_first_reverse_tests {
         }
         assert!(shutdown, "actual ProductServer shutdown refused");
         files.expect("owned fixture artifact cleanup");
+    }
+
+    fn assert_genuine_clock(fixture: &mut Fixture) {
+        let before = fixture.clock_observations.lock().unwrap().len();
+        let at = fixture.command(CicsOperation::AsktimeEib, None, false);
+        let response = fixture.normal(at);
+        for output in ["EIBDATE", "EIBTIME"] {
+            assert!(!response.outputs[output].bytes().is_empty());
+        }
+        let clocks = fixture.clock_observations.lock().unwrap();
+        assert_eq!(clocks.len(), before + 1);
+        let clock = &clocks[before];
+        assert!(matches!(
+            clock.request.request,
+            HostRequest::Clock(ClockRequest::UtcTimestamp)
+        ));
+        assert_eq!(
+            clock.request.run_unit,
+            fixture.invocation.as_ref().unwrap().run_unit_id
+        );
+        assert!(matches!(&clock.result.outcome, Ok(HostResult::Clock(value))
+            if value.len() == 17 && value.bytes().all(|byte| byte.is_ascii_digit())));
+        println!(
+            "CICS_GENUINE_CLOCK_ACTUAL {:?} {:?}",
+            clock.request, clock.result
+        );
+    }
+
+    #[tokio::test]
+    async fn cics_task_browse_retirement_genuine_nested_clock_and_root_return() {
+        run("genuine-clock-return", false, |fixture| {
+            assert_genuine_clock(fixture);
+            let cursor = fixture.start(b"AA", false);
+            let first = fixture.read(CicsOperation::ReadPrev, b"AA");
+            fixture.record(first, b"AA01", b"AA", b"AA");
+            assert_genuine_clock(fixture);
+            let at = fixture.command(CicsOperation::Return, None, false);
+            assert_eq!(fixture.normal(at).disposition, CicsDisposition::Returned);
+            assert!(fixture.owned.is_none());
+            assert_eq!(fixture.commands[at].delegates.len(), 1);
+            fixture.retired_probe(&cursor);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn cics_genuine_nested_clock_live_cancellation_refuses_before_dispatch() {
+        run("genuine-clock-cancel", false, |fixture| {
+            assert_genuine_clock(fixture);
+            fixture
+                .invocation
+                .as_ref()
+                .unwrap()
+                .cancellation_probe
+                .as_ref()
+                .unwrap()
+                .request();
+            let before = fixture.clock_observations.lock().unwrap().len();
+            let at = fixture.command(CicsOperation::AsktimeEib, None, false);
+            assert!(matches!(
+                fixture.commands[at].result,
+                Err(HostProblem::Cancelled)
+            ));
+            assert_eq!(fixture.clock_observations.lock().unwrap().len(), before);
+            assert!(fixture.owned.is_none());
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn cics_genuine_nested_clock_expired_deadline_refuses_before_dispatch() {
+        run_with_deadline("genuine-clock-deadline", false, Some(500), |fixture| {
+            assert_genuine_clock(fixture);
+            let deadline = fixture.invocation.as_ref().unwrap().deadline_tick;
+            let waited = std::time::Instant::now();
+            while fixture.server.jes_tick().unwrap() < deadline
+                && waited.elapsed() < std::time::Duration::from_secs(2)
+            {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            assert!(fixture.server.jes_tick().unwrap() >= deadline);
+            let before = fixture.clock_observations.lock().unwrap().len();
+            let at = fixture.command(CicsOperation::AsktimeEib, None, false);
+            assert!(matches!(
+                fixture.commands[at].result,
+                Err(HostProblem::TimedOut)
+            ));
+            assert_eq!(fixture.clock_observations.lock().unwrap().len(), before);
+            assert!(fixture.owned.is_none());
+        })
+        .await;
     }
 
     #[tokio::test]
