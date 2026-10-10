@@ -182,6 +182,38 @@ fn execute() { dispatch("COBTUPDT"); }
                 with self.assertRaises(scanner.BoundaryError):
                     scanner.production(source)
 
+    def test_malformed_delimiters_fail_closed_before_test_exclusion(self):
+        for source in [
+            "fn execute() {",
+            "fn execute(] {}",
+            "fn execute() { let value = [1, 2); }",
+            "#[cfg(test)] fn fixture() { let value = [1, 2); }\n"
+            'fn execute() { dispatch("COBTUPDT"); }',
+            "fn execute() {} }",
+        ]:
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(scanner.BoundaryError, "Rust delimiter"):
+                    scanner.production(source)
+
+    def test_delimiter_validation_preserves_macro_tokens_and_literal_forms(self):
+        source = r'''macro_rules! forward {
+    ($value:expr) => { consume!([$value]); };
+}
+fn execute<'a>(program: &'a str) {
+    let text = "{[(}]}";
+    let bytes = b"[(}";
+    let cstring = c"}])";
+    let raw = r##"{[)\""##;
+    let raw_bytes = br##"{[)\""##;
+    let raw_cstring = cr##"{[)\""##;
+    let chars = ('}', b']', '\u{7b}', '\x5b', '\'');
+    /* ([{ /* ]}) */ */
+    // )]}
+    forward!(program);
+}
+'''
+        self.assertEqual(scanner.production(source), source)
+
     def test_batch_cli_preserves_order_and_production_dispatch(self):
         with tempfile.TemporaryDirectory() as temporary:
             paths = [Path(temporary) / "first.rs", Path(temporary) / "second.rs"]

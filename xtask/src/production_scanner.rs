@@ -201,6 +201,20 @@ fn execute(program: &str) -> bool { program.is_empty() }"#,
     }
 
     #[test]
+    fn malformed_production_delimiters_fail_closed() {
+        let root = crate::repository_root().unwrap();
+        for source in [
+            "fn execute() {",
+            "fn execute(] {}",
+            "#[cfg(test)] fn fixture() { let value = [1, 2); }\nfn execute() {}",
+        ] {
+            let fixture = Fixture::new(source);
+            let failure = read_source(&root, &fixture.path).unwrap_err();
+            assert!(failure.contains("Rust delimiter"), "{source}: {failure}");
+        }
+    }
+
+    #[test]
     fn linked_trust_excludes_test_configuration_and_requires_actual_link() {
         let root = crate::repository_root().unwrap();
         let fixture = Fixture::new("mod trust;\npub use trust::Authority;");

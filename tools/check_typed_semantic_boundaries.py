@@ -147,7 +147,31 @@ def test_item_end(source: str, position: int) -> int:
     raise BoundaryError("unterminated #[cfg(test)] item")
 
 
+def validate_delimiters(source: str) -> None:
+    """Reject broken token scopes before a test-only item can mask them."""
+    delimiters = []
+    cursor = 0
+    closing = {")": "(", "]": "[", "}": "{"}
+    while cursor < len(source):
+        skipped = skip_non_code(source, cursor)
+        if skipped != cursor:
+            cursor = skipped
+            continue
+        char = source[cursor]
+        if char in "([{":
+            delimiters.append((char, cursor))
+        elif char in closing:
+            require(
+                bool(delimiters) and delimiters[-1][0] == closing[char],
+                f"unbalanced Rust delimiter {char} at character {cursor}",
+            )
+            delimiters.pop()
+        cursor += 1
+    require(not delimiters, f"unterminated Rust delimiter scopes: {delimiters}")
+
+
 def production(source: str) -> str:
+    validate_delimiters(source)
     # Mask only removed items, retaining source coordinates and production literals.
     # Inner attributes apply to their enclosing item, not to following siblings.
     excluded = []
