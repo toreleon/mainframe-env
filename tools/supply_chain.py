@@ -373,11 +373,15 @@ def profile_archive(path: Path, pin: dict, compression: str, maximum: int):
 
 def archive_name(value: str, root: str, directory: bool = False) -> str:
     name = value[:-1] if directory and value.endswith("/") else value
-    candidate = PurePosixPath(name)
-    require(bool(name) and len(name.encode("utf-8")) <= 4096 and candidate.as_posix() == name and not candidate.is_absolute()
-            and ".." not in candidate.parts and "\\" not in name and not any(ord(c) < 32 or 127 <= ord(c) <= 159 for c in name)
-            and candidate.parts[0] == root, f"unsafe profile archive path: {value!r}")
-    require(directory or len(candidate.parts) > 1, "archive root is not a file")
+    parts = name.split("/")
+    # Canonical relative POSIX components have no empty, dot or parent leaf.
+    # This is the same lexical admission without constructing Path objects for
+    # every archive/tree entry; no filesystem authority is inferred here.
+    require(bool(name) and len(name.encode("utf-8")) <= 4096
+            and all(part not in {"", ".", ".."} for part in parts)
+            and "\\" not in name and not any(ord(c) < 32 or 127 <= ord(c) <= 159 for c in name)
+            and parts[0] == root, f"unsafe profile archive path: {value!r}")
+    require(directory or len(parts) > 1, "archive root is not a file")
     return name
 
 
@@ -559,7 +563,8 @@ def _validate_zowe_tree_command(tree: Path, rows: dict[str, dict], zowe: dict) -
     """Fresh command-only walk; no descriptor/admission survives this call."""
     canonical_input(tree)
     root_before = tree.lstat()
-    parents = {str(parent) for name in rows for parent in PurePosixPath(name).parents if str(parent) != "."}
+    parents = {"/".join(parts[:index]) for name in rows for parts in [name.split("/")]
+               for index in range(1, len(parts))}
     found, directories = set(), set()
     directory_states = {}
     total = 0
@@ -579,7 +584,7 @@ def _validate_zowe_tree_command(tree: Path, rows: dict[str, dict], zowe: dict) -
                 name = relative + "/" + entry.name if relative else entry.name
                 metadata = entry.stat(follow_symlinks=False)
                 archive_name(name, "package", stat.S_ISDIR(metadata.st_mode))
-                require(len(PurePosixPath(name).parts) <= zowe["tree"]["max_depth"], "Zowe tree depth exceeds bound")
+                require(len(name.split("/")) <= zowe["tree"]["max_depth"], "Zowe tree depth exceeds bound")
                 safe_input_mode(metadata, name)
                 children.append((entry.name, child, name, metadata))
         return children
@@ -616,7 +621,7 @@ def _validate_zowe_tree_command(tree: Path, rows: dict[str, dict], zowe: dict) -
         with _tree_directory(package, metadata, root_descriptor, leaf) as package_descriptor:
             visit(package_descriptor, package, name)
             require(found == set(rows) and directories == parents, "Zowe tree membership differs")
-            canonical = json.dumps([rows[key] for key in sorted(rows, key=PurePosixPath)],
+            canonical = json.dumps([rows[key] for key in sorted(rows, key=lambda name: tuple(name.split("/")))],
                                    sort_keys=True, separators=(",", ":")).encode("utf-8")
             digest = hashlib.sha256(canonical).hexdigest()
             require(digest == zowe["tree"]["sha256"], "Zowe retained comparison digest differs")

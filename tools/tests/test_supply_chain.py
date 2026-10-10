@@ -31,6 +31,20 @@ def digest(path: Path) -> str:
 
 
 class SupplyChainTests(unittest.TestCase):
+    def test_archive_name_preserves_components_and_utf8_byte_boundaries(self):
+        for name in ("package/.env", "package/..name", "package/a b/é",
+                     "package/" + "x" * 4088, "package/" + "é" * 2044):
+            with self.subTest(name=name):
+                self.assertEqual(supply_chain.archive_name(name, "package"), name)
+        self.assertEqual(supply_chain.archive_name("package/", "package", True), "package")
+        for name in ("", "package", "/package/file", "package//file", "package/./file",
+                     "package/../file", "package/file/", "other/file", "package/a\\b",
+                     "package/a\x00b", "package/a\x7fb", "package/a\x80b",
+                     "package/" + "x" * 4089, "package/" + "é" * 2045):
+            with self.subTest(name=name):
+                with self.assertRaises(supply_chain.SupplyChainError):
+                    supply_chain.archive_name(name, "package")
+
     def test_repository_lock_closes_tracked_inputs_and_full_msrv(self):
         ci_lock, jenkins_lock = supply_chain.check_repository(ROOT)
         self.assertEqual(ci_lock["rust"]["msrv"]["version"], "1.95.0")

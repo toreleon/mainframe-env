@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Admit canonical archive components and order command-local Zowe tree identities without repeated Path construction; preserve UTF-8 byte bounds, lexical refusals, exact pinned digests, fresh byte reads, descriptor fences and all fixed client limits."
