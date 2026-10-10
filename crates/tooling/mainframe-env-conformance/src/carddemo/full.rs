@@ -32,7 +32,8 @@ pub fn verify_carddemo_full_from_env(
         online_receipt::verify_carddemo_base_online_observed(inventory_path)?;
     route_observations.extend(online_observations)?;
     let batch = verify_carddemo_base_batch_from_env(inventory_path)?;
-    let db2 = verify_carddemo_db2_from_env(inventory_path)?;
+    let (db2, db2_observations) = verify_carddemo_db2_observed(inventory_path)?;
+    route_observations.extend(db2_observations)?;
     let ims = verify_carddemo_ims_from_env(inventory_path)?;
     let (mq, mq_observations) =
         mq_receipt::verify_carddemo_mq_authorization_observed(inventory_path)?;

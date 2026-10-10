@@ -12,6 +12,7 @@ mod journey_closure;
 use journey_closure::{close_carddemo_issues, close_carddemo_journeys};
 mod journey_observations;
 use journey_observations::RouteObservations;
+mod db2_observations;
 mod full;
 #[cfg(test)]
 use full::exercise_full_certification;
@@ -788,6 +789,7 @@ struct BaseOnlineExercise {
 }
 
 struct Db2Exercise {
+    route_observations: RouteObservations,
     online_routes: usize,
     batch_routes: usize,
     extraction_records: usize,
@@ -4475,6 +4477,12 @@ pub fn verify_carddemo_base_batch_from_env(
 pub fn verify_carddemo_db2_from_env(
     inventory_path: &Path,
 ) -> Result<CardDemoDb2Receipt, CorpusProblem> {
+    verify_carddemo_db2_observed(inventory_path).map(|(receipt, _)| receipt)
+}
+
+fn verify_carddemo_db2_observed(
+    inventory_path: &Path,
+) -> Result<(CardDemoDb2Receipt, RouteObservations), CorpusProblem> {
     let corpus_dir = PathBuf::from(env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
@@ -4597,27 +4605,30 @@ pub fn verify_carddemo_db2_from_env(
             digest_field(&mut shape, digest.as_bytes());
         }
     }
-    Ok(CardDemoDb2Receipt {
-        schema_version: "mainframe-env.carddemo-db2-receipt@1".into(),
-        status: "pass".into(),
-        corpus_commit: corpus.commit,
-        programs_compiled,
-        sql_include_expansions,
-        sql_operations,
-        ddl_files,
-        online_routes: exercise.online_routes,
-        batch_routes: exercise.batch_routes,
-        extraction_records: exercise.extraction_records,
-        authorization_controls: exercise.authorization_controls,
-        restart_controls: exercise.restart_controls,
-        rollback_controls: exercise.rollback_controls,
-        conflict_controls: exercise.conflict_controls,
-        failure_controls: exercise.failure_controls,
-        table_sha256: exercise.table_sha256,
-        dataset_sha256: exercise.dataset_sha256,
-        spool_sha256: exercise.spool_sha256,
-        db2_shape_sha256: format!("{:x}", shape.finalize()),
-    })
+    Ok((
+        CardDemoDb2Receipt {
+            schema_version: "mainframe-env.carddemo-db2-receipt@1".into(),
+            status: "pass".into(),
+            corpus_commit: corpus.commit,
+            programs_compiled,
+            sql_include_expansions,
+            sql_operations,
+            ddl_files,
+            online_routes: exercise.online_routes,
+            batch_routes: exercise.batch_routes,
+            extraction_records: exercise.extraction_records,
+            authorization_controls: exercise.authorization_controls,
+            restart_controls: exercise.restart_controls,
+            rollback_controls: exercise.rollback_controls,
+            conflict_controls: exercise.conflict_controls,
+            failure_controls: exercise.failure_controls,
+            table_sha256: exercise.table_sha256,
+            dataset_sha256: exercise.dataset_sha256,
+            spool_sha256: exercise.spool_sha256,
+            db2_shape_sha256: format!("{:x}", shape.finalize()),
+        },
+        exercise.route_observations,
+    ))
 }
 
 fn carddemo_package_trust() -> Result<Arc<HmacSha256PackageTrust>, CorpusProblem> {
@@ -4983,8 +4994,17 @@ async fn exercise_db2_routes(
     online: OnlineApplicationDefinition,
     definitions: Vec<BatchProgramDefinition>,
 ) -> Result<Db2Exercise, CorpusProblem> {
-    let artifact_root =
-        env::temp_dir().join(format!("mainframe-env-carddemo-db2-{}", std::process::id()));
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|error| CorpusProblem::new("carddemo.db2.clock", error.to_string()))?
+        .as_nanos();
+    let artifact_root = env::temp_dir().join(format!(
+        "mainframe-env-carddemo-db2-{}-{nonce}",
+        std::process::id(),
+    ));
+    fs::create_dir(&artifact_root)
+        .map_err(|error| CorpusProblem::new("carddemo.db2.artifact_owner", error.to_string()))?;
+    let mut route_observations = RouteObservations::default();
     let config = ServerConfig {
         store_profile: StoreProfile::Memory,
         artifact_root: artifact_root.clone(),
@@ -5027,6 +5047,15 @@ async fn exercise_db2_routes(
         AccessIntent::Alter,
     )
     .map_err(terminal_problem)?;
+    // Existing exact seed profiles shadow the broad installation profile.
+    // Grant only this fixture's two admitted import destinations to IBMUSER.
+    for dataset in [
+        "AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS",
+        "AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS",
+    ] {
+        racf.permit("DATASET", dataset, "IBMUSER", AccessIntent::Alter)
+            .map_err(terminal_problem)?;
+    }
     racf.define_profile("DATASET", "INPFILE", "IBMUSER", None)
         .map_err(terminal_problem)?;
     racf.permit("DATASET", "INPFILE", "IBMUSER", AccessIntent::Alter)
@@ -5653,6 +5682,18 @@ async fn exercise_db2_routes(
         ));
     }
 
+    db2_observations::require_extracted(&extracted_type, &extracted_category)?;
+    for name in ["TRANTYPE", "TRANCATG"] {
+        let relative = format!("app/jcl/{name}.jcl");
+        let import = String::from_utf8(read_corpus_file(corpus_dir, &corpus_dir.join(&relative))?)
+            .map_err(|_| {
+                CorpusProblem::new("carddemo.db2.jcl_invalid", "VSAM import JCL is not UTF-8")
+            })?;
+        let id = submit_job_with_retcode(&server, &app, &import, "CC 0000").await?;
+        job_ids.insert(name.into(), id);
+    }
+    db2_observations::compare_vsam(&mut route_observations, &server)?;
+
     let table_sha256 = db2_table_digests(&server)?;
     let dataset_sha256 = db2_dataset_digests(&server)?;
     let spool_sha256 = base_batch_spool_digests(&server, &job_ids)?;
@@ -5689,6 +5730,7 @@ async fn exercise_db2_routes(
             "Db2 tables, extracted datasets, or spool changed across restart",
         ));
     }
+    db2_observations::require_vsam(&restarted)?;
     let restarted_app = restarted.router();
     let resumed = carddemo_terminal_exchange(
         &restarted_app,
@@ -5705,12 +5747,20 @@ async fn exercise_db2_routes(
         )
     })?;
     require_online_mapset(&resumed, "COTRTLI", "Db2 cursor restart")?;
-    let _ = restarted.graceful_shutdown().await;
+    drop(restarted_app);
+    if !restarted.graceful_shutdown().await {
+        return Err(CorpusProblem::new(
+            "carddemo.db2.shutdown_failed",
+            "reopened Db2 server did not shut down",
+        ));
+    }
     drop(restarted);
-    let _ = fs::remove_dir_all(&artifact_root);
+    fs::remove_dir_all(&artifact_root)
+        .map_err(|error| CorpusProblem::new("carddemo.db2.artifact_cleanup", error.to_string()))?;
     Ok(Db2Exercise {
+        route_observations,
         online_routes: 2,
-        batch_routes: 3,
+        batch_routes: job_ids.len(),
         extraction_records,
         authorization_controls: 1,
         restart_controls: 1,
@@ -7576,7 +7626,12 @@ fn db2_table_digests(server: &ProductServer) -> Result<BTreeMap<String, String>,
 
 fn db2_dataset_digests(server: &ProductServer) -> Result<BTreeMap<String, String>, CorpusProblem> {
     let mut output = BTreeMap::new();
-    for dataset in ["AWS.M2.CARDDEMO.TRANTYPE.PS", "AWS.M2.CARDDEMO.TRANCATG.PS"] {
+    for dataset in [
+        "AWS.M2.CARDDEMO.TRANTYPE.PS",
+        "AWS.M2.CARDDEMO.TRANCATG.PS",
+        "AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS",
+        "AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS",
+    ] {
         let records = utility_records(server, dataset, None)?;
         let mut digest = Sha256::new();
         for record in records {
