@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Fixed typed semantic artifact-admission verification to follow the actual private online-machine module while retaining all manifest checks and raw-payload bypass refusals for both source owners."

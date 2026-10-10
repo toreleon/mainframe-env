@@ -228,5 +228,96 @@ class TypedSemanticBoundaryTests(unittest.TestCase):
             )
 
 
+class ProductArtifactAdmissionOwnerTests(unittest.TestCase):
+    def fixture(self, root):
+        paths = {
+            "model": "crates/contracts/mainframe-env-store-api/src/model.rs",
+            "cobol": "crates/apps/mainframe-env-server/src/cobol.rs",
+            "artifact": "crates/apps/mainframe-env-server/src/cobol/artifact.rs",
+            "product": "crates/apps/mainframe-env-server/src/product.rs",
+            "machine": "crates/apps/mainframe-env-server/src/product/online_machine.rs",
+        }
+        sources = {
+            "model": "pub struct ExecutableArtifactMetadata;\n"
+                     "pub struct ArtifactRecord { pub executable: Option<ExecutableArtifactMetadata> }\n",
+            "cobol": "fn execute() {}\n",
+            "artifact": "pub(crate) fn admit_executable_artifact() { ValidatedArtifact::read(); }\n",
+            "product": "mod online_machine;\nimpl ProductServer { fn launch() { self.run_online_exchange(); } }\n",
+            "machine": "impl ProductServer { fn run_online_exchange() {\n"
+                       "    let executable = admit_executable_artifact(&record)?;\n"
+                       "    ReferenceMachine::from_binary(executable.payload(), invocation, limits);\n"
+                       "    machine.restore_checkpoint(&checkpoint);\n"
+                       "} }\n",
+        }
+        actual = {}
+        for key, relative in paths.items():
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(sources[key])
+            actual[key] = path
+        return actual, sources
+
+    def test_actual_plain_online_owner_satisfies_original_admission_predicates(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.fixture(root)
+            typed_boundaries.check_product_artifact_admission(root)
+
+    def test_original_metadata_admission_and_raw_payload_refusals_remain_live(self):
+        cases = [
+            ("model", "pub struct ExecutableArtifactMetadata", "pub struct MissingMetadata"),
+            ("model", "pub executable: Option<ExecutableArtifactMetadata>", "pub executable: bool"),
+            ("artifact", "pub(crate) fn admit_executable_artifact", "fn missing_admission"),
+            ("artifact", "ValidatedArtifact::read", "unchecked_payload"),
+            ("machine", "admit_executable_artifact(&record)?", "unchecked_payload(&record)?"),
+        ]
+        for key, old, new in cases:
+            with self.subTest(owner=key, refused=old), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                paths, sources = self.fixture(root)
+                paths[key].write_text(sources[key].replace(old, new))
+                with self.assertRaises(typed_boundaries.BoundaryError):
+                    typed_boundaries.check_product_artifact_admission(root)
+        for key in ("cobol", "product", "machine"):
+            with self.subTest(raw_payload_owner=key), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                paths, sources = self.fixture(root)
+                paths[key].write_text(
+                    sources[key] + "fn bypass() { ReferenceMachine::from_binary(\n"
+                    "                &record.payload, invocation, limits); }\n"
+                )
+                with self.assertRaises(typed_boundaries.BoundaryError):
+                    typed_boundaries.check_product_artifact_admission(root)
+
+    def test_only_an_actual_production_private_owner_can_supply_admission(self):
+        for declaration in (
+            "// mod online_machine;",
+            'const SHADOW: &str = "mod online_machine;";',
+            "#[cfg(test)] mod online_machine;",
+            "mod nested { mod online_machine; }",
+            '#[path = "other.rs"] mod online_machine;',
+        ):
+            with self.subTest(declaration=declaration), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                paths, _ = self.fixture(root)
+                paths["product"].write_text(declaration)
+                with self.assertRaises(typed_boundaries.BoundaryError):
+                    typed_boundaries.check_product_artifact_admission(root)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths, _ = self.fixture(root)
+            paths["machine"].unlink()
+            with self.assertRaises(FileNotFoundError):
+                typed_boundaries.check_product_artifact_admission(root)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths, _ = self.fixture(root)
+            paths["machine"].write_text(
+                "fn unchecked() {}\n#[cfg(test)] fn shadow() { admit_executable_artifact(&record)?; }\n"
+            )
+            with self.assertRaises(typed_boundaries.BoundaryError):
+                typed_boundaries.check_product_artifact_admission(root)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -333,6 +333,32 @@ def check_cics_descriptor_entries(root: Path) -> None:
         require(required in cics_descriptor_entries, f"typed CICS descriptor registry omits {required}")
 
 
+def check_product_artifact_admission(root: Path) -> None:
+    store_model = production(
+        read(root, "crates/contracts/mainframe-env-store-api/src/model.rs")
+    )
+    server_cobol = production(read(root, "crates/apps/mainframe-env-server/src/cobol.rs"))
+    server_artifact = production(
+        read(root, "crates/apps/mainframe-env-server/src/cobol/artifact.rs")
+    )
+    server_product = production(read(root, "crates/apps/mainframe-env-server/src/product.rs"))
+    server_product += "\n" + linked_module_production(
+        root / "crates/apps/mainframe-env-server/src/product.rs", "online_machine"
+    )
+    require(
+        "pub struct ExecutableArtifactMetadata" in store_model
+        and "pub executable: Option<ExecutableArtifactMetadata>" in store_model,
+        "artifact persistence does not retain versioned executable metadata",
+    )
+    require(
+        "pub(crate) fn admit_executable_artifact" in server_artifact
+        and "ValidatedArtifact::read" in server_artifact
+        and "admit_executable_artifact(&record)?" in server_product
+        and "ReferenceMachine::from_binary(\n                &record.payload" not in server_cobol
+        and "ReferenceMachine::from_binary(\n                &record.payload" not in server_product,
+        "normal product load or restore bypasses manifest-aware artifact admission",
+    )
+
 def check(root: Path) -> None:
     compiler_manifest = read(root, "crates/kernel/mainframe-env-compiler/Cargo.toml")
     compiler_dependencies = tomllib.loads(compiler_manifest).get("dependencies", {})
@@ -655,27 +681,7 @@ def check(root: Path) -> None:
         "typed CICS coordinator proof",
     )
 
-    store_model = production(
-        read(root, "crates/contracts/mainframe-env-store-api/src/model.rs")
-    )
-    server_cobol = production(read(root, "crates/apps/mainframe-env-server/src/cobol.rs"))
-    server_artifact = production(
-        read(root, "crates/apps/mainframe-env-server/src/cobol/artifact.rs")
-    )
-    server_product = production(read(root, "crates/apps/mainframe-env-server/src/product.rs"))
-    require(
-        "pub struct ExecutableArtifactMetadata" in store_model
-        and "pub executable: Option<ExecutableArtifactMetadata>" in store_model,
-        "artifact persistence does not retain versioned executable metadata",
-    )
-    require(
-        "pub(crate) fn admit_executable_artifact" in server_artifact
-        and "ValidatedArtifact::read" in server_artifact
-        and "admit_executable_artifact(&record)?" in server_product
-        and "ReferenceMachine::from_binary(\n                &record.payload" not in server_cobol
-        and "ReferenceMachine::from_binary(\n                &record.payload" not in server_product,
-        "normal product load or restore bypasses manifest-aware artifact admission",
-    )
+    check_product_artifact_admission(root)
     versions = json.loads(read(root, "conformance/subsystems/platform/inventory/contracts.json"))
     require(
         versions.get("contracts", {}).get("artifact") == "mainframe-env.artifact@3",
