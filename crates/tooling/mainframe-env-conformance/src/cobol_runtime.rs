@@ -579,6 +579,203 @@ DATA DIVISION. WORKING-STORAGE SECTION.
 01 RIGHT-EDGE PIC X(4) VALUE 'RITE'.
 "#;
 
+    const BMS_NUMERIC_INPUT_STORAGE_DATA: &str = r#"
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 LEFT-EDGE PIC X(4) VALUE 'LEFT'.
+01 INPUT-MAP.
+   05 GUARD-L PIC X(2) VALUE '<<'.
+   05 ACCTSIDL PIC S9(4) COMP VALUE 258.
+   05 ACCTSIDA PIC X VALUE 'a'.
+   05 ACCTSIDI PIC 9(11) VALUE 12345678901.
+   05 GUARD-R PIC X(2) VALUE '>>'.
+01 RIGHT-EDGE PIC X(4) VALUE 'RITE'.
+"#;
+
+    #[test]
+    fn cics_bms_input_storage_numeric_display_keeps_terminal_bytes() {
+        // Controlled replies exercise raw storage ownership, not numeric evaluation.
+        for (id, input, expected) in [
+            (
+                "DIGITS",
+                b"00000000050".as_slice(),
+                b"<<\x00\x0ba00000000050>>".as_slice(),
+            ),
+            (
+                "SPACES",
+                b"           ".as_slice(),
+                b"<<\x00\x0ba           >>".as_slice(),
+            ),
+            (
+                "TEXT",
+                b"not-a-num!?".as_slice(),
+                b"<<\x00\x0banot-a-num!?>>".as_slice(),
+            ),
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BMS-NUMERIC-{id}. \
+                 {BMS_NUMERIC_INPUT_STORAGE_DATA}\nPROCEDURE DIVISION.\n\
+                 EXEC CICS RECEIVE MAP('SYNMAP') INTO(INPUT-MAP) END-EXEC.\n\
+                 DISPLAY 'DONE'. STOP RUN."
+            );
+            check_cics_bms_reply(
+                &source,
+                mainframe_env_host_api::CicsOperation::ReceiveMap,
+                b"NUMERIC-TRANSPORT-FRAME!",
+                &[
+                    ("BMS.ACCTSID", "mainframe-env.cics.payload@1", input),
+                    ("BMS.ACCTSID.LENGTH", "mainframe-env.cics.decimal@1", b"11"),
+                ],
+                &[
+                    ("LEFT-EDGE", b"LEFT", b"LEFT"),
+                    ("INPUT-MAP", b"<<\x01\x02a12345678901>>", expected),
+                    ("RIGHT-EDGE", b"RITE", b"RITE"),
+                ],
+                false,
+            );
+        }
+    }
+
+    #[test]
+    fn cics_bms_input_storage_numeric_display_short_prefix_preserves_surplus() {
+        // DFHMDI's input-field note preserves surplus data; no numeric conversion occurs.
+        for (id, input, count, expected) in [
+            (
+                "SHORT",
+                b"50".as_slice(),
+                b"2".as_slice(),
+                b"<<\x00\x02a50345678901>>".as_slice(),
+            ),
+            (
+                "EMPTY",
+                b"".as_slice(),
+                b"0".as_slice(),
+                b"<<\x00\x00a12345678901>>".as_slice(),
+            ),
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BMS-NUMERIC-{id}. \
+                 {BMS_NUMERIC_INPUT_STORAGE_DATA}\nPROCEDURE DIVISION.\n\
+                 EXEC CICS RECEIVE MAP('SYNMAP') INTO(INPUT-MAP) END-EXEC.\n\
+                 DISPLAY 'DONE'. STOP RUN."
+            );
+            check_cics_bms_reply(
+                &source,
+                mainframe_env_host_api::CicsOperation::ReceiveMap,
+                b"SHORT-TRANSPORT-FRAME!",
+                &[
+                    ("BMS.ACCTSID", "mainframe-env.cics.payload@1", input),
+                    ("BMS.ACCTSID.LENGTH", "mainframe-env.cics.decimal@1", count),
+                ],
+                &[("INPUT-MAP", b"<<\x01\x02a12345678901>>", expected)],
+                false,
+            );
+        }
+    }
+
+    #[test]
+    fn cics_bms_input_storage_numeric_display_omitted_preserves_storage() {
+        let source = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BMS-NUMERIC-OMITTED. \
+             {BMS_NUMERIC_INPUT_STORAGE_DATA}\nPROCEDURE DIVISION.\n\
+             EXEC CICS RECEIVE MAP('SYNMAP') INTO(INPUT-MAP) END-EXEC.\n\
+             DISPLAY 'DONE'. STOP RUN."
+        );
+        check_cics_bms_reply(
+            &source,
+            mainframe_env_host_api::CicsOperation::ReceiveMap,
+            b"OMITTED-NUMERIC-FRAME!",
+            &[],
+            &[(
+                "INPUT-MAP",
+                b"<<\x01\x02a12345678901>>",
+                b"<<\x01\x02a12345678901>>",
+            )],
+            false,
+        );
+    }
+
+    #[test]
+    fn cics_bms_input_storage_alphanumeric_digits_are_not_zero_filled() {
+        let data = BMS_INPUT_STORAGE_DATA.replace("VALUE 'old!'", "VALUE '0000'");
+        let source = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BMS-DIGIT-TEXT. {data}\n\
+             PROCEDURE DIVISION.\n\
+             EXEC CICS RECEIVE MAP('SYNMAP') INTO(INPUT-MAP) END-EXEC.\n\
+             DISPLAY 'DONE'. STOP RUN."
+        );
+        check_cics_bms_reply(
+            &source,
+            mainframe_env_host_api::CicsOperation::ReceiveMap,
+            b"DIGIT-TEXT-FRAME!",
+            &[
+                ("BMS.ALPHA", "mainframe-env.cics.payload@1", b"42"),
+                ("BMS.ALPHA.LENGTH", "mainframe-env.cics.decimal@1", b"2"),
+            ],
+            &[(
+                "INPUT-MAP",
+                b"<<\x01\x02a0000||\x03\x04bstay?>>",
+                b"<<\x00\x02a42  ||\x03\x04bstay?>>",
+            )],
+            false,
+        );
+    }
+
+    #[test]
+    fn cics_bms_input_storage_numeric_projection_refuses_before_writes() {
+        for (id, extra_name, extra_schema, extra_bytes) in [
+            (
+                "UNKNOWN",
+                "BMS.ZZZ",
+                "mainframe-env.cics.payload@1",
+                b"x".as_slice(),
+            ),
+            (
+                "OVERSIZE",
+                "BMS.ACCTSID.LENGTH",
+                "mainframe-env.cics.decimal@1",
+                b"12".as_slice(),
+            ),
+            (
+                "BAD-SCHEMA",
+                "BMS.ACCTSID.LENGTH",
+                "mainframe-env.cics.payload@1",
+                b"11".as_slice(),
+            ),
+            (
+                "BAD-LENGTH",
+                "BMS.ACCTSID.LENGTH",
+                "mainframe-env.cics.decimal@1",
+                b"-1".as_slice(),
+            ),
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BMS-NUMERIC-{id}. \
+                 {BMS_NUMERIC_INPUT_STORAGE_DATA}\nPROCEDURE DIVISION.\n\
+                 EXEC CICS RECEIVE MAP('SYNMAP') INTO(INPUT-MAP) END-EXEC.\n\
+                 DISPLAY 'DONE'. STOP RUN."
+            );
+            check_cics_bms_reply(
+                &source,
+                mainframe_env_host_api::CicsOperation::ReceiveMap,
+                b"INVALID-NUMERIC-FRAME!",
+                &[
+                    (
+                        "BMS.ACCTSID",
+                        "mainframe-env.cics.payload@1",
+                        b"00000000050",
+                    ),
+                    (extra_name, extra_schema, extra_bytes),
+                ],
+                &[(
+                    "INPUT-MAP",
+                    b"<<\x01\x02a12345678901>>",
+                    b"<<\x01\x02a12345678901>>",
+                )],
+                true,
+            );
+        }
+    }
+
     #[test]
     fn cics_bms_input_storage_present_fields_exclude_transport_frame() {
         let source = format!(

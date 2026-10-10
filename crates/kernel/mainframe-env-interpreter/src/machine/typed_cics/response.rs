@@ -110,10 +110,12 @@ fn project_receive_map(
             || length.length != 2
             || length.layout.scale != 0
             || !length.layout.signed
-            || !matches!(
+            || !(matches!(
                 layout.category,
                 LayoutCategory::Alphanumeric | LayoutCategory::Alphabetic
-            )
+            ) || (layout.category == LayoutCategory::NumericDisplay
+                && !layout.signed
+                && layout.scale == 0))
         {
             continue;
         }
@@ -151,24 +153,29 @@ fn project_receive_map(
                 coefficient: i128::from(count),
                 scale: 0,
             };
-            encode_decimal(&length.layout, number)?;
-            writes.push((length.layout.name.clone(), CobolValue::Decimal(number)));
+            writes.push((length.clone(), encode_decimal(&length.layout, number)?));
         } else {
             if value.schema() != "mainframe-env.cics.payload@1" || value.bytes().len() > data.length
             {
                 return Err(MachineProblem::UnexpectedHostResult);
             }
-            writes.push((
-                data.layout.name.clone(),
-                CobolValue::Bytes(value.bytes().to_vec()),
-            ));
+            // Numeric DISPLAY receives terminal bytes, not a COBOL numeric assignment.
+            // A short prefix leaves surplus storage intact (DFHMDI input-field note).
+            // Existing text fields retain their fixed-field fitting contract.
+            let bytes = if data.layout.category == LayoutCategory::NumericDisplay {
+                let mut bytes = machine.read_reference(data)?;
+                bytes[..value.bytes().len()].copy_from_slice(value.bytes());
+                bytes
+            } else {
+                FixedValue::fit(value.bytes(), data.length, data.layout.justified_right)
+                    .bytes()
+                    .to_vec()
+            };
+            writes.push((data.clone(), bytes));
         }
     }
-    for (name, value) in writes {
-        match value {
-            CobolValue::Bytes(bytes) => machine.write(&name, &bytes)?,
-            CobolValue::Decimal(number) => machine.write_decimal(&name, number)?,
-        }
+    for (reference, bytes) in writes {
+        machine.write_reference(&reference, &bytes)?;
     }
     Ok(true)
 }
