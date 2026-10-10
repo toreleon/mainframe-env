@@ -19,9 +19,9 @@ const PARTICIPANT_CONTRACT: &str = include_str!(
 );
 
 const SCENARIO: &str = "cics.file-uow.local";
-// Frozen current effective runner document includes the 18 upstream MQ selected cases.
-// The CICS scenario, all prior cases and normalized catalog metadata remain unchanged.
-const SPEC_DIGEST: &str = "sha256:4d6d838c9f2a2b848e6b9d6e3a32b3f519c4cf807d0071cae3f394db18950233";
+// Frozen effective runner document binds the boxed MQ typed-request fixture source.
+// All cases, scenarios and normalized catalog metadata remain unchanged.
+const SPEC_DIGEST: &str = "sha256:7d03ccc7ef0480f4f628b44d566c3f512f421fac2e98d4c586f08d24c1477daf";
 // Frozen same-builder normalized catalog metadata, not an execution authority.
 const CATALOG_ROWS_DIGEST: &str =
     "sha256:c5d0d72ded0d030bc05c0e89ae70390e90606419fb21e698bac16fe4864145aa";
