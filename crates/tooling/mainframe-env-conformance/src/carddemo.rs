@@ -12,8 +12,12 @@ mod journey_closure;
 use journey_closure::{close_carddemo_issues, close_carddemo_journeys};
 mod journey_observations;
 use journey_observations::RouteObservations;
+mod card_observations;
+mod db2_control_observations;
 mod db2_observations;
 mod full;
+mod jes_security_observations;
+mod security_observations;
 #[cfg(test)]
 use full::exercise_full_certification;
 pub use full::verify_carddemo_full_from_env;
@@ -21,6 +25,8 @@ mod online_receipt;
 pub use online_receipt::verify_carddemo_base_online_from_env;
 mod mq_receipt;
 pub use mq_receipt::verify_carddemo_mq_authorization_from_env;
+#[cfg(test)]
+mod base_online_observation_tests;
 #[cfg(test)]
 mod journey_closure_tests;
 mod transaction_harness;
@@ -33,6 +39,7 @@ mod transaction_tests;
 
 mod authorization_context;
 mod bms;
+mod bms_seed_oracles;
 mod control_library;
 mod ims_packages;
 mod ims_routes;
@@ -702,6 +709,9 @@ pub struct CardDemoImsReceipt {
     pub ims_shape_sha256: String,
 }
 
+/// Pinned source compilation and local provider-control results.
+/// Route/control counts describe provider probes; only `journeys_passed` records
+/// completed first-party application journeys. Provider probes earn none.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct CardDemoMqAuthorizationReceipt {
     pub schema_version: String,
@@ -5504,8 +5514,11 @@ async fn exercise_db2_routes(
         ));
     }
 
+    db2_control_observations::check_inputs(corpus_dir)?;
+    let rollback_before = db2_control_observations::capture(&server)?;
+    db2_control_observations::require_rollback_before(&rollback_before)?;
     let rollback = db2_control_invocation("db2-rollback")?;
-    server
+    let inserted = server
         .db2_service()
         .execute(
             &rollback,
@@ -5522,13 +5535,33 @@ async fn exercise_db2_routes(
             )?,
         )
         .map_err(terminal_problem)?;
-    server
+    let pending = server
+        .db2_service()
+        .execute(&rollback, &db2_control_observations::rollback_probe())
+        .map_err(terminal_problem)?;
+    db2_control_observations::require_admitted_insert(
+        &inserted,
+        &pending,
+        &rollback_before,
+        &db2_control_observations::capture(&server)?,
+    )?;
+    let rolled_back = server
         .db2_service()
         .execute(
             &rollback,
             &db2_control_request(Db2Operation::Rollback, 50_002, BTreeMap::new())?,
         )
         .map_err(terminal_problem)?;
+    let selected = server
+        .db2_service()
+        .execute(&rollback, &db2_control_observations::rollback_probe())
+        .map_err(terminal_problem)?;
+    db2_control_observations::require_rolled_back(
+        &rolled_back,
+        &selected,
+        &rollback_before,
+        &db2_control_observations::capture(&server)?,
+    )?;
     if server
         .db2_service()
         .table_rows("CARDDEMO.TRANSACTION_TYPE")
@@ -5626,13 +5659,14 @@ async fn exercise_db2_routes(
         ));
     }
 
+    let maintenance_before = db2_control_observations::require_maintenance_before(&server)?;
     let maintenance = String::from_utf8(read_corpus_file(
         corpus_dir,
         &corpus_dir.join("app/app-transaction-type-db2/jcl/MNTTRDB2.jcl"),
     )?)
     .map_err(|_| CorpusProblem::new("carddemo.db2.jcl_invalid", "MNTTRDB2 is not UTF-8"))?;
     let maintenance_id = submit_job_with_retcode(&server, &app, &maintenance, "CC 0000").await?;
-    job_ids.insert("MNTTRDB2".into(), maintenance_id);
+    job_ids.insert("MNTTRDB2".into(), maintenance_id.clone());
     let maintained_rows = server
         .db2_service()
         .table_rows("CARDDEMO.TRANSACTION_TYPE")
@@ -5661,6 +5695,12 @@ async fn exercise_db2_routes(
             ),
         ));
     }
+    db2_control_observations::compare_completed_maintenance(
+        &server,
+        &maintenance_id,
+        &maintenance_before,
+        &mut route_observations,
+    )?;
     let extract = String::from_utf8(read_corpus_file(
         corpus_dir,
         &corpus_dir.join("app/app-transaction-type-db2/jcl/TRANEXTR.jcl"),
@@ -6187,7 +6227,6 @@ async fn exercise_cdv1_route(
 }
 
 struct MqAuthorizationExercise {
-    route_observations: RouteObservations,
     queues_installed: usize,
     triggers_installed: usize,
     ims_roots: usize,
@@ -6200,7 +6239,6 @@ async fn exercise_mq_authorization_routes(
     corpus_dir: &Path,
     ims_definition: ImsApplicationDefinition,
 ) -> Result<MqAuthorizationExercise, CorpusProblem> {
-    let mut route_observations = RouteObservations::default();
     let artifact_root = env::temp_dir().join(format!(
         "mainframe-env-carddemo-mq-authorization-{}",
         std::process::id()
@@ -6728,25 +6766,20 @@ async fn exercise_mq_authorization_routes(
             )?,
         )
         .map_err(terminal_problem)?;
-    route_observations.compare(
-        journey_closure::AuthorityKind::Journey,
-        "CD.J17",
-        "IMS GU/GNP navigation",
-        summary
+    if summary
+        .segments
+        .first()
+        .is_none_or(|segment| !segment.data.starts_with(b"000001APPROVED-SUMMARY"))
+        || detail
             .segments
             .first()
-            .is_none_or(|segment| !segment.data.starts_with(b"000001APPROVED-SUMMARY"))
-            || detail
-                .segments
-                .first()
-                .is_none_or(|segment| !segment.data.starts_with(b"20260830APPROVED-DETAIL")),
-        || {
-            Ok(CorpusProblem::new(
-                "carddemo.authorization.navigation_drift",
-                "IMS summary/detail navigation changed",
-            ))
-        },
-    )?;
+            .is_none_or(|segment| !segment.data.starts_with(b"20260830APPROVED-DETAIL"))
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.authorization.navigation_drift",
+            "IMS summary/detail navigation changed",
+        ));
+    }
 
     let ddl = String::from_utf8(read_corpus_file(
         corpus_dir,
@@ -6828,18 +6861,12 @@ async fn exercise_mq_authorization_routes(
     let fraud_rows = db2
         .table_rows("CARDDEMO.AUTHFRDS")
         .map_err(terminal_problem)?;
-    route_observations.compare(
-        journey_closure::AuthorityKind::Journey,
-        "CD.J17",
-        "DB2 AUTHFRDS insert/update",
-        fraud_rows.len() != 1 || fraud_rows[0].get(22).map(Vec::as_slice) != Some(b"Y"),
-        || {
-            Ok(CorpusProblem::new(
-                "carddemo.authorization.fraud_drift",
-                "AUTHFRDS insert/update did not persist the fraud marker",
-            ))
-        },
-    )?;
+    if fraud_rows.len() != 1 || fraud_rows[0].get(22).map(Vec::as_slice) != Some(b"Y") {
+        return Err(CorpusProblem::new(
+            "carddemo.authorization.fraud_drift",
+            "AUTHFRDS insert/update did not persist the fraud marker",
+        ));
+    }
 
     let purge_jcl = String::from_utf8(read_corpus_file(
         corpus_dir,
@@ -6928,18 +6955,12 @@ async fn exercise_mq_authorization_routes(
     let hierarchy = ims.hierarchy("DBPAUTP0").map_err(terminal_problem)?;
     let ims_roots = hierarchy.len();
     let ims_children = hierarchy.iter().map(|root| root.children.len()).sum();
-    route_observations.compare(
-        journey_closure::AuthorityKind::Journey,
-        "CD.J18",
-        "exact remaining hierarchy",
-        !hierarchy.is_empty(),
-        || {
-            Ok(CorpusProblem::new(
-                "carddemo.authorization.purge_drift",
-                "expiry-days zero did not purge the exact IMS hierarchy",
-            ))
-        },
-    )?;
+    if !hierarchy.is_empty() {
+        return Err(CorpusProblem::new(
+            "carddemo.authorization.purge_drift",
+            "expiry-days zero did not purge the exact IMS hierarchy",
+        ));
+    }
     let queue_sha256 = mq_queue_digests(&mq)?;
     if !server.graceful_shutdown().await {
         return Err(CorpusProblem::new(
@@ -6987,7 +7008,6 @@ async fn exercise_mq_authorization_routes(
     drop(restarted);
     let _ = fs::remove_dir_all(&artifact_root);
     Ok(MqAuthorizationExercise {
-        route_observations,
         queues_installed: install.queues,
         triggers_installed: install.triggers,
         ims_roots,
@@ -9936,6 +9956,12 @@ async fn exercise_base_online_smoke(
             "account view did not complete its xref, account, and customer reads",
         ));
     }
+    bms_seed_oracles::compare_account_view(
+        &corpus_dir,
+        &account_detail,
+        &_account_fields,
+        &mut route_observations,
+    )?;
     let rollback_controls =
         exercise_account_rollback_control(&server, &app, &mut route_observations).await?;
     let card_mutations =
@@ -10019,7 +10045,8 @@ async fn exercise_base_online_smoke(
     let admin_mutations =
         exercise_admin_user_lifecycle(&server, &app, &mut route_observations).await?;
     let regular_mutations =
-        exercise_regular_online_journeys(&server, &app, &mut route_observations).await?;
+        exercise_regular_online_journeys(&server, &app, &corpus_dir, &mut route_observations)
+            .await?;
     let mut controls =
         exercise_base_online_controls(&server, &app, &mut route_observations).await?;
     controls.rollback_controls = rollback_controls;
@@ -10037,6 +10064,12 @@ async fn exercise_base_online_smoke(
     })?;
     let restart_route = select_regular_option(&server, &app, 3, "COCRDLI").await?;
     drop(app);
+    if !server.graceful_shutdown().await {
+        return Err(CorpusProblem::new(
+            "carddemo.online.shutdown_failed",
+            "base online server did not drain before reopen",
+        ));
+    }
     drop(server);
     let restarted = ProductServer::open(config, store, secrets, default_program_router())
         .map_err(terminal_problem)?;
@@ -10056,6 +10089,14 @@ async fn exercise_base_online_smoke(
             "restarted suspended journey retained an active worker",
         ));
     }
+    drop(restarted_app);
+    if !restarted.graceful_shutdown().await {
+        return Err(CorpusProblem::new(
+            "carddemo.online.shutdown_failed",
+            "reopened base online server did not drain",
+        ));
+    }
+    drop(restarted);
     let mut observations = vec![
         format!("maps:{}", selected_maps.len()),
         format!("dataset-reads:{dataset_reads}"),
@@ -10247,6 +10288,7 @@ async fn exercise_admin_user_lifecycle(
     app: &axum::Router,
     route_observations: &mut RouteObservations,
 ) -> Result<usize, CorpusProblem> {
+    security_observations::verify_user_security_seed(server)?;
     let dataset = "AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS";
     let before = carddemo_dataset_text_records(server, dataset)?;
     if before.iter().any(|record| record.starts_with("TEST0001")) {
@@ -10303,6 +10345,11 @@ async fn exercise_admin_user_lifecycle(
             ))
         },
     )?;
+    let duplicate_before = transaction_harness::snapshot(server)?;
+    let duplicate_trace_before = server
+        .online_trace(&add.session)
+        .map_err(terminal_problem)?
+        .len();
     let duplicate =
         carddemo_terminal_exchange(app, &add.session, &add.headers, 0x7d, add_fields).await?;
     if !online_screen_fields(&duplicate)?
@@ -10315,6 +10362,74 @@ async fn exercise_admin_user_lifecycle(
             "duplicate user add did not fail without mutation",
         ));
     }
+
+    let duplicate_after = transaction_harness::snapshot(server)?;
+    let duplicate_trace = server
+        .online_trace(&add.session)
+        .map_err(terminal_problem)?;
+    let duplicate_effects = duplicate_trace
+        .get(duplicate_trace_before..)
+        .ok_or_else(|| {
+            CorpusProblem::new(
+                "carddemo.online.user_condition_drift",
+                "duplicate trace shrank",
+            )
+        })?;
+    let duplicate_observed = security_observations::user_refusal_matches(
+        security_observations::UserRefusal::Duplicate,
+        &duplicate,
+        duplicate_effects,
+        &duplicate_before,
+        &duplicate_after,
+    )?;
+
+    // A genuinely absent eight-byte key enters COUSR02C's actual READ NOTFND
+    // branch. It is distinct from the selected key used by the successful update.
+    if carddemo_dataset_text_records(server, dataset)?
+        .iter()
+        .any(|row| row.starts_with("MISS0001"))
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.online.user_fixture_conflict",
+            "missing-key fixture already exists",
+        ));
+    }
+    let missing_route = select_admin_option(server, app, 3, "COUSR02").await?;
+    let missing_before = transaction_harness::snapshot(server)?;
+    let missing_trace_before = server
+        .online_trace(&missing_route.session)
+        .map_err(terminal_problem)?
+        .len();
+    let missing = carddemo_terminal_exchange(
+        app,
+        &missing_route.session,
+        &missing_route.headers,
+        0x7d,
+        BTreeMap::from([("USRIDIN".into(), "MISS0001".into())]),
+    )
+    .await?;
+    let missing_after = transaction_harness::snapshot(server)?;
+    let missing_trace = server
+        .online_trace(&missing_route.session)
+        .map_err(terminal_problem)?;
+    let missing_effects = missing_trace.get(missing_trace_before..).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.online.user_condition_drift",
+            "missing-key trace shrank",
+        )
+    })?;
+    let missing_observed = security_observations::user_refusal_matches(
+        security_observations::UserRefusal::Missing,
+        &missing,
+        missing_effects,
+        &missing_before,
+        &missing_after,
+    )?;
+    security_observations::observe_user_conditions(
+        route_observations,
+        duplicate_observed,
+        missing_observed,
+    )?;
 
     let update = select_admin_option(server, app, 3, "COUSR02").await?;
     let selected = carddemo_terminal_exchange(
@@ -10449,6 +10564,7 @@ async fn select_admin_option(
 async fn exercise_regular_online_journeys(
     server: &ProductServer,
     app: &axum::Router,
+    corpus_dir: &Path,
     route_observations: &mut RouteObservations,
 ) -> Result<usize, CorpusProblem> {
     let card = "0500024453765740";
@@ -10497,6 +10613,12 @@ async fn exercise_regular_online_journeys(
         ));
     }
 
+    bms_seed_oracles::compare_card_detail(
+        corpus_dir,
+        &detail,
+        &_detail_fields,
+        route_observations,
+    )?;
     let transaction_list = select_regular_option(server, app, 6, "COTRN00").await?;
     for (aid, operation) in [
         (0xf8, "transaction list PF8"),
@@ -10736,6 +10858,8 @@ async fn exercise_base_online_controls(
         "Basic {}",
         base64::engine::general_purpose::STANDARD.encode("WEBUSER:transport-password")
     );
+    security_observations::verify_user_security_seed(server)?;
+    let admin_denial_before = transaction_harness::snapshot(server)?;
     let denied = terminal_http(
         app,
         Method::POST,
@@ -10751,7 +10875,15 @@ async fn exercise_base_online_controls(
         journey_closure::AuthorityKind::Journey,
         "CD.J08",
         "regular-user denial",
-        denied.0 != StatusCode::FORBIDDEN,
+        denied.0 != StatusCode::FORBIDDEN
+            || !security_observations::remaining_admin_denials(
+                server,
+                app,
+                &regular_authorization,
+                &denied,
+                &admin_denial_before,
+            )
+            .await?,
         || {
             Ok(CorpusProblem::new(
                 "carddemo.online.regular_admin_denial",
@@ -10808,6 +10940,63 @@ async fn exercise_base_online_controls(
     let right_result = right_result?;
     require_online_mapset(&left_result, "COACTVW", "concurrent account session")?;
     require_online_mapset(&right_result, "COCRDLI", "concurrent card session")?;
+    // Read stored state after both independently addressed exchanges finish.
+    // Equality binds each route's full screen/version/run state to its session.
+    let left_uri = format!("/mainframe-env/cics/v1/sessions/{}", left.session);
+    let right_uri = format!("/mainframe-env/cics/v1/sessions/{}", right.session);
+    let (left_stored, right_stored) = tokio::join!(
+        terminal_http(
+            app,
+            Method::GET,
+            &left_uri,
+            left.headers.clone(),
+            Vec::new(),
+        ),
+        terminal_http(
+            app,
+            Method::GET,
+            &right_uri,
+            right.headers.clone(),
+            Vec::new(),
+        ),
+    );
+    let left_stored = left_stored?;
+    let right_stored = right_stored?;
+    require_terminal_status(
+        left_stored.0,
+        StatusCode::OK,
+        "concurrent account read-back",
+    )?;
+    require_terminal_status(right_stored.0, StatusCode::OK, "concurrent card read-back")?;
+    let left_stored: serde_json::Value = serde_json::from_slice(&left_stored.1)
+        .map_err(|error| CorpusProblem::new("carddemo.online.response", error.to_string()))?;
+    let right_stored: serde_json::Value = serde_json::from_slice(&right_stored.1)
+        .map_err(|error| CorpusProblem::new("carddemo.online.response", error.to_string()))?;
+    route_observations.compare(
+        journey_closure::AuthorityKind::Journey,
+        "CD.J09",
+        "concurrent session isolation",
+        left.session == right.session
+            || left_result["session"] != left.session
+            || right_result["session"] != right.session
+            || left_stored != left_result
+            || right_stored != right_result
+            || left_stored["mapset"] != "COACTVW"
+            || right_stored["mapset"] != "COCRDLI"
+            || left_stored["screen_base64"]
+                .as_str()
+                .is_none_or(str::is_empty)
+            || right_stored["screen_base64"]
+                .as_str()
+                .is_none_or(str::is_empty)
+            || left_stored["screen_base64"] == right_stored["screen_base64"],
+        || {
+            Ok(CorpusProblem::new(
+                "carddemo.online.concurrent_session_state_drift",
+                "concurrent account/card sessions did not retain their independent response state",
+            ))
+        },
+    )?;
 
     let oversized_launch = terminal_http(
         app,
@@ -11066,6 +11255,8 @@ async fn exercise_card_update_mutation(
     let card = "0500024453765740";
     let dataset = "AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS";
     let before = carddemo_dataset_text_records(server, dataset)?;
+    let before_index_state = card_observations::capture(server)?;
+    card_observations::require_seed(&before_index_state)?;
     let before_record = before
         .iter()
         .find(|record| record.starts_with(card))
@@ -11261,6 +11452,12 @@ async fn exercise_card_update_mutation(
                 ),
             ))
         },
+    )?;
+    let after_index_state = card_observations::capture(server)?;
+    card_observations::compare_rewrite(
+        route_observations,
+        &before_index_state,
+        &after_index_state,
     )?;
     Ok(1)
 }
@@ -12503,6 +12700,46 @@ mod tests {
         assert_eq!(exercise.sqlite_backup_restore_controls, 1);
         assert_eq!(exercise.postgres_restart_controls, 1);
         assert_eq!(exercise.cross_principal_controls, 2);
+        assert!(
+            exercise
+                .route_observations
+                .journeys()
+                .iter()
+                .any(|(id, requirements)| {
+                    id == "CD.J19"
+                        && requirements
+                            .iter()
+                            .any(|requirement| requirement == "job IDs and spool")
+                })
+        );
+        assert!(
+            exercise
+                .route_observations
+                .journeys()
+                .iter()
+                .any(|(id, requirements)| {
+                    id == "CD.J20"
+                        && requirements
+                            .iter()
+                            .any(|requirement| requirement == "2x overload")
+                })
+        );
+        assert!(
+            !exercise
+                .route_observations
+                .journeys()
+                .iter()
+                .any(|(id, requirements)| {
+                    id == "CD.J20"
+                        && requirements
+                            .iter()
+                            .any(|requirement| requirement == "online and batch concurrency")
+                })
+        );
+        println!(
+            "actual physical backend-control observation identities: {:?}; selected info/JES twofold offered load only; zero full-profile closure and zero licensed credit",
+            exercise.route_observations.journeys(),
+        );
     }
 
     struct BundleCorpus {

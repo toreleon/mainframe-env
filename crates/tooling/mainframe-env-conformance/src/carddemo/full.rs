@@ -217,7 +217,7 @@ pub(super) struct FullCertificationExercise {
     pub(super) sqlite_backup_restore_controls: usize,
     pub(super) postgres_restart_controls: usize,
     pub(super) cross_principal_controls: usize,
-    route_observations: RouteObservations,
+    pub(super) route_observations: RouteObservations,
 }
 
 pub(super) async fn exercise_full_certification() -> Result<FullCertificationExercise, CorpusProblem>
@@ -228,6 +228,8 @@ pub(super) async fn exercise_full_certification() -> Result<FullCertificationExe
         .map_err(|error| CorpusProblem::new("carddemo.full.clock", error.to_string()))?
         .as_nanos();
     let memory_root = env::temp_dir().join(format!("mainframe-env-carddemo-full-memory-{nonce}"));
+    fs::create_dir(&memory_root)
+        .map_err(|error| CorpusProblem::new("carddemo.full.memory_owner", error.to_string()))?;
     let memory = ProductServer::open(
         ServerConfig {
             store_profile: StoreProfile::Memory,
@@ -306,39 +308,92 @@ pub(super) async fn exercise_full_certification() -> Result<FullCertificationExe
     for index in 0..8usize {
         let route = app.clone();
         tasks.push(tokio::spawn(async move {
-            route
-                .oneshot(
-                    Request::builder()
-                        .uri("/zosmf/info")
-                        .body(Body::empty())
-                        .expect("static info request"),
+            (
+                None::<String>,
+                terminal_http(
+                    &route,
+                    Method::GET,
+                    "/zosmf/info",
+                    BTreeMap::new(),
+                    Vec::new(),
                 )
-                .await
-                .map(|response| response.status())
+                .await,
+            )
         }));
         let route = app.clone();
         let authorization = basic.clone();
         tasks.push(tokio::spawn(async move {
-            let jcl =
-                format!("//MX{index:06} JOB 'CD027',CLASS=A,MSGCLASS=H\n//STEP EXEC PGM=IEFBR14\n");
-            route
-                .oneshot(
-                    Request::builder()
-                        .method(Method::PUT)
-                        .uri("/zosmf/restjobs/jobs")
-                        .header("authorization", authorization)
-                        .header("x-csrf-zosmf-header", "true")
-                        .body(Body::from(jcl))
-                        .expect("static job request"),
+            let name = format!("MX{index:06}");
+            let jcl = format!("//{name} JOB 'CD027',CLASS=A,MSGCLASS=H\n//STEP EXEC PGM=IEFBR14\n");
+            (
+                Some(name),
+                terminal_http(
+                    &route,
+                    Method::PUT,
+                    "/zosmf/restjobs/jobs",
+                    BTreeMap::from([
+                        ("authorization".into(), authorization),
+                        ("x-csrf-zosmf-header".into(), "true".into()),
+                    ]),
+                    jcl.into_bytes(),
                 )
-                .await
-                .map(|response| response.status())
+                .await,
+            )
         }));
     }
-    let mut completed = 0usize;
+    // Join every offered request before interpreting any failure.
+    let mut joined = Vec::new();
     for task in tasks {
-        if let Ok(Ok(StatusCode::OK | StatusCode::CREATED)) = task.await {
-            completed += 1;
+        joined.push(task.await);
+    }
+    let mut completed = 0usize;
+    let mut info_ok = 0usize;
+    let mut submitted_jobs = BTreeMap::new();
+    let mut submitted_ids = BTreeSet::new();
+    for result in joined {
+        let (expected_name, response) = result.map_err(|error| {
+            CorpusProblem::new("carddemo.full.overload_drift", error.to_string())
+        })?;
+        let (status, body) = response?;
+        // Preserve the original status union, then enforce each actual route.
+        if !matches!(status, StatusCode::OK | StatusCode::CREATED) {
+            return Err(CorpusProblem::new(
+                "carddemo.full.overload_drift",
+                format!("mixed-load request returned {status}"),
+            ));
+        }
+        completed += 1;
+        match expected_name {
+            None => {
+                require_terminal_status(status, StatusCode::OK, "mixed-load info")?;
+                info_ok += 1;
+            }
+            Some(name) => {
+                require_terminal_status(status, StatusCode::CREATED, "mixed-load job submission")?;
+                let job: serde_json::Value = serde_json::from_slice(&body).map_err(|error| {
+                    CorpusProblem::new("carddemo.full.overload_drift", error.to_string())
+                })?;
+                let id = job["jobid"]
+                    .as_str()
+                    .filter(|id| !id.is_empty())
+                    .ok_or_else(|| {
+                        CorpusProblem::new(
+                            "carddemo.full.overload_drift",
+                            "submitted job ID is missing",
+                        )
+                    })?
+                    .to_string();
+                if job["jobname"] != name
+                    || job["owner"] != "IBMUSER"
+                    || !submitted_ids.insert(id)
+                    || submitted_jobs.insert(name, job).is_some()
+                {
+                    return Err(CorpusProblem::new(
+                        "carddemo.full.overload_drift",
+                        "mixed-load submissions did not produce distinct expected owner job identities",
+                    ));
+                }
+            }
         }
     }
     if completed != 16 || memory.metrics().active != 0 {
@@ -347,10 +402,39 @@ pub(super) async fn exercise_full_certification() -> Result<FullCertificationExe
             format!("2x mixed load completed {completed}/16"),
         ));
     }
+    let owner_headers = BTreeMap::from([("authorization".into(), basic.clone())]);
+    for (name, job) in &submitted_jobs {
+        let actual = wait_for_submitted_job(&memory, &app, &owner_headers, job.clone()).await?;
+        if actual["jobname"] != *name
+            || actual["jobid"] != job["jobid"]
+            || actual["owner"] != "IBMUSER"
+            || actual["status"] != "OUTPUT"
+            || actual["retcode"] != "CC 0000"
+        {
+            return Err(CorpusProblem::new(
+                "carddemo.full.overload_drift",
+                "mixed-load owner jobs did not complete with their exact submitted identities",
+            ));
+        }
+    }
+    let mixed_active = memory.metrics().active;
+    let mixed_refused = completed != 16
+        || info_ok != 8
+        || submitted_jobs.len() != 8
+        || submitted_ids.len() != 8
+        || mixed_active != 0;
     let appuser = format!(
         "Basic {}",
         base64::engine::general_purpose::STANDARD.encode("APPUSER:APPPASS1")
     );
+    let job_spool_proof = jes_security_observations::exercise_job_principal_denials(
+        &app,
+        &owner_headers,
+        &appuser,
+        &submitted_jobs,
+    )
+    .await?;
+    let principal_refused = job_spool_proof.principal_refused();
     let (status, body) = terminal_http(
         &app,
         Method::GET,
@@ -359,7 +443,10 @@ pub(super) async fn exercise_full_certification() -> Result<FullCertificationExe
         Vec::new(),
     )
     .await?;
-    if status != StatusCode::OK || body.windows(8).any(|window| window == b"MX000000") {
+    if status != StatusCode::OK
+        || body.windows(8).any(|window| window == b"MX000000")
+        || principal_refused
+    {
         return Err(CorpusProblem::new(
             "carddemo.full.principal_leak",
             "APPUSER observed IBMUSER job state",
@@ -379,11 +466,12 @@ pub(super) async fn exercise_full_certification() -> Result<FullCertificationExe
         Vec::new(),
     )
     .await?;
+    let memory_drained = memory.graceful_shutdown().await;
     route_observations.compare(
         journey_closure::AuthorityKind::Journey,
         "CD.J19",
         "authentication",
-        invalid_status != StatusCode::UNAUTHORIZED || !memory.graceful_shutdown().await,
+        invalid_status != StatusCode::UNAUTHORIZED || !memory_drained,
         || {
             Ok(CorpusProblem::new(
                 "carddemo.full.authentication_drift",
@@ -391,11 +479,27 @@ pub(super) async fn exercise_full_certification() -> Result<FullCertificationExe
             ))
         },
     )?;
+    drop(app);
     drop(memory);
-    let _ = fs::remove_dir_all(&memory_root);
+    fs::remove_dir_all(&memory_root)
+        .map_err(|error| CorpusProblem::new("carddemo.full.memory_cleanup", error.to_string()))?;
+    // Publish positive owner evidence after actual drain and owned cleanup.
+    job_spool_proof.observe_job_ids_and_spool(&mut route_observations)?;
+    route_observations.compare(
+        journey_closure::AuthorityKind::Journey,
+        "CD.J20",
+        "2x overload",
+        mixed_refused,
+        || {
+            Ok(CorpusProblem::new(
+                "carddemo.full.overload_drift",
+                "16 joined mixed requests did not retain eight info results and eight completed owner job identities",
+            ))
+        },
+    )?;
 
     let sqlite_root = env::temp_dir().join(format!("mainframe-env-carddemo-full-sqlite-{nonce}"));
-    fs::create_dir_all(&sqlite_root)
+    fs::create_dir(&sqlite_root)
         .map_err(|error| CorpusProblem::new("carddemo.full.sqlite", error.to_string()))?;
     let sqlite_path = sqlite_root.join("state.db");
     let sqlite_backup = sqlite_root.join("backup.db");
@@ -473,12 +577,14 @@ pub(super) async fn exercise_full_certification() -> Result<FullCertificationExe
         default_program_router(),
     )
     .map_err(terminal_problem)?;
+    // Attempt the actual stop independently of a failed read or byte comparison.
+    let restored_records = utility_records(&restored, "IBMUSER.CD027.BACKUP", None);
+    let restored_drained = restored.graceful_shutdown().await;
     route_observations.compare(
         journey_closure::AuthorityKind::Journey,
         "CD.J20",
         "backup/restore",
-        utility_records(&restored, "IBMUSER.CD027.BACKUP", None)? != [b"SQLITE-RESTORE  ".to_vec()]
-            || !restored.graceful_shutdown().await,
+        restored_records? != [b"SQLITE-RESTORE  ".to_vec()] || !restored_drained,
         || {
             Ok(CorpusProblem::new(
                 "carddemo.full.sqlite_restore_drift",
@@ -487,7 +593,8 @@ pub(super) async fn exercise_full_certification() -> Result<FullCertificationExe
         },
     )?;
     drop(restored);
-    let _ = fs::remove_dir_all(&sqlite_root);
+    fs::remove_dir_all(&sqlite_root)
+        .map_err(|error| CorpusProblem::new("carddemo.full.sqlite_cleanup", error.to_string()))?;
 
     let postgres_url = env::var("MAINFRAME_ENV_POSTGRES_TEST_URL").map_err(|_| {
         CorpusProblem::new(
@@ -585,9 +692,16 @@ pub(super) async fn exercise_full_certification() -> Result<FullCertificationExe
             },
         })
         .map_err(terminal_problem)?;
-    let _ = postgres_restarted.graceful_shutdown().await;
+    if !postgres_restarted.graceful_shutdown().await {
+        return Err(CorpusProblem::new(
+            "carddemo.full.postgres",
+            "reopened PostgreSQL server did not drain",
+        ));
+    }
     drop(postgres_restarted);
-    let _ = fs::remove_dir_all(&postgres_root);
+    // Shared PostgreSQL artifacts must never create a local directory. The
+    // existing refusal above remains authoritative; this path owns no local
+    // PostgreSQL artifact namespace to remove.
     Ok(FullCertificationExercise {
         route_observations,
         mixed_requests_offered: 16,

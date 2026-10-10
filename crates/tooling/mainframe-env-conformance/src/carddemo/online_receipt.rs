@@ -20,10 +20,16 @@ pub(super) fn verify_carddemo_base_online_observed(
     let programs = definition.programs.len();
     let transactions = definition.transactions.len();
     let maps = definition.maps.len();
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|error| CorpusProblem::new("carddemo.online.clock", error.to_string()))?
+        .as_nanos();
     let artifact_root = env::temp_dir().join(format!(
-        "mainframe-env-carddemo-base-online-{}",
+        "mainframe-env-carddemo-base-online-{}-{nonce}",
         std::process::id()
     ));
+    fs::create_dir(&artifact_root)
+        .map_err(|error| CorpusProblem::new("carddemo.online.artifact_owner", error.to_string()))?;
     let config = ServerConfig {
         store_profile: StoreProfile::Memory,
         artifact_root: artifact_root.clone(),
@@ -53,7 +59,6 @@ pub(super) fn verify_carddemo_base_online_observed(
         exercise_navigation_observations(&mut exercise.route_observations).await?;
         Ok::<_, CorpusProblem>(exercise)
     });
-    let _ = fs::remove_dir_all(&artifact_root);
     let exercise = result?;
     if exercise.screen_paths != maps
         || exercise.dataset_reads == 0
@@ -79,6 +84,9 @@ pub(super) fn verify_carddemo_base_online_observed(
             ),
         ));
     }
+    fs::remove_dir_all(&artifact_root).map_err(|error| {
+        CorpusProblem::new("carddemo.online.artifact_cleanup", error.to_string())
+    })?;
     let mut shape = Sha256::new();
     digest_field(&mut shape, terminal.corpus_commit.as_bytes());
     digest_field(&mut shape, &(programs as u64).to_be_bytes());

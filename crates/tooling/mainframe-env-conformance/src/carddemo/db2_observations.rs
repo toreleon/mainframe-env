@@ -346,11 +346,14 @@ mod tests {
         assert_eq!(receipt.dataset_sha256.len(), 4);
         assert_eq!(
             observations.journeys(),
-            &[("CD.J14".into(), vec!["Db2-to-VSAM record bytes".into()])]
+            &[(
+                "CD.J14".into(),
+                vec!["COBTUPDT".into(), "Db2-to-VSAM record bytes".into()]
+            )]
         );
         assert!(observations.issues().is_empty());
         println!(
-            "actual pinned-corpus PS extraction and two KSDS imports: 25 ordered 60-byte Cp037 records and provider keys compared, including reopen; one owned observation; no full-profile or licensed credit"
+            "actual pinned-corpus PS extraction and two KSDS imports: 25 ordered 60-byte Cp037 records and provider keys compared, including reopen; exact compiled COBTUPDT command/success spool and complete table transition; two owned observations; no full-profile or licensed credit"
         );
     }
 }
