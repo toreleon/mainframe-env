@@ -49,8 +49,9 @@ prose commit cannot hide an intervening failed code change.
 
 `ci-checks/plan.json`, per-command JSON/logs, and `summary.json` are archived by
 Jenkins. The summary records actual selected-command time. Failed runs leave later
-gates unrun, and each attempt starts with fresh receipts. The current five-build/two-artifact retention stays
-bounded. Download/compiler caches are reusable computation; test receipts are
+gates unrun, and each attempt starts with fresh receipts. Jenkins retains five build records and one
+artifact set, matching `Jenkinsfile` and the local runbook, so retention stays bounded.
+Download/compiler caches are reusable computation; test receipts are
 evidence and cannot substitute for required candidate checks.
 
 Avoid routine cache deletion, toolchain changes, alternate build flags, or

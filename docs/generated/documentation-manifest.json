@@ -2346,7 +2346,7 @@
       "normative": false,
       "path": "docs/runbooks/VERIFICATION-WORKFLOW.md",
       "relative_links": 1,
-      "sha256": "sha256:9e4d1b59e244b6a049a7efd6ed1992802ee9dd1deb418f47782b3bcc84875644",
+      "sha256": "sha256:9d6886364bbb00b1d07c55a62b99357a1eb4900c75bda7fcf9d504a22f3d65b8",
       "title": "Verification workflow",
       "xtask_commands": 1
     },
