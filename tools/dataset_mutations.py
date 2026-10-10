@@ -22,7 +22,9 @@ import time
 from dataclasses import dataclass
 
 SOURCE = Path('crates/tooling/mainframe-env-conformance/src/dataset_reference.rs')
-CICS_FILE_SOURCE = Path('crates/providers/mainframe-env-cics/src/handlers/file_control.rs')
+CICS_FILE_SOURCE = Path(
+    'crates/providers/mainframe-env-cics/src/handlers/file_control/first_reverse.rs'
+)
 CICS_RECOVERY_SOURCE = Path('crates/providers/mainframe-env-cics/src/handlers/recovery.rs')
 CICS_SOURCES = (CICS_FILE_SOURCE, CICS_RECOVERY_SOURCE)
 CICS_SCENARIOS = Path('crates/tooling/mainframe-env-conformance/src/cics_pilot.rs')
@@ -86,12 +88,12 @@ CICS_MUTATIONS = (
         'cics-omit-rewrite',
         'Report a successful product REWRITE without invoking the dataset transition',
         '    } else {\n        service.nested(run, HostRequest::Dataset(host_request))\n'
-        '    }\n    .map_err(|problem| normalize_file_not_found(operation, problem))?;',
+        '    }\n    .map_err(',
         '    } else if operation == CicsOperation::Rewrite {\n'
         '        Ok(HostResult::Dataset(DatasetResult::Mutated { version: 1 }))\n'
         '    } else {\n'
         '        service.nested(run, HostRequest::Dataset(host_request))\n'
-        '    }\n    .map_err(|problem| normalize_file_not_found(operation, problem))?;',
+        '    }\n    .map_err(',
         CICS_FILE_SOURCE,
     ),
     Mutation(
