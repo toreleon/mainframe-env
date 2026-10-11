@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Use unbuffered complete EOF reads for Linux process metadata to avoid redundant buffering fill reads while retaining census deadlines and failure handling."

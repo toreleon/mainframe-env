@@ -251,7 +251,7 @@ def _linux_stat_bytes(path: str) -> bytes:
     trace = _LINUX_CENSUS_TRACE.get()
     if trace is not None:
         trace['stage'] = 'stat_open'
-    with open(path, 'rb') as stream:
+    with open(path, 'rb', buffering=0) as stream:
         if trace is not None:
             trace['stage'] = 'stat_read'
         chunks = []
