@@ -229,3 +229,131 @@ fn oracle_input_requires_exact_regular_private_width_and_frozen_hash() {
     assert!(load_expected(&root, "selected.bin", 4, &hash).is_err());
     fs::remove_dir(root).unwrap();
 }
+
+#[test]
+fn refusal_diagnostics_locate_actual_boundary_without_storage_or_context_values() {
+    const POISON: &str = "DO_NOT_LOG_RAW_STORAGE";
+    let (reads, slots, expected) = fixture();
+    assert!(compare_data(&reads, &slots, &expected).is_ok());
+    let check = |result: Result<(), CorpusProblem>, stage: &str, read, role, field| {
+        let error = result.unwrap_err();
+        assert_eq!(error.code, "carddemo.online.read_copyback_storage");
+        assert_eq!(
+            error.detail,
+            format!(
+                "selected READ comparison refused: stage={stage}; read={read:?}; \
+                 cell_role={role:?}; eib_field={field:?}"
+            )
+        );
+        assert!(!error.detail.contains(POISON));
+        assert!(!error.detail.contains("CAVW"));
+    };
+    for (index, read) in reads.iter().enumerate() {
+        for (role, _) in read.cells.iter().enumerate() {
+            let mut altered = reads.clone();
+            let cell = &mut altered[index].cells[role];
+            if role == 0 {
+                cell.bytes[..POISON.len()].copy_from_slice(POISON.as_bytes());
+            } else {
+                cell.bytes.copy_from_slice(&POISON.as_bytes()[..4]);
+            }
+            check(
+                compare_data(&altered, &slots, &expected),
+                "cell-bytes",
+                Some(index),
+                Some(role),
+                None,
+            );
+            let mut altered = reads.clone();
+            altered[index].cells[role].name = POISON.into();
+            check(
+                compare_data(&altered, &slots, &expected),
+                "cell-geometry",
+                Some(index),
+                Some(role),
+                None,
+            );
+        }
+        for (field, _) in read.eib.iter().enumerate() {
+            let mut altered = reads.clone();
+            altered[index].eib[field].1 = CicsReadCopybackValue::Bytes(POISON.as_bytes().to_vec());
+            check(
+                compare_data(&altered, &slots, &expected),
+                "eib",
+                Some(index),
+                None,
+                Some(field),
+            );
+        }
+        let mut altered = reads.clone();
+        altered[index].eib[0].0 = POISON;
+        check(
+            compare_data(&altered, &slots, &expected),
+            "eib",
+            Some(index),
+            None,
+            Some(0),
+        );
+        let mut altered = reads.clone();
+        altered[index].eib.pop();
+        check(
+            compare_data(&altered, &slots, &expected),
+            "eib",
+            Some(index),
+            None,
+            None,
+        );
+        let mut altered = reads.clone();
+        altered[index].resource.value = Sha256::digest(POISON.as_bytes()).into();
+        check(
+            compare_data(&altered, &slots, &expected),
+            "resource",
+            Some(index),
+            None,
+            None,
+        );
+        let mut altered = reads.clone();
+        altered[index].cells.pop();
+        check(
+            compare_data(&altered, &slots, &expected),
+            "cell-membership",
+            Some(index),
+            None,
+            None,
+        );
+        let mut altered = expected.clone();
+        altered[index].pop();
+        check(
+            compare_data(&reads, &slots, &altered),
+            "oracle-width",
+            Some(index),
+            None,
+            None,
+        );
+    }
+    let mut altered = reads.clone();
+    altered.pop();
+    check(
+        compare_data(&altered, &slots, &expected),
+        "read-chain",
+        None,
+        None,
+        None,
+    );
+    let mut altered = reads.clone();
+    altered.push(reads[2].clone());
+    check(
+        compare_data(&altered, &slots, &expected),
+        "read-chain",
+        None,
+        None,
+        None,
+    );
+    check(
+        require_at(false, RefusalStage::OwnerBinding, None, None),
+        "owner-binding",
+        None,
+        None,
+        None,
+    );
+}

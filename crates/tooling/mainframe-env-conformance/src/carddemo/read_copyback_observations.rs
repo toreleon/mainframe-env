@@ -53,6 +53,57 @@ fn problem() -> CorpusProblem {
 fn require(value: bool) -> Result<(), CorpusProblem> {
     if value { Ok(()) } else { Err(problem()) }
 }
+// Fixed metadata only: never interpolate actual names, values, keys or bytes.
+#[derive(Clone, Copy)]
+enum RefusalStage {
+    OwnerBinding,
+    ReadChain,
+    OracleWidth,
+    CellMembership,
+    Resource,
+    Eib,
+    CellGeometry,
+    CellBytes,
+}
+
+fn refusal(
+    stage: RefusalStage,
+    read: Option<usize>,
+    cell_role: Option<usize>,
+    eib_field: Option<usize>,
+) -> CorpusProblem {
+    let stage = match stage {
+        RefusalStage::OwnerBinding => "owner-binding",
+        RefusalStage::ReadChain => "read-chain",
+        RefusalStage::OracleWidth => "oracle-width",
+        RefusalStage::CellMembership => "cell-membership",
+        RefusalStage::Resource => "resource",
+        RefusalStage::Eib => "eib",
+        RefusalStage::CellGeometry => "cell-geometry",
+        RefusalStage::CellBytes => "cell-bytes",
+    };
+    CorpusProblem::new(
+        "carddemo.online.read_copyback_storage",
+        format!(
+            "selected READ comparison refused: stage={stage}; read={read:?}; \
+             cell_role={cell_role:?}; eib_field={eib_field:?}"
+        ),
+    )
+}
+
+fn require_at(
+    value: bool,
+    stage: RefusalStage,
+    read: Option<usize>,
+    cell_role: Option<usize>,
+) -> Result<(), CorpusProblem> {
+    if value {
+        Ok(())
+    } else {
+        Err(refusal(stage, read, cell_role, None))
+    }
+}
+
 fn digest(value: &str) -> Result<[u8; 32], CorpusProblem> {
     require(value.len() == 64)?;
     let mut bytes = [0; 32];
@@ -255,7 +306,7 @@ impl Prepared {
             .get_execution(origin.execution())
             .map_err(|_| problem())?
             .ok_or_else(problem)?;
-        require(
+        require_at(
             terminal_matches(terminal, session, origin.run().as_str())
                 && completed.session().as_str() == session
                 && completed.asserted_source_digest() == &digest(SOURCE)?
@@ -282,6 +333,9 @@ impl Prepared {
                 && execution.terminal_tick == Some(completed.terminal_tick())
                 && execution.owner_lease.is_none()
                 && execution.lease_expiry_tick.is_none(),
+            RefusalStage::OwnerBinding,
+            None,
+            None,
         )?;
         let reads = archive
             .reads()
@@ -382,7 +436,7 @@ fn compare_data(
     slots: &[Vec<CellSelection>],
     expected: &[Vec<u8>],
 ) -> Result<(), CorpusProblem> {
-    require(
+    require_at(
         reads.len() == 3
             && slots.len() == 3
             && expected.len() == 3
@@ -390,25 +444,59 @@ fn compare_data(
                 .windows(2)
                 .all(|pair| pair[0].sequence < pair[1].sequence)
             && reads[0].sequence > 0,
+        RefusalStage::ReadChain,
+        None,
+        None,
     )?;
     for (index, ((read, selected), bytes)) in reads.iter().zip(slots).zip(expected).enumerate() {
-        require(
-            bytes.len() == ORACLES[index].2
-                && read.cells.len() == 3
-                && selected.len() == 3
-                && read.resource.format == AuditResourceDigestFormat::CanonicalHostResourceV1
-                && read.resource.value == digest(ORACLES[index].4)?
-                && read.eib == expected_eib(),
+        require_at(
+            bytes.len() == ORACLES[index].2,
+            RefusalStage::OracleWidth,
+            Some(index),
+            None,
         )?;
+        require_at(
+            read.cells.len() == 3 && selected.len() == 3,
+            RefusalStage::CellMembership,
+            Some(index),
+            None,
+        )?;
+        require_at(
+            read.resource.format == AuditResourceDigestFormat::CanonicalHostResourceV1
+                && read.resource.value == digest(ORACLES[index].4)?,
+            RefusalStage::Resource,
+            Some(index),
+            None,
+        )?;
+        let expected_context = expected_eib();
+        if read.eib != expected_context {
+            let field = (read.eib.len() == expected_context.len())
+                .then(|| {
+                    read.eib
+                        .iter()
+                        .zip(&expected_context)
+                        .position(|(actual, expected)| actual != expected)
+                })
+                .flatten();
+            return Err(refusal(RefusalStage::Eib, Some(index), None, field));
+        }
         for (role, (cell, selection)) in read.cells.iter().zip(selected).enumerate() {
             let expected_bytes = if role == 0 { bytes.as_slice() } else { &[0; 4] };
-            require(
+            require_at(
                 cell.name == selection.name
                     && cell.id == selection.id
                     && cell.base == selection.base
                     && cell.offset == selection.offset
-                    && cell.bytes.len() == selection.length
-                    && cell.bytes == expected_bytes,
+                    && cell.bytes.len() == selection.length,
+                RefusalStage::CellGeometry,
+                Some(index),
+                Some(role),
+            )?;
+            require_at(
+                cell.bytes == expected_bytes,
+                RefusalStage::CellBytes,
+                Some(index),
+                Some(role),
             )?;
         }
     }
