@@ -257,10 +257,19 @@ def _linux_stat_bytes(path: str) -> bytes:
     with open(path, 'rb', buffering=0) as stream:
         if trace is not None:
             trace['stage'] = 'stat_read'
-        chunks = []
+        # Keep the first complete bytes chunk without allocating a list. The
+        # next read still establishes EOF; short reads never establish EOF.
+        raw = b''
+        chunks = None
         while chunk := stream.read(4096):
+            if chunks is None:
+                if not raw and type(chunk) is bytes:
+                    raw = chunk
+                    continue
+                chunks = [raw] if raw else []
             chunks.append(chunk)
-        raw = b''.join(chunks)
+        if chunks is not None:
+            raw = b''.join(chunks)
         if trace is not None:
             trace['stage'] = 'stat_close'
     return raw

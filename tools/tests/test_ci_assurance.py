@@ -2021,6 +2021,47 @@ class LinuxStatReaderTests(unittest.TestCase):
         self.assertEqual(stream.read.call_count, 4)
         stream.__exit__.assert_called_once()
 
+        # Differential boundary cases for the allocation fast path. These are
+        # pure streams, not a procfs census; every original 4096-byte read and
+        # the actual EOF read remain observable.
+        cases = ([b''], [b'42 (one) Z 1 987654321 0', b''],
+                 [b'X' * 4096, b''], [b'X' * 4096, b'Y', b''],
+                 [b'4', b'2 (late) Z 1 987654321', b' 0', b''],
+                 [bytearray(b'42 (bytes-like) S 1 1 0'), b''],
+                 [b'42 (prefix) S 1 1 0', bytearray(b' tail'), b''])
+        for chunks in cases:
+            with self.subTest(chunks=len(chunks)):
+                stream = Mock()
+                stream.__enter__ = Mock(return_value=stream)
+                stream.__exit__ = Mock(return_value=False)
+                stream.read.side_effect = chunks
+                with patch('builtins.open', return_value=stream) as opened:
+                    actual = ci._linux_stat_bytes('/proc/42/stat')
+                self.assertEqual(actual, b''.join(chunks[:-1]))
+                self.assertIs(type(actual), bytes)
+                self.assertEqual(stream.read.call_count, len(chunks))
+                self.assertTrue(all(call.args == (4096,) and not call.kwargs
+                                    for call in stream.read.call_args_list))
+                opened.assert_called_once_with('/proc/42/stat', 'rb', buffering=0)
+                stream.__exit__.assert_called_once()
+
+        # A fast-path prefix cannot hide a later failure or invalid read type.
+        problem = OSError(5, 'failure after one full chunk')
+        for offered, expected in (([b'X' * 4096, problem], OSError),
+                                  (['not bytes', b''], TypeError),
+                                  ([b'valid prefix', 'not bytes', b''], TypeError)):
+            with self.subTest(expected=expected.__name__):
+                stream = Mock()
+                stream.__enter__ = Mock(return_value=stream)
+                stream.__exit__ = Mock(return_value=False)
+                stream.read.side_effect = offered
+                with patch('builtins.open', return_value=stream), \
+                        self.assertRaises(expected) as caught:
+                    ci._linux_stat_bytes('/proc/42/stat')
+                if expected is OSError:
+                    self.assertIs(caught.exception, problem)
+                stream.__exit__.assert_called_once()
+
     def test_complete_nonuniform_multipage_bytes_keep_order_and_tail(self):
         expected = bytes(range(256)) * 49 + b'complete-final-tail\x00\xff'
         with tempfile.TemporaryDirectory() as directory:
