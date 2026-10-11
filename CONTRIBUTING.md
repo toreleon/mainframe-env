@@ -27,6 +27,14 @@ environment. A skipped external test receives no evidence credit.
 
 ## Change workflow
 
+Before implementation, search existing issues and active PRs, read the owning
+progress record, and claim one bounded outcome with its owner, dependencies,
+affected contracts and intended PR base. Follow the
+[coordination workflow](docs/delivery/WORK-COORDINATION.md) and use the
+[issue forms](.github/ISSUE_TEMPLATE/) and
+[PR template](.github/pull_request_template.md). An unassigned issue may already
+be reserved by an active PR; confirm the claim before duplicating its work.
+
 Use a `codex/<topic>` branch from current `origin/main`. For documentation
 contributions, begin with the [documentation authoring guide](docs/guides/README.md#maintain-documentation).
 For a defect report, include the exact revision, command, sanitized fixture,
@@ -47,7 +55,8 @@ and read its plan and progress record. Update that record after bounded work;
 Cargo package versions and schema revisions remain build and compatibility
 metadata. Regenerate subsystem indexes and navigation with `cargo xtask docs`.
 
-1. Start from a clean branch and preserve unrelated user changes.
+1. Confirm the canonical issue's bounded scope and owner, inspect overlap with
+   active PRs, and start from a clean branch while preserving unrelated changes.
 2. Identify the owning contract, provider, schema, and recovery boundary before
    editing. For IBM language or subsystem semantics, first search and read the
    relevant verified [cached IBM sources](docs/runbooks/IBM-DOCS-CACHE.md), then
@@ -60,6 +69,12 @@ metadata. Regenerate subsystem indexes and navigation with `cargo xtask docs`.
    [`changes/unreleased`](changes/README.md) fragment in the same change. Do not
    edit `CHANGELOG.md` directly in parallel feature pull requests.
 7. Keep implementation changes and source publication as separate decisions.
+
+Independent PRs target main. A dependent repair can target an explicitly named
+parent branch, such as Foundation #393; link its prerequisites and use `Refs`
+for the issue until the fix reaches main. Record branch verification, delivery
+to main and parent-phase acceptance separately. Close only the item's complete
+declared scope with source-qualified evidence.
 
 Install the repository-local documentation-manifest merge driver once per
 clone before maintaining parallel worktrees:

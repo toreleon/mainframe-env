@@ -12,6 +12,11 @@ this mapping and generates navigation, prompt indexes, and progress views.
 
 ## Work sequencing
 
+Use the [coordination workflow](WORK-COORDINATION.md) to claim a bounded issue,
+check active PR overlap and record the intended integration branch. Consult the
+[tracking audit](WORK-AUDIT-2026-10-11.md) for the current issue queues and the
+legacy roadmap mapping.
+
 1. Select a named phase and read its plan, status, implementation prompt, and
    source/catalog authorities.
 2. Verify start gates and consumed dependencies on the current candidate.
