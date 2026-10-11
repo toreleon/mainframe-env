@@ -527,3 +527,72 @@ fn completed_stage_surface_refuses_receive_suspension_or_other_session_principal
         ));
     }
 }
+
+#[test]
+fn fixed_route_stage_diagnostics_discard_audit_actor_key_and_payload_values() {
+    const PRIVATE: &str = "PRIVATE_SENTINEL_DO_NOT_LOG";
+    let (actor, records) = fixture();
+    let verify = |result: Result<(), CorpusProblem>, stage: RefusalStage, route| {
+        let error = result.unwrap_err();
+        let error = audit_refusal_for_route(error, route);
+        assert_eq!(error.code, "carddemo.online.read_request_binding");
+        assert_eq!(error.detail, refuse_at(stage, Some(route), None).detail);
+        assert!(!error.detail.contains(PRIVATE));
+        assert!(!error.detail.contains("selected-actor"));
+        assert!(!error.detail.contains("selected-invocation"));
+    };
+    for route in [Route::Signon, Route::Account] {
+        let mut altered = records.clone();
+        altered[0].execution_id = ExecutionId::new(PRIVATE, InvocationLimits::default()).unwrap();
+        verify(
+            compare_audits(&actor, &key(), 40, &altered, &oracles::ACCOUNT_READS),
+            RefusalStage::AuditOwner,
+            route,
+        );
+        let mut altered = records.clone();
+        altered[0].resource.value = Sha256::digest(PRIVATE.as_bytes()).into();
+        verify(
+            compare_audits(&actor, &key(), 40, &altered, &oracles::ACCOUNT_READS),
+            RefusalStage::OuterRead,
+            route,
+        );
+        let mut altered = records.clone();
+        altered[1].resource.value = Sha256::digest(PRIVATE.as_bytes()).into();
+        verify(
+            compare_audits(&actor, &key(), 40, &altered, &oracles::ACCOUNT_READS),
+            RefusalStage::InnerRead,
+            route,
+        );
+        verify(
+            Err(CorpusProblem::new("unused", PRIVATE)),
+            RefusalStage::AuditOracle,
+            route,
+        );
+        for ordinal in 0..MAX_STAGE_ROWS {
+            let error = refuse_at(RefusalStage::ReplayDescriptor, Some(route), Some(ordinal));
+            assert_eq!(error.code, "carddemo.online.read_request_binding");
+            assert!(error.detail.ends_with(&format!("row=Some({ordinal})")));
+            assert!(!error.detail.contains(PRIVATE));
+        }
+    }
+    let row = ProviderStateRecord {
+        namespace: REPLAY_NAMESPACE.into(),
+        key: PRIVATE.into(),
+        version: 2,
+        payload: PRIVATE.as_bytes().to_vec(),
+    };
+    let before = BeforeStage {
+        rows: BTreeMap::from([(row.key.clone(), row)]),
+        trace: vec![],
+    };
+    let mut after = before.clone();
+    after.rows.get_mut(PRIVATE).unwrap().payload.push(1);
+    let Err(error) = changed_rows(&before, &after) else {
+        panic!("changed historical row refuses");
+    };
+    assert_eq!(
+        error.detail,
+        refuse_at(RefusalStage::SnapshotFreshness, None, None).detail
+    );
+    assert!(!error.detail.contains(PRIVATE));
+}

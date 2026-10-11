@@ -104,6 +104,83 @@ fn refuse() -> CorpusProblem {
     )
 }
 
+// Closed metadata only: no provider row, request, key, actor or HTTP value is formatted.
+#[derive(Clone, Copy)]
+enum RefusalStage {
+    Snapshot,
+    SnapshotBounds,
+    SnapshotFreshness,
+    FreshRows,
+    Surface,
+    RunIdentity,
+    ReplayKey,
+    CoreEffect,
+    ReplayDescriptor,
+    ReplayTerminal,
+    OwnerIdentity,
+    OwnerRecord,
+    TerminalEvents,
+    InvocationKey,
+    OwnerAmbiguity,
+    OwnerSet,
+    AuditRead,
+    AuditOwner,
+    AuditOracle,
+    OuterRead,
+    InnerRead,
+    Trace,
+}
+
+fn refuse_at(stage: RefusalStage, route: Option<Route>, row: Option<usize>) -> CorpusProblem {
+    let stage = match stage {
+        RefusalStage::Snapshot => "snapshot",
+        RefusalStage::SnapshotBounds => "snapshot-bounds",
+        RefusalStage::SnapshotFreshness => "snapshot-freshness",
+        RefusalStage::FreshRows => "fresh-rows",
+        RefusalStage::Surface => "surface",
+        RefusalStage::RunIdentity => "run-identity",
+        RefusalStage::ReplayKey => "replay-key",
+        RefusalStage::CoreEffect => "core-effect",
+        RefusalStage::ReplayDescriptor => "replay-descriptor",
+        RefusalStage::ReplayTerminal => "replay-terminal",
+        RefusalStage::OwnerIdentity => "owner-identity",
+        RefusalStage::OwnerRecord => "owner-record",
+        RefusalStage::TerminalEvents => "terminal-events",
+        RefusalStage::InvocationKey => "invocation-key",
+        RefusalStage::OwnerAmbiguity => "owner-ambiguity",
+        RefusalStage::OwnerSet => "owner-set",
+        RefusalStage::AuditRead => "audit-read",
+        RefusalStage::AuditOwner => "audit-owner",
+        RefusalStage::AuditOracle => "audit-oracle",
+        RefusalStage::OuterRead => "outer-read",
+        RefusalStage::InnerRead => "inner-read",
+        RefusalStage::Trace => "trace",
+    };
+    let route = match route {
+        Some(Route::Signon) => "signon",
+        Some(Route::Account) => "account",
+        None => "unspecified",
+    };
+    CorpusProblem::new(
+        "carddemo.online.read_request_binding",
+        format!("selected READ binding refused: route={route}; stage={stage}; row={row:?}"),
+    )
+}
+
+fn audit_refusal_for_route(error: CorpusProblem, route: Route) -> CorpusProblem {
+    // These are the only classified helper refusals. Any unclassified detail is
+    // discarded, including an independent frozen request-construction refusal.
+    let stage = [
+        RefusalStage::AuditOwner,
+        RefusalStage::OuterRead,
+        RefusalStage::InnerRead,
+    ]
+    .into_iter()
+    .find(|stage| refuse_at(*stage, None, None).detail == error.detail)
+    .unwrap_or(RefusalStage::AuditOracle);
+    refuse_at(stage, Some(route), None)
+}
+
 pub(super) fn before_stage(
     store: &dyn PlatformStore,
     server: &ProductServer,
@@ -111,10 +188,12 @@ pub(super) fn before_stage(
 ) -> Result<BeforeStage, CorpusProblem> {
     let rows = store
         .list_provider_state_bounded(REPLAY_NAMESPACE, MAX_STAGE_ROWS + 1, MAX_STAGE_BYTES)
-        .map_err(|_| refuse())?;
-    let trace = server.online_trace(session).map_err(|_| refuse())?;
+        .map_err(|_| refuse_at(RefusalStage::Snapshot, None, None))?;
+    let trace = server
+        .online_trace(session)
+        .map_err(|_| refuse_at(RefusalStage::Snapshot, None, None))?;
     if rows.len() > MAX_STAGE_ROWS || trace.len() > MAX_STAGE_TRACE {
-        return Err(refuse());
+        return Err(refuse_at(RefusalStage::SnapshotBounds, None, None));
     }
     let count = rows.len();
     let rows = rows
@@ -122,7 +201,7 @@ pub(super) fn before_stage(
         .map(|row| (row.key.clone(), row))
         .collect::<BTreeMap<_, _>>();
     if rows.len() != count {
-        return Err(refuse());
+        return Err(refuse_at(RefusalStage::SnapshotBounds, None, None));
     }
     Ok(BeforeStage { rows, trace })
 }
@@ -139,7 +218,7 @@ fn changed_rows<'a>(
         .any(|(key, row)| after.rows.get(key) != Some(row))
         || !after.trace.starts_with(&before.trace)
     {
-        return Err(refuse());
+        return Err(refuse_at(RefusalStage::SnapshotFreshness, None, None));
     }
     let changed = after
         .rows
@@ -148,7 +227,7 @@ fn changed_rows<'a>(
         .map(|(_, row)| row)
         .collect::<Vec<_>>();
     if changed.is_empty() {
-        return Err(refuse());
+        return Err(refuse_at(RefusalStage::FreshRows, None, None));
     }
     Ok(changed)
 }
@@ -199,7 +278,7 @@ fn check_execution(
         || execution.state != ExecutionState::Completed
         || execution.terminal_tick.is_none_or(|tick| tick == 0)
     {
-        return Err(refuse());
+        return Err(refuse_at(RefusalStage::OwnerRecord, None, None));
     }
     Ok(())
 }
@@ -223,7 +302,7 @@ fn compare_audits(
                 || audit.decision != AuditDecision::Success
         })
     {
-        return Err(refuse());
+        return Err(refuse_at(RefusalStage::AuditOwner, None, None));
     }
     let full = AuditResourceDigestFormat::CanonicalHostResourceV1;
     let expected_outer = expected
@@ -253,7 +332,7 @@ fn compare_audits(
             .windows(2)
             .any(|pair| pair[0].effect_sequence >= pair[1].effect_sequence)
     {
-        return Err(refuse());
+        return Err(refuse_at(RefusalStage::OuterRead, None, None));
     }
     // This program's source-owned dataset capability contains exactly an
     // Attributes preflight and the plain Read for each selected CICS READ.
@@ -278,7 +357,7 @@ fn compare_audits(
             .windows(2)
             .any(|pair| pair[0].effect_sequence >= pair[1].effect_sequence)
     {
-        return Err(refuse());
+        return Err(refuse_at(RefusalStage::InnerRead, None, None));
     }
     Ok(())
 }
@@ -297,61 +376,84 @@ pub(super) fn compare_stage(
         session,
         installed,
     } = *context;
-    oracles::check_inputs(corpus)?;
+    oracles::check_inputs(corpus).map_err(|error| {
+        if error.code == "carddemo.online.read_request_binding" {
+            refuse_at(RefusalStage::AuditOracle, Some(route), None)
+        } else {
+            error
+        }
+    })?;
     if !terminal_surface_matches(terminal, session, route) {
-        return Err(refuse());
+        return Err(refuse_at(RefusalStage::Surface, Some(route), None));
     }
     let run = RunUnitId::new(
-        terminal["run_unit"].as_str().ok_or_else(refuse)?,
+        terminal["run_unit"]
+            .as_str()
+            .ok_or_else(|| refuse_at(RefusalStage::RunIdentity, Some(route), None))?,
         InvocationLimits::default(),
     )
-    .map_err(|_| refuse())?;
-    let after = before_stage(store, server, session)?;
-    let changed = changed_rows(before, &after)?;
+    .map_err(|_| refuse_at(RefusalStage::RunIdentity, Some(route), None))?;
+    let after = before_stage(store, server, session)
+        .map_err(|_| refuse_at(RefusalStage::Snapshot, Some(route), None))?;
+    let changed = changed_rows(before, &after)
+        .map_err(|_| refuse_at(RefusalStage::SnapshotFreshness, Some(route), None))?;
     let mut owners = BTreeMap::<String, ExecutionRecord>::new();
     let mut invocation_keys = BTreeMap::<String, IdempotencyKey>::new();
     let mut terminal_sequences = BTreeMap::<String, u64>::new();
-    for row in changed {
-        let key =
-            IdempotencyKey::new(&row.key, InvocationLimits::default()).map_err(|_| refuse())?;
+    for (ordinal, row) in changed.into_iter().enumerate() {
+        let key = IdempotencyKey::new(&row.key, InvocationLimits::default())
+            .map_err(|_| refuse_at(RefusalStage::ReplayKey, Some(route), Some(ordinal)))?;
         let effect = store
             .effect(&key)
-            .map_err(|_| refuse())?
-            .ok_or_else(refuse)?;
+            .map_err(|_| refuse_at(RefusalStage::CoreEffect, Some(route), Some(ordinal)))?
+            .ok_or_else(|| refuse_at(RefusalStage::CoreEffect, Some(route), Some(ordinal)))?;
         let descriptor = describe_cics_replay_row(row, Some(&effect), CicsLimits::default())
-            .map_err(|_| refuse())?;
+            .map_err(|_| refuse_at(RefusalStage::ReplayDescriptor, Some(route), Some(ordinal)))?;
         if descriptor.codec != CicsReplayCodecVersion::RetentionV3
             || descriptor.retention != CicsReplayRetentionState::Terminal
             || descriptor.owner_run_unit.as_deref() != Some(run.as_str())
         {
-            return Err(refuse());
+            return Err(refuse_at(
+                RefusalStage::ReplayTerminal,
+                Some(route),
+                Some(ordinal),
+            ));
         }
         let id = ExecutionId::new(
-            descriptor.owner_execution.as_deref().ok_or_else(refuse)?,
+            descriptor.owner_execution.as_deref().ok_or_else(|| {
+                refuse_at(RefusalStage::OwnerIdentity, Some(route), Some(ordinal))
+            })?,
             InvocationLimits::default(),
         )
-        .map_err(|_| refuse())?;
+        .map_err(|_| refuse_at(RefusalStage::OwnerIdentity, Some(route), Some(ordinal)))?;
         let execution = store
             .get_execution(&id)
-            .map_err(|_| refuse())?
-            .ok_or_else(refuse)?;
+            .map_err(|_| refuse_at(RefusalStage::OwnerRecord, Some(route), Some(ordinal)))?
+            .ok_or_else(|| refuse_at(RefusalStage::OwnerRecord, Some(route), Some(ordinal)))?;
         let program = execution
             .selector
             .as_str()
             .strip_prefix("program:")
-            .ok_or_else(refuse)?;
+            .ok_or_else(|| refuse_at(RefusalStage::OwnerIdentity, Some(route), Some(ordinal)))?;
         if !route.programs().contains(&program) || execution.execution_id != id {
-            return Err(refuse());
+            return Err(refuse_at(
+                RefusalStage::OwnerIdentity,
+                Some(route),
+                Some(ordinal),
+            ));
         }
         check_execution(
             &execution,
             program,
-            installed.get(program).ok_or_else(refuse)?,
+            installed
+                .get(program)
+                .ok_or_else(|| refuse_at(RefusalStage::OwnerRecord, Some(route), Some(ordinal)))?,
             &run,
-        )?;
+        )
+        .map_err(|_| refuse_at(RefusalStage::OwnerRecord, Some(route), Some(ordinal)))?;
         let events = store
             .events(&id, execution.version, 2)
-            .map_err(|_| refuse())?;
+            .map_err(|_| refuse_at(RefusalStage::TerminalEvents, Some(route), Some(ordinal)))?;
         if !terminal_events_match(route, program, &execution, &run, &events)
             || effect.intent.attempt != execution.attempt
             || effect.intent.capability.as_ref().map(CapabilityId::as_str)
@@ -360,13 +462,16 @@ pub(super) fn compare_stage(
                 digest.format != AuditResourceDigestFormat::CanonicalHostResourceV1
             })
         {
-            return Err(refuse());
+            return Err(refuse_at(
+                RefusalStage::TerminalEvents,
+                Some(route),
+                Some(ordinal),
+            ));
         }
-        let invocation_key = effect
-            .intent
-            .audit_invocation_key
-            .clone()
-            .ok_or_else(refuse)?;
+        let invocation_key =
+            effect.intent.audit_invocation_key.clone().ok_or_else(|| {
+                refuse_at(RefusalStage::InvocationKey, Some(route), Some(ordinal))
+            })?;
         if owners
             .get(program)
             .is_some_and(|previous| previous != &execution)
@@ -374,7 +479,11 @@ pub(super) fn compare_stage(
                 .get(program)
                 .is_some_and(|previous| previous != &invocation_key)
         {
-            return Err(refuse());
+            return Err(refuse_at(
+                RefusalStage::OwnerAmbiguity,
+                Some(route),
+                Some(ordinal),
+            ));
         }
         let program = program.to_string();
         invocation_keys.insert(program.clone(), invocation_key);
@@ -390,19 +499,22 @@ pub(super) fn compare_stage(
             .iter()
             .any(|program| !owners.contains_key(*program))
     {
-        return Err(refuse());
+        return Err(refuse_at(RefusalStage::OwnerSet, Some(route), None));
     }
-    let actor = owners.get(route.reading_program()).ok_or_else(refuse)?;
+    let actor = owners
+        .get(route.reading_program())
+        .ok_or_else(|| refuse_at(RefusalStage::OwnerSet, Some(route), None))?;
     let audits = store
         .audit_records(&actor.execution_id, 0, MAX_ACTOR_AUDITS + 1)
-        .map_err(|_| refuse())?;
+        .map_err(|_| refuse_at(RefusalStage::AuditRead, Some(route), None))?;
     compare_audits(
         actor,
         &invocation_keys[route.reading_program()],
         terminal_sequences[route.reading_program()],
         &audits,
         route.reads(),
-    )?;
+    )
+    .map_err(|error| audit_refusal_for_route(error, route))?;
     let trace = &after.trace[before.trace.len()..];
     let reads = trace
         .iter()
@@ -437,7 +549,7 @@ pub(super) fn compare_stage(
                 .count()
                 != 1)
     {
-        return Err(refuse());
+        return Err(refuse_at(RefusalStage::Trace, Some(route), None));
     }
     let (id, requirement) = match route {
         Route::Signon => ("CD.J03", "USRSEC keyed read"),
