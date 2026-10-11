@@ -503,6 +503,9 @@ pub struct ReferenceMachine {
     effect_sequence: u64,
     executed_steps: u64,
     pending: Option<Pending>,
+    pending_pc: Option<usize>,
+    // Volatile host-resume failure position; never changes the execution pc or snapshots.
+    host_failure_pc: Option<usize>,
     perform_stack: Vec<usize>,
     deferred_drive: Option<MachineDrive<EffectRequest>>,
     // Volatile live-drive observation; deliberately absent from every snapshot.
@@ -853,6 +856,8 @@ impl ReferenceMachine {
             effect_sequence: 0,
             executed_steps: 0,
             pending: None,
+            pending_pc: None,
+            host_failure_pc: None,
             perform_stack: Vec::new(),
             deferred_drive: None,
             normal_return: None,
@@ -1229,6 +1234,8 @@ impl ReferenceMachine {
         });
         self.install_storage64_snapshot(restored_storage64, area_bindings);
         self.pending = None;
+        self.pending_pc = None;
+        self.host_failure_pc = None;
         self.deferred_drive = None;
         self.normal_return = None;
         Ok(())
@@ -1599,12 +1606,13 @@ impl ReferenceMachine {
 
     #[must_use]
     pub fn position_summary(&self) -> String {
-        self.operations.get(self.pc).map_or_else(
-            || format!("pc={} completed", self.pc),
+        let pc = self.host_failure_pc.unwrap_or(self.pc);
+        self.operations.get(pc).map_or_else(
+            || format!("pc={pc} completed"),
             |operation| {
                 format!(
                     "pc={} {} {:?} role={:?} scope={:?} text={:?}",
-                    self.pc,
+                    pc,
                     operation.identity.name(),
                     arguments(operation),
                     optional_text_attribute(operation, "control_role"),
@@ -4521,6 +4529,7 @@ impl ReferenceMachine {
             sequence: self.effect_sequence,
             kind,
         });
+        self.pending_pc = Some(self.pc);
         Ok(Step::Effect(Box::new(effect)))
     }
     fn mutation(&self) -> Result<Mutation, MachineProblem> {
@@ -8483,10 +8492,16 @@ impl Machine for ReferenceMachine {
         quantum: Quantum,
     ) -> MachineDrive<Self::Effect> {
         self.normal_return = None;
+        self.host_failure_pc = None;
         let result = (|| -> Result<MachineDrive<Self::Effect>, MachineProblem> {
             match resume {
                 MachineResume::Start if self.pending.is_none() => {}
-                MachineResume::HostResult(result) => self.resume_host(result)?,
+                MachineResume::HostResult(result) => {
+                    let issuing_pc = self.pending_pc.take();
+                    self.resume_host(result).inspect_err(|_| {
+                        self.host_failure_pc = issuing_pc;
+                    })?;
+                }
                 MachineResume::Cancelled => {
                     return Ok(self.interrupted_drive(FailureCategory::Cancelled));
                 }
@@ -11749,6 +11764,9 @@ impl MachineProblem {
 mod instance;
 #[cfg(test)]
 mod size_truncation_tests;
+
+#[cfg(test)]
+mod host_call_failure_tests;
 
 #[cfg(test)]
 mod tests {
