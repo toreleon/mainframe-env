@@ -330,7 +330,7 @@ async fn run(corpus: &Path, inventory: &Path, evidence: PathBuf) -> Result<(), C
                     // Every offered initialization program is a native utility;
                     // no absent compiled batch program is silently substituted.
                     let plan=parse_jcl(&JclBundle {primary:jcl.clone(),symbols:BTreeMap::from([("SYSUID".into(),"IBMUSER".into())]),..JclBundle::default()},JclLimits::default()).map_err(package_problem)?;
-                    refuse(plan.steps.iter().any(|step|!matches!(step.program.as_str(),"IDCAMS"|"IEBGENER"|"SDSF")),"financial initialization gained a compiled program dependency")?;
+                    refuse(plan.steps.iter().any(|step|!matches!(step.program.as_str(),"IDCAMS"|"IEBGENER"|"SDSF"|"IEFBR14")),"financial initialization gained a compiled program dependency")?;
                     let id=submit_job_with_retcode(&server,&app,&jcl,"CC 0000").await?;
                     refuse(!ids.insert(id.clone()),"financial initialization real job ID repeated")?;physical(&owner,&path,identity)?;
                     let job=server.batch_service().get(&id).map_err(terminal_problem)?;let label=plan.name;

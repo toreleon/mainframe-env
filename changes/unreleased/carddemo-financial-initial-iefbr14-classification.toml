@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Recognize the existing IEFBR14 built-in in the source-pinned CardDemo SQLite initialization-only owner; preserve all twelve jobs, nine complete dataset comparisons, source pins, bounds and compiled-program refusal. The DUSRSECJ inline encoding contract remains separately unverified."
