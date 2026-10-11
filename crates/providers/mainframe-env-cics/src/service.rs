@@ -192,6 +192,7 @@ struct Run {
     latest_abend: Option<handlers::AbendRecord>,
     /// Volatile explicit ABEND unwinding through active synchronous program loans.
     program_abend: Option<handlers::PendingProgramAbend>,
+    /// Task-entry COMMAREA, including terminal continuation; never START data.
     retrieve: Vec<u8>,
     current_records: BTreeMap<String, Vec<u8>>,
     file_updates: handlers::FileUpdateState,
@@ -3361,6 +3362,8 @@ impl<'a> Reader<'a> {
 
 #[cfg(test)]
 mod tests {
+    mod retrieve_compatibility;
+
     fn activate_get_scope_process(cics: &CicsService, invocation: &Invocation) {
         use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess, BtsReply};
         let authority = BtsLifecycleStore::new(cics.store.as_ref());
@@ -26666,13 +26669,22 @@ mod tests {
         assert_eq!(linked.disposition, CicsDisposition::Complete);
         assert_eq!(linked.outputs["COMMAREA"].bytes(), b"CHILD");
 
+        let retrieve_service = CicsService::open_with_replay_clock(
+            authorities(),
+            Arc::new(MemoryStore::new(Default::default())),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
         let retrieve_invocation = invocation_for(
             "retrieve-run",
             BTreeMap::from([("cics.retrieve".into(), argument(b"MQ-TRIGGER"))]),
         );
         let retrieve_session = SessionId::new("retrieve-session", 64).unwrap();
-        service.create_session(&retrieve_session, 24, 80).unwrap();
-        service
+        retrieve_service
+            .create_session(&retrieve_session, 24, 80)
+            .unwrap();
+        retrieve_service
             .register_run(
                 retrieve_invocation.clone(),
                 &retrieve_session,
@@ -26683,15 +26695,15 @@ mod tests {
             .unwrap();
         let retrieve = request(CicsOperation::Retrieve, BTreeMap::new(), 1);
         assert_eq!(
-            service
-                .invoke(
-                    &effect(&retrieve_invocation.run_unit_id, retrieve.clone(), 1),
-                    retrieve,
-                )
-                .unwrap()
-                .payload
-                .bytes(),
-            b"MQ-TRIGGER"
+            retrieve_service.invoke(
+                &effect(&retrieve_invocation.run_unit_id, retrieve.clone(), 1),
+                retrieve,
+            ),
+            Err(HostProblem::Condition {
+                name: "ENDDATA".into(),
+                response: 29,
+                response2: 0,
+            })
         );
     }
 

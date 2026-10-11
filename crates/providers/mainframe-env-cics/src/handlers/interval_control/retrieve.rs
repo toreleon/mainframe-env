@@ -10,18 +10,6 @@ pub(super) fn invoke(
     run: &Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
-    if request.arguments.is_empty() && !run.retrieve.is_empty() {
-        return service.response(
-            run,
-            CicsDisposition::Complete,
-            "NORMAL",
-            0,
-            0,
-            None,
-            None,
-            run.retrieve.clone(),
-        );
-    }
     validate_request(request)?;
     let mutation = request
         .mutation
@@ -192,6 +180,11 @@ pub(super) fn invoke(
 }
 
 fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
+    // The provider compatibility form returns START data in the response payload.
+    // It shares the typed route's durable consumption and replay identity.
+    if request.arguments.is_empty() {
+        return Ok(());
+    }
     const ALLOWED: &[&str] = &[
         "INTO",
         "INTO.MAXLENGTH",

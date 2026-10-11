@@ -205,7 +205,13 @@ request exact-width writable destinations for any corresponding value.
 ENVDEFERR is decided before one-time consumption when the producer omitted a
 requested field. START FMH is persisted with the data record; RETRIEVE emits a
 strict typed EIBFMH byte that the interpreter applies to its implicit EIB
-state. RETRIEVE may alternatively use SET with mandatory LENGTH: the compiler
+state. The provider's empty-argument RETRIEVE compatibility form uses the same
+durable START consumer and returns data in its response payload. Both forms
+require a configured durable clock and mutation identity, consume records by
+compare-and-swap, replay the same consumed record for the same effect, and return
+ENDDATA 29/0 when exhausted. RETURN TRANSID COMMAREA remains separate task-entry
+state for DFHCOMMAREA/EIBCALEN and is never returned by RETRIEVE.
+RETRIEVE may alternatively use SET with mandatory LENGTH: the compiler
 requires a pointer target, and the interpreter returns task-owned bytes through
 its checked virtual-address model. Local START PROTECT writes no worker item
 until an explicit successful SYNCPOINT commits its issuing run's
