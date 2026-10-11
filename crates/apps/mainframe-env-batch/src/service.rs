@@ -7879,6 +7879,79 @@ mod tests {
     }
 
     #[test]
+    fn new_generation_uses_exact_supported_unblocked_dd_attributes() {
+        for (recfm, record_format) in [
+            ("F", RecordFormat::Fixed),
+            ("FB", RecordFormat::FixedBlocked),
+            ("V", RecordFormat::Variable),
+            ("VB", RecordFormat::VariableBlocked),
+        ] {
+            let (service, dataset) = service_with_real_datasets();
+            let base = DatasetName::new("USER.REJECTS", 128).unwrap();
+            dataset
+                .invoke(DatasetRequest::DefineGenerationGroup {
+                    base: base.clone(),
+                    limit: 3,
+                    scratch: true,
+                    empty: false,
+                    mutation: dataset_test_mutation(612),
+                })
+                .unwrap();
+            let invocation = invocation();
+            let submitted = service
+                .submit(
+                    &invocation,
+                    &JclBundle {
+                        primary: format!(
+                            "//GDGFORMT JOB CLASS=A\n//STEP15 EXEC PGM=IEFBR14\n//DALYREJS DD DISP=(NEW,CATLG,DELETE),\n//         DCB=(RECFM={recfm},LRECL=430,BLKSIZE=0),\n//         DSN=USER.REJECTS(+1)\n"
+                        ),
+                        ..Default::default()
+                    },
+                    &IdempotencyKey::new("exact-gdg-format", InvocationLimits::default()).unwrap(),
+                    false,
+                )
+                .unwrap();
+            let completed = service.run_next(&invocation, false).unwrap().unwrap();
+            assert_eq!(completed.id, submitted.id);
+            assert_eq!(completed.state, JobState::Completed);
+            assert_eq!(completed.return_code, Some(0));
+            let DatasetResult::Generation {
+                dataset: generated,
+                absolute_generation,
+                ..
+            } = dataset
+                .invoke(DatasetRequest::ResolveGeneration { base, relative: 0 })
+                .unwrap()
+            else {
+                panic!("actual generated dataset is required");
+            };
+            assert_eq!(generated.as_str(), "USER.REJECTS.G0001V00");
+            assert_eq!(absolute_generation, 1);
+            let DatasetResult::Attributes {
+                attributes,
+                version,
+            } = dataset
+                .invoke(DatasetRequest::Attributes { dataset: generated })
+                .unwrap()
+            else {
+                panic!("actual generated attributes are required");
+            };
+            assert!(version > 0);
+            assert_eq!(
+                attributes,
+                DatasetAttributes {
+                    organization: DatasetOrganization::Sequential,
+                    record_format,
+                    logical_record_length: 430,
+                    key_offset: None,
+                    key_length: None,
+                    ccsid: Some(37),
+                }
+            );
+        }
+    }
+
+    #[test]
     fn submit_replay_hold_release_run_spool_and_purge() {
         let service = service(Arc::new(MemoryStore::new(Default::default())), builtins());
         let invocation = invocation();
