@@ -116,7 +116,8 @@
     "docs/decisions/0058-native-mq-protected-scope-succession.md",
     "docs/decisions/0059-native-mq-serial-owned-sqlite-file-custody.md",
     "docs/decisions/0060-passive-cics-read-copyback.md",
-    "docs/decisions/0061-cobol-chunked-initializer-carrier.md"
+    "docs/decisions/0061-cobol-chunked-initializer-carrier.md",
+    "docs/decisions/0062-passive-db2-copyback.md"
   ],
   "navigation": [
     {
@@ -600,6 +601,10 @@
         {
           "label": "ADR-0061: Bounded COBOL initializer byte carrier",
           "path": "docs/decisions/0061-cobol-chunked-initializer-carrier.md"
+        },
+        {
+          "label": "ADR-0062: Provisional passive Db2 machine copyback trace",
+          "path": "docs/decisions/0062-passive-db2-copyback.md"
         }
       ],
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."

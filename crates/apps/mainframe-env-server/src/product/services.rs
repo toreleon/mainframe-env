@@ -2,6 +2,30 @@
 use super::*;
 
 impl ProductServer {
+    pub(super) fn online_transaction(
+        &self,
+        transaction: &str,
+    ) -> Result<Option<(String, ArtifactRef)>, GatewayProblem> {
+        let transaction = normalize_online_name(transaction, 16).map_err(gateway_problem)?;
+        let Some(program) = self
+            .online_transactions
+            .lock()
+            .map_err(|_| gateway_problem(HostProblem::InfrastructureFailure))?
+            .get(&transaction)
+            .cloned()
+        else {
+            return Ok(None);
+        };
+        let artifact = self
+            .online_programs
+            .lock()
+            .map_err(|_| gateway_problem(HostProblem::InfrastructureFailure))?
+            .get(&program)
+            .cloned()
+            .ok_or_else(|| gateway_problem(HostProblem::InfrastructureFailure))?;
+        Ok(Some((program, artifact)))
+    }
+
     pub fn memory(config: ServerConfig) -> Result<Arc<Self>, HostProblem> {
         let store: Arc<dyn PlatformStore> = Arc::new(MemoryStore::new(Default::default()));
         let secrets = Arc::new(MemorySecretResolver::default());

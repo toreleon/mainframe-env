@@ -33,6 +33,9 @@ mod db2_syntax_fixtures;
 mod decimal_adapter;
 mod framework;
 mod ims_candidate;
+#[cfg(all(test, target_os = "linux"))]
+#[path = "carddemo/j10_source_controls.rs"]
+mod j10_source_controls;
 mod jcl;
 mod licensed_harness;
 mod mq_selected;

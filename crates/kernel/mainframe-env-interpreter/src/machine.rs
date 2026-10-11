@@ -46,10 +46,18 @@ mod amode64_access;
 mod cics_read_copyback;
 mod completion;
 #[cfg(feature = "assurance-observers")]
+mod db2_copyback;
+mod sql_effect;
+#[cfg(feature = "assurance-observers")]
 pub use cics_read_copyback::{
     CicsReadCopybackArchive, CicsReadCopybackCell, CicsReadCopybackEffect, CicsReadCopybackOrigin,
     CicsReadCopybackPlan, CicsReadCopybackProblem, CicsReadCopybackRecord,
     CicsReadCopybackSelection, CicsReadCopybackSlotSelection, CicsReadCopybackValue,
+};
+#[cfg(feature = "assurance-observers")]
+pub use db2_copyback::{
+    Db2CopybackArchive, Db2CopybackCell, Db2CopybackOrigin, Db2CopybackPlan, Db2CopybackProblem,
+    Db2CopybackRecord, Db2CopybackSlot, Db2CopybackValue,
 };
 mod normal_return;
 pub use normal_return::{InstalledProgramReturn, InstalledProgramReturnKind};
@@ -519,6 +527,8 @@ pub struct ReferenceMachine {
     normal_return: Option<normal_return::NormalReturnMarker>,
     #[cfg(feature = "assurance-observers")]
     cics_read_copyback: Option<cics_read_copyback::Collector>,
+    #[cfg(feature = "assurance-observers")]
+    db2_copyback: Option<db2_copyback::Collector>,
 }
 impl ReferenceMachine {
     pub fn from_binary(
@@ -870,6 +880,8 @@ impl ReferenceMachine {
             normal_return: None,
             #[cfg(feature = "assurance-observers")]
             cics_read_copyback: None,
+            #[cfg(feature = "assurance-observers")]
+            db2_copyback: None,
         };
         typed_decimal::validate_machine(&machine)?;
         typed_cics::validate_machine(&machine)?;
@@ -1020,6 +1032,10 @@ impl ReferenceMachine {
         #[cfg(feature = "assurance-observers")]
         if let Some(collector) = &mut self.cics_read_copyback {
             collector.refuse(CicsReadCopybackProblem::Restoration);
+        }
+        #[cfg(feature = "assurance-observers")]
+        if let Some(collector) = &mut self.db2_copyback {
+            collector.refuse(Db2CopybackProblem::Restoration);
         }
         // The old schema has no opaque MQI alias/lifecycle references. Never
         // restore it under a new typed frame and silently mint replacement access.
@@ -1638,12 +1654,22 @@ impl ReferenceMachine {
         if let Some(collector) = &mut self.cics_read_copyback {
             collector.resumed(&result);
         }
+        #[cfg(feature = "assurance-observers")]
+        if let Some(collector) = &mut self.db2_copyback {
+            collector.resumed(&result);
+        }
         let outcome = self.resume_host_inner(result);
         #[cfg(feature = "assurance-observers")]
         if outcome.is_err()
             && let Some(collector) = &mut self.cics_read_copyback
         {
             collector.refuse(CicsReadCopybackProblem::Application);
+        }
+        #[cfg(feature = "assurance-observers")]
+        if outcome.is_err()
+            && let Some(collector) = &mut self.db2_copyback
+        {
+            collector.refuse(Db2CopybackProblem::Application);
         }
         outcome
     }
@@ -1985,6 +2011,8 @@ impl ReferenceMachine {
                         self.write_value(target, &CobolValue::Bytes(value.clone()))?;
                     }
                 }
+                #[cfg(feature = "assurance-observers")]
+                self.observe_db2_copyback_applied();
             }
             (PendingKind::MqMqi(targets), HostResult::MqMqi(result)) => {
                 self.finish_typed_mq(*targets, *result)
@@ -4340,111 +4368,6 @@ impl ReferenceMachine {
         )
     }
 
-    fn sql_effect(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
-        let opcode_index = args
-            .iter()
-            .position(|token| !matches!(token.as_str(), "SQL" | "END-EXEC"))
-            .ok_or(MachineProblem::InvalidOperation)?;
-        let opcode = args[opcode_index].to_ascii_uppercase();
-        if opcode == "DECLARE" {
-            let cursor = args
-                .get(opcode_index + 1)
-                .ok_or(MachineProblem::InvalidOperation)?;
-            if args
-                .get(opcode_index + 2)
-                .is_some_and(|token| token == "CURSOR")
-            {
-                self.sql_cursors.insert(normalize(cursor), args.to_vec());
-            }
-            return Ok(Step::Next);
-        }
-        let mut statement_tokens = args.to_vec();
-        let cursor = if matches!(opcode.as_str(), "OPEN" | "FETCH" | "CLOSE") {
-            Some(
-                args.get(opcode_index + 1)
-                    .ok_or(MachineProblem::InvalidOperation)?
-                    .to_ascii_uppercase(),
-            )
-        } else {
-            None
-        };
-        if opcode == "OPEN" {
-            statement_tokens = self
-                .sql_cursors
-                .get(&normalize(cursor.as_deref().unwrap_or_default()))
-                .cloned()
-                .ok_or(MachineProblem::InvalidOperation)?;
-        }
-        let into = position(&statement_tokens, "INTO");
-        let from = position(&statement_tokens, "FROM");
-        let mut inputs = BTreeMap::new();
-        let mut targets = Vec::new();
-        for (index, token) in statement_tokens.iter().enumerate() {
-            if !token.starts_with(':') {
-                continue;
-            }
-            for raw_name in token.trim_start_matches(':').split(':') {
-                let name = normalize(raw_name);
-                if self.layout(&name).is_none() && !self.implicit.contains_key(&name) {
-                    continue;
-                }
-                let write = matches!(opcode.as_str(), "SELECT" | "FETCH")
-                    && into.is_some_and(|into| index > into)
-                    && from.is_none_or(|from| index < from);
-                if write {
-                    targets.push(name);
-                } else {
-                    inputs.insert(
-                        name.clone(),
-                        Db2HostVariable {
-                            value: self.read(&name)?,
-                            indicator: None,
-                        },
-                    );
-                }
-            }
-        }
-        let operation = match opcode.as_str() {
-            "SELECT"
-                if statement_tokens
-                    .iter()
-                    .any(|token| token.starts_with("COUNT")) =>
-            {
-                Db2Operation::Count
-            }
-            "SELECT" => Db2Operation::Select,
-            "INSERT" => Db2Operation::Insert,
-            "UPDATE" => Db2Operation::Update,
-            "DELETE" => Db2Operation::Delete,
-            "OPEN" => Db2Operation::OpenCursor,
-            "FETCH" => Db2Operation::FetchCursor,
-            "CLOSE" => Db2Operation::CloseCursor,
-            "COMMIT" => Db2Operation::Commit,
-            "ROLLBACK" => Db2Operation::Rollback,
-            _ => return Err(MachineProblem::UnsupportedForm),
-        };
-        let mutation = operation
-            .is_mutating()
-            .then(|| self.mutation())
-            .transpose()?;
-        self.effect(
-            HostRequest::Db2(Db2Request {
-                operation,
-                statement: statement_tokens
-                    .iter()
-                    .filter(|token| !matches!(token.as_str(), "SQL" | "END-EXEC"))
-                    .cloned()
-                    .collect::<Vec<_>>()
-                    .join(" "),
-                cursor,
-                inputs,
-                outputs: targets.clone(),
-                max_rows: 1,
-                mutation,
-            }),
-            PendingKind::Db2 { targets },
-        )
-    }
     fn effect(&mut self, request: HostRequest, kind: PendingKind) -> Result<Step, MachineProblem> {
         self.effect_sequence = self
             .effect_sequence
@@ -4467,6 +4390,8 @@ impl ReferenceMachine {
             .map_err(MachineProblem::Host)?;
         #[cfg(feature = "assurance-observers")]
         self.observe_read_copyback_offer(&effect, &kind);
+        #[cfg(feature = "assurance-observers")]
+        self.observe_db2_copyback_offer(&effect, &kind);
         self.pending = Some(Pending {
             sequence: self.effect_sequence,
             kind,

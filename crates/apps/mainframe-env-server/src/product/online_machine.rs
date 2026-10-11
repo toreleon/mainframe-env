@@ -156,6 +156,14 @@ impl ProductServer {
             #[cfg(feature = "assurance-observers")]
             let read_observation =
                 self.bind_cics_read_observation(session, principal, &current, &record, &invocation);
+            #[cfg(feature = "assurance-observers")]
+            let db2_observation = self.bind_db2_copyback_observation(
+                session,
+                principal,
+                &current,
+                &record,
+                &invocation,
+            );
             let mut machine = ReferenceMachine::from_binary(
                 executable.payload(),
                 invocation.clone(),
@@ -169,6 +177,10 @@ impl ProductServer {
             }
             #[cfg(feature = "assurance-observers")]
             if let Some(observation) = &read_observation {
+                observation.enable(&mut machine);
+            }
+            #[cfg(feature = "assurance-observers")]
+            if let Some(observation) = &db2_observation {
                 observation.enable(&mut machine);
             }
             let coordinator = ExecutionCoordinator::durable(
@@ -194,6 +206,10 @@ impl ProductServer {
                     )?;
                     #[cfg(feature = "assurance-observers")]
                     if let Some(observation) = read_observation {
+                        observation.finish(self, &invocation, &mut machine);
+                    }
+                    #[cfg(feature = "assurance-observers")]
+                    if let Some(observation) = db2_observation {
                         observation.finish(self, &invocation, &mut machine);
                     }
                     return Ok(());

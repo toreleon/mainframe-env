@@ -1,0 +1,91 @@
+{
+  "schema": "private.carddemo.j10-source-controls@1",
+  "corpus_commit": "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e",
+  "source_pins": {
+    "app/ctl/REPROCT.ctl": "5c6b8f26aa53c23131265e715b53130a1a7afd88b5bd3319aeca91f3d1a55bf5",
+    "app/proc/REPROC.prc": "4562039d1c7b90f05cc946dd1cd1cb93571bb279740c5c9777acfa3ea23fbc9f",
+    "app/jcl/TRANBKP.jcl": "457cd00d14a1d9ac9983d92212541df3456e8428862b97cf10bab7249b9e6183",
+    "app/jcl/TRANREPT.jcl": "7d8fc0777e6b9fb1c62aee6b4b10a67d127057c84b92203c7152f230b3db9571",
+    "app/jcl/DUSRSECJ.jcl": "02b0b78847e722b133b23d8f6152471214ea65d4f4c08692a5f42425987ca3c4"
+  },
+  "control_source_sha256": "5c6b8f26aa53c23131265e715b53130a1a7afd88b5bd3319aeca91f3d1a55bf5",
+  "raw_f80_sha256": "d4be5d9e718500a6c3865f3c1857887ab2e024133019e38385ecd5290a381098",
+  "rows": [
+    {
+      "ordinal": 0,
+      "bytes": 80,
+      "sha256": "487e25b12821e641d0eb4c398ea6dcc0f6a3ac6b70ad4871852b98c0dc0a9b05"
+    },
+    {
+      "ordinal": 1,
+      "bytes": 80,
+      "sha256": "23f5c8ff78ba12e52044269def828d3422cccc27ad215519b37da80a063fe4c2"
+    },
+    {
+      "ordinal": 2,
+      "bytes": 80,
+      "sha256": "cb8e0cf4b3a8a927db82753a28c19bb7f3a707096bfbbc79c77ce56bf59abd14"
+    },
+    {
+      "ordinal": 3,
+      "bytes": 80,
+      "sha256": "dad0a7912c9e3d32865ba67fa5711e2b73c4195efdca37126bae43b57ceef0bd"
+    },
+    {
+      "ordinal": 4,
+      "bytes": 80,
+      "sha256": "521152cc241efa1e1106e23761b154142faa53660a0fba36a158cf4ec90c466d"
+    },
+    {
+      "ordinal": 5,
+      "bytes": 80,
+      "sha256": "b8978a1e4cb6b851359fda701000cfccb9ee2232d622230ace8c0aeaee9020d7"
+    },
+    {
+      "ordinal": 6,
+      "bytes": 80,
+      "sha256": "cb8e0cf4b3a8a927db82753a28c19bb7f3a707096bfbbc79c77ce56bf59abd14"
+    },
+    {
+      "ordinal": 7,
+      "bytes": 80,
+      "sha256": "ba19ee2924683de30c3ea4d3bcc412806d7c9fa29f7fe1e9496aa22af77182a1"
+    },
+    {
+      "ordinal": 8,
+      "bytes": 80,
+      "sha256": "cb8e0cf4b3a8a927db82753a28c19bb7f3a707096bfbbc79c77ce56bf59abd14"
+    },
+    {
+      "ordinal": 9,
+      "bytes": 80,
+      "sha256": "56ba2aaf0257c7495822c783e2210b264b538182d8d9d7cd441577d00e42d8fa"
+    },
+    {
+      "ordinal": 10,
+      "bytes": 80,
+      "sha256": "3e7ea2b1bbf99158a4e7a324ce73d465b2e0e7ddfad9934f1994052f86f6b61f"
+    },
+    {
+      "ordinal": 11,
+      "bytes": 80,
+      "sha256": "167d0e98c9f14d5f5ad9324320d8d8350bac60055dd4482306410747840432a9"
+    },
+    {
+      "ordinal": 12,
+      "bytes": 80,
+      "sha256": "c2142bbf160d4f7f3b1ef251d63a8a246b8093edf2a7bb752bb99e3780e45f25"
+    },
+    {
+      "ordinal": 13,
+      "bytes": 80,
+      "sha256": "5ebcba1f92f6f0e6736f193e5f99b7afb4c84bc0b5f0356bcffde967e2652397"
+    },
+    {
+      "ordinal": 14,
+      "bytes": 80,
+      "sha256": "d6e60699b81f433a127794a7f5e0a289503098595c0a695fb0696edb74edd714"
+    }
+  ],
+  "credit": "Source/carrier controls only; no journey/issue/application/vendor acceptance"
+}

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Bind optional passive SQL copyback observations to actual online artifact, ordinary completed actor, canonical effects, Db2 replay and successful audits; add a private source-owned storage control with exact compiler MIR names and unchanged uppercase runtime descriptors, without application or vendor credit."

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add a separate ignored first-party Db2 batch-only source owner for CREADB21, native COBTUPDT maintenance, TRANEXTR and exact VSAM imports with complete existing row/spool oracles, two checked drains, same MemoryStore reopen and privately retained metadata; preserve public99 and missing98 owners and withhold application rollback, vendor and acceptance credit."

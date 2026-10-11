@@ -6,11 +6,16 @@ use crate::*;
 /// All other represented provider rows remain fenced to the uncertain owner.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RootCustodySuccessor {
+    /// Unknown predecessor snapshot and cutoff request for storage recapture.
     pub cutoff: RootCustodyCutoff,
+    /// Fresh coordinator admission to validate against the preserved cutoff.
     pub admission: RootDriverAdmission,
+    /// Four represented provider row identities selected for storage handoff.
     pub handoff_rows: Vec<ProviderStateIdentity>,
 }
 impl RootCustodySuccessor {
+    /// Check structural bounds and represented identities before storage admission.
+    /// This does not authorize a manager or attest native execution.
     pub fn validate_bounds(&self) -> Result<(), StoreError> {
         self.cutoff.validate_bounds()?;
         self.admission.validate()?;

@@ -1,9 +1,16 @@
 //! A distinct missing-key98 diagnostic with no journey or issue observation.
 //! Default key99, its exact comparator and its retained failure remain unchanged.
 use super::*;
+#[cfg(feature = "assurance-observers")]
+#[path = "db2_copyback_owner_tests.rs"]
+mod db2_copyback_owner_tests;
 use mainframe_env_execution_api::RunUnitId;
 use std::io::{Seek, SeekFrom, Write};
 use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt};
+
+// Separately named batch-only owner reuses this private held receipt lease.
+#[path = "db2_batch_source_owner.rs"]
+mod batch_source_owner;
 
 const KEY: &str = "98";
 const SEED_KEYS: [&[u8]; 7] = [b"01", b"02", b"03", b"04", b"05", b"06", b"07"];
@@ -677,17 +684,15 @@ fn actual_dto_run_unit_is_validated_hashed_and_not_replaced_by_run_alias() {
 fn replaced_evidence_artifact_or_receipt_refuses_writes_and_preserves_owned_bytes() {
     let parent = env::temp_dir().canonicalize().unwrap();
     for replacement in ["evidence", "artifact", "receipt"] {
-        let nonce = format!(
-            "{:x}",
-            Sha256::digest(
-                format!(
-                    "{}:{:?}:{replacement}",
-                    std::process::id(),
-                    std::time::SystemTime::now()
-                )
-                .as_bytes()
-            )
-        );
+        let mut nonce_digest = Sha256::new();
+        digest_field(&mut nonce_digest, &std::process::id().to_be_bytes());
+        let nonce_tick = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        digest_field(&mut nonce_digest, &nonce_tick.to_be_bytes());
+        digest_field(&mut nonce_digest, replacement.as_bytes());
+        let nonce = format!("{:x}", nonce_digest.finalize());
         let evidence = parent.join(format!("carddemo-missing98-controls-{nonce}"));
         fs::DirBuilder::new().mode(0o700).create(&evidence).unwrap();
         let artifacts = evidence.join("owned-artifacts");

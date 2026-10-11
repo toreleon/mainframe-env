@@ -185,6 +185,13 @@ pub use cics_read_copyback::{
     ArmedReadCopybackObservation, CicsReadObservationProblem, CicsReadObserverManager,
     CompletedReadCopyback, SourceBoundReadCopybackProfile,
 };
+#[cfg(feature = "assurance-observers")]
+mod db2_copyback;
+#[cfg(feature = "assurance-observers")]
+pub use db2_copyback::{
+    ArmedDb2CopybackObservation, CompletedDb2Copyback, Db2ObservationProblem, Db2ObserverManager,
+    SourceBoundDb2CopybackProfile,
+};
 mod continuation;
 mod exchange;
 pub(crate) use continuation::online_continuation_dependencies;
@@ -392,6 +399,8 @@ pub struct ProductServer {
     online_traces: Mutex<BTreeMap<String, Vec<CicsTraceEntry>>>,
     #[cfg(feature = "assurance-observers")]
     cics_read_copyback: Mutex<cics_read_copyback::Registry>,
+    #[cfg(feature = "assurance-observers")]
+    db2_copyback: Mutex<db2_copyback::Registry>,
     sessions: Mutex<BTreeMap<String, AuthSession>>,
     console: Mutex<Vec<ConsoleMessage>>,
     sequence: Mutex<SequenceState>,
@@ -840,6 +849,8 @@ impl ProductServer {
             online_traces: Mutex::new(BTreeMap::new()),
             #[cfg(feature = "assurance-observers")]
             cics_read_copyback: Mutex::new(cics_read_copyback::Registry::default()),
+            #[cfg(feature = "assurance-observers")]
+            db2_copyback: Mutex::new(db2_copyback::Registry::default()),
             sessions: Mutex::new(sessions),
             console: Mutex::new(console),
             sequence: Mutex::new(sequence),
@@ -4166,30 +4177,6 @@ impl ProductServer {
             invocation.artifact = artifact;
         }
         Ok(invocation)
-    }
-
-    fn online_transaction(
-        &self,
-        transaction: &str,
-    ) -> Result<Option<(String, ArtifactRef)>, GatewayProblem> {
-        let transaction = normalize_online_name(transaction, 16).map_err(gateway_problem)?;
-        let Some(program) = self
-            .online_transactions
-            .lock()
-            .map_err(|_| gateway_problem(HostProblem::InfrastructureFailure))?
-            .get(&transaction)
-            .cloned()
-        else {
-            return Ok(None);
-        };
-        let artifact = self
-            .online_programs
-            .lock()
-            .map_err(|_| gateway_problem(HostProblem::InfrastructureFailure))?
-            .get(&program)
-            .cloned()
-            .ok_or_else(|| gateway_problem(HostProblem::InfrastructureFailure))?;
-        Ok(Some((program, artifact)))
     }
 
     fn ams(&self, principal: &str, control: &[u8]) -> Result<GatewayResponse, GatewayProblem> {

@@ -21,6 +21,11 @@ pub use machine::{
     CicsReadCopybackPlan, CicsReadCopybackProblem, CicsReadCopybackRecord,
     CicsReadCopybackSelection, CicsReadCopybackSlotSelection, CicsReadCopybackValue,
 };
+#[cfg(feature = "assurance-observers")]
+pub use machine::{
+    Db2CopybackArchive, Db2CopybackCell, Db2CopybackOrigin, Db2CopybackPlan, Db2CopybackProblem,
+    Db2CopybackRecord, Db2CopybackSlot, Db2CopybackValue,
+};
 pub use machine::{
     InstalledProgramReturn, InstalledProgramReturnKind, MachineProblem, MachineSnapshot,
     MqMqiAbiScope, MqMqiConnxProfile, MqMqiProgramFrame, MqMqiProgramProfile, ReferenceMachine,

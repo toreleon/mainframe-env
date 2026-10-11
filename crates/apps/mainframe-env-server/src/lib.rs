@@ -32,6 +32,11 @@ pub use product::{
 };
 #[cfg(feature = "assurance-observers")]
 pub use product::{
+    ArmedDb2CopybackObservation, CompletedDb2Copyback, Db2ObservationProblem, Db2ObserverManager,
+    SourceBoundDb2CopybackProfile,
+};
+#[cfg(feature = "assurance-observers")]
+pub use product::{
     ArmedReadCopybackObservation, CicsReadObservationProblem, CicsReadObserverManager,
     CompletedReadCopyback, SourceBoundReadCopybackProfile,
 };

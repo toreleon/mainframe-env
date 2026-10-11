@@ -494,7 +494,7 @@ pub fn parse_csd(source: &str) -> Result<Vec<CsdResource>, InstallProblem> {
 }
 
 // A line beginning '*' is a comment only outside an open quoted operand.
-// This preserves the pinned CardDemo 47+23-star INITIAL continuation as one
+// This preserves the retained 47+23-star INITIAL continuation as one
 // literal and the following DFHMDF as a separate statement. Physical assembler
 // column/sequence-field semantics are not claimed by this host-text parser.
 fn continued_statements(source: &str) -> Result<Vec<String>, InstallProblem> {

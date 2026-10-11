@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 248,
+    "markdown_documents": 249,
     "navigation_groups": 8,
-    "normative_documents": 109,
+    "normative_documents": 110,
     "xtask_commands": 162
   },
   "documents": [
@@ -341,8 +341,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 190,
-      "sha256": "sha256:7ff6da09fac43482d641b4ad46ec301d76309db16f68f6ee2678ef657c6f9e0e",
+      "relative_links": 191,
+      "sha256": "sha256:05a16079f0e6ccbbcec977bdac42a90a1fc5329262eac60f14692279f81c05b3",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -1576,6 +1576,18 @@
       "sha256": "sha256:eabf3d426e80022b6585a17938ec1f7dee46331c6430cae41c44184cad72f6c2",
       "status": "proposed. This changes local executable representation, not IBM language meaning or acceptance completion.",
       "title": "0061. Versioned bounded COBOL initializer byte carrier",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env interpreter assurance-observers provisional Db2 copyback trace",
+      "normative": true,
+      "owner": "interpreter and assurance maintainers",
+      "path": "docs/decisions/0062-passive-db2-copyback.md",
+      "relative_links": 0,
+      "scope": "opt-in live SQL request/result provenance and postapplication storage observations",
+      "sha256": "sha256:9ea3d138ffe98926bc2db39027fde395eded6512a07b3de7b8bf29591b3a3902",
+      "status": "proposed. Unrun diagnostic infrastructure; no SQL semantic or acceptance result.",
+      "title": "0062. Provisional passive Db2 machine copyback trace",
       "xtask_commands": 0
     },
     {
@@ -2914,6 +2926,10 @@
         {
           "label": "ADR-0061: Bounded COBOL initializer byte carrier",
           "path": "docs/decisions/0061-cobol-chunked-initializer-carrier.md"
+        },
+        {
+          "label": "ADR-0062: Provisional passive Db2 machine copyback trace",
+          "path": "docs/decisions/0062-passive-db2-copyback.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -3136,7 +3152,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:a573094cbc8cfc095801cb8f374467c9b82ad7b71ec573271049c8c246f69a76",
+  "registry_sha256": "sha256:e79229f163c292faa4cbb41721d386df0431076bfa30638d6a4a632e255cfe56",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {
