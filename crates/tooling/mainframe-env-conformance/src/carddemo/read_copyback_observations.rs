@@ -124,10 +124,12 @@ struct Slot {
 }
 
 fn selected_slot(module: &Module, name: &str, width: usize) -> Result<Slot, CorpusProblem> {
+    // MIR uses lowercase names; the live machine's descriptor remains uppercase.
+    let ir_name = name.to_ascii_lowercase();
     let matches = module
         .storage()
         .iter()
-        .filter(|slot| slot.name == name)
+        .filter(|slot| slot.name == ir_name)
         .collect::<Vec<_>>();
     let [selected] = matches.as_slice() else {
         return Err(problem());

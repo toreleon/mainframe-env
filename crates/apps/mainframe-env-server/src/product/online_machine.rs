@@ -79,6 +79,9 @@ impl ProductServer {
                 context
             }
         };
+        #[cfg(feature = "assurance-observers")]
+        let terminal_admission =
+            cics_read_copyback::TerminalAdmission::capture(&context.invocation);
         let mut invocation = context.invocation;
         if let Some(continuation) = saved.as_ref() {
             invocation
@@ -154,8 +157,14 @@ impl ProductServer {
             )
             .map_err(|_| HostProblem::ResourceExhausted)?;
             #[cfg(feature = "assurance-observers")]
-            let read_observation =
-                self.bind_cics_read_observation(session, principal, &current, &record, &invocation);
+            let read_observation = self.bind_cics_read_observation(
+                session,
+                principal,
+                &current,
+                &record,
+                &invocation,
+                terminal_admission.as_ref().filter(|_| frame == 0),
+            );
             #[cfg(feature = "assurance-observers")]
             let db2_observation = self.bind_db2_copyback_observation(
                 session,

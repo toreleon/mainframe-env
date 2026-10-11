@@ -21,7 +21,7 @@ fn owner(program: &str) -> ExecutionRecord {
 }
 
 fn key() -> IdempotencyKey {
-    IdempotencyKey::new("selected-invocation", InvocationLimits::default()).unwrap()
+    IdempotencyKey::new("selected-invocation:COACTVWC", InvocationLimits::default()).unwrap()
 }
 
 fn audit(
@@ -67,7 +67,26 @@ fn fixture() -> (ExecutionRecord, Vec<AuditRecord>) {
             read.dataset_digest().unwrap(),
         ));
     }
+    records.push(admission(&owner, "selected-invocation", "CICS.CM00"));
     (owner, records)
+}
+
+fn admission(owner: &ExecutionRecord, original_key: &str, resource: &str) -> AuditRecord {
+    let request = HostRequest::Security(SecurityRequest::Authorize {
+        principal: owner.principal.clone(),
+        class: "TCICSTRN".into(),
+        resource: ResourceName::new(resource, 246).unwrap(),
+        intent: AccessIntent::Execute,
+    });
+    let mut record = audit(
+        owner,
+        1,
+        "host.security.authorize",
+        canonical_audit_resource_digest(&request),
+    );
+    record.invocation_key = IdempotencyKey::new(original_key, InvocationLimits::default()).unwrap();
+    record.observed_tick = 0;
+    record
 }
 
 #[test]
@@ -240,6 +259,9 @@ fn foreign_audit_actor_run_principal_attempt_invocation_and_bad_decisions_refuse
         )
         .is_err()
     );
+
+    exact_fresh_terminal_admission_binds_both_source_owned_read_routes();
+    exact_terminal_admission_refuses_changed_authority_missing_duplicate_and_key_boundary();
 }
 
 #[test]
@@ -595,4 +617,139 @@ fn fixed_route_stage_diagnostics_discard_audit_actor_key_and_payload_values() {
         refuse_at(RefusalStage::SnapshotFreshness, None, None).detail
     );
     assert!(!error.detail.contains(PRIVATE));
+}
+
+fn exact_fresh_terminal_admission_binds_both_source_owned_read_routes() {
+    let (account, records) = fixture();
+    compare_audits(&account, &key(), 40, &records, &oracles::ACCOUNT_READS).unwrap();
+    let signon = owner("COSGN00C");
+    let key =
+        IdempotencyKey::new("selected-invocation:COSGN00C", InvocationLimits::default()).unwrap();
+    let read = &oracles::SIGNON_READ[0];
+    let mut records = vec![
+        audit(
+            &signon,
+            20,
+            "host.cics.execute",
+            read.cics_digest().unwrap(),
+        ),
+        audit(
+            &signon,
+            1,
+            "host.dataset.read",
+            read.attributes_digest().unwrap(),
+        ),
+        audit(
+            &signon,
+            2,
+            "host.dataset.read",
+            read.dataset_digest().unwrap(),
+        ),
+    ];
+    for record in &mut records {
+        record.invocation_key = key.clone();
+    }
+    records.push(admission(&signon, "selected-invocation", "CICS.CC00"));
+    compare_audits(&signon, &key, 40, &records, &oracles::SIGNON_READ).unwrap();
+}
+
+fn exact_terminal_admission_refuses_changed_authority_missing_duplicate_and_key_boundary() {
+    let (owner, records) = fixture();
+    let limits = InvocationLimits::default();
+    let last = records.len() - 1;
+    let mut variants = Vec::new();
+    let mut changed = records.clone();
+    changed.pop();
+    variants.push(changed);
+    let mut changed = records.clone();
+    changed.push(records[last].clone());
+    variants.push(changed);
+    for key in [
+        "foreign",
+        "selected-invocation:OTHER",
+        "selected-invocation:COACTVWC",
+    ] {
+        let mut changed = records.clone();
+        changed[last].invocation_key = IdempotencyKey::new(key, limits).unwrap();
+        variants.push(changed);
+    }
+    let mut changed = records.clone();
+    changed[last].execution_id = ExecutionId::new("foreign", limits).unwrap();
+    variants.push(changed);
+    let mut changed = records.clone();
+    changed[last].run_unit_id = RunUnitId::new("foreign", limits).unwrap();
+    variants.push(changed);
+    let mut changed = records.clone();
+    changed[last].principal = PrincipalId::new("OTHER", limits).unwrap();
+    variants.push(changed);
+    let mut changed = records.clone();
+    changed[last].attempt += 1;
+    variants.push(changed);
+    let mut changed = records.clone();
+    changed[last].capability = CapabilityId::new("host.clock", limits).unwrap();
+    variants.push(changed);
+    let mut changed = records.clone();
+    changed[last].effect_sequence = 2;
+    variants.push(changed);
+    let mut changed = records.clone();
+    changed[last].observed_tick = 1;
+    variants.push(changed);
+    let mut changed = records.clone();
+    changed[last].decision = AuditDecision::Deny;
+    variants.push(changed);
+    for request in [
+        HostRequest::Security(SecurityRequest::Authorize {
+            principal: owner.principal.clone(),
+            class: "TCICSTRN".into(),
+            resource: ResourceName::new("CICS.CC00", 246).unwrap(),
+            intent: AccessIntent::Execute,
+        }),
+        HostRequest::Security(SecurityRequest::Authorize {
+            principal: owner.principal.clone(),
+            class: "FACILITY".into(),
+            resource: ResourceName::new("CICS.CM00", 246).unwrap(),
+            intent: AccessIntent::Execute,
+        }),
+        HostRequest::Security(SecurityRequest::Authorize {
+            principal: owner.principal.clone(),
+            class: "TCICSTRN".into(),
+            resource: ResourceName::new("CICS.CM00", 246).unwrap(),
+            intent: AccessIntent::Read,
+        }),
+        HostRequest::Security(SecurityRequest::Authorize {
+            principal: PrincipalId::new("OTHER", limits).unwrap(),
+            class: "TCICSTRN".into(),
+            resource: ResourceName::new("CICS.CM00", 246).unwrap(),
+            intent: AccessIntent::Execute,
+        }),
+    ] {
+        let mut changed = records.clone();
+        changed[last].resource = canonical_audit_resource_digest(&request);
+        variants.push(changed);
+    }
+    let mut changed = records.clone();
+    changed[last].resource.format = AuditResourceDigestFormat::CanonicalHostOversizedResourceV1;
+    variants.push(changed);
+    for changed in variants {
+        assert!(compare_audits(&owner, &key(), 40, &changed, &oracles::ACCOUNT_READS).is_err());
+    }
+    for offered in [
+        "selected-invocation",
+        ":COACTVWC",
+        "selected-invocation:OTHER",
+    ] {
+        assert!(
+            compare_audits(
+                &owner,
+                &IdempotencyKey::new(offered, limits).unwrap(),
+                40,
+                &records,
+                &oracles::ACCOUNT_READS,
+            )
+            .is_err()
+        );
+    }
+    let mut changed = records;
+    changed[0].invocation_key = IdempotencyKey::new("selected-invocation", limits).unwrap();
+    assert!(compare_audits(&owner, &key(), 40, &changed, &oracles::ACCOUNT_READS).is_err());
 }

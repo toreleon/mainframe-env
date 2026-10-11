@@ -243,6 +243,9 @@ fn selected_outer_audit_identity_resource_decision_and_duplicate_corruptions_ref
     inner.observed_tick = 50;
     nested.push(inner);
     assert!(audits_match(&nested, &invocation, &effects, &events));
+
+    exact_captured_terminal_admission_uses_preclaim_selector_and_preserves_program_audits();
+    terminal_admission_wrong_actor_key_resource_count_domain_and_program_zero_tick_refuse();
 }
 
 #[test]
@@ -257,6 +260,7 @@ fn dropped_real_binding_latches_cleanup_refusal_and_cannot_publish_rows() {
     ));
     drop(BoundObservation {
         state,
+        terminal_admission: None,
         finished: false,
     });
     assert!(matches!(
@@ -306,4 +310,176 @@ fn bounded_event_and_audit_pages_refuse_cap_plus_one_without_truncation() {
         &[(1, resource())],
         &events
     ));
+}
+
+fn terminal_context_fixture() -> (Invocation, Invocation, TerminalAdmission, AuditRecord) {
+    let limits = InvocationLimits::default();
+    let mut context = invocation();
+    context.selector = Selector::new("cics:TX00", limits).unwrap();
+    // A continuation's resumed transaction is deliberately different. The
+    // provider admitted TX00 before claiming NX00; the root selector is retained.
+    context.bindings.insert(
+        "cics.transaction".into(),
+        BoundedPayload::new("mainframe-env.cics.transaction@1", b"NX00".to_vec(), limits).unwrap(),
+    );
+    let captured = TerminalAdmission::capture(&context).unwrap();
+    let mut program = context.clone();
+    program.selector = Selector::new("program:FIXTURE", limits).unwrap();
+    program.idempotency_key = IdempotencyKey::new("observer-key:FIXTURE", limits).unwrap();
+    let request = HostRequest::Security(SecurityRequest::Authorize {
+        principal: context.principal.id().clone(),
+        class: "TCICSTRN".into(),
+        resource: ResourceName::new("CICS.TX00", 246).unwrap(),
+        intent: AccessIntent::Execute,
+    });
+    let mut admission = audit(&context, 1);
+    admission.observed_tick = 0;
+    admission.capability = CapabilityId::new("host.security.authorize", limits).unwrap();
+    admission.resource = canonical_audit_resource_digest(&request);
+    (context, program, captured, admission)
+}
+
+fn exact_captured_terminal_admission_uses_preclaim_selector_and_preserves_program_audits() {
+    let (context, program, captured, admission) = terminal_context_fixture();
+    let events = events(&program);
+    let effects = (1..=4)
+        .map(|sequence| (sequence, resource()))
+        .collect::<Vec<_>>();
+    let mut records = (1..=4)
+        .map(|sequence| audit(&program, sequence))
+        .collect::<Vec<_>>();
+    records.push(admission);
+    assert!(captured.matches_actor(&program));
+    assert_eq!(captured.invocation_key, context.idempotency_key);
+    assert_eq!(captured.resource, records.last().unwrap().resource);
+    assert!(audits_match_with_terminal_admission(
+        &records,
+        &program,
+        &effects,
+        &events,
+        Some(&captured)
+    ));
+    assert!(!audits_match_with_terminal_admission(
+        &records, &program, &effects, &events, None
+    ));
+    assert!(TerminalAdmission::capture(&program).is_none());
+    for selector in [
+        "cics:",
+        "cics:lower",
+        "cics:WITH.DOT",
+        "cics:ABCDEFGHIJKLMNOPQ",
+    ] {
+        let mut changed = context.clone();
+        changed.selector = Selector::new(selector, InvocationLimits::default()).unwrap();
+        assert!(TerminalAdmission::capture(&changed).is_none());
+    }
+    let mut transferred = program.clone();
+    transferred.execution_id =
+        ExecutionId::new("transferred-actor", InvocationLimits::default()).unwrap();
+    assert!(!captured.matches_actor(&transferred));
+    assert!(!audits_match_with_terminal_admission(
+        &records,
+        &transferred,
+        &effects,
+        &events,
+        Some(&captured)
+    ));
+    let mut zero = records;
+    zero[0].observed_tick = 0;
+    assert!(!audits_match_with_terminal_admission(
+        &zero,
+        &program,
+        &effects,
+        &events,
+        Some(&captured)
+    ));
+}
+
+fn terminal_admission_wrong_actor_key_resource_count_domain_and_program_zero_tick_refuse() {
+    let (_, program, captured, admission) = terminal_context_fixture();
+    let limits = InvocationLimits::default();
+    let events = events(&program);
+    let effects = (1..=4)
+        .map(|sequence| (sequence, resource()))
+        .collect::<Vec<_>>();
+    let mut records = (1..=4)
+        .map(|sequence| audit(&program, sequence))
+        .collect::<Vec<_>>();
+    records.push(admission);
+    let last = records.len() - 1;
+    let mut variants = Vec::new();
+    let mut changed = records.clone();
+    changed.pop();
+    variants.push(changed);
+    let mut changed = records.clone();
+    changed.push(records[last].clone());
+    variants.push(changed);
+    for field in 0..10 {
+        let mut changed = records.clone();
+        match field {
+            0 => changed[last].execution_id = ExecutionId::new("foreign", limits).unwrap(),
+            1 => changed[last].run_unit_id = RunUnitId::new("foreign", limits).unwrap(),
+            2 => changed[last].principal = PrincipalId::new("foreign", limits).unwrap(),
+            3 => changed[last].attempt += 1,
+            4 => changed[last].invocation_key = IdempotencyKey::new("foreign", limits).unwrap(),
+            5 => changed[last].effect_sequence = 2,
+            6 => changed[last].observed_tick = 1,
+            7 => changed[last].decision = AuditDecision::UnknownOutcome,
+            8 => changed[last].capability = CapabilityId::new("host.dataset.read", limits).unwrap(),
+            9 => {
+                changed[last].resource.format =
+                    AuditResourceDigestFormat::CanonicalHostOversizedResourceV1
+            }
+            _ => unreachable!(),
+        }
+        variants.push(changed);
+    }
+    for (class, resource_name, intent) in [
+        ("TCICSTRN", "CICS.NX00", AccessIntent::Execute),
+        ("FACILITY", "CICS.TX00", AccessIntent::Execute),
+        ("TCICSTRN", "CICS.TX00", AccessIntent::Read),
+    ] {
+        let mut changed = records.clone();
+        changed[last].resource =
+            canonical_audit_resource_digest(&HostRequest::Security(SecurityRequest::Authorize {
+                principal: program.principal.id().clone(),
+                class: class.into(),
+                resource: ResourceName::new(resource_name, 246).unwrap(),
+                intent,
+            }));
+        variants.push(changed);
+    }
+    let mut changed = records.clone();
+    changed[0].invocation_key = captured.invocation_key.clone();
+    variants.push(changed);
+    let mut changed = records.clone();
+    changed[0].observed_tick = 0;
+    variants.push(changed);
+    for changed in variants {
+        assert!(!audits_match_with_terminal_admission(
+            &changed,
+            &program,
+            &effects,
+            &events,
+            Some(&captured)
+        ));
+    }
+    for field in 0..5 {
+        let mut changed = captured.clone();
+        match field {
+            0 => changed.execution = ExecutionId::new("foreign", limits).unwrap(),
+            1 => changed.run = RunUnitId::new("foreign", limits).unwrap(),
+            2 => changed.principal = PrincipalId::new("foreign", limits).unwrap(),
+            3 => changed.attempt += 1,
+            4 => changed.invocation_key = IdempotencyKey::new("foreign", limits).unwrap(),
+            _ => unreachable!(),
+        }
+        assert!(!audits_match_with_terminal_admission(
+            &records,
+            &program,
+            &effects,
+            &events,
+            Some(&changed)
+        ));
+    }
 }

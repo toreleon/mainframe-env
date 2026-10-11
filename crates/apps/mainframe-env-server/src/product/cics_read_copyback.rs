@@ -7,6 +7,7 @@ use mainframe_env_cics::{
 use mainframe_env_execution_api::{
     AuditDecision, AuditRecord, AuditResourceDigest, LifecycleEvent,
 };
+use mainframe_env_host_api::{SecurityRequest, canonical_audit_resource_digest};
 use mainframe_env_interpreter::{
     CicsReadCopybackArchive, CicsReadCopybackEffect, CicsReadCopybackPlan,
 };
@@ -175,6 +176,7 @@ impl ProductServer {
         program: &str,
         record: &ArtifactRecord,
         invocation: &Invocation,
+        terminal_admission: Option<&TerminalAdmission>,
     ) -> Option<BoundObservation> {
         // Clone selection under one short lock. No callbacks/store/drive/clock run here.
         let state = {
@@ -189,7 +191,8 @@ impl ProductServer {
             }
             state.clone()
         };
-        let valid = principal == &state.profile.principal
+        let valid = terminal_admission.is_none_or(|admission| admission.matches_actor(invocation))
+            && principal == &state.profile.principal
             && invocation.principal.id() == principal
             && invocation.selector == state.profile.selector
             && invocation.artifact == state.profile.artifact
@@ -216,6 +219,7 @@ impl ProductServer {
         }
         Some(BoundObservation {
             state,
+            terminal_admission: terminal_admission.cloned(),
             finished: false,
         })
     }
@@ -276,8 +280,65 @@ impl CicsReadObserverManager {
     }
 }
 
+// Captured only from the actual provider-returned pre-program task invocation.
+// The separate resumed transaction binding may already name the continuation;
+// the root selector retains the transaction authorize_terminal actually checked.
+#[derive(Clone)]
+pub(super) struct TerminalAdmission {
+    execution: ExecutionId,
+    run: RunUnitId,
+    principal: PrincipalId,
+    attempt: u32,
+    invocation_key: IdempotencyKey,
+    resource: AuditResourceDigest,
+}
+
+impl TerminalAdmission {
+    pub(super) fn capture(context: &Invocation) -> Option<Self> {
+        let transaction = context.selector.as_str().strip_prefix("cics:")?;
+        if transaction.is_empty()
+            || transaction.len() > 16
+            || !transaction
+                .bytes()
+                .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'-')
+        {
+            return None;
+        }
+        let resource =
+            ResourceName::new(format!("CICS.{}", transaction.to_ascii_uppercase()), 246).ok()?;
+        let request = HostRequest::Security(SecurityRequest::Authorize {
+            principal: context.principal.id().clone(),
+            class: "TCICSTRN".into(),
+            resource,
+            intent: AccessIntent::Execute,
+        });
+        Some(Self {
+            execution: context.execution_id.clone(),
+            run: context.run_unit_id.clone(),
+            principal: context.principal.id().clone(),
+            attempt: context.attempt,
+            invocation_key: context.idempotency_key.clone(),
+            resource: canonical_audit_resource_digest(&request),
+        })
+    }
+
+    fn matches_actor(&self, invocation: &Invocation) -> bool {
+        let Some(program) = invocation.selector.as_str().strip_prefix("program:") else {
+            return false;
+        };
+        !program.is_empty()
+            && self.execution == invocation.execution_id
+            && self.run == invocation.run_unit_id
+            && self.principal == *invocation.principal.id()
+            && self.attempt == invocation.attempt
+            && invocation.idempotency_key.as_str()
+                == format!("{}:{program}", self.invocation_key.as_str())
+    }
+}
+
 pub(super) struct BoundObservation {
     state: Arc<ArmState>,
+    terminal_admission: Option<TerminalAdmission>,
     finished: bool,
 }
 
@@ -317,7 +378,15 @@ impl BoundObservation {
             .take_read_copyback()
             .ok_or(CicsReadObservationProblem::Application)
             .and_then(|archive| archive.map_err(|_| CicsReadObservationProblem::Application))
-            .and_then(|archive| qualify(server, invocation, &self.state, archive));
+            .and_then(|archive| {
+                qualify(
+                    server,
+                    invocation,
+                    &self.state,
+                    self.terminal_admission.as_ref(),
+                    archive,
+                )
+            });
         let _ = self.state.result.set(result);
         self.finished = true;
     }
@@ -388,12 +457,27 @@ fn events_match(
     true
 }
 
+#[cfg(test)]
 fn audits_match(
     audits: &[AuditRecord],
     invocation: &Invocation,
     effects: &[(u64, AuditResourceDigest)],
     events: &[LifecycleEvent],
 ) -> bool {
+    audits_match_with_terminal_admission(audits, invocation, effects, events, None)
+}
+
+fn audits_match_with_terminal_admission(
+    audits: &[AuditRecord],
+    invocation: &Invocation,
+    effects: &[(u64, AuditResourceDigest)],
+    events: &[LifecycleEvent],
+    terminal_admission: Option<&TerminalAdmission>,
+) -> bool {
+    if terminal_admission.is_some_and(|admission| !admission.matches_actor(invocation)) {
+        return false;
+    }
+    let mut admissions = 0;
     if audits.is_empty()
         || audits.len() > MAX_AUDITS
         || audits.iter().any(|audit| {
@@ -401,10 +485,25 @@ fn audits_match(
                 || audit.run_unit_id != invocation.run_unit_id
                 || audit.principal != *invocation.principal.id()
                 || audit.attempt != invocation.attempt
-                || audit.invocation_key != invocation.idempotency_key
-                || audit.observed_tick == 0
                 || audit.decision != AuditDecision::Success
+                || if audit.invocation_key == invocation.idempotency_key {
+                    // Every ordinary program audit retains the original key and
+                    // positive-tick predicate, including nonselected capabilities.
+                    audit.observed_tick == 0
+                } else if terminal_admission.is_some_and(|admission| {
+                    audit.invocation_key == admission.invocation_key
+                        && audit.capability.as_str() == "host.security.authorize"
+                        && audit.resource == admission.resource
+                        && audit.effect_sequence == 1
+                        && audit.observed_tick == 0
+                }) {
+                    admissions += 1;
+                    false
+                } else {
+                    true
+                }
         })
+        || admissions != usize::from(terminal_admission.is_some())
     {
         return false;
     }
@@ -473,6 +572,7 @@ fn qualify(
     server: &ProductServer,
     invocation: &Invocation,
     state: &ArmState,
+    terminal_admission: Option<&TerminalAdmission>,
     archive: CicsReadCopybackArchive,
 ) -> Result<CompletedReadCopyback, CicsReadObservationProblem> {
     let refuse = || CicsReadObservationProblem::Ownership;
@@ -577,7 +677,13 @@ fn qualify(
         .chain([terminal])
         .map(|effect| (effect.sequence(), effect.resource()))
         .collect::<Vec<_>>();
-    if !audits_match(&audits, invocation, &effects, &events) {
+    if !audits_match_with_terminal_admission(
+        &audits,
+        invocation,
+        &effects,
+        &events,
+        terminal_admission,
+    ) {
         return Err(refuse());
     }
     // A bounded non-atomic observation, never a durable ownership/authorization lease.

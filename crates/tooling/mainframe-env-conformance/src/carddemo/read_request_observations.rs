@@ -8,6 +8,7 @@ use mainframe_env_cics::{
 use mainframe_env_execution_api::{
     AuditDecision, AuditRecord, AuditResourceDigestFormat, LifecycleEvent, LifecycleEventKind,
 };
+use mainframe_env_host_api::{HostRequest, SecurityRequest, canonical_audit_resource_digest};
 use mainframe_env_store_api::{
     ExecutionRecord, ExecutionState, PlatformStore, ProviderStateRecord,
 };
@@ -283,6 +284,44 @@ fn check_execution(
     Ok(())
 }
 
+// The existing CICS resume admits the fresh task before the server appends the
+// selected program to its invocation key. This is a distinct exact admission
+// record, not a program effect or a reason to discard unrelated audits.
+fn terminal_admission(
+    execution: &ExecutionRecord,
+    invocation_key: &IdempotencyKey,
+) -> Result<
+    (
+        IdempotencyKey,
+        mainframe_env_execution_api::AuditResourceDigest,
+    ),
+    CorpusProblem,
+> {
+    let (program, resource) = match execution.selector.as_str() {
+        "program:COSGN00C" => ("COSGN00C", "CICS.CC00"),
+        // COMEN01C stages CM00, then its resumed task XCTLs COACTVWC. The
+        // account's RETURN stages CAVW; the next resume authorizes the retained
+        // current CM00 transaction before claiming that continuation.
+        "program:COACTVWC" => ("COACTVWC", "CICS.CM00"),
+        _ => return Err(refuse_at(RefusalStage::AuditOwner, None, None)),
+    };
+    let original = invocation_key
+        .as_str()
+        .strip_suffix(&format!(":{program}"))
+        .filter(|key| !key.is_empty())
+        .ok_or_else(|| refuse_at(RefusalStage::AuditOwner, None, None))?;
+    let original = IdempotencyKey::new(original, InvocationLimits::default())
+        .map_err(|_| refuse_at(RefusalStage::AuditOwner, None, None))?;
+    let request = HostRequest::Security(SecurityRequest::Authorize {
+        principal: execution.principal.clone(),
+        class: "TCICSTRN".into(),
+        resource: ResourceName::new(resource, 246)
+            .map_err(|_| refuse_at(RefusalStage::AuditOwner, None, None))?,
+        intent: AccessIntent::Execute,
+    });
+    Ok((original, canonical_audit_resource_digest(&request)))
+}
+
 fn compare_audits(
     execution: &ExecutionRecord,
     invocation_key: &IdempotencyKey,
@@ -290,6 +329,8 @@ fn compare_audits(
     audits: &[AuditRecord],
     expected: &[oracles::ReadOracle],
 ) -> Result<(), CorpusProblem> {
+    let (admission_key, admission_digest) = terminal_admission(execution, invocation_key)?;
+    let mut admissions = 0;
     if audits.is_empty()
         || audits.len() > MAX_ACTOR_AUDITS
         || audits.iter().any(|audit| {
@@ -297,10 +338,23 @@ fn compare_audits(
                 || audit.run_unit_id != execution.run_unit_id
                 || audit.principal != execution.principal
                 || audit.attempt != execution.attempt
-                || audit.invocation_key != *invocation_key
                 || audit.effect_sequence == 0
                 || audit.decision != AuditDecision::Success
+                || if audit.invocation_key == *invocation_key {
+                    false
+                } else if audit.invocation_key == admission_key
+                    && audit.capability.as_str() == "host.security.authorize"
+                    && audit.resource == admission_digest
+                    && audit.effect_sequence == 1
+                    && audit.observed_tick == 0
+                {
+                    admissions += 1;
+                    false
+                } else {
+                    true
+                }
         })
+        || admissions != 1
     {
         return Err(refuse_at(RefusalStage::AuditOwner, None, None));
     }

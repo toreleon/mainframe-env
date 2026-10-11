@@ -1,3 +1,3 @@
 schema_version = "mainframe-env.changelog-fragment@1"
 category = "changed"
-summary = "Report fixed READ copyback comparison stages and ordinals without storage or context values; preserve every independent oracle and owner check."
+summary = "Report fixed READ copyback comparison stages and ordinals without storage or context values; select exact lowercase compiler MIR names while preserving uppercase runtime descriptors and every independent oracle and owner check."

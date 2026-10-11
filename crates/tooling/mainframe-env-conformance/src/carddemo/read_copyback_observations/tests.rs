@@ -126,6 +126,7 @@ fn wrong_resource_sequence_order_or_missing_extra_read_refuses() {
 
 #[test]
 fn cell_roles_views_dimensions_and_identity_are_exact() {
+    assert_exact_lowercase_mir_names_keep_uppercase_runtime_descriptors();
     let (reads, slots, expected) = fixture();
     for read in 0..3 {
         for role in 0..3 {
@@ -356,4 +357,60 @@ fn refusal_diagnostics_locate_actual_boundary_without_storage_or_context_values(
         None,
         None,
     );
+}
+
+fn named_mir_selection_module(name: &str, width: u64, duplicate: bool) -> Module {
+    let mut builder = mainframe_env_ir::ModuleBuilder::new(mainframe_env_ir::IrLimits::default());
+    let base = builder
+        .add_storage("__program_storage", 1024, None)
+        .unwrap();
+    let alias = mainframe_env_ir::StorageReference {
+        storage: base,
+        offset: 7,
+        length: width,
+    };
+    builder
+        .add_storage(name, width, Some(alias.clone()))
+        .unwrap();
+    if duplicate {
+        builder.add_storage(name, width, Some(alias)).unwrap();
+    }
+    let region = builder.add_region().unwrap();
+    builder.add_block(region).unwrap();
+    builder.finish().unwrap()
+}
+
+fn assert_exact_lowercase_mir_names_keep_uppercase_runtime_descriptors() {
+    for (source, mir, width) in [
+        ("CARD-XREF-RECORD", "card-xref-record", 50),
+        ("ACCOUNT-RECORD", "account-record", 300),
+        ("CUSTOMER-RECORD", "customer-record", 500),
+        (
+            "WS-MISC-STORAGE.WS-CICS-PROCESSNG-VARS.WS-RESP-CD",
+            "ws-misc-storage.ws-cics-processng-vars.ws-resp-cd",
+            4,
+        ),
+        (
+            "WS-MISC-STORAGE.WS-CICS-PROCESSNG-VARS.WS-REAS-CD",
+            "ws-misc-storage.ws-cics-processng-vars.ws-reas-cd",
+            4,
+        ),
+    ] {
+        let module = named_mir_selection_module(mir, width, false);
+        let selected = selected_slot(&module, source, usize::try_from(width).unwrap()).unwrap();
+        assert_eq!(selected.descriptor.storage, module.storage()[1].id);
+        assert_eq!(selected.descriptor.qualified_layout_name, source);
+        assert_eq!(
+            (selected.base, selected.offset, selected.length),
+            (0, 7, usize::try_from(width).unwrap())
+        );
+    }
+    for name in ["ACCOUNT-RECORD", "Account-Record", "account-record.other"] {
+        let module = named_mir_selection_module(name, 300, false);
+        assert!(selected_slot(&module, "ACCOUNT-RECORD", 300).is_err());
+    }
+    let duplicate = named_mir_selection_module("account-record", 300, true);
+    assert!(selected_slot(&duplicate, "ACCOUNT-RECORD", 300).is_err());
+    let wrong_width = named_mir_selection_module("account-record", 301, false);
+    assert!(selected_slot(&wrong_width, "ACCOUNT-RECORD", 300).is_err());
 }
