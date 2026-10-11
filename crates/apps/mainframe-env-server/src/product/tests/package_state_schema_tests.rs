@@ -17,8 +17,8 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
 
 const PACKAGE_ID: &str = "https://mainframe-env.invalid/schemas/application-package@2";
 const INSTALLER_ID: &str = "https://mainframe-env.invalid/schemas/application-installer@1";
@@ -43,9 +43,51 @@ impl jsonschema::Retrieve for RefuseRetrieval {
     }
 }
 
-fn schema_documents() -> Vec<Value> {
+struct SchemaDocuments {
+    bytes: Vec<Vec<u8>>,
+    values: Vec<Value>,
+}
+
+#[derive(Clone, Eq, PartialEq)]
+struct SchemaMemoKey {
+    id: String,
+    documents: Vec<Vec<u8>>,
+}
+
+// Cache only successful pure validator construction. Changed exact inputs and a
+// full memo still use the original builder; no instance or typed owner is cached.
+const MAX_SCHEMA_MEMO_ENTRIES: usize = 3;
+struct SchemaMemo<T> {
+    entries: Vec<(SchemaMemoKey, T)>,
+}
+
+impl<T: Clone> SchemaMemo<T> {
+    fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+
+    fn get_or_build<E>(
+        &mut self,
+        key: &SchemaMemoKey,
+        build: impl FnOnce() -> Result<T, E>,
+    ) -> Result<T, E> {
+        if let Some((_, value)) = self.entries.iter().find(|(stored, _)| stored == key) {
+            return Ok(value.clone());
+        }
+        let value = build()?;
+        if self.entries.len() < MAX_SCHEMA_MEMO_ENTRIES {
+            self.entries.push((key.clone(), value.clone()));
+        }
+        Ok(value)
+    }
+}
+
+fn schema_documents() -> SchemaDocuments {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../conformance/subsystems");
-    RESOURCES
+    let mut bytes_by_document = Vec::new();
+    let values = RESOURCES
         .iter()
         .map(|relative| {
             let path = root.join(relative);
@@ -54,16 +96,62 @@ fn schema_documents() -> Vec<Value> {
             });
             let schema: Value = serde_json::from_slice(&bytes).unwrap();
             jsonschema::draft202012::meta::validate(&schema).unwrap();
+            bytes_by_document.push(bytes);
             schema
         })
-        .collect()
+        .collect();
+    SchemaDocuments {
+        bytes: bytes_by_document,
+        values,
+    }
 }
 
 fn validator(id: &str) -> jsonschema::Validator {
+    // Read, parse and meta-validate every current document before selecting the
+    // exact byte-and-ID key. Reference documents and their ordering are included.
     let documents = schema_documents();
+    let key = SchemaMemoKey {
+        id: id.into(),
+        documents: documents.bytes,
+    };
+    memoized_validator(&key, || build_validator(id, &documents.values)).unwrap()
+}
+
+fn validator_memo() -> &'static Mutex<SchemaMemo<jsonschema::Validator>> {
+    static MEMO: OnceLock<Mutex<SchemaMemo<jsonschema::Validator>>> = OnceLock::new();
+    MEMO.get_or_init(|| Mutex::new(SchemaMemo::new()))
+}
+
+fn memoized_validator(
+    key: &SchemaMemoKey,
+    build: impl FnOnce() -> Result<jsonschema::Validator, jsonschema::ValidationError<'static>>,
+) -> Result<jsonschema::Validator, jsonschema::ValidationError<'static>> {
+    {
+        let memo = validator_memo().lock().unwrap();
+        if let Some((_, value)) = memo.entries.iter().find(|(stored, _)| stored == key) {
+            return Ok(value.clone());
+        }
+    }
+    // The original fallible builder and its panics run outside the shared lock.
+    // Concurrent callers may build twice; recheck only successful results.
+    let value = build()?;
+    let mut memo = validator_memo().lock().unwrap();
+    if let Some((_, stored)) = memo.entries.iter().find(|(stored, _)| stored == key) {
+        return Ok(stored.clone());
+    }
+    if memo.entries.len() < MAX_SCHEMA_MEMO_ENTRIES {
+        memo.entries.push((key.clone(), value.clone()));
+    }
+    Ok(value)
+}
+
+fn build_validator(
+    id: &str,
+    documents: &[Value],
+) -> Result<jsonschema::Validator, jsonschema::ValidationError<'static>> {
     let mut registry = jsonschema::Registry::new().retriever(RefuseRetrieval);
     let mut ids = BTreeSet::new();
-    for document in &documents {
+    for document in documents {
         let resource_id = document["$id"].as_str().expect("Local schema needs $id");
         assert!(
             ids.insert(resource_id),
@@ -80,7 +168,6 @@ fn validator(id: &str) -> jsonschema::Validator {
         .offline()
         .with_registry(&registry)
         .build(schema)
-        .unwrap()
 }
 
 // Optional external payload emission happens before an assertion, retaining red
@@ -315,6 +402,118 @@ fn schemas_compile_offline_with_local_reference_closure() {
             .prepare()
             .is_err()
     );
+
+    // Fold pure memo controls into this existing owner: no new test or credit.
+    let documents = schema_documents();
+    let key = SchemaMemoKey {
+        id: PACKAGE_ID.into(),
+        documents: documents.bytes,
+    };
+    let mut memo = SchemaMemo::<Vec<u8>>::new();
+    let calls = std::cell::Cell::new(0);
+    let mut first = memo
+        .get_or_build(&key, || {
+            calls.set(calls.get() + 1);
+            Ok::<_, ()>(vec![7, 8])
+        })
+        .unwrap();
+    first[0] = 99;
+    first.push(98);
+    assert_eq!(
+        memo.get_or_build(&key, || {
+            calls.set(calls.get() + 1);
+            Ok::<_, ()>(vec![9])
+        })
+        .unwrap(),
+        vec![7, 8]
+    );
+    assert_eq!(calls.get(), 1);
+    assert_eq!(memo.entries.len(), 1);
+    for variant in 0..RESOURCES.len() + 2 {
+        let mut changed = key.clone();
+        if variant == 0 {
+            changed.id = INSTALLER_ID.into();
+        } else if variant == 1 {
+            changed.documents.reverse();
+        } else {
+            // Even a semantically equivalent byte change must rebuild.
+            changed.documents[variant - 2].push(b'\n');
+        }
+        assert!(changed != key);
+        let before = calls.get();
+        assert_eq!(
+            memo.get_or_build(&changed, || {
+                calls.set(calls.get() + 1);
+                Ok::<_, ()>(vec![variant as u8])
+            })
+            .unwrap(),
+            vec![variant as u8]
+        );
+        assert_eq!(calls.get(), before + 1);
+        assert!(memo.entries.len() <= MAX_SCHEMA_MEMO_ENTRIES);
+    }
+    let mut refused = SchemaMemo::<Vec<u8>>::new();
+    assert_eq!(
+        refused.get_or_build(&key, || Err::<Vec<u8>, _>("construction refused")),
+        Err("construction refused")
+    );
+    assert!(refused.entries.is_empty());
+    assert_eq!(
+        refused.get_or_build(&key, || Ok::<_, ()>(vec![1])).unwrap(),
+        vec![1]
+    );
+    let overflow_key = SchemaMemoKey {
+        id: "uncached-control".into(),
+        documents: key.documents.clone(),
+    };
+    assert_eq!(memo.entries.len(), MAX_SCHEMA_MEMO_ENTRIES);
+    for _ in 0..2 {
+        let before = calls.get();
+        assert_eq!(
+            memo.get_or_build(&overflow_key, || {
+                calls.set(calls.get() + 1);
+                Ok::<_, ()>(vec![2])
+            })
+            .unwrap(),
+            vec![2]
+        );
+        assert_eq!(calls.get(), before + 1);
+        assert_eq!(memo.entries.len(), MAX_SCHEMA_MEMO_ENTRIES);
+    }
+
+    // Exercise the actual shared memo owner, including both native construction
+    // refusal and the original unknown-ID panic, before valid typed DTO reuse.
+    let failure_key = SchemaMemoKey {
+        id: "https://mainframe-env.invalid/memo-refusal-control".into(),
+        documents: key.documents.clone(),
+    };
+    assert!(
+        memoized_validator(&failure_key, || {
+            jsonschema::draft202012::options()
+                .offline()
+                .build(&unresolved)
+        })
+        .is_err()
+    );
+    assert!(!validator_memo().is_poisoned());
+    assert!(
+        !validator_memo()
+            .lock()
+            .unwrap()
+            .entries
+            .iter()
+            .any(|(stored, _)| stored == &failure_key)
+    );
+    let unknown = std::panic::catch_unwind(|| {
+        validator("https://mainframe-env.invalid/unknown-owned-schema")
+    });
+    assert!(unknown.is_err());
+    assert!(!validator_memo().is_poisoned());
+    let recovered = validator(INSTALLER_ID);
+    assert!(recovered.is_valid(&export(&installer())));
+    assert!(recovered.is_valid(&ready_state()));
+    assert!(!recovered.is_valid(&json!({"applications": null})));
+    assert!(validator_memo().lock().unwrap().entries.len() <= MAX_SCHEMA_MEMO_ENTRIES);
 }
 
 #[test]

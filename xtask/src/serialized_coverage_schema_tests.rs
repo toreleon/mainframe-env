@@ -20,6 +20,16 @@ fn schema(name: &str) -> (PathBuf, Value) {
     (path, value)
 }
 
+fn validate_compiled_schema_instance(
+    validator: &jsonschema::Validator,
+    instance: &Value,
+    path: &Path,
+) -> TaskResult {
+    validator
+        .validate(instance)
+        .map_err(|error| format!("{} violates its schema: {error}", path.display()))
+}
+
 fn evidence() -> Value {
     json!({
         "schema_version": "mainframe-env.coverage-evidence@1",
@@ -218,6 +228,8 @@ fn fully_sourced_complete_row_passes_schemas_and_owned_store() {
     let mut refs = serde_json::Map::new();
     let mut store = CoverageStore::default();
     let (evidence_path, evidence_schema) = schema("coverage-evidence.schema.json");
+    let evidence_validator = compile_draft_2020_12_schema(&evidence_schema, &evidence_path)
+        .expect("fully sourced synthetic evidence schema");
     for gate in CoverageGate::ALL {
         let record = typed_evidence(gate, EvidenceOutcome::Pass);
         let mut wire = evidence();
@@ -231,7 +243,7 @@ fn fully_sourced_complete_row_passes_schemas_and_owned_store() {
                 "source_digest": DIGEST
             });
         }
-        validate_schema_instance(&evidence_schema, &wire, &evidence_path)
+        validate_compiled_schema_instance(&evidence_validator, &wire, &evidence_path)
             .expect("fully sourced synthetic evidence");
         refs.insert(gate.slug().into(), json!([record.identity()]));
         store
@@ -611,6 +623,8 @@ mod projection {
     fn unknown_legacy_summary_and_gate_fields_are_rejected() {
         let (_, ledger, _) = fixture();
         let (path, schema) = schema("coverage-ledger.schema.json");
+        let validator =
+            compile_draft_2020_12_schema(&schema, &path).expect("current coverage ledger schema");
         for pointer in [
             "/baselines/0/rows",
             "/baselines/0/gates/fake",
@@ -625,7 +639,7 @@ mod projection {
                 .unwrap()
                 .insert(key.into(), json!([]));
             assert!(
-                validate_schema_instance(&schema, &invalid, &path).is_err(),
+                validate_compiled_schema_instance(&validator, &invalid, &path).is_err(),
                 "unknown field {pointer}"
             );
         }
@@ -664,9 +678,11 @@ mod projection {
         let (_, _, mut row) = fixture();
         row["derived_state"] = json!("complete");
         let (path, schema) = schema("coverage-row.schema.json");
+        let validator =
+            compile_draft_2020_12_schema(&schema, &path).expect("current coverage row schema");
         for refs in [json!({"recognized": []}), json!({"recognized": [DIGEST]})] {
             row["evidence_refs"] = refs;
-            assert!(validate_schema_instance(&schema, &row, &path).is_err());
+            assert!(validate_compiled_schema_instance(&validator, &row, &path).is_err());
         }
     }
 
