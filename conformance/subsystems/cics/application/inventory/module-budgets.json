@@ -486,7 +486,8 @@
       "crates/providers/mainframe-env-cics/src/handlers/program_control/administrative_status/security.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control/administrative_status/tests.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control/administrative_status/tests/sqlite_reopen.rs",
-      "crates/providers/mainframe-env-cics/src/handlers/host_boundary/link_entry/call_tests.rs"
+      "crates/providers/mainframe-env-cics/src/handlers/host_boundary/link_entry/call_tests.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/host_boundary/readonly_journal_tests.rs"
     ]
   }
 }

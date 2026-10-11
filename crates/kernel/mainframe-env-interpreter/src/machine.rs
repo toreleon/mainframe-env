@@ -4376,8 +4376,8 @@ impl ReferenceMachine {
         if self.effect_sequence > self.invocation.limits.max_effects {
             return Err(MachineProblem::ResourceExhausted);
         }
-        let mutating = request.is_mutating();
-        let key = mutating.then(|| self.effect_key()).transpose()?;
+        let journaled = request.requires_dispatch_record();
+        let key = journaled.then(|| self.effect_key()).transpose()?;
         let effect = EffectRequest {
             run_unit: self.invocation.run_unit_id.clone(),
             sequence: self.effect_sequence,
@@ -11359,6 +11359,7 @@ mod size_truncation_tests;
 #[cfg(test)]
 mod tests {
     mod chunked_initialization_tests;
+    mod readonly_journal_tests;
     use super::*;
     use mainframe_env_execution_api::{
         ArtifactRef, CapabilityId, ExecutionId, IdempotencyKey, Principal, PrincipalId, RequestId,

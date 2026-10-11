@@ -69,7 +69,7 @@ where
             }
         };
         let audit_resource = canonical_audit_resource_digest(&effect.request);
-        let mutating = effect.request.is_mutating();
+        let journaled = effect.idempotency_key.is_some();
         let capability = effect
             .request
             .required_capability(InvocationLimits::default());
@@ -272,7 +272,7 @@ where
         )
         .is_err()
         {
-            if mutating || matches!(&result.outcome, Err(HostProblem::UnknownOutcome)) {
+            if journaled || matches!(&result.outcome, Err(HostProblem::UnknownOutcome)) {
                 return Err(failed_outcome(problem(
                     FailureCategory::UnknownOutcome,
                     "host dispatch completed but result persistence failed; reconcile the intent",

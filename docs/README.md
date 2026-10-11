@@ -200,6 +200,7 @@ explicitly names that authority as superseded.
 - [ADR-0060: Passive CICS READ copyback observation](decisions/0060-passive-cics-read-copyback.md)
 - [ADR-0061: Bounded COBOL initializer byte carrier](decisions/0061-cobol-chunked-initializer-carrier.md)
 - [ADR-0062: Provisional passive Db2 machine copyback trace](decisions/0062-passive-db2-copyback.md)
+- [ADR-0063: Actual dispatch ownership for selected readonly effects](decisions/0063-readonly-dispatch-ownership.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.
 

@@ -86,6 +86,16 @@ machine evaluates runtime values, authorization context, provider generation,
 and transaction state before emitting the request. Provider and store
 authorities remain unchanged as semantic families migrate.
 
+Selected compiled dataset READ and CICS file read/browse occurrences also retain
+original dispatch keys and genuine coordinator intent/result records. This is
+ownership of an observed host call; the request remains nonmutating and carries
+no fabricated nested mutation. Keyed readonly result persistence failures remain
+`UnknownOutcome`. CICS retains the actual response under the same bounded
+canonical envelope, but a repeated readonly receipt refuses before redispatch
+or cached reply because a durable result does not recreate a volatile cursor.
+Midbrowse cursor recovery is outside this slice. See
+[ADR-0063](../decisions/0063-readonly-dispatch-ownership.md).
+
 For a mutating effect:
 
 ```mermaid

@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 249,
+    "markdown_documents": 250,
     "navigation_groups": 8,
-    "normative_documents": 110,
+    "normative_documents": 111,
     "xtask_commands": 162
   },
   "documents": [
@@ -341,8 +341,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 191,
-      "sha256": "sha256:05a16079f0e6ccbbcec977bdac42a90a1fc5329262eac60f14692279f81c05b3",
+      "relative_links": 192,
+      "sha256": "sha256:4b2ab39950758ded5c053e3af08dbfc4d21529ac4799e3c554bc73197324f22c",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -471,9 +471,9 @@
       "normative": true,
       "owner": "execution and store maintainers",
       "path": "docs/architecture/EXECUTION-AND-DURABILITY.md",
-      "relative_links": 2,
+      "relative_links": 3,
       "scope": "execution lifecycle, effects, work, checkpoints, and durability",
-      "sha256": "sha256:01e111ac430284e40edde026f952f6ad984f662d771f03e8afeb56c0c6c23120",
+      "sha256": "sha256:a91ba1c4a7158a6b2a00d30d347e3d2d0c9b141aa83693631bd9a5c42a73ec3c",
       "status": "Accepted by repository owner",
       "title": "Execution and Durability Architecture",
       "xtask_commands": 0
@@ -1588,6 +1588,18 @@
       "sha256": "sha256:9ea3d138ffe98926bc2db39027fde395eded6512a07b3de7b8bf29591b3a3902",
       "status": "proposed. Unrun diagnostic infrastructure; no SQL semantic or acceptance result.",
       "title": "0062. Provisional passive Db2 machine copyback trace",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env selected typed nonmutating dispatch occurrences",
+      "normative": true,
+      "owner": "host, execution and CICS maintainers",
+      "path": "docs/decisions/0063-readonly-dispatch-ownership.md",
+      "relative_links": 0,
+      "scope": "original compiled dataset READ and CICS file read/browse intent/result attribution",
+      "sha256": "sha256:0ac9cd6e3b5221bd3ce177632a60af9ba53738f39f2d0fb4e9f5bb0188b6daa4",
+      "status": "proposed; implementation and focused controls unrun.",
+      "title": "0063. Actual dispatch ownership for selected readonly effects",
       "xtask_commands": 0
     },
     {
@@ -2930,6 +2942,10 @@
         {
           "label": "ADR-0062: Provisional passive Db2 machine copyback trace",
           "path": "docs/decisions/0062-passive-db2-copyback.md"
+        },
+        {
+          "label": "ADR-0063: Actual dispatch ownership for selected readonly effects",
+          "path": "docs/decisions/0063-readonly-dispatch-ownership.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -3152,7 +3168,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:e79229f163c292faa4cbb41721d386df0431076bfa30638d6a4a632e255cfe56",
+  "registry_sha256": "sha256:4da7a19a7ddfafcd9bcce3b257bd9ebc2e6ce27d349a75e31f718f6b835951ca",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {
