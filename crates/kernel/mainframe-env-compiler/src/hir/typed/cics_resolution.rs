@@ -460,8 +460,10 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::ReceiveMap => {
             &["MAP", "MAPSET", "FROM", "INTO", "LENGTH", "RESP", "RESP2"]
         }
-        HirCicsOperation::SendMap => &["MAP", "MAPSET", "FROM", "LENGTH", "RESP", "RESP2"],
-        HirCicsOperation::SendText => &["FROM", "LENGTH", "RESP", "RESP2"],
+        HirCicsOperation::SendMap => {
+            &["MAP", "MAPSET", "FROM", "LENGTH", "CURSOR", "RESP", "RESP2"]
+        }
+        HirCicsOperation::SendText => &["FROM", "LENGTH", "CURSOR", "RESP", "RESP2"],
         HirCicsOperation::SendPartnset => &["PARTNSET", "RESP", "RESP2"],
         HirCicsOperation::ReceivePartn => &["PARTN", "INTO", "SET", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::SendControl => &[
@@ -629,7 +631,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::SendMap => &[
             "DATAONLY", "ERASE", "CURSOR", "FREEKB", "MAPONLY", "NOHANDLE",
         ],
-        HirCicsOperation::SendText => &["ERASE", "FREEKB", "NOHANDLE"],
+        HirCicsOperation::SendText => &["ERASE", "FREEKB", "CURSOR", "NOHANDLE"],
         HirCicsOperation::SendPartnset => &["NOHANDLE"],
         HirCicsOperation::ReceivePartn => &["ASIS", "NOHANDLE"],
         HirCicsOperation::SendControl => terminal_control::SEND_CONTROL_OPTIONS,

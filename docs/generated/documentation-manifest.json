@@ -26,7 +26,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 0,
-      "sha256": "sha256:12ab36d5f0dbbbf7d0c243ce7156ca5d537ba55369e2032c76e9265f512966d4",
+      "sha256": "sha256:8ecc2dd72b85a5a9043976e1fb1dde650a10d93cc916f58ab74bfbf4f7ce163a",
       "title": "Changelog",
       "xtask_commands": 0
     },
@@ -385,7 +385,7 @@
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
       "relative_links": 25,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:b7d66ce43c278928cb3e63488945b8d7bcb9c9731e2b2d01b0634f832cdb4f0d",
+      "sha256": "sha256:3dfeba87bee261b1cffb1ab1b3d6a0091122809bd208dbd6b923b87a95af155c",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -1526,7 +1526,7 @@
       "normative": false,
       "path": "docs/delivery/WORK-AUDIT-2026-10-11.md",
       "relative_links": 81,
-      "sha256": "sha256:3520c46266fc97af3d51ca60da7cbe46e0e603d79d24c296aa10abc58485122c",
+      "sha256": "sha256:87503c01e51786e5b318c95d5712d8cd653f8011a5861641c6aa9ae0d9c71b2a",
       "title": "Roadmap and contribution audit — 2026-10-11",
       "xtask_commands": 0
     },
