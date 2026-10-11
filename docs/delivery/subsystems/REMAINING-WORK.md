@@ -217,6 +217,12 @@ missing. Local or synthetic harness validation supplies no licensed credit.
 
 ## Missing tracking information and reconciliation
 
+The [tracking audit](../WORK-AUDIT-2026-10-11.md) links the 54 package IDs to
+their existing epics, the remaining defect queues and the new bounded Foundation
+and SPI slices. Apply the [coordination workflow](../WORK-COORDINATION.md) when
+claiming the next slice; these planning rows do not reserve unrecorded work or
+grant acceptance.
+
 The 54 deliverables above remain present in their plans. Several progress
 records do not give every package an individual state, assigned person, linked
 active issue, reviewed source/date or next bounded slice. Those facts are

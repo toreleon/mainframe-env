@@ -103,6 +103,7 @@
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
     "docs/delivery/IMPLEMENTATION-ROADMAP.md",
     "docs/delivery/VERIFICATION-STRATEGY.md",
+    "docs/delivery/WORK-COORDINATION.md",
     "docs/delivery/ZOSMF-API.md",
     "docs/delivery/subsystems/mq/inquiry-source-boundary.md",
     "docs/guides/MAINFRAME-SANDBOX.md"
@@ -167,6 +168,14 @@
         {
           "label": "Implementation prompts",
           "path": "docs/prompts/README.md"
+        },
+        {
+          "label": "Contribution ownership and parallel work",
+          "path": "docs/delivery/WORK-COORDINATION.md"
+        },
+        {
+          "label": "Roadmap tracking audit (2026-10-11)",
+          "path": "docs/delivery/WORK-AUDIT-2026-10-11.md"
         }
       ]
     },

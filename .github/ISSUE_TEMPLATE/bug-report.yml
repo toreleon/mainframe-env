@@ -1,0 +1,33 @@
+name: Reproducible defect
+description: Report a defect with a bounded reproducer and current source.
+title: "[bug / phase] "
+labels: ["bug", "status:triage"]
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Source, environment and authority
+      description: Include the SHA, pinned tools/backend/profile, owning phase and existing issue/PR search. Do not include secrets or licensed material.
+    validations:
+      required: true
+  - type: textarea
+    id: reproducer
+    attributes:
+      label: Reproducer and actual behavior
+      description: Provide the exact command or journey, a sanitized minimal fixture, actual output and retained evidence identity.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior and impact
+      description: Cite the owning contract or pinned source. State correctness/data-loss impact and affected workloads.
+    validations:
+      required: true
+  - type: textarea
+    id: coordination
+    attributes:
+      label: Scope, overlap and completion
+      description: Name existing repairs/PRs, affected boundaries, dependencies, regression acceptance and missing inputs. Do not infer a cause from a symptom.
+    validations:
+      required: true

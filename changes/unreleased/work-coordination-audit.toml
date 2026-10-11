@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Documented issue ownership, parallel-work boundaries and integration states, with contribution templates and a roadmap tracking audit."

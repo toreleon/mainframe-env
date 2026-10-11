@@ -1,0 +1,47 @@
+name: Bounded work item
+description: Plan one implementation, evidence or source-preparation slice.
+title: "[phase / slice] "
+labels: ["enhancement", "status:triage"]
+body:
+  - type: textarea
+    id: authority
+    attributes:
+      label: Authority and existing work
+      description: Name the subsystem.phase, parent epic, work-package ID, plan/status links and related issues/PRs searched.
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Current implementation and source
+      description: Record the current SHA, existing code/drafts, actual evidence and what remains unknown.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Outcome and scope boundary
+      description: State one observable deliverable, affected contracts/paths and explicit exclusions.
+    validations:
+      required: true
+  - type: textarea
+    id: coordination
+    attributes:
+      label: Ownership, overlap and dependencies
+      description: Record any confirmed owner/active claim, overlapping PRs, consumed dependencies and intended PR base. Unassigned does not mean unclaimed.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance
+      description: List commands/journeys, required negative/recovery/parity cases and the exact completion boundary.
+    validations:
+      required: true
+  - type: textarea
+    id: blockers
+    attributes:
+      label: Inputs, decisions and next action
+      description: Name missing source/environment/decision inputs, or explicitly state none. Separate local implementation from external campaigns.
+    validations:
+      required: true

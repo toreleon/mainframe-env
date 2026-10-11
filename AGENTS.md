@@ -86,6 +86,14 @@ applicable. Cover negative cases, recovery, authorization, backend parity, and
 
 ## Commit & Pull Request Guidelines
 
+Before new implementation, follow the
+[work coordination guide](docs/delivery/WORK-COORDINATION.md): reuse a canonical
+issue, record the bounded outcome and PR base, and inspect active claims and
+shared contract overlap. Existing task authorization can confirm its owner;
+do not request routine approval again. An unassigned issue is not proof that
+another contributor's active scope is available. Preserve the main checkout
+and use the explicitly recorded parent branch for dependent repairs.
+
 Use `codex/<topic>` branches and prefixes `feat(dev):`, `fix(ir):`, `docs:`, or
 `ci:`. Preserve unrelated changes. PRs explain behavior, issues, checks/skips,
 and migration risks. Parallel feature PRs add a unique TOML file under
