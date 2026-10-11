@@ -83,7 +83,7 @@ impl CicsService {
                 current.handle_state.clone().apply(&mut restored);
                 // Trace is collected by the embedding before transfer/restoration.
                 restored.trace.clear();
-                restored.host_sequence = 0;
+                // Nested mutation keys belong to the task, across actor replacements.
                 restored.outer_effect_key = None;
                 restored.program_abend = None;
                 restored
@@ -393,6 +393,41 @@ mod tests {
         actor.selector = Selector::new("program:EXIT", InvocationLimits::default()).unwrap();
         actor.artifact = ArtifactRef::new("exit-artifact", InvocationLimits::default()).unwrap();
         actor
+    }
+
+    #[test]
+    fn terminal_program_restore_keeps_nested_mutation_sequence_across_actor_replacement() {
+        let (service, task, session) = fixture(1);
+        let prior_key = {
+            let mut state = service.lock().unwrap();
+            let run = state.runs.get_mut(&task.run_unit_id).unwrap();
+            run.host_sequence = 7;
+            super::super::super::nested_key(run, run.host_sequence).unwrap()
+        };
+        for (offset, name) in ["exit-one", "exit-two"].into_iter().enumerate() {
+            service
+                .restore_terminal_program_run(
+                    task.clone(),
+                    actor(&task, name),
+                    &session,
+                    "MENU",
+                    Vec::new(),
+                    2,
+                )
+                .unwrap();
+            let mut state = service.lock().unwrap();
+            let run = state.runs.get_mut(&task.run_unit_id).unwrap();
+            assert_eq!(
+                run.host_sequence,
+                7 + offset as u64,
+                "same-task replacement must retain nested sequence"
+            );
+            run.host_sequence += 1;
+            assert_ne!(
+                super::super::super::nested_key(run, run.host_sequence).unwrap(),
+                prior_key
+            );
+        }
     }
 
     #[test]
