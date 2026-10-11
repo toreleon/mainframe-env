@@ -66,6 +66,7 @@ CardDemo participant ownership and batch completion boundary.
 | [0055](0055-standard-package-mac-envelope.md) | bounded COSE_Mac0 profile and exact retained verification | Bounded production MAC implementation accepted; full Foundation pending |
 | [0056](0056-cics-first-reverse-position.md) | additive retained-position Dataset observation for the implicit CICS first reverse read | Accepted bounded design; verification pending |
 | [0061](0061-cobol-chunked-initializer-carrier.md) | versioned byte-preserving bounded COBOL initializer carrier | Proposed |
+| [0065](0065-local-exec-dli-exact-storage-copyback.md) | exact admitted fixed storage on the existing local EXEC DLI route | Proposed |
 
 Parallel subsystem work allocated the same 0028 and 0029 numeric prefixes.
 Their distinct full filenames and subsystem-qualified labels identify each

@@ -1037,3 +1037,11 @@ mod tests;
 #[cfg(test)]
 #[path = "ims_raw_call_tests.rs"]
 mod raw_call_tests;
+
+#[cfg(test)]
+#[path = "ims_exec_dli_association_tests.rs"]
+mod exec_dli_association_tests;
+
+#[cfg(test)]
+#[path = "ims_exec_dli_copyback_tests.rs"]
+mod exec_dli_copyback_tests;

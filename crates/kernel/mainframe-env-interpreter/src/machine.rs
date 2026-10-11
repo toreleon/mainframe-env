@@ -1,4 +1,5 @@
 mod call_codec;
+mod ims_copyback;
 pub use call_codec::encode_cobol_call_result;
 use call_codec::*;
 mod dataset_codec;
@@ -379,7 +380,7 @@ enum PendingKind {
         targets: Vec<String>,
     },
     Ims {
-        target: Option<String>,
+        capture: ims_copyback::Capture,
     },
     Mq {
         handle: Option<String>,
@@ -2021,11 +2022,8 @@ impl ReferenceMachine {
             (PendingKind::MqMqi(_), _) => {
                 return Err(MachineProblem::Host(HostProblem::UnknownOutcome));
             }
-            (PendingKind::Ims { target }, HostResult::Ims(result)) => {
-                self.write("DIBSTAT", result.status.as_bytes())?;
-                if let Some((target, segment)) = target.zip(result.segments.first()) {
-                    self.write(&target, &segment.data)?;
-                }
+            (PendingKind::Ims { capture }, HostResult::Ims(result)) => {
+                self.finish_ims_copyback(capture, result)?;
             }
             (
                 PendingKind::Mq {
@@ -4311,24 +4309,9 @@ impl ReferenceMachine {
             .and_then(|value| u16::try_from(value.coefficient).ok())
             .filter(|value| *value > 0)
             .unwrap_or(1);
-        let mut qualifiers = Vec::new();
-        for (_, values) in groups.iter().filter(|(name, _)| name == "WHERE") {
-            let Some(equal) = values.iter().position(|token| token == "=") else {
-                return Err(MachineProblem::UnsupportedForm);
-            };
-            let field = values
-                .get(equal.saturating_sub(1))
-                .ok_or(MachineProblem::InvalidOperation)?;
-            let value_name = values
-                .get(equal + 1)
-                .ok_or(MachineProblem::InvalidOperation)?;
-            qualifiers.push(ImsQualifier {
-                segment: segments.last().cloned().unwrap_or_else(|| "ROOT".into()),
-                field: normalize(field),
-                value: self.resolve(value_name)?,
-            });
-        }
+        let mut qualifiers = self.ims_where_qualifiers(&groups)?;
         if qualifiers.is_empty()
+            && groups.is_empty()
             && let Some(using) = position(args, "USING")
         {
             for token in args.iter().skip(using + 2) {
@@ -4350,7 +4333,7 @@ impl ReferenceMachine {
             .is_mutating()
             .then(|| self.mutation())
             .transpose()?;
-        self.effect(
+        self.ims_storage_effect(
             HostRequest::Ims(ImsRequest {
                 operation,
                 psb,
@@ -4364,7 +4347,7 @@ impl ReferenceMachine {
                 system: None,
                 q_class: None,
             }),
-            PendingKind::Ims { target },
+            target,
         )
     }
 

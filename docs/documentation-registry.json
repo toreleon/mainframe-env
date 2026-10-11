@@ -118,7 +118,8 @@
     "docs/decisions/0060-passive-cics-read-copyback.md",
     "docs/decisions/0061-cobol-chunked-initializer-carrier.md",
     "docs/decisions/0062-passive-db2-copyback.md",
-    "docs/decisions/0063-readonly-dispatch-ownership.md"
+    "docs/decisions/0063-readonly-dispatch-ownership.md",
+    "docs/decisions/0065-local-exec-dli-exact-storage-copyback.md"
   ],
   "navigation": [
     {
@@ -610,6 +611,10 @@
         {
           "label": "ADR-0063: Actual dispatch ownership for selected readonly effects",
           "path": "docs/decisions/0063-readonly-dispatch-ownership.md"
+        },
+        {
+          "label": "ADR-0065: Local EXEC DLI exact storage copyback",
+          "path": "docs/decisions/0065-local-exec-dli-exact-storage-copyback.md"
         }
       ],
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."

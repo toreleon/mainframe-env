@@ -116,3 +116,41 @@ pub(super) fn decode_call_values(payload: &BoundedPayload) -> Result<Vec<Vec<u8>
     }
     Ok(values)
 }
+
+impl ReferenceMachine {
+    // Option groups retain source order; WHERE qualifies its preceding SEGMENT.
+    pub(super) fn ims_where_qualifiers(
+        &self,
+        groups: &[(String, Vec<String>)],
+    ) -> Result<Vec<ImsQualifier>, MachineProblem> {
+        let mut segment = None;
+        let mut qualifiers = Vec::new();
+        for (name, values) in groups {
+            if name == "SEGMENT" {
+                segment = if let [name] = values.as_slice() {
+                    let name = normalize(name);
+                    (!name.is_empty()).then_some(name)
+                } else {
+                    None
+                };
+            } else if name == "WHERE" {
+                let segment = segment.clone().ok_or(MachineProblem::InvalidOperation)?;
+                let Some(equal) = values.iter().position(|token| token == "=") else {
+                    return Err(MachineProblem::UnsupportedForm);
+                };
+                let field = values
+                    .get(equal.saturating_sub(1))
+                    .ok_or(MachineProblem::InvalidOperation)?;
+                let value_name = values
+                    .get(equal + 1)
+                    .ok_or(MachineProblem::InvalidOperation)?;
+                qualifiers.push(ImsQualifier {
+                    segment,
+                    field: normalize(field),
+                    value: self.resolve(value_name)?,
+                });
+            }
+        }
+        Ok(qualifiers)
+    }
+}

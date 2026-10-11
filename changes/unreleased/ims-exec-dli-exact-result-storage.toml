@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Preflighted fixed local EXEC DLI reply storage against admitted MIR identities and exact widths before DIBSTAT/area copyback, preserving status-only replies and separating structured operands from positional USING. Raw CALL ABI and first-party IMS acceptance remain separate."

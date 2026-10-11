@@ -12,6 +12,10 @@ use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsE
 #[path = "db2_batch_source_owner.rs"]
 mod batch_source_owner;
 
+// Independently named real readonly IMS guest reuses only this held receipt lease.
+#[path = "ims_firstparty_readonly_owner_tests.rs"]
+mod ims_firstparty_readonly_owner_tests;
+
 const KEY: &str = "98";
 const SEED_KEYS: [&[u8]; 7] = [b"01", b"02", b"03", b"04", b"05", b"06", b"07"];
 const EXTRA_SOURCE_PINS: &[(&str, &str)] = &[

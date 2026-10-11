@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 250,
+    "markdown_documents": 251,
     "navigation_groups": 8,
-    "normative_documents": 111,
+    "normative_documents": 112,
     "xtask_commands": 162
   },
   "documents": [
@@ -341,8 +341,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 192,
-      "sha256": "sha256:4b2ab39950758ded5c053e3af08dbfc4d21529ac4799e3c554bc73197324f22c",
+      "relative_links": 193,
+      "sha256": "sha256:33d311f77782ac552a17b0991fe098533f5555e9fb151321b8276c272490a9ea",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -1603,10 +1603,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env local typed EXEC DLI storage proposal",
+      "normative": true,
+      "owner": "interpreter and IMS assurance maintainers",
+      "path": "docs/decisions/0065-local-exec-dli-exact-storage-copyback.md",
+      "relative_links": 0,
+      "scope": "fixed working-storage views on the existing typed EXEC DLI request/result route",
+      "sha256": "sha256:72dec8c8bcc731640bf5dd4352f27b5c85560a90e6e7cba73b353681ccdf272b",
+      "status": "proposed. Unrun local storage admission; no first-party or IBM acceptance.",
+      "title": "0065. Local EXEC DLI exact storage copyback",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 60,
-      "sha256": "sha256:1079b006bd124b09fc6b49167c81656c0d82feaa250a13bf48d0ee9215d16241",
+      "relative_links": 61,
+      "sha256": "sha256:244b503aafe8655d130cb44f94095e1ec8d8054e19608840e1cfb7b8de2cd36a",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -2946,6 +2958,10 @@
         {
           "label": "ADR-0063: Actual dispatch ownership for selected readonly effects",
           "path": "docs/decisions/0063-readonly-dispatch-ownership.md"
+        },
+        {
+          "label": "ADR-0065: Local EXEC DLI exact storage copyback",
+          "path": "docs/decisions/0065-local-exec-dli-exact-storage-copyback.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -3168,7 +3184,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:4da7a19a7ddfafcd9bcce3b257bd9ebc2e6ce27d349a75e31f718f6b835951ca",
+  "registry_sha256": "sha256:40b48a0db09187a469ef0ea84413f736083934782d113bef74258fdcc163308a",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

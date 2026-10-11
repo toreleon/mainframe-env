@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Preserved each compiled EXEC DLI WHERE qualifier on its nearest preceding unambiguous SEGMENT in the existing typed IMS request; malformed association refuses before an offer. Raw CALL ABI and full first-party application acceptance remain separate."
