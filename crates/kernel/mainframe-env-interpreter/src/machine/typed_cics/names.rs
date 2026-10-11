@@ -1,8 +1,8 @@
 #[cfg(test)]
 use mainframe_env_host_api::CicsOperation;
 use mainframe_env_ir::{
-    BtsBrowseInput, BtsBrowseOutput, CicsAssignOutput, CicsOperandName, CicsOutputName,
-    CicsPlanOperation, CicsPlanOption,
+    BtsBrowseInput, BtsBrowseOutput, CicsAssignOutput, CicsEffectPlan, CicsOperandName,
+    CicsOutputName, CicsPlanOperation, CicsPlanOption,
 };
 
 pub(super) const fn counter_shape(operation: Option<CicsPlanOperation>) -> Option<(usize, bool)> {
@@ -44,7 +44,7 @@ pub(super) enum SlotUse {
     Output,
     ExactOutput(usize),
     AbstimeOutput,
-    FormatTextOutput(usize),
+    FormatTextOutput(usize, Option<usize>),
     MillisecondsOutput,
     NumericOutput,
     HalfwordOutput,
@@ -235,6 +235,22 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
     }
 }
 
+pub(super) fn plan_output_slot_use(plan: &CicsEffectPlan, name: CicsOutputName) -> SlotUse {
+    let slot_use = output_slot_use(name);
+    let SlotUse::FormatTextOutput(field, _) = slot_use else {
+        return slot_use;
+    };
+    let (operand, option) = if name == CicsOutputName::Time {
+        (CicsOperandName::TimeSep, CicsPlanOption::TimeSep)
+    } else {
+        (CicsOperandName::DateSep, CicsPlanOption::DateSep)
+    };
+    let separated =
+        plan.options.contains(&option) || plan.operands.iter().any(|value| value.name == operand);
+    let separator_count = if name == CicsOutputName::Yyddd { 1 } else { 2 };
+    SlotUse::FormatTextOutput(field, (!separated).then_some(field - separator_count))
+}
+
 pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
     match name {
         CicsOutputName::BtsBrowse(
@@ -356,10 +372,10 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         | CicsOutputName::TypeNamespace => SlotUse::Output,
         CicsOutputName::Milliseconds => SlotUse::MillisecondsOutput,
         CicsOutputName::Mmddyy | CicsOutputName::Time | CicsOutputName::Yymmdd => {
-            SlotUse::FormatTextOutput(8)
+            SlotUse::FormatTextOutput(8, None)
         }
-        CicsOutputName::Mmddyyyy | CicsOutputName::Yyyymmdd => SlotUse::FormatTextOutput(10),
-        CicsOutputName::Yyddd => SlotUse::FormatTextOutput(6),
+        CicsOutputName::Mmddyyyy | CicsOutputName::Yyyymmdd => SlotUse::FormatTextOutput(10, None),
+        CicsOutputName::Yyddd => SlotUse::FormatTextOutput(6, None),
         CicsOutputName::Resp
         | CicsOutputName::SecurityRead
         | CicsOutputName::SecurityUpdate

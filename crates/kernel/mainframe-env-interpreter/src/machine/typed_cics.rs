@@ -146,7 +146,7 @@ pub(super) fn validate_machine(machine: &ReferenceMachine) -> Result<(), Machine
         }
         validate_address_set_slots(machine, operation, &plan)?;
         for output in &plan.outputs {
-            let slot_use = names::output_slot_use(output.name);
+            let slot_use = names::plan_output_slot_use(&plan, output.name);
             validate_machine_slot(machine, operation, &output.target, slot_use)?;
         }
     }
