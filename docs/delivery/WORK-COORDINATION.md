@@ -79,6 +79,14 @@ These states do not imply completion of a parent phase. A draft is not a shipped
 fix; a merged parser does not prove runtime behavior; a local pass does not
 prove licensed equivalence. Mark unrecorded facts Unknown rather than Unstarted.
 
+Use the existing board's Status field for flow. Unknown and Closed without
+delivery are also valid delivery values: the former records missing evidence;
+the latter records abandoned/duplicate scope without claiming implementation.
+Preserve source and closure scope when reconciling historical items. The
+[project guide](subsystems/GITHUB-PROJECT.md) defines the safe migration and
+actual access checks; an account permission flag alone is not a successful
+credential write test.
+
 Use existing `area:*`, `priority:p0` through `priority:p3`, `bug`, `enhancement`,
 `question`, `documentation` and `type:epic` labels. Prefer `area:jcl-jes` and
 `area:dataset` for new work instead of the historical `area:jcl`/`area:vsam`

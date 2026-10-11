@@ -1525,8 +1525,8 @@
     {
       "normative": false,
       "path": "docs/delivery/WORK-AUDIT-2026-10-11.md",
-      "relative_links": 80,
-      "sha256": "sha256:30d9c8dcf85d6f79cc6b895c75d15faf8fba4d4ccf5d5e200ceeee3da9884d2e",
+      "relative_links": 81,
+      "sha256": "sha256:3520c46266fc97af3d51ca60da7cbe46e0e603d79d24c296aa10abc58485122c",
       "title": "Roadmap and contribution audit — 2026-10-11",
       "xtask_commands": 0
     },
@@ -1535,9 +1535,9 @@
       "normative": true,
       "owner": "maintainers",
       "path": "docs/delivery/WORK-COORDINATION.md",
-      "relative_links": 7,
+      "relative_links": 8,
       "scope": "issue intake, ownership, parallel changes, integration and closure",
-      "sha256": "sha256:1010cc096aeff2556e5cfc7e348c11866e77c1d53aab5d94a1437e33a811057b",
+      "sha256": "sha256:f4338c1be752c8f94e1c0f67b0aa0b576e9fa794dd9832bd0bac0acaa10d15b0",
       "status": "Proposed contribution workflow",
       "title": "Coordinate contributions and parallel work",
       "xtask_commands": 0
@@ -1565,8 +1565,8 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/GITHUB-PROJECT.md",
-      "relative_links": 3,
-      "sha256": "sha256:6c01b2a32923fba21d551e8e771f6ec2fc43f68ac32d199d64153f1c52ff0bf6",
+      "relative_links": 4,
+      "sha256": "sha256:f208f97ce99d783dcffdb4edf3295a04fd6cc65a2d7e95cbd8341d8865e70c3f",
       "title": "Track subsystem work on GitHub",
       "xtask_commands": 0
     },

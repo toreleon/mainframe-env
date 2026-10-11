@@ -43,6 +43,33 @@ rejection, required reviewers, protected branches or project automation.
 Actual board access, owner confirmation and protection configuration remain
 explicit adoption work under #228.
 
+### Subsequent coordination reconciliation
+
+The authorized follow-up inspects Project #3's 137 items, 17 fields and two
+views against 68 open issues and two open PRs. Twelve open issues are absent
+from the board, and fifty closed issues retain an active flow column. All 68
+issue bodies now contain a current coordination record; each has one flow and
+priority label and an area classification. Original reports, checklists,
+states and assignees remain intact. Eight native parent links connect
+#406–#412 to #405 and #413 to #16.
+
+The active Foundation claim is visible on its reserved children. Preparation
+and investigation are not promoted to current-tip runtime acceptance. #412
+waits on its stated batch/data-volume prerequisites; the settled #399 decision
+is retained. #332/#333 retain their assignees and a required handoff boundary
+with #405 before the final integrated gate. Closed #173 is no longer presented
+as an active issue blocker for #180; current retained-source/review readiness
+still needs triage.
+
+Board migration is prepared for 155 unique items, with flow and delivery
+separate. `viewerCanUpdate` is true, but actual field and item mutations are
+both denied by the integration credential. No board configuration is claimed.
+Branch-protection read remains denied and the accessible ruleset list is empty.
+The [project guide](subsystems/GITHUB-PROJECT.md) records the migration, manual
+maintenance and unresolved access/automation/administrative obligations. A
+subsequent read contains #413 after the explicit parent links, bringing the
+board to 138 items; existing content IDs remain preserved and deduplicated.
+
 ## Roadmap coverage and implementation state
 
 The [remaining-work inventory](subsystems/REMAINING-WORK.md) contains each
