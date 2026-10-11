@@ -37560,6 +37560,245 @@ mod tests {
     }
 
     #[test]
+    fn send_text_wait_completes_display_before_return_issue_312() {
+        let directory = std::env::temp_dir().join(format!(
+            "cics-send-wait-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let stores: [Arc<dyn ProviderStateStore>; 2] = [
+            Arc::new(MemoryStore::new(Default::default())),
+            Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap()),
+        ];
+        for store in stores {
+            let cics = service(store.clone());
+            let (invocation, session) = registered(&cics);
+            let send = request(
+                CicsOperation::SendText,
+                BTreeMap::from([
+                    ("FROM".into(), argument(b"HELLOWORLD")),
+                    ("LENGTH".into(), cics_decimal(5)),
+                    ("OPTION.WAIT".into(), cics_option()),
+                ]),
+                1,
+            );
+            let send_effect = effect(&invocation.run_unit_id, send.clone(), 1);
+            let response = cics.invoke(&send_effect, send.clone()).unwrap();
+            assert_eq!(response.disposition, CicsDisposition::Complete);
+            assert_eq!(response.condition, "NORMAL");
+            assert_eq!(response.payload.bytes(), b"HELLO");
+            let version = cics.lock().unwrap().sessions[session.as_str()].version;
+            assert_eq!(
+                cics.lock().unwrap().sessions[session.as_str()].screen,
+                b"HELLO"
+            );
+            assert_eq!(cics.invoke(&send_effect, send.clone()).unwrap(), response);
+            assert_eq!(
+                cics.lock().unwrap().sessions[session.as_str()].version,
+                version
+            );
+            let mut malformed = request(CicsOperation::SendText, send.arguments, 2);
+            malformed
+                .arguments
+                .insert("OPTION.WAIT".into(), argument(b"WAIT"));
+            assert_eq!(
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, malformed.clone(), 2),
+                    malformed
+                ),
+                Err(HostProblem::Malformed)
+            );
+            drop(cics);
+            let reopened = service(store);
+            assert_eq!(
+                reopened.lock().unwrap().sessions[session.as_str()].screen,
+                b"HELLO"
+            );
+        }
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn assign_startcode_returns_terminal_origin_issue_312() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let invocation = invocation();
+        let session = SessionId::new("terminal-origin", 64).unwrap();
+        service
+            .launch_terminal(invocation.clone(), &session, "MENU", 24, 80, "csrf", 1, 100)
+            .unwrap();
+        let assign = request(
+            CicsOperation::Assign,
+            BTreeMap::from([("STARTCODE".into(), argument(b"WS-STARTCODE"))]),
+            1,
+        );
+        let response = service
+            .invoke(&effect(&invocation.run_unit_id, assign.clone(), 1), assign)
+            .unwrap();
+        assert_eq!(response.condition, "NORMAL");
+        assert_eq!(response.outputs["STARTCODE"].bytes(), b"TD");
+    }
+
+    #[test]
+    fn assign_startcode_uses_retained_start_origin_issue_312() {
+        for with_data in [false, true] {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let cics = CicsService::open_with_runtime(
+                authorities(),
+                store.clone(),
+                store.clone(),
+                CicsLimits::default(),
+                Arc::new(TestCicsClock::fixed(1_000)),
+            )
+            .unwrap();
+            let (issuer, _) = registered(&cics);
+            let mut arguments = BTreeMap::from([
+                ("TRANSID".into(), argument(b"NEXT")),
+                ("REQID".into(), argument(b"ORIGIN01")),
+            ]);
+            if with_data {
+                arguments.insert("FROM".into(), argument(b"DATA"));
+            }
+            let start = request(CicsOperation::Start, arguments, 1);
+            cics.invoke(&effect(&issuer.run_unit_id, start.clone(), 1), start)
+                .unwrap();
+            let work = store
+                .claim("cics-worker", Some(CICS_START_WORK_GENERATION), 1_000, 100)
+                .unwrap()
+                .unwrap();
+            cics.promote_start_work(&work, 1_000).unwrap();
+            let target = invocation_for(
+                "started",
+                BTreeMap::from([(
+                    "cics.start-request".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.start-request@1",
+                        b"ORIGIN01".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                )]),
+            );
+            let session = SessionId::new("started", 64).unwrap();
+            cics.launch_background_task(target.clone(), &session, "NEXT")
+                .unwrap();
+            let assign = request(
+                CicsOperation::Assign,
+                BTreeMap::from([("STARTCODE".into(), argument(b"WS-STARTCODE"))]),
+                2,
+            );
+            let response = cics
+                .invoke(&effect(&target.run_unit_id, assign.clone(), 2), assign)
+                .unwrap();
+            assert_eq!(
+                response.outputs["STARTCODE"].bytes(),
+                if with_data { b"SD" } else { b"S " }
+            );
+        }
+    }
+
+    #[test]
+    fn assign_startcode_uses_bound_origin_and_dpl_context_issue_312() {
+        for (key, schema, value, expected) in [
+            (
+                "cics.start-code",
+                "mainframe-env.cics.start-code@1",
+                "S ",
+                "S ",
+            ),
+            (
+                "cics.start-code",
+                "mainframe-env.cics.start-code@1",
+                "SD",
+                "SD",
+            ),
+            (
+                "cics.start-code",
+                "mainframe-env.cics.start-code@1",
+                "TD",
+                "TD",
+            ),
+            (
+                "cics.start-code",
+                "mainframe-env.cics.start-code@1",
+                "U",
+                "U ",
+            ),
+            (
+                "cics.execution-context",
+                "mainframe-env.cics.execution-context@1",
+                "dpl-without-synconreturn",
+                "D ",
+            ),
+            (
+                "cics.execution-context",
+                "mainframe-env.cics.execution-context@1",
+                "dpl-synconreturn",
+                "DS",
+            ),
+        ] {
+            let cics = service(Arc::new(MemoryStore::new(Default::default())));
+            let invocation = invocation_for(
+                "origin",
+                BTreeMap::from([(
+                    key.into(),
+                    BoundedPayload::new(
+                        schema,
+                        value.as_bytes().to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                )]),
+            );
+            let session = SessionId::new("origin", 64).unwrap();
+            cics.create_session(&session, 24, 80).unwrap();
+            cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let assign = request(
+                CicsOperation::Assign,
+                BTreeMap::from([("STARTCODE".into(), argument(b"WS-STARTCODE"))]),
+                1,
+            );
+            let response = cics
+                .invoke(&effect(&invocation.run_unit_id, assign.clone(), 1), assign)
+                .unwrap();
+            assert_eq!(response.outputs["STARTCODE"].bytes(), expected.as_bytes());
+        }
+        for (schema, value) in [
+            ("mainframe-env.cics.start-code@1", "XX"),
+            ("wrong-schema@1", "TD"),
+        ] {
+            let cics = service(Arc::new(MemoryStore::new(Default::default())));
+            let invocation = invocation_for(
+                "bad-origin",
+                BTreeMap::from([(
+                    "cics.start-code".into(),
+                    BoundedPayload::new(
+                        schema,
+                        value.as_bytes().to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                )]),
+            );
+            let session = SessionId::new("bad-origin", 64).unwrap();
+            cics.create_session(&session, 24, 80).unwrap();
+            cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let assign = request(
+                CicsOperation::Assign,
+                BTreeMap::from([("STARTCODE".into(), argument(b"WS-STARTCODE"))]),
+                1,
+            );
+            assert_eq!(
+                cics.invoke(&effect(&invocation.run_unit_id, assign.clone(), 1), assign),
+                Err(HostProblem::Malformed)
+            );
+        }
+    }
+
+    #[test]
     fn send_text_length_selects_the_requested_prefix() {
         let service = service(Arc::new(MemoryStore::new(Default::default())));
         let (invocation, session) = registered(&service);

@@ -528,6 +528,12 @@ defaults. DATAONLY requires explicit symbolic FROM bytes, ignores map defaults,
 applies supplied field attributes, and preserves an existing attribute for
 `X'00'`. `SEND TEXT` requires FROM and accepts the same three LENGTH forms; an
 out-of-range runtime value returns LENGERR 22/0 without changing the screen.
+`SEND TEXT WAIT` returns only after the virtual screen has been durably replaced;
+this synchronous provider has no pending output queue. Replay returns the retained
+completion without sending again. This follows IBM CICS TS 6.x
+[`SEND TEXT`, WAIT](https://www.ibm.com/docs/en/SSJL4D_6.x/reference-applications/commands-api/dfhp4_sendtext.html),
+catalog row `0192`, pinned in `ibm-cics-ts-6x-application-api-sources-c-2026-09-10`
+(`#312`).
 `RECEIVE MAP` requires MAP, applies the same MAPSET default, and optionally
 writes INTO. The provider validates the canonical request shape and uses the
 requested durable map definition for
@@ -544,7 +550,7 @@ is empty: local purge succeeds idempotently without changing the already
 displayed screen or current map. DPL use returns `INVREQ` 16/200. Deleting a
 nonempty accumulated message and surfacing temporary-storage `TSIOERR` remain
 unready until that logical-message authority exists.
-The typed ASSIGN subset carries each of its 92 admitted context values as a
+The typed ASSIGN subset carries each of its 93 admitted context values as a
 pre-resolved output binding under one bounded output-name authority. It retains
 the existing 16-option maximum, exact receiver checks, partial-INVREQ behavior,
 local/DPL matrix, EIBFN and provider semantics without carrying source command
@@ -578,9 +584,29 @@ terminal identity is propagated. Historical sessions without an identifier
 remain readable but do not acquire a fabricated one. Because no client network
 endpoint is retained, local `TNADDR` returns the source-defined 39 blanks for
 an unresolved address; nonterminal use returns 16/5 and DPL fails closed until
-remote endpoint context exists. The other 21 generated
+remote endpoint context exists. The other 20 generated
 ASSIGN semantic options remain compiler rejections until
 their contexts are implemented.
+`STARTCODE` requires a writable two-character alphanumeric receiver (`PIC XX`).
+It returns terminal origin `TD`, retained local START origin `S ` or `SD`,
+bound START ATTACH origin `U `, or DPL origin `D ` or `DS`. Existing start-code
+bindings are validated and padded to two bytes. A facility-less task without
+retained origin, or a DPL context without SYNCONRETURN identity, fails closed.
+This follows IBM CICS TS 6.x
+[`ASSIGN`, STARTCODE](https://www.ibm.com/docs/en/SSJL4D_6.x/reference-applications/commands-api/dfhp4_assign.html),
+catalog row `0011`, pinned in `ibm-cics-ts-6x-application-api-sources-a-2026-09-10`
+(`#312`). The output uses append-only tag `110`; existing tags retain their meaning.
+
+The GenApp `WRITEQ TS FROM(WRITE-MSG-L) LENGTH(23)` rejection remains when
+`WRITE-MSG-L` is `PIC X(13)`: LENGTH selects the number of bytes supplied by FROM,
+so this requests ten bytes beyond the owned area. The compiler reports
+`CICS WRITEQ TS LENGTH exceeds the FROM data area`; a length of 13 is admitted.
+This bounds protection follows the FROM/LENGTH contract in IBM CICS TS 6.x
+[`WRITEQ TS`](https://www.ibm.com/docs/en/SSJL4D_6.x/reference-applications/commands-api/dfhp4_writeqts.html),
+catalog row `0258`, pinned in `ibm-cics-ts-6x-application-api-sources-c-2026-09-10`
+(`#312`). It is a compiler safety check, not a claim that IBM diagnoses the same
+source as a translation error. The caller must supply a sufficiently large area
+or correct the requested length.
 The legacy route admits only the source-valid option subset whose behavior is
 implemented by that raw handler. A catalog-known option outside that subset
 fails explicitly before compatibility lowering instead of being silently

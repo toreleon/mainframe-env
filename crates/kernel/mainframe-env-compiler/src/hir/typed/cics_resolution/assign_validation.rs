@@ -1,5 +1,5 @@
 use super::{Clauses, complete_data_reference};
-use crate::{CobolUsage, SemanticModel};
+use crate::{CobolUsage, DataCategory, SemanticModel};
 use std::collections::BTreeSet;
 
 pub(super) fn validate(
@@ -83,6 +83,7 @@ pub(super) fn validate(
         "SCRNHT",
         "SCRNWD",
         "SOSI",
+        "STARTCODE",
         "SYSID",
         "TASKPRIORITY",
         "TCTUALENG",
@@ -114,6 +115,15 @@ pub(super) fn validate(
             .map_err(|_| format!("CICS ASSIGN option {name} requires one writable data area"))?;
         super::super::require_writable(&target)
             .map_err(|_| format!("CICS ASSIGN option {name} requires one writable data area"))?;
+        if name == "STARTCODE"
+            && (target.length != 2
+                || target.category != DataCategory::Alphanumeric
+                || target.usage != CobolUsage::Display)
+        {
+            return Err(
+                "CICS ASSIGN STARTCODE requires a two-character alphanumeric data area".into(),
+            );
+        }
         if name == "TASKPRIORITY"
             && (target.usage != CobolUsage::Binary || target.length != 2 || target.scale != 0)
         {

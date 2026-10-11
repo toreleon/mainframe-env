@@ -4645,6 +4645,77 @@ mod tests {
         }
     }
 
+    // IBM CICS TS 6.x, api-commands:0011, dfhp4_assign.html STARTCODE.
+    #[test]
+    fn assign_startcode_accepts_two_character_output_issue_312() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. STARTCODE. DATA DIVISION. WORKING-STORAGE SECTION. 01 WS-STARTCODE PIC XX. PROCEDURE DIVISION. EXEC CICS ASSIGN STARTCODE(WS-STARTCODE) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("STARTCODE PIC XX: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed ASSIGN STARTCODE");
+        assert_eq!(command.operation, HirCicsOperation::Assign);
+        assert!(command.outputs.iter().any(|output| {
+            matches!(output.name, HirCicsOutputName::Assign(identity) if identity.name() == "STARTCODE")
+                && output.target.length == 2
+        }));
+        for picture in ["X", "XXX", "99"] {
+            let rejected = analyze(&source.replace("PIC XX", &format!("PIC {picture}")));
+            assert!(rejected.hir.is_none());
+            assert!(rejected.diagnostics.iter().any(|diagnostic| {
+                diagnostic
+                    .public_message()
+                    .contains("STARTCODE requires a two-character alphanumeric data area")
+            }));
+        }
+    }
+
+    // IBM CICS TS 6.x, api-commands:0192, dfhp4_sendtext.html WAIT.
+    #[test]
+    fn send_text_wait_lowers_completion_option_issue_312() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. SENDWAIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 MSG-X PIC X(13). PROCEDURE DIVISION. EXEC CICS SEND TEXT FROM(MSG-X) LENGTH(13) WAIT END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("SEND TEXT WAIT: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed SEND TEXT WAIT");
+        assert_eq!(command.operation, HirCicsOperation::SendText);
+        assert_eq!(command.options, BTreeSet::from([HirCicsOption::Wait]));
+    }
+
+    // IBM CICS TS 6.x, api-commands:0258, dfhp4_writeqts.html FROM/LENGTH.
+    #[test]
+    fn writeq_ts_rejects_length_beyond_from_area_issue_312() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. WRITEOVER. DATA DIVISION. WORKING-STORAGE SECTION. 01 WRITE-MSG-L PIC X(13). PROCEDURE DIVISION. EXEC CICS WRITEQ TS QUEUE('GENAQ') FROM(WRITE-MSG-L) LENGTH(23) END-EXEC. STOP RUN.";
+        let rejected = analyze(source);
+        assert!(rejected.hir.is_none());
+        assert!(rejected.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("CICS WRITEQ TS LENGTH exceeds the FROM data area")
+        }));
+        assert!(
+            analyze(&source.replace("LENGTH(23)", "LENGTH(13)"))
+                .hir
+                .is_some()
+        );
+    }
+
     #[test]
     fn cics_writeq_ts_local_forms_are_typed() {
         let analysis = analyze(

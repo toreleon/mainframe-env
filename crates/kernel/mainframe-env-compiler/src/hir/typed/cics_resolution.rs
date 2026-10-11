@@ -629,7 +629,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::SendMap => &[
             "DATAONLY", "ERASE", "CURSOR", "FREEKB", "MAPONLY", "NOHANDLE",
         ],
-        HirCicsOperation::SendText => &["ERASE", "FREEKB", "NOHANDLE"],
+        HirCicsOperation::SendText => &["ERASE", "FREEKB", "WAIT", "NOHANDLE"],
         HirCicsOperation::SendPartnset => &["NOHANDLE"],
         HirCicsOperation::ReceivePartn => &["ASIS", "NOHANDLE"],
         HirCicsOperation::SendControl => terminal_control::SEND_CONTROL_OPTIONS,

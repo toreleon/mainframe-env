@@ -113,6 +113,9 @@ pub(super) fn validate_candidate(
                     && matches!(*name, "CLNTIPFAMILY" | "SRVRIPFAMILY" | "SSLTYPE") => {}
             (CicsApplicationOptionValueShape::BoundedAmbiguity, true)
                 if descriptor.runtime_operation == Some("StartBrexit") && *name == "BRDATA" => {}
+            // IBM CICS TS 6.x dfhp4_assign.html: STARTCODE is a two-character output.
+            (CicsApplicationOptionValueShape::BoundedAmbiguity, true)
+                if descriptor.runtime_operation == Some("Assign") && *name == "STARTCODE" => {}
             (CicsApplicationOptionValueShape::BoundedAmbiguity, _) => {
                 if matches!(
                     descriptor.label_tokens,
