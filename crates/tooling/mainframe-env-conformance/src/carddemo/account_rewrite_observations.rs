@@ -87,8 +87,7 @@ pub(super) async fn exercise(
         .map(|(name, value)| ((*name).into(), (*value).into()))
         .collect::<BTreeMap<String, String>>();
     let review =
-        carddemo_terminal_exchange(app, &route.session, &route.headers, 0x7d, fields.clone())
-            .await?;
+        carddemo_terminal_exchange(app, &route.session, &route.headers, 0x7d, fields).await?;
     require(review["mapset"] == "COACTUP" && review["map"] == "CACTUPA")?;
     require_blank_error(&review)?;
     field_literal(
@@ -99,8 +98,11 @@ pub(super) async fn exercise(
     )?;
     require(inserted::capture_state(context.server)? == before)?;
     let rewrite_before = evidence::before(context, &route.session)?;
+    // The source protects the reviewed fields and sets FSET before PF5.
+    // Offer only the AID; the terminal preserves those declared modified values.
     let saved =
-        carddemo_terminal_exchange(app, &route.session, &route.headers, 0xf5, fields).await?;
+        carddemo_terminal_exchange(app, &route.session, &route.headers, 0xf5, BTreeMap::new())
+            .await?;
     require(saved["mapset"] == "COACTUP" && saved["map"] == "CACTUPA")?;
     require_blank_error(&saved)?;
     field_literal(
