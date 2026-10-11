@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Check exact level-88 quoted token spelling at the declaration boundary while preserving the existing executable literal refusals and supported alternate-delimiter layouts."

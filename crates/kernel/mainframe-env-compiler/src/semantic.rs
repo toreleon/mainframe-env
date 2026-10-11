@@ -2049,18 +2049,18 @@ fn declaration_words(line: &str) -> Vec<String> {
             quote = Some(character);
         } else if character.is_whitespace() {
             if !word.is_empty() {
-                let value = word.trim_matches([',', ';', '.']).to_ascii_uppercase();
+                let value = word.trim_matches([',', ';', '.']).to_string();
                 if !value.is_empty() {
                     words.push(value);
                 }
                 word.clear();
             }
         } else {
-            word.push(character);
+            word.push(character.to_ascii_uppercase());
         }
     }
     if !word.is_empty() {
-        let value = word.trim_matches([',', ';', '.']).to_ascii_uppercase();
+        let value = word.trim_matches([',', ';', '.']).to_string();
         if !value.is_empty() {
             words.push(value);
         }
@@ -2091,7 +2091,7 @@ fn extract_program_id(source: &str) -> Option<String> {
     let marker = source.find("PROGRAM-ID")?;
     let rest = &source[marker + "PROGRAM-ID".len()..];
     Some(
-        rest.trim_start_matches([' ', '\t', '.'])
+        rest.trim_start_matches(|ch: char| ch.is_ascii_whitespace() || ch == '.')
             .split(|ch: char| ch == '.' || ch.is_whitespace())
             .next()?
             .trim()
@@ -2976,7 +2976,97 @@ mod tests {
         let model = SemanticModel::analyze(&source, 1024, 32).unwrap();
         assert!(model.layout("MESSAGE-X").is_some());
         assert!(model.layout("MESSAGE-SHOWN").is_some());
+        assert_eq!(
+            model.layout("MESSAGE-SHOWN").unwrap().condition_values,
+            ["'Selected transaction type shown above'"]
+        );
         assert_eq!(model.data_descriptions.len(), 2);
+    }
+
+    // Local source-byte preservation: the pinned CardDemo COTRTUPC level-88
+    // message uses this mixed-case VALUE on the following physical line.
+    #[test]
+    fn level88_condition_values_keep_offered_case_across_declaration_lines() {
+        for message in [
+            "No record found for this key in database",
+            "no record found for this key in database",
+            "NO RECORD FOUND FOR THIS KEY IN DATABASE",
+        ] {
+            let declaration =
+                format!("01 message-x pic x(75). 88 message-missing value\n '{message}'");
+            let model = SemanticModel::analyze(&program(&declaration), 1024, 32).unwrap();
+            let parent = model.layout("MESSAGE-X").unwrap();
+            assert_eq!(parent.length, 75);
+            assert_eq!(parent.initial, vec![b' '; 75]);
+            let condition = model.layout("MESSAGE-MISSING").unwrap();
+            assert_eq!(condition.category, DataCategory::Condition);
+            assert_eq!(condition.parent.as_deref(), Some("MESSAGE-X"));
+            assert_eq!(condition.alias_of.as_deref(), Some("MESSAGE-X"));
+            assert_eq!(condition.length, 0);
+            assert_eq!(condition.condition_values, [format!("'{message}'")]);
+            assert_eq!(model.storage_bytes, 75);
+        }
+    }
+
+    #[test]
+    fn level88_condition_values_keep_case_and_doubled_quote_spelling() {
+        for (literal, supported_literal) in [
+            ("'Bob''s Type'", "\"Bob's Type\""),
+            ("\"Say \"\"Mixed Type\"\"\"", "'Say \"Mixed Type\"'"),
+        ] {
+            let declaration = format!("01 message-x pic x(40). 88 message-shown value {literal}");
+            let sentences = declaration_sentences(&declaration);
+            assert_eq!(sentences.len(), 2);
+            let words = declaration_words(&sentences[1]);
+            assert_eq!(words, ["88", "MESSAGE-SHOWN", "VALUE", literal]);
+            assert_eq!(values_clause(&words), [literal]);
+            // Spelling preservation does not extend the executable literal subset.
+            assert!(matches!(
+                SemanticModel::analyze(&program(&declaration), 1024, 32),
+                Err(SemanticProblem::InvalidDeclaration(name)) if name == "MESSAGE-SHOWN"
+            ));
+
+            let supported =
+                format!("01 message-x pic x(40). 88 message-shown value {supported_literal}");
+            let model = SemanticModel::analyze(&program(&supported), 1024, 32).unwrap();
+            assert_eq!(
+                model.layout("MESSAGE-SHOWN").unwrap().condition_values,
+                [supported_literal]
+            );
+            assert_eq!(model.storage_bytes, 40);
+        }
+    }
+
+    #[test]
+    fn declaration_literal_payloads_do_not_change_keyword_or_prefix_canonicalization() {
+        assert_eq!(
+            declaration_words("88 message-value value x'aBcD' thru x'dEf0'."),
+            ["88", "MESSAGE-VALUE", "VALUE", "X'aBcD'", "THRU", "X'dEf0'"]
+        );
+        // Freeze the existing local tokenizer's quoted newline spelling;
+        // this does not admit a new physical COBOL continuation format.
+        assert_eq!(
+            declaration_words("88 message-value value 'MiXeD\nnext' low-values."),
+            [
+                "88",
+                "MESSAGE-VALUE",
+                "VALUE",
+                "'MiXeD\nnext'",
+                "LOW-VALUES"
+            ]
+        );
+        assert_eq!(
+            declaration_words("88 message-value values are space thru high-values."),
+            [
+                "88",
+                "MESSAGE-VALUE",
+                "VALUES",
+                "ARE",
+                "SPACE",
+                "THRU",
+                "HIGH-VALUES"
+            ]
+        );
     }
 
     #[test]

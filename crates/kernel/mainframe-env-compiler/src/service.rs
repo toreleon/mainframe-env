@@ -2887,4 +2887,81 @@ mod tests {
                 .is_empty()
         );
     }
+
+    #[test]
+    fn multiline_program_id_keeps_semantic_hir_and_scope_identity() {
+        for name in ["COACTUPC", "COTRTLIC", "COTRTUPC"] {
+            for newline in ["\n", "\r\n"] {
+                for format in [
+                    SourceFormat::Free,
+                    SourceFormat::Fixed,
+                    SourceFormat::Variable,
+                ] {
+                    let declared = format!("    {name}.");
+                    let lines = [
+                        "IDENTIFICATION DIVISION.",
+                        "PROGRAM-ID.",
+                        declared.as_str(),
+                        "DATA DIVISION.",
+                        "WORKING-STORAGE SECTION.",
+                        "01 MARKER PIC X(4) VALUE 'KEEP'.",
+                        "PROCEDURE DIVISION.",
+                        "GOBACK.",
+                    ];
+                    let source = if format == SourceFormat::Free {
+                        lines.join(newline)
+                    } else {
+                        lines
+                            .iter()
+                            .enumerate()
+                            .map(|(index, line)| format!("{:06} {line}{newline}", index + 1))
+                            .collect::<String>()
+                    };
+                    let analysis =
+                        CobolCompiler::default().analyze(&bundle_in_format(&source, format));
+                    assert_eq!(analysis.completeness, Completeness::Complete);
+                    assert!(
+                        analysis.diagnostics.is_empty(),
+                        "{:?}",
+                        analysis.diagnostics
+                    );
+                    let semantic = analysis.semantic.unwrap();
+                    assert_eq!(semantic.program_id, name);
+                    assert_eq!(semantic.scopes.len(), 1);
+                    assert_eq!(semantic.scopes[0].name, name);
+                    assert_eq!(semantic.layout("MARKER").unwrap().initial, b"KEEP");
+                    assert_eq!(semantic.storage_bytes, 4);
+                    assert_eq!(analysis.hir.unwrap().program_id, name);
+                }
+            }
+        }
+        let same_line = CobolCompiler::default().analyze(&bundle(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. SAME. PROCEDURE DIVISION. GOBACK.",
+        ));
+        assert_eq!(same_line.semantic.unwrap().program_id, "SAME");
+        assert_eq!(same_line.hir.unwrap().program_id, "SAME");
+    }
+
+    #[test]
+    fn multiline_program_id_never_substitutes_a_fixture_owner_or_missing_name() {
+        let foreign = CobolCompiler::default().analyze(&bundle(
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID.\n    OTHER.\nPROCEDURE DIVISION. GOBACK.",
+        ));
+        assert_eq!(foreign.completeness, Completeness::Complete);
+        let semantic = foreign.semantic.unwrap();
+        assert_eq!(semantic.program_id, "OTHER");
+        assert_eq!(semantic.scopes[0].name, "OTHER");
+        assert_ne!(semantic.program_id, "COACTUPC");
+        assert_eq!(foreign.hir.unwrap().program_id, "OTHER");
+        for missing in [
+            "IDENTIFICATION DIVISION. PROCEDURE DIVISION. GOBACK.",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID.\n \r\n .",
+        ] {
+            let refused = CobolCompiler::default().analyze(&bundle(missing));
+            assert_eq!(refused.completeness, Completeness::Incomplete);
+            assert!(!refused.diagnostics.is_empty());
+            assert!(refused.semantic.is_none());
+            assert!(refused.hir.is_none());
+        }
+    }
 }
