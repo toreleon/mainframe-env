@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Accept two-character CICS ASSIGN STARTCODE receivers and SEND TEXT WAIT completion on the virtual terminal; retain the WRITEQ TS FROM/LENGTH overrun rejection with dedicated regressions (#312)."
