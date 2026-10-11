@@ -52,6 +52,9 @@ mod decimal_commit;
 mod eib;
 #[cfg(test)]
 mod floating_insertion_tests;
+mod inspect;
+#[cfg(test)]
+mod inspect_tests;
 mod layout_admission;
 mod layout_resolution;
 mod legacy_mq;
@@ -5928,165 +5931,6 @@ impl ReferenceMachine {
         }
         Ok(overflow)
     }
-    fn inspect_op(&mut self, args: &[String]) -> Result<(), MachineProblem> {
-        if args.is_empty() {
-            return Err(MachineProblem::InvalidOperation);
-        }
-        let control = ["CONVERTING", "REPLACING", "TALLYING"]
-            .into_iter()
-            .filter_map(|keyword| position(args, keyword))
-            .min()
-            .unwrap_or(args.len());
-        let reference = self.reference(&args[..control])?;
-        let source = self.read_reference(&reference)?;
-        let range = self.inspect_range(&source, args)?;
-        if let Some(converting) = position(args, "CONVERTING") {
-            if args.get(converting + 2).is_none_or(|token| token != "TO") {
-                return Err(MachineProblem::InvalidOperation);
-            }
-            let from = self.resolve(
-                args.get(converting + 1)
-                    .ok_or(MachineProblem::InvalidOperation)?,
-            )?;
-            let to = self.resolve(
-                args.get(converting + 3)
-                    .ok_or(MachineProblem::InvalidOperation)?,
-            )?;
-            if from.is_empty() || from.len() != to.len() {
-                return Err(MachineProblem::DataException);
-            }
-            let mut converted = source.clone();
-            for byte in &mut converted[range.clone()] {
-                *byte = from
-                    .iter()
-                    .position(|candidate| candidate == byte)
-                    .map_or(*byte, |index| to[index]);
-            }
-            self.write_reference(&reference, &converted)?;
-        } else if let Some(replacing) = position(args, "REPLACING") {
-            let mode = args
-                .get(replacing + 1)
-                .ok_or(MachineProblem::InvalidOperation)?;
-            let by = position(args, "BY").ok_or(MachineProblem::InvalidOperation)?;
-            let to = self.resolve(args.get(by + 1).ok_or(MachineProblem::InvalidOperation)?)?;
-            let mut replaced = source.clone();
-            match mode.as_str() {
-                "CHARACTERS" => {
-                    if to.len() != 1 {
-                        return Err(MachineProblem::DataException);
-                    }
-                    replaced[range.clone()].fill(to[0]);
-                }
-                "ALL" | "LEADING" | "FIRST" => {
-                    let from = self.resolve(
-                        args.get(replacing + 2)
-                            .ok_or(MachineProblem::InvalidOperation)?,
-                    )?;
-                    if from.is_empty() || from.len() != to.len() {
-                        return Err(MachineProblem::DataException);
-                    }
-                    let inspected = &mut replaced[range.clone()];
-                    if mode == "LEADING" {
-                        let mut offset = 0usize;
-                        while inspected
-                            .get(offset..offset.saturating_add(from.len()))
-                            .is_some_and(|candidate| candidate == from)
-                        {
-                            inspected[offset..offset + from.len()].copy_from_slice(&to);
-                            offset += from.len();
-                        }
-                    } else if mode == "FIRST" {
-                        if let Some(at) = find_bytes(inspected, &from) {
-                            inspected[at..at + from.len()].copy_from_slice(&to);
-                        }
-                    } else {
-                        let all = replace_bytes(inspected, &from, &to)?;
-                        inspected.copy_from_slice(&all);
-                    }
-                }
-                _ => return Err(MachineProblem::UnsupportedForm),
-            }
-            self.write_reference(&reference, &replaced)?;
-        } else if let Some(tallying) = position(args, "TALLYING") {
-            let target = args
-                .get(tallying + 1)
-                .ok_or(MachineProblem::InvalidOperation)?;
-            let for_at = position(args, "FOR").ok_or(MachineProblem::InvalidOperation)?;
-            let mode = args
-                .get(for_at + 1)
-                .ok_or(MachineProblem::InvalidOperation)?;
-            let inspected = &source[range];
-            let count = match mode.as_str() {
-                "CHARACTERS" => inspected.len(),
-                "ALL" | "LEADING" => {
-                    let needle = self.resolve(
-                        args.get(for_at + 2)
-                            .ok_or(MachineProblem::InvalidOperation)?,
-                    )?;
-                    if mode == "ALL" {
-                        count_bytes(inspected, &needle)?
-                    } else if needle.is_empty() {
-                        return Err(MachineProblem::InvalidOperation);
-                    } else {
-                        let mut offset = 0usize;
-                        while inspected
-                            .get(offset..offset.saturating_add(needle.len()))
-                            .is_some_and(|candidate| candidate == needle)
-                        {
-                            offset += needle.len();
-                        }
-                        offset / needle.len()
-                    }
-                }
-                _ => return Err(MachineProblem::UnsupportedForm),
-            };
-            let next = decimal_add(
-                self.arithmetic_mode,
-                self.decimal(target)?,
-                Decimal {
-                    coefficient: i128::try_from(count)
-                        .map_err(|_| MachineProblem::ResourceExhausted)?,
-                    scale: 0,
-                },
-            )?;
-            self.write_decimal(target, next)?;
-        }
-        Ok(())
-    }
-
-    fn inspect_range(
-        &self,
-        source: &[u8],
-        args: &[String],
-    ) -> Result<std::ops::Range<usize>, MachineProblem> {
-        let delimiter = |keyword: &str| -> Result<Option<Vec<u8>>, MachineProblem> {
-            position(args, keyword)
-                .map(|at| {
-                    let at = at
-                        + 1
-                        + usize::from(args.get(at + 1).is_some_and(|token| token == "INITIAL"));
-                    self.resolve(args.get(at).ok_or(MachineProblem::InvalidOperation)?)
-                })
-                .transpose()
-        };
-        let after = delimiter("AFTER")?;
-        let before = delimiter("BEFORE")?;
-        let start = if let Some(after) = after {
-            let Some(at) = find_bytes(source, &after) else {
-                return Ok(source.len()..source.len());
-            };
-            at.checked_add(after.len())
-                .ok_or(MachineProblem::ResourceExhausted)?
-        } else {
-            0
-        };
-        let end = before
-            .as_ref()
-            .and_then(|before| find_bytes(&source[start..], before))
-            .map_or(source.len(), |at| start + at);
-        Ok(start..end)
-    }
-
     fn initialize_op(&mut self, args: &[String]) -> Result<(), MachineProblem> {
         let with_filler = args
             .windows(2)
@@ -11619,37 +11463,6 @@ fn json_figurative_bytes(layout: &LayoutMetadata, value: &str, length: usize) ->
     Some(bytes)
 }
 
-fn replace_bytes(source: &[u8], from: &[u8], to: &[u8]) -> Result<Vec<u8>, MachineProblem> {
-    if from.is_empty() || from.len() != to.len() {
-        return Err(MachineProblem::UnsupportedForm);
-    }
-    let mut result = source.to_vec();
-    let mut offset = 0usize;
-    while let Some(position) = find_bytes(&result[offset..], from) {
-        let start = offset + position;
-        result[start..start + from.len()].copy_from_slice(to);
-        offset = start + from.len();
-    }
-    Ok(result)
-}
-
-fn count_bytes(source: &[u8], needle: &[u8]) -> Result<usize, MachineProblem> {
-    if needle.is_empty() {
-        return Err(MachineProblem::InvalidOperation);
-    }
-    let mut count = 0usize;
-    let mut offset = 0usize;
-    while let Some(position) = find_bytes(&source[offset..], needle) {
-        count = count
-            .checked_add(1)
-            .ok_or(MachineProblem::ResourceExhausted)?;
-        offset = offset
-            .checked_add(position + needle.len())
-            .ok_or(MachineProblem::ResourceExhausted)?;
-    }
-    Ok(count)
-}
-
 fn failure_drive(category: FailureCategory, message: &str) -> MachineDrive<EffectRequest> {
     MachineDrive::Failed(
         ExecutionProblem::new(
@@ -11759,7 +11572,7 @@ mod tests {
     };
     use mainframe_env_ir::{Effect, IrLimits, ModuleBuilder};
 
-    fn divide_rounding_machine() -> ReferenceMachine {
+    pub(super) fn divide_rounding_machine() -> ReferenceMachine {
         let mut machine =
             ReferenceMachine::from_binary(&binary(), invocation(), CodecLimits::default()).unwrap();
         for name in ["R", "SRC", "Q", "REM"] {
