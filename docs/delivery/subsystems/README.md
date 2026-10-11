@@ -8,6 +8,12 @@ dependency. Work is tracked by these names rather than release milestones.
 Specifications, fixtures, and tests live in `conformance/subsystems/<name>/`;
 workload-specific inputs live in `conformance/profiles/<name>/`.
 
+The [remaining-work summary](REMAINING-WORK.md) maps the old 0.9–0.17
+milestones to these phases and lists all 54 planned work packages. It separates
+recorded implementation from missing behavior, pending checks and reporting
+gaps. Plan headers describe planning specifications; current implementation
+status belongs to each owning progress record.
+
 ## Subsystem plans
 
 <!-- BEGIN GENERATED SUBSYSTEM INDEX -->

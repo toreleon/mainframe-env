@@ -565,6 +565,10 @@
           "path": "docs/delivery/UNRELEASED-STATUS.md"
         },
         {
+          "label": "Remaining roadmap work and legacy milestone mapping",
+          "path": "docs/delivery/subsystems/REMAINING-WORK.md"
+        },
+        {
           "label": "Verification strategy",
           "path": "docs/delivery/VERIFICATION-STRATEGY.md"
         },
