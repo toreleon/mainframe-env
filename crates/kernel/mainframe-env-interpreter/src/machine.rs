@@ -52,6 +52,9 @@ mod decimal_commit;
 mod eib;
 #[cfg(test)]
 mod floating_insertion_tests;
+#[cfg(test)]
+mod indexed_by_tests;
+mod indexes;
 mod layout_admission;
 mod layout_resolution;
 mod legacy_mq;
@@ -2707,8 +2710,17 @@ impl ReferenceMachine {
             .map(control_tokens)
             .map(|tokens| tokens.into_iter().skip(1).collect::<Vec<_>>())
             .collect::<Vec<_>>();
+        let start = if args.iter().any(|token| token == "ALL") {
+            1
+        } else {
+            let value = value_decimal(self.eval_value(std::slice::from_ref(&index_name))?)?;
+            if value.scale != 0 || value.coefficient <= 0 {
+                return Err(MachineProblem::SubscriptError);
+            }
+            usize::try_from(value.coefficient).map_err(|_| MachineProblem::SubscriptError)?
+        };
         let mut found = false;
-        for occurrence in 1..=active {
+        for occurrence in start..=active {
             self.implicit.insert(
                 normalize(&index_name),
                 CobolValue::Decimal(Decimal {
@@ -4823,6 +4835,15 @@ impl ReferenceMachine {
                 } else {
                     decimal_subtract(self.arithmetic_mode, current, amount)?
                 };
+                if self.index_table(target).is_some() {
+                    let zero_literal = args[direction + 2..].len() == 1
+                        && decimal_text(&args[direction + 2])
+                            .is_some_and(|value| value.coefficient == 0);
+                    if amount.scale != 0 || zero_literal {
+                        return Err(MachineProblem::DataException);
+                    }
+                    self.index_displacement_for(target, value)?;
+                }
                 if self.layout(target).is_some() {
                     layout_assignments.push((vec![target.clone()], value, false));
                 } else if matches!(
@@ -4846,6 +4867,12 @@ impl ReferenceMachine {
         let to = position(args, "TO").ok_or(MachineProblem::InvalidOperation)?;
         if to == 0 || to + 1 >= args.len() {
             return Err(MachineProblem::InvalidOperation);
+        }
+        if args[..to]
+            .iter()
+            .any(|target| self.index_table(target).is_some())
+        {
+            return self.set_indexes(&args[..to], &args[to + 1..]);
         }
         let targets = self
             .arithmetic_items(&args[..to], true)?
@@ -8064,15 +8091,31 @@ impl ReferenceMachine {
                         }
                         _ => return Err(MachineProblem::SubscriptError),
                     };
-                    if index == 0 || index > *occurs {
+                    let displacement =
+                        if tokens.len() == 1 && self.index_table(&tokens[0]).is_some() {
+                            usize::try_from(self.index_displacement_for(
+                                &tokens[0],
+                                Decimal {
+                                    coefficient: index as i128,
+                                    scale: 0,
+                                },
+                            )?)
+                            .map_err(|_| MachineProblem::SubscriptError)?
+                        } else {
+                            index
+                                .checked_sub(1)
+                                .and_then(|index| index.checked_mul(*stride))
+                                .ok_or(MachineProblem::SubscriptError)?
+                        };
+                    if displacement.checked_add(*stride).is_none_or(|end| {
+                        occurs
+                            .checked_mul(*stride)
+                            .is_none_or(|extent| end > extent)
+                    }) {
                         return Err(MachineProblem::SubscriptError);
                     }
                     offset = offset
-                        .checked_add(
-                            (index - 1)
-                                .checked_mul(*stride)
-                                .ok_or(MachineProblem::SubscriptError)?,
-                        )
+                        .checked_add(displacement)
                         .ok_or(MachineProblem::SubscriptError)?;
                 }
                 length = layout.element_length.min(layout.length);
