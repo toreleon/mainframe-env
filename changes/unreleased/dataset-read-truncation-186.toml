@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Dataset reads expose incomplete input through a `more` flag; batch steps and other whole-input consumers fail explicitly instead of using a truncated record prefix (#186)."
