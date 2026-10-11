@@ -365,6 +365,7 @@ impl SemanticModel {
             &files,
             &user_functions,
             pointer_bytes,
+            upper.contains("EXEC CICS"),
         )?;
         Ok(Self {
             program_id,
