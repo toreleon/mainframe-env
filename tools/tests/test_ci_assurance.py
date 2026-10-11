@@ -2379,6 +2379,36 @@ class CensusFailureDiagnosticTests(unittest.TestCase):
         self.assertEqual((row['owned_leader_pid'], row['owned_pgid']), (987654321, 987654321))
         self.assertTrue(row['leader_retained'])
         self.assertFalse(row['member_observed'])
+        self.assertEqual(row['deadline_detected_monotonic_seconds'], .051)
+        self.assertEqual(row['finished_monotonic_seconds'], .051)
+
+        # Model later exception handling without moving the original refusal.
+        original_retain = ci._retain_census_failure
+        def delayed_retain(trace, problem, retained):
+            clock[0] = .091
+            original_retain(trace, problem, retained)
+        clock[0] = 0.0
+        with self.trace_context() as delayed_collector, \
+                patch.object(ci.time, 'monotonic', side_effect=lambda: clock[0]) as sample, \
+                patch.object(ci.time, 'thread_time', return_value=1) as cpu, \
+                patch.object(ci, '_retain_census_failure', side_effect=delayed_retain), \
+                self.snapshots([[('42', late)]]) as (delayed_scans, delayed_reads):
+            with self.assertRaisesRegex(OSError, '^' + self.ERROR + '$'):
+                ci._linux_group_observation(987654321, 1)
+        delayed = delayed_collector['observations'][0]
+        self.assertEqual((delayed_scans, delayed_reads), ([('42',)], ['42']))
+        self.assertEqual(delayed['deadline_monotonic_seconds'], .05)
+        self.assertEqual(delayed['deadline_detected_monotonic_seconds'], .051)
+        self.assertEqual(delayed['finished_monotonic_seconds'], .091)
+        self.assertEqual(delayed['elapsed_seconds'], .091)
+        self.assertAlmostEqual(delayed['finished_monotonic_seconds']
+                               - delayed['deadline_detected_monotonic_seconds'], .04)
+        self.assertEqual(sample.call_count, 6)
+        self.assertEqual(cpu.call_count, 2)
+        self.assertEqual((delayed['retry_count'], delayed['vanished_scans']), (0, 0))
+        self.assertFalse(delayed['member_observed'])
+        self.assertIsNone(ci._LINUX_CENSUS_TRACE.get())
+        self.assertIsNone(ci._LINUX_CENSUS_UNTIL.get())
 
     def test_vanished_rescan_cost_keeps_original_fifty_millisecond_deadline(self):
         clock = [0.0]
@@ -2428,6 +2458,16 @@ class CensusFailureDiagnosticTests(unittest.TestCase):
         self.assertEqual(row['deadline_monotonic_seconds'], .01)
         self.assertEqual(row['numeric_entries_per_scan'], [])
         self.assertEqual((row['stat_reads_started'], row['retry_count']), (0, 0))
+        self.assertEqual(row['deadline_detected_monotonic_seconds'], .02)
+        self.assertEqual(row['finished_monotonic_seconds'], .02)
+        with patch.object(ci.time, 'monotonic') as sample:
+            ci._check_linux_census_deadline(None)
+        sample.assert_not_called()
+        with patch.object(ci.time, 'monotonic', return_value=.1) as sample:
+            with self.assertRaisesRegex(OSError, '^' + self.ERROR + '$'):
+                ci._check_linux_census_deadline(.05)
+        self.assertEqual(sample.call_count, 1)
+        self.assertIsNone(ci._LINUX_CENSUS_TRACE.get())
 
     def test_reader_close_failure_and_unavailable_cpu_preserve_exact_oserror(self):
         stream = Mock()
@@ -2451,6 +2491,7 @@ class CensusFailureDiagnosticTests(unittest.TestCase):
         self.assertEqual((row['stage'], row['errno']), ('stat_close', 5))
         self.assertIsNone(row['thread_cpu_seconds'])
         self.assertEqual((row['stat_reads_started'], row['stat_reads_completed']), (1, 0))
+        self.assertNotIn('deadline_detected_monotonic_seconds', row)
 
     def test_diagnostics_bound_rows_and_restore_context_after_failures(self):
         from contextvars import Context

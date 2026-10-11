@@ -240,7 +240,10 @@ def _retain_census_failure(trace, problem, collector):
 
 
 def _check_linux_census_deadline(until) -> None:
-    if until is not None and time.monotonic() >= until:
+    if until is not None and (detected := time.monotonic()) >= until:
+        trace = _LINUX_CENSUS_TRACE.get()
+        if trace is not None:
+            trace['deadline_detected_monotonic_seconds'] = detected
         raise OSError('owned group membership census observation deadline exceeded')
 
 
