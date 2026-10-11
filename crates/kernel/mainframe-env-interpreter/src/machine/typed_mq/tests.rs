@@ -75,6 +75,7 @@ fn field(machine: &mut ReferenceMachine, name: &str, bytes: Vec<u8>, numeric: bo
             scale: 0,
             native_binary: false,
             signed: numeric,
+            sign_leading: false,
             sign_separate: false,
             justified_right: false,
             blank_when_zero: false,

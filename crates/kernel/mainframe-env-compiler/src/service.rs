@@ -435,6 +435,52 @@ mod tests {
     }
 
     #[test]
+    fn sign_leading_placement_survives_executable_lowering() {
+        for (clause, leading, separate) in [
+            ("LEADING SEPARATE", 1, 1),
+            ("TRAILING SEPARATE", 0, 1),
+            ("LEADING", 1, 0),
+            ("TRAILING", 0, 0),
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. SIGNTEST. DATA DIVISION.                  WORKING-STORAGE SECTION. 01 R PIC S9(6) SIGN {clause}.                  PROCEDURE DIVISION. MOVE 7 TO R. DISPLAY R. STOP RUN."
+            );
+            let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+                .compile(request(&source, CompilationMode::Executable))
+                .unwrap()
+            else {
+                panic!("SIGN {clause} must publish");
+            };
+            let module = decode_binary(artifact.payload(), CodecLimits::default()).unwrap();
+            let layout = module
+                .regions()
+                .iter()
+                .flat_map(|region| &region.blocks)
+                .flat_map(|block| &block.operations)
+                .find(|op| {
+                    op.identity.name() == "define"
+                        && op.attributes.get("name") == Some(&Attribute::Text("R".into()))
+                })
+                .unwrap();
+            assert_eq!(
+                layout.attributes.get("sign_separate"),
+                Some(&Attribute::Integer(separate)),
+                "{clause}"
+            );
+            assert_eq!(
+                layout.attributes.get("length"),
+                Some(&Attribute::Integer(6 + separate)),
+                "{clause}"
+            );
+            assert_eq!(
+                layout.attributes.get("sign_leading"),
+                Some(&Attribute::Integer(leading)),
+                "SIGN {clause} lost its placement"
+            );
+        }
+    }
+
+    #[test]
     fn bts_child_link_six_rows_lower_with_reserved_tags_and_reject_conflicting_wait() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. BTSP. DATA DIVISION. WORKING-STORAGE SECTION. 01 CHILD-X PIC X(16). 01 ANY-X PIC X(16). 01 CHANNEL-X PIC X(16). 01 AB-X PIC X(4). 01 STATUS-X PIC S9(9) COMP. 01 TIMEOUT-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS FETCH ANY(ANY-X) COMPSTATUS(STATUS-X) CHANNEL(CHANNEL-X) ABCODE(AB-X) NOSUSPEND END-EXEC. EXEC CICS FETCH CHILD(CHILD-X) COMPSTATUS(STATUS-X) TIMEOUT(TIMEOUT-X) END-EXEC. EXEC CICS FREE CHILD(CHILD-X) END-EXEC. EXEC CICS LINK ACQACTIVITY END-EXEC. EXEC CICS LINK ACQPROCESS END-EXEC. EXEC CICS LINK ACTIVITY('SUBTASK') INPUTEVENT('GO') END-EXEC.";
         let analysis = CobolCompiler::default().analyze(&bundle(source));

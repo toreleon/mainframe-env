@@ -56,6 +56,8 @@ mod layout_admission;
 mod layout_resolution;
 mod legacy_mq;
 mod observability;
+#[cfg(test)]
+mod sign_placement_tests;
 mod snapshot_codec;
 mod typed_cics;
 pub(crate) mod typed_mq;
@@ -137,6 +139,7 @@ struct LayoutMetadata {
     scale: u32,
     native_binary: bool,
     signed: bool,
+    sign_leading: bool,
     sign_separate: bool,
     justified_right: bool,
     blank_when_zero: bool,
@@ -9328,6 +9331,16 @@ fn layout_metadata(operations: &[Operation]) -> Result<LayoutState, MachineProbl
                 .unwrap_or_default()
                 != 0,
             signed: integer_attribute(operation, "signed")? != 0,
+            // Older executable layouts default to the COBOL trailing sign.
+            sign_leading: match operation.attributes.get("sign_leading") {
+                None | Some(Attribute::Integer(0)) => false,
+                Some(Attribute::Integer(1)) => true,
+                _ => {
+                    return Err(MachineProblem::InvalidArtifact(
+                        "invalid sign_leading".into(),
+                    ));
+                }
+            },
             sign_separate: integer_attribute(operation, "sign_separate")? != 0,
             justified_right: optional_integer_attribute(operation, "justified_right")
                 .unwrap_or_default()
@@ -10934,16 +10947,26 @@ fn encode_decimal(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Ma
             let start = output.len() - copy;
             output[start..].copy_from_slice(&digits.as_bytes()[digits.len() - copy..]);
             if layout.signed && !layout.sign_separate {
-                let last = output.last_mut().ok_or(MachineProblem::SizeError)?;
+                let sign_digit = if layout.sign_leading {
+                    output.first_mut()
+                } else {
+                    output.last_mut()
+                }
+                .ok_or(MachineProblem::SizeError)?;
                 let overpunch = if value.coefficient < 0 {
                     b"}JKLMNOPQR"
                 } else {
                     b"{ABCDEFGHI"
                 };
-                *last = overpunch[usize::from(*last - b'0')];
+                *sign_digit = overpunch[usize::from(*sign_digit - b'0')];
             }
             if layout.sign_separate {
-                output.push(if value.coefficient < 0 { b'-' } else { b'+' });
+                let sign = if value.coefficient < 0 { b'-' } else { b'+' };
+                if layout.sign_leading {
+                    output.insert(0, sign);
+                } else {
+                    output.push(sign);
+                }
             }
             Ok(output)
         }
@@ -11784,6 +11807,7 @@ mod tests {
                     scale: 2,
                     native_binary: false,
                     signed: true,
+                    sign_leading: false,
                     sign_separate: false,
                     justified_right: false,
                     blank_when_zero: false,
@@ -12037,6 +12061,7 @@ mod tests {
                 scale: 0,
                 native_binary: false,
                 signed: false,
+                sign_leading: false,
                 sign_separate: false,
                 justified_right: false,
                 blank_when_zero: false,
@@ -12457,6 +12482,7 @@ mod tests {
             scale,
             native_binary: false,
             signed,
+            sign_leading: false,
             sign_separate: false,
             justified_right: false,
             blank_when_zero: false,
@@ -12777,6 +12803,7 @@ mod tests {
             scale: 2,
             native_binary: false,
             signed: true,
+            sign_leading: false,
             sign_separate: false,
             justified_right: false,
             blank_when_zero: false,
@@ -13065,6 +13092,7 @@ mod tests {
             scale,
             native_binary: false,
             signed: true,
+            sign_leading: false,
             sign_separate: false,
             justified_right: false,
             blank_when_zero,
@@ -13099,6 +13127,7 @@ mod tests {
             scale: 0,
             native_binary: false,
             signed: true,
+            sign_leading: false,
             sign_separate: false,
             justified_right: false,
             blank_when_zero: false,
@@ -13235,6 +13264,7 @@ mod tests {
                 scale: 0,
                 native_binary: false,
                 signed: false,
+                sign_leading: false,
                 sign_separate: false,
                 justified_right: false,
                 blank_when_zero: false,

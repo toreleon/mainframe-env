@@ -192,6 +192,10 @@ pub(crate) fn lower_to_core(
                 Attribute::Integer(i64::from(layout.signed)),
             ),
             (
+                "sign_leading".into(),
+                Attribute::Integer(i64::from(layout.sign_leading)),
+            ),
+            (
                 "sign_separate".into(),
                 Attribute::Integer(i64::from(layout.sign_separate)),
             ),
