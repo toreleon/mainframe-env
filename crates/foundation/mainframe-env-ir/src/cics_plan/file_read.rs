@@ -57,7 +57,11 @@ pub(super) fn invalid_shape(
         })
         || !matches!(
             operand_value(plan, CicsOperandName::Length),
-            None | Some(CicsOperandValue::Storage(_) | CicsOperandValue::LengthOf(_))
+            None | Some(
+                CicsOperandValue::Integer(0..=32_767)
+                    | CicsOperandValue::Storage(_)
+                    | CicsOperandValue::LengthOf(_)
+            )
         )
         || outputs.contains(&CicsOutputName::Length)
             != matches!(

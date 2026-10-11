@@ -3127,7 +3127,7 @@ mod tests {
 
         for source in [
             "IDENTIFICATION DIVISION. PROGRAM-ID. BADBLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(2). 01 RECORD-X PIC X(4). PROCEDURE DIVISION. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) LENGTH(KEY-X) END-EXEC.",
-            "IDENTIFICATION DIVISION. PROGRAM-ID. BADBLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(2). 01 RECORD-X PIC X(4). PROCEDURE DIVISION. EXEC CICS READNEXT FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) LENGTH(2) END-EXEC.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADBLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(2). 01 RECORD-X PIC X(4). PROCEDURE DIVISION. EXEC CICS READNEXT FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) LENGTH(-1) END-EXEC.",
         ] {
             assert!(analyze(source).hir.is_none(), "{source}");
         }
@@ -7371,6 +7371,134 @@ mod tests {
     }
 
     #[test]
+    fn cics_read_and_rewrite_accept_halfword_length_literals() {
+        for length in [0, 8, 32_767] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. LITLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). 01 KEY-X PIC X(16). 01 R PIC S9(9) COMP. 01 R2 PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) LENGTH({length}) KEYLENGTH(16) RESP(R) RESP2(R2) END-EXEC. EXEC CICS REWRITE FILE('ACCTDAT') FROM(REC-X) LENGTH({length}) END-EXEC. STOP RUN."
+            ));
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("literal LENGTH({length}): {:?}", analysis.diagnostics));
+            let commands = hir
+                .statements
+                .iter()
+                .filter_map(|statement| match statement.resolved.as_ref() {
+                    Some(HirResolvedStatement::Cics(command)) => Some(command),
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(commands.len(), 2);
+            for command in &commands {
+                assert!(command.operands.iter().any(|operand| {
+                    operand.name == HirCicsOperandName::Length
+                        && operand.value == HirCicsValue::Integer(length)
+                }));
+                assert!(
+                    !command
+                        .outputs
+                        .iter()
+                        .any(|output| { output.name == HirCicsOutputName::Length })
+                );
+            }
+            assert!(commands[0].operands.iter().any(|operand| {
+                operand.name == HirCicsOperandName::KeyLength
+                    && operand.value == HirCicsValue::Integer(16)
+            }));
+        }
+    }
+
+    #[test]
+    fn cics_file_length_literals_reject_invalid_halfwords_and_missing_names() {
+        for command in [
+            "READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) LENGTH",
+            "READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) KEYLENGTH",
+            "REWRITE FILE('ACCTDAT') FROM(REC-X) LENGTH",
+        ] {
+            let relation = if command.ends_with("KEYLENGTH") {
+                " GTEQ"
+            } else {
+                ""
+            };
+            for invalid in [
+                "-1",
+                "-0",
+                "1.5",
+                "32768",
+                "2147483647",
+                "999999999999999999999",
+            ] {
+                let analysis = analyze(&format!(
+                    "IDENTIFICATION DIVISION. PROGRAM-ID. BADLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). 01 KEY-X PIC X(16). PROCEDURE DIVISION. EXEC CICS {command}({invalid}){relation} END-EXEC. STOP RUN."
+                ));
+                assert!(analysis.hir.is_none(), "{command}({invalid})");
+                assert!(
+                    analysis.diagnostics.iter().any(|diagnostic| {
+                        diagnostic
+                            .public_message()
+                            .contains("literal must be an integer between 0 and 32767")
+                    }),
+                    "{command}({invalid}): {:?}",
+                    analysis.diagnostics
+                );
+            }
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADNAME. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). 01 KEY-X PIC X(16). PROCEDURE DIVISION. EXEC CICS {command}(MISSING-X) END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none());
+            assert!(
+                analysis.diagnostics.iter().any(|diagnostic| {
+                    diagnostic
+                        .public_message()
+                        .contains("cannot resolve MISSING-X: Missing")
+                }),
+                "{:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+
+    #[test]
+    fn cics_sibling_file_commands_accept_halfword_length_literals() {
+        for command in [
+            "READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) LENGTH(8) KEYLENGTH(0) GTEQ",
+            "READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) KEYLENGTH(32767)",
+            "READNEXT FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) LENGTH(8) KEYLENGTH(16)",
+            "READPREV FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) LENGTH(8) KEYLENGTH(16)",
+            "STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) KEYLENGTH(16)",
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. SIBLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). 01 KEY-X PIC X(16). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{command}: {:?}", analysis.diagnostics));
+            let cics = hir
+                .statements
+                .iter()
+                .find_map(|statement| match statement.resolved.as_ref() {
+                    Some(HirResolvedStatement::Cics(command)) => Some(command),
+                    _ => None,
+                })
+                .expect("typed file command");
+            assert!(
+                cics.operands
+                    .iter()
+                    .filter(|operand| {
+                        matches!(
+                            operand.name,
+                            HirCicsOperandName::Length | HirCicsOperandName::KeyLength
+                        )
+                    })
+                    .all(|operand| matches!(operand.value, HirCicsValue::Integer(_)))
+            );
+        }
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADREWR. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). PROCEDURE DIVISION. EXEC CICS REWRITE FILE('ACCTDAT') FROM(REC-X) KEYLENGTH(16) END-EXEC. STOP RUN.",
+        );
+        assert!(analysis.hir.is_none(), "REWRITE has no KEYLENGTH option");
+    }
+
+    #[test]
     fn cics_file_lengths_lower_as_typed_values_and_read_output() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). 01 KEY-X PIC X(3). 01 LEN-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) LENGTH(LEN-X) KEYLENGTH(LENGTH OF KEY-X) END-EXEC. EXEC CICS REWRITE FILE('ACCTDAT') FROM(REC-X) LENGTH(LENGTH OF REC-X) END-EXEC. STOP RUN.";
         let hir = analyze(source).hir.expect("typed CICS length HIR");
@@ -7433,7 +7561,7 @@ mod tests {
                 .any(|output| output.name == HirCicsOutputName::Length)
         );
 
-        for invalid in ["LENGTH(8)", "LENGTH(LENGTH OF KEY-X)"] {
+        for invalid in ["LENGTH(-1)", "LENGTH(LENGTH OF KEY-X)"] {
             let analysis = analyze(&format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. BADRLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). 01 KEY-X PIC X(3). PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) {invalid} END-EXEC. STOP RUN."
             ));

@@ -239,9 +239,10 @@ the latest held key for the same file; WRITE FILE reads FROM and RIDFLD storage
 slots, while REWRITE reads FROM and consumes the same-file update hold. Optional
 WRITE or REWRITE LENGTH is a bounded literal, halfword-binary value, or matching
 `LENGTH OF` and selects the exact FROM prefix before the durable mutation.
-READ LENGTH supplies a writable halfword capacity and receives the actual
-record length after transfer. Optional READ, WRITE, or explicit-key DELETE
-KEYLENGTH accepts a positive literal, halfword-binary value, or `LENGTH OF` the
+READ, READNEXT, and READPREV LENGTH accept a halfword integer literal capacity
+(0–32767) or matching `LENGTH OF` without write-back; writable halfword storage
+receives the actual record length after transfer. Optional READ, WRITE, or
+explicit-key DELETE KEYLENGTH accepts a positive literal, halfword-binary value, or `LENGTH OF` the
 RIDFLD area and must match the durable key definition. These operations require
 exactly one FILE/DATASET alias, carry a mutation identity, and update the
 operation-specific EIBFN. A current-record DELETE or REWRITE without a hold
