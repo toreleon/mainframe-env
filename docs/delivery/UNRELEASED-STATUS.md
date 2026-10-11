@@ -8,6 +8,12 @@ what changed. Current implementation and acceptance belong to the subsystem
 progress records below. A merged fragment, generated identity, typed route or
 passing helper test does not complete an entire subsystem.
 
+For the old 0.9–0.17 milestones, use the
+[remaining-work summary](subsystems/REMAINING-WORK.md). It maps all nine phases
+and 54 work packages to their plan/progress authorities and distinguishes
+implementation work from acceptance still pending. A missing package-level
+progress entry is a reporting gap, not proof that no code exists.
+
 ## Status vocabulary
 
 | State | Meaning |

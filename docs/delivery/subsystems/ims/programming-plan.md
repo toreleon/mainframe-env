@@ -3,7 +3,7 @@
 Subsystem: **ims**
 Phase: **programming**
 
-Status: **Proposed**
+Status: **Planning specification; implementation tracked in the progress record**
 Start gate: cobol.execution COBOL host ABI, racf.security SAF, and dataset.data storage/catalog contracts frozen
 Completion dependencies: cobol.execution, racf.security, dataset.data
 Estimate: 20–32 engineer-months

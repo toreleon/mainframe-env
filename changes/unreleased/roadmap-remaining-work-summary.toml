@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Consolidate legacy 0.9–0.17 roadmap aliases and all 54 work packages, separate implementation from pending acceptance, and clarify historical planning and branch-result boundaries."

@@ -1,6 +1,6 @@
 {
   "counts": {
-    "markdown_documents": 237,
+    "markdown_documents": 238,
     "navigation_groups": 8,
     "normative_documents": 98,
     "xtask_commands": 163
@@ -341,8 +341,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 179,
-      "sha256": "sha256:310973c140115d2e72f0a1b32e26fd7f0f538c994e8636c72b53538c15b13a0e",
+      "relative_links": 180,
+      "sha256": "sha256:9dd141d839a01d4d53ac0fd8584e34920ec9829df130d5378e0407d58d517b3f",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -1497,8 +1497,8 @@
     {
       "normative": false,
       "path": "docs/delivery/UNRELEASED-STATUS.md",
-      "relative_links": 19,
-      "sha256": "sha256:c88d8ba3782d6674c6d578968d3a9248c1583abc05356004a3e67e74290fbe36",
+      "relative_links": 20,
+      "sha256": "sha256:d447f163e0d7ca0f760c010ec43790d032c0ac2042f613db7e58ec4e6a398c5e",
       "title": "Unreleased changes and remaining work",
       "xtask_commands": 1
     },
@@ -1553,16 +1553,24 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/README.md",
-      "relative_links": 37,
-      "sha256": "sha256:9a95dc42e69a07f190555250b8415d98c1927a662be227995f421a404dac9d69",
+      "relative_links": 38,
+      "sha256": "sha256:ff9fc44874d5c66377aa9742ca72f6bd1da9adda7d8e46a54e4999fd52adda13",
       "title": "Subsystem delivery plans",
       "xtask_commands": 2
     },
     {
       "normative": false,
+      "path": "docs/delivery/subsystems/REMAINING-WORK.md",
+      "relative_links": 42,
+      "sha256": "sha256:e11e53fea79d7a6a9888c4b734fcbdf442a823e3d90fe73f9032452840d4af05",
+      "title": "Remaining roadmap work",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
       "path": "docs/delivery/subsystems/certification/licensed-plan.md",
       "relative_links": 2,
-      "sha256": "sha256:23998b81f00b6180e3feb1d5ce30442af843216af9570c63bd9ad13ff93fca65",
+      "sha256": "sha256:faa6b598626778c9b2d0fabbf01a7eeb92430a9fd35877eb9f8a151750da9ac4",
       "title": "Licensed certification — Differential certification",
       "xtask_commands": 0
     },
@@ -1593,8 +1601,8 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/cics/application-api-plan.md",
-      "relative_links": 10,
-      "sha256": "sha256:f33ae012037ff77c7be0bb35934689f82e306b92b92ff699b27909875fc26d3f",
+      "relative_links": 11,
+      "sha256": "sha256:1b90e14630e44a739fcbbf33711eace6b4cfd0c66d04d838ce3990346c349f11",
       "title": "CICS — Application API",
       "xtask_commands": 0
     },
@@ -1618,7 +1626,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cics/system-api-plan.md",
       "relative_links": 2,
-      "sha256": "sha256:7468973478dda74b4870cfe6552411cf180255cc449b3104dbeab10393a5cc1e",
+      "sha256": "sha256:4c11f44ff928144e04f6281662c93b3d534f2f9d07db95ad39e90b567a10a74b",
       "title": "CICS — SPI and FEPI",
       "xtask_commands": 0
     },
@@ -1722,7 +1730,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/db2/core-plan.md",
       "relative_links": 3,
-      "sha256": "sha256:77e58fcf77c539a895a7af277225bd6e0a04deca4ef8fc7e88ae69035f1a5f5d",
+      "sha256": "sha256:1a971433db9616f90d6ae99222a619d5cbf5abe42558365f463da4585fdc34cd",
       "title": "Db2 — Engine and common SQL",
       "xtask_commands": 0
     },
@@ -1746,7 +1754,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/db2/programming-plan.md",
       "relative_links": 2,
-      "sha256": "sha256:d86095ad9ce96cb1426217e5451de37a3649616d89146362497719735a86707e",
+      "sha256": "sha256:e87dd0201f3ff154e8ccef6c71afeb7ba94bac17c8164d0f842020baf318d700",
       "title": "Db2 — Complete programming surface",
       "xtask_commands": 0
     },
@@ -1778,7 +1786,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-plan.md",
       "relative_links": 2,
-      "sha256": "sha256:9e00f37822ba6d38e7e862e78ed7192b5297a41c2afbb054dc5c9879fb4b1034",
+      "sha256": "sha256:5e01280b208524d07061d6dbf5fdb0cc9442cfe870ed5864e913ca201ac742a9",
       "title": "IMS — DB / TM programming surface",
       "xtask_commands": 0
     },
@@ -1802,7 +1810,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/integration/transactions-plan.md",
       "relative_links": 2,
-      "sha256": "sha256:6fb997d6567fc2a1588360ca35c36a2add76f7ab71e07533af1ab71a92c9abf4",
+      "sha256": "sha256:d1c9eb0371bde1bdc08a8ca6d4c36417beae68d4731faa749ce594c99cc18bd1",
       "title": "Cross-resource integration — Transactions and recovery",
       "xtask_commands": 0
     },
@@ -1870,7 +1878,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-plan.md",
       "relative_links": 3,
-      "sha256": "sha256:dca02036dda520579fb57b00c2485137e367a3e33f45bc863169e1610e4986b6",
+      "sha256": "sha256:384ec7275501c60ba0e4ba44b48a6476203fa0b27390862047b503778cdc0658",
       "title": "IBM MQ — MQI programming surface",
       "xtask_commands": 0
     },
@@ -1902,7 +1910,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/zosmf/rest-plan.md",
       "relative_links": 2,
-      "sha256": "sha256:628d09ba07812a797171294e451175e4622f807ef27c9e7a3abd2c3ad05aa95c",
+      "sha256": "sha256:888919678308e4a165096899482e48a2ac28a02827e469c94ccb6788b416388e",
       "title": "z/OSMF — REST portfolio",
       "xtask_commands": 0
     },
@@ -2129,8 +2137,8 @@
     {
       "normative": false,
       "path": "docs/research/IBM-OFFICIAL-COVERAGE-ROADMAP.md",
-      "relative_links": 13,
-      "sha256": "sha256:54b3641562da8126ff2bec6f49a394fbb3c364a0cb937a15702408ef8e51bbdc",
+      "relative_links": 14,
+      "sha256": "sha256:b26091e29aaa6b2a215ce97214e6f914e725bcd8c86d3377e116a943047375a5",
       "title": "IBM official coverage and de-hardcoding roadmap",
       "xtask_commands": 0
     },
@@ -2758,6 +2766,10 @@
           "path": "docs/delivery/UNRELEASED-STATUS.md"
         },
         {
+          "label": "Remaining roadmap work and legacy milestone mapping",
+          "path": "docs/delivery/subsystems/REMAINING-WORK.md"
+        },
+        {
           "label": "Verification strategy",
           "path": "docs/delivery/VERIFICATION-STRATEGY.md"
         },
@@ -2960,7 +2972,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:95ac25532cbc184708b38511837822158295432cd22aa8f47003e7df3aeeeb6a",
+  "registry_sha256": "sha256:1d4e5288b43cd3ff3912aedb6844318c1948c25e290bdb1bc996a10ed89224af",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

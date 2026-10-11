@@ -3,7 +3,7 @@
 Subsystem: **integration**
 Phase: **transactions**
 
-Status: **Proposed**
+Status: **Planning specification; implementation tracked in the progress record**
 Start gate: accepted JES, CICS, Db2, IMS, and MQ provider state/UOW contracts
 Completion dependencies: jes.execution, cics.system-api, db2.programming, ims.programming, mq.programming
 Estimate: 14–22 engineer-months

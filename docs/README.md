@@ -196,6 +196,7 @@ ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immuta
 - [Implementation roadmap](delivery/IMPLEMENTATION-ROADMAP.md)
 - [Implementation status](delivery/IMPLEMENTATION-STATUS.md)
 - [Unreleased changes and remaining work](delivery/UNRELEASED-STATUS.md)
+- [Remaining roadmap work and legacy milestone mapping](delivery/subsystems/REMAINING-WORK.md)
 - [Verification strategy](delivery/VERIFICATION-STRATEGY.md)
 - [Compatibility and cutover](delivery/COMPATIBILITY-AND-CUTOVER.md)
 - [z/OSMF compatibility API](delivery/ZOSMF-API.md)

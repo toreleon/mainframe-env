@@ -10,6 +10,11 @@ The analysis, the row inventories and every denominator below are the
 every official source was re-pointed from a PDF to that book's IBM Documentation
 topic set, which changes what "Official sources used for this baseline" names.
 
+The observable footprint and hardcode audit below are historical snapshot
+figures, not current progress. Use the
+[remaining-work summary](../delivery/subsystems/REMAINING-WORK.md) for the old
+0.9–0.17 mapping and the owning implementation/acceptance records.
+
 ## Executive conclusion
 
 The current system is a strong, bounded CardDemo runtime, but it is not close to
