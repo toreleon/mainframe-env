@@ -26,7 +26,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 0,
-      "sha256": "sha256:12ab36d5f0dbbbf7d0c243ce7156ca5d537ba55369e2032c76e9265f512966d4",
+      "sha256": "sha256:b76b18c9b20b38eb273880b14ec8772091e525f40b05d88241c36da61c9c5296",
       "title": "Changelog",
       "xtask_commands": 0
     },
@@ -1862,7 +1862,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/jcl/planning-status.md",
       "relative_links": 0,
-      "sha256": "sha256:8d0591b812c1c9f583a88f6d5383dc165082d44f4b9dde294c362ff8eb28ae30",
+      "sha256": "sha256:1fdee9dea99984638355c8783c49d747dc711dce4656fbd8c36a36a9b72fa628",
       "title": "JCL — Converter and planner progress",
       "xtask_commands": 0
     },

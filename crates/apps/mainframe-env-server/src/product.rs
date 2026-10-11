@@ -4894,6 +4894,34 @@ impl ProductServer {
             "DEFINE" => {
                 let name = control_name(&text, "NAME")
                     .ok_or_else(|| gateway_problem(HostProblem::Malformed))?;
+                // #273: IDCAMS RECORDSIZE is (average, maximum), default (4089, 4089).
+                let ksds_cluster = words.get(1).is_some_and(|word| {
+                    word.split('(')
+                        .next()
+                        .is_some_and(|kind| kind.eq_ignore_ascii_case("CLUSTER"))
+                }) && !words.iter().any(|word| {
+                    ["NONINDEXED", "NUMBERED", "LINEAR"]
+                        .iter()
+                        .any(|kind| word.trim_matches(['(', ')']).eq_ignore_ascii_case(kind))
+                });
+                let maximum = if !ksds_cluster {
+                    32760
+                } else if let Some(value) = control_name(&text, "RECORDSIZE") {
+                    let sizes = value
+                        .split(|ch: char| ch == ',' || ch.is_whitespace())
+                        .filter(|value| !value.is_empty())
+                        .map(str::parse::<u32>)
+                        .collect::<Result<Vec<_>, _>>()
+                        .map_err(|_| gateway_problem(HostProblem::Malformed))?;
+                    if sizes.len() != 2 || sizes[0] == 0 || sizes[1] < sizes[0] {
+                        return Err(gateway_problem(HostProblem::Malformed));
+                    }
+                    sizes[1]
+                } else if text.to_ascii_uppercase().contains("RECORDSIZE") {
+                    return Err(gateway_problem(HostProblem::Malformed));
+                } else {
+                    4089
+                };
                 self.dataset_call(
                     principal,
                     DatasetRequest::Create {
@@ -4901,7 +4929,7 @@ impl ProductServer {
                         attributes: DatasetAttributes {
                             organization: DatasetOrganization::KeySequenced,
                             record_format: RecordFormat::Variable,
-                            logical_record_length: 32760,
+                            logical_record_length: maximum,
                             key_offset: Some(0),
                             key_length: Some(8),
                             ccsid: Some(37),
@@ -6443,6 +6471,9 @@ mod tests {
 
     #[path = "bts_set_lifetime.rs"]
     mod bts_set_lifetime;
+
+    #[path = "ams_recordsize.rs"]
+    mod ams_recordsize;
 
     #[path = "program_default_abend.rs"]
     mod program_default_abend;
@@ -9066,7 +9097,7 @@ mod tests {
             &server,
             "ALICE",
             b"ALICEPASS",
-            "//PARENT JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILD JOB CLASS=A\n//RUN EXEC PGM=IKJEFT01\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n//WORK DD DSN=&&WORK,DISP=(NEW,DELETE,DELETE)\n"
+            "//PARENT JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILD JOB CLASS=A\n//RUN EXEC PGM=IKJEFT01\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n//WORK DD DSN=&&WORK,DISP=(NEW,DELETE,DELETE),\n//         DCB=(RECFM=VB,LRECL=32760)\n"
                 .into(),
         );
         let parent_id = parent["jobid"].as_str().unwrap();
@@ -9605,7 +9636,7 @@ mod tests {
             &server,
             "ALICE",
             b"ALICEPASS",
-            "//PARENT JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILD JOB CLASS=A\n//RUN EXEC PGM=IEFBR14\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n//WORK DD DSN=&&WORK,DISP=(NEW,DELETE,DELETE)\n"
+            "//PARENT JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILD JOB CLASS=A\n//RUN EXEC PGM=IEFBR14\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n//WORK DD DSN=&&WORK,DISP=(NEW,DELETE,DELETE),\n//         DCB=(RECFM=VB,LRECL=32760)\n"
                 .into(),
         );
         let parent_id = parent["jobid"].as_str().unwrap();

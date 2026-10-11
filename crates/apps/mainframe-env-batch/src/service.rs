@@ -3628,7 +3628,17 @@ impl BatchService {
             }
         } else if command == "define-cluster" {
             validate_vsam_component_clauses(statement)?;
-            let (minimum, maximum) = pair_operand(statement, "RECORDSIZE").unwrap_or((80, 80));
+            // #273: IDCAMS KSDS omission default; preserve other cluster defaults.
+            let default_recordsize = if statement.contains(" LINEAR")
+                || statement.contains("NUMBERED")
+                || statement.contains("NONINDEXED")
+            {
+                (80, 80)
+            } else {
+                (4089, 4089)
+            };
+            let (minimum, maximum) =
+                pair_operand(statement, "RECORDSIZE").unwrap_or(default_recordsize);
             let keys = pair_operand(statement, "KEYS");
             let organization = if statement.contains(" LINEAR") {
                 DatasetOrganization::Linear
@@ -9149,7 +9159,7 @@ mod tests {
             .submit(
                 &invocation,
                 &JclBundle {
-                    primary: "//TEMPJOB JOB CLASS=A\n//MAKE EXEC PGM=IEFBR14\n//WORK DD DSN=&&WORK,DISP=(NEW,PASS,DELETE)\n//USE EXEC PGM=IEFBR14\n//INPUT DD DSN=&&WORK,DISP=(OLD,DELETE,DELETE)\n".into(),
+                    primary: "//TEMPJOB JOB CLASS=A\n//MAKE EXEC PGM=IEFBR14\n//WORK DD DSN=&&WORK,DISP=(NEW,PASS,DELETE),\n//         DCB=(RECFM=VB,LRECL=32760)\n//USE EXEC PGM=IEFBR14\n//INPUT DD DSN=&&WORK,DISP=(OLD,DELETE,DELETE)\n".into(),
                     ..Default::default()
                 },
                 &IdempotencyKey::new("temporary-lifecycle", InvocationLimits::default()).unwrap(),
@@ -9172,7 +9182,7 @@ mod tests {
             .submit(
                 &invocation,
                 &JclBundle {
-                    primary: "//TCLEAN JOB CLASS=A\n//MAKE EXEC PGM=IEFBR14\n//WORK DD DSN=&&WORK,DISP=(NEW,PASS,DELETE)\n"
+                    primary: "//TCLEAN JOB CLASS=A\n//MAKE EXEC PGM=IEFBR14\n//WORK DD DSN=&&WORK,DISP=(NEW,PASS,DELETE),\n//         DCB=(RECFM=VB,LRECL=32760)\n"
                         .into(),
                     ..Default::default()
                 },
@@ -9196,7 +9206,7 @@ mod tests {
             .submit(
                 &invocation,
                 &JclBundle {
-                    primary: "//CATJOB JOB CLASS=A\n//MAKE EXEC PGM=IEFBR14\n//DATA DD DSN=USER.DISP,DISP=(NEW,CATLG,DELETE)\n"
+                    primary: "//CATJOB JOB CLASS=A\n//MAKE EXEC PGM=IEFBR14\n//DATA DD DSN=USER.DISP,DISP=(NEW,CATLG,DELETE),\n//         DCB=(RECFM=VB,LRECL=32760)\n"
                         .into(),
                     ..Default::default()
                 },
@@ -9305,7 +9315,7 @@ mod tests {
             .submit(
                 &invocation,
                 &JclBundle {
-                    primary: "//PARTIAL JOB CLASS=A\n//STEP EXEC PGM=IEFBR14\n//ONE DD DSN=USER.PARTIAL,DISP=NEW\n//TWO DD DSN=USER.PARTIAL,DISP=NEW\n"
+                    primary: "//PARTIAL JOB CLASS=A\n//STEP EXEC PGM=IEFBR14\n//ONE DD DSN=USER.PARTIAL,DISP=NEW,\n//         DCB=(RECFM=VB,LRECL=32760)\n//TWO DD DSN=USER.PARTIAL,DISP=NEW,\n//         DCB=(RECFM=VB,LRECL=32760)\n"
                         .into(),
                     ..Default::default()
                 },
@@ -9329,7 +9339,7 @@ mod tests {
             .submit(
                 &invocation,
                 &JclBundle {
-                    primary: "//ROLLJOB JOB CLASS=A\n//FAIL EXEC PGM=NOTREAL\n//WORK DD DSN=IBMUSER.ROLLBACK,DISP=(NEW,KEEP,DELETE)\n".into(),
+                    primary: "//ROLLJOB JOB CLASS=A\n//FAIL EXEC PGM=NOTREAL\n//WORK DD DSN=IBMUSER.ROLLBACK,DISP=(NEW,KEEP,DELETE),\n//         DCB=(RECFM=VB,LRECL=32760)\n".into(),
                     ..Default::default()
                 },
                 &IdempotencyKey::new("abnormal-rollback", InvocationLimits::default()).unwrap(),
@@ -9398,6 +9408,48 @@ mod tests {
             }),
             Ok(DatasetResult::Locks { locks }) if locks.is_empty()
         ));
+    }
+
+    #[test]
+    fn idcams_ksds_recordsize_omission_uses_4089_without_changing_esds_default() {
+        let (service, dataset) = service_with_real_datasets();
+        let invocation = invocation();
+        let submitted = service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//AMSJOB JOB CLASS=A\n//AMS EXEC PGM=IDCAMS\n//SYSIN DD *\n DEFINE CLUSTER (NAME(IBMUSER.DEFAULT) INDEXED KEYS(8 0))\n DEFINE CLUSTER (NAME(IBMUSER.ESDEF) NONINDEXED)\n/*\n".into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("recordsize-default", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        let completed = service.run_next(&invocation, false).unwrap().unwrap();
+        assert_eq!(completed.state, JobState::Completed);
+        assert_eq!(
+            completed.return_code,
+            Some(0),
+            "{:?}",
+            service
+                .spool(&invocation, &submitted.id, "SYSPRINT", 0, 8)
+                .unwrap()
+                .0
+                .into_iter()
+                .map(|line| String::from_utf8_lossy(&line).into_owned())
+                .collect::<Vec<_>>()
+        );
+        for (name, length) in [("IBMUSER.DEFAULT", 4089), ("IBMUSER.ESDEF", 80)] {
+            let DatasetResult::Attributes { attributes, .. } = dataset
+                .invoke(DatasetRequest::Attributes {
+                    dataset: DatasetName::new(name, 128).unwrap(),
+                })
+                .unwrap()
+            else {
+                panic!("expected defined cluster attributes");
+            };
+            assert_eq!(attributes.logical_record_length, length, "{name}");
+        }
     }
 
     #[test]
@@ -10488,7 +10540,7 @@ mod tests {
             .submit(
                 &invocation,
                 &JclBundle {
-                    primary: "//GDGJOB JOB CLASS=A\n//DEFINE EXEC PGM=IDCAMS\n//SYSIN DD *\n DEFINE GENERATIONDATAGROUP (NAME(IBMUSER.HISTORY) LIMIT(3) SCRATCH NOEMPTY)\n/*\n//COPY EXEC PGM=IEBGENER\n//SYSUT1 DD *\nGENERATION\n/*\n//SYSUT2 DD DSN=IBMUSER.HISTORY(+1),DISP=(NEW,CATLG,DELETE)\n".into(),
+                    primary: "//GDGJOB JOB CLASS=A\n//DEFINE EXEC PGM=IDCAMS\n//SYSIN DD *\n DEFINE GENERATIONDATAGROUP (NAME(IBMUSER.HISTORY) LIMIT(3) SCRATCH NOEMPTY)\n/*\n//COPY EXEC PGM=IEBGENER\n//SYSUT1 DD *\nGENERATION\n/*\n//SYSUT2 DD DSN=IBMUSER.HISTORY(+1),DISP=(NEW,CATLG,DELETE),\n//         DCB=(RECFM=VB,LRECL=32760)\n".into(),
                     ..Default::default()
                 },
                 &IdempotencyKey::new("gdg-output", InvocationLimits::default()).unwrap(),
@@ -10740,7 +10792,7 @@ mod tests {
             .submit(
                 &invocation,
                 &JclBundle {
-                    primary: "//ABDISP JOB CLASS=A\n//FAIL EXEC PGM=FAILPGM\n//DATA DD DSN=IBMUSER.ABDISP,DISP=(NEW,KEEP,DELETE)\n"
+                    primary: "//ABDISP JOB CLASS=A\n//FAIL EXEC PGM=FAILPGM\n//DATA DD DSN=IBMUSER.ABDISP,DISP=(NEW,KEEP,DELETE),\n//         DCB=(RECFM=VB,LRECL=32760)\n"
                         .into(),
                     ..Default::default()
                 },
