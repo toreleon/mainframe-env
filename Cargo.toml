@@ -102,3 +102,15 @@ strip = "symbols"
 # ../protos inputs used by its release-only generator. Use its shipped bindings.
 [profile.release.package.in_toto_attestation]
 debug-assertions = true
+
+# Keep real password hashing costs in tests without interpreting the crypto loops.
+# Retain development assertions and overflow checks for both dependencies.
+[profile.test.package.argon2]
+opt-level = 3
+debug-assertions = true
+overflow-checks = true
+
+[profile.test.package.blake2]
+opt-level = 3
+debug-assertions = true
+overflow-checks = true
