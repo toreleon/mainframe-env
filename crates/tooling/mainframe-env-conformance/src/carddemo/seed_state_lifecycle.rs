@@ -700,7 +700,7 @@ impl Owner {
         )?;
         let destination = self.evidence.join("seed-lifecycle.json");
         receipt_destination(&destination, retained.as_ref())?;
-        let raw = serde_json::to_vec_pretty(report).map_err(package_problem)?;
+        let raw = serde_json::to_vec(report).map_err(package_problem)?;
         refuse(
             raw.len() > 64 * 1024 * 1024,
             "retained seed evidence exceeds original output ceiling",

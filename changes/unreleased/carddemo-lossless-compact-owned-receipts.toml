@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Retain complete private CardDemo lifecycle receipts as compact JSON so indentation of complete package byte arrays does not consume the original 64 MiB evidence ceiling; preserve every snapshot value, complete comparator, ownership check and refusal bound."

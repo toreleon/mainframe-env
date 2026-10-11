@@ -594,3 +594,68 @@ async fn pinned_seed_state_lifecycle_produces_only_complete_owned_issue_predicat
         observed.issues()
     );
 }
+
+#[test]
+fn complete_receipt_values_are_retained_without_array_indentation() {
+    let temp = Temporary::create();
+    let owner = Owner::claim(temp.0.join("evidence")).unwrap();
+    let literal = r#"{"artifact":{"payload":[0,1,32,64,128,255]},"providers":{"registry":{"key":"contrôle\n\t","payload":[255,128,64,32,1,0],"version":7}},"retained_packages":{"1":{"blobs":{"sha256:synthetic":[0,32,128,255]}},"2":{"blobs":{"sha256:synthetic":[255,128,32,0]}}},"staged_generations":[2]}"#;
+    let report: serde_json::Value = serde_json::from_str(literal).unwrap();
+    owner.save(&report).unwrap();
+    let raw = fs::read(owner.evidence.join("seed-lifecycle.json")).unwrap();
+    assert_eq!(raw, literal.as_bytes());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&raw).unwrap(),
+        report
+    );
+    let receipt = owner.receipt.lock().unwrap().clone().unwrap();
+    assert_eq!(receipt.bytes, raw.len());
+    assert_eq!(receipt.sha256, format!("{:x}", Sha256::digest(&raw)));
+    receipt_destination(&owner.evidence.join("seed-lifecycle.json"), Some(&receipt)).unwrap();
+    let mut changed = report.clone();
+    changed["retained_packages"]["2"]["blobs"]["sha256:synthetic"][3] = serde_json::json!(1);
+    owner.save(&changed).unwrap();
+    let raw = fs::read(owner.evidence.join("seed-lifecycle.json")).unwrap();
+    let retained: serde_json::Value = serde_json::from_slice(&raw).unwrap();
+    assert_eq!(retained, changed);
+    assert_ne!(retained, report);
+    assert_eq!(
+        retained["retained_packages"]["2"]["blobs"]["sha256:synthetic"][3],
+        1
+    );
+}
+
+#[test]
+fn compact_receipt_over_original_ceiling_refuses_without_losing_prior_state() {
+    let temp = Temporary::create();
+    let owner = Owner::claim(temp.0.join("evidence")).unwrap();
+    owner
+        .save(&serde_json::json!({"retained":"prior complete control"}))
+        .unwrap();
+    let destination = owner.evidence.join("seed-lifecycle.json");
+    let prior = fs::read(&destination).unwrap();
+    let identity = fs::symlink_metadata(&destination).unwrap();
+    let original = (identity.dev(), identity.ino());
+    fs::write(
+        owner.owned.join("artifact"),
+        b"owned bytes retained on refusal",
+    )
+    .unwrap();
+    // A JSON string has two delimiting bytes: this complete serialized value
+    // exceeds the unchanged 64 MiB ceiling even with compact representation.
+    let oversized = serde_json::Value::String("X".repeat(64 * 1024 * 1024));
+    let error = owner.save(&oversized).unwrap_err();
+    assert_eq!(
+        error.detail,
+        "retained seed evidence exceeds original output ceiling"
+    );
+    assert_eq!(fs::read(&destination).unwrap(), prior);
+    let identity = fs::symlink_metadata(&destination).unwrap();
+    assert_eq!((identity.dev(), identity.ino()), original);
+    assert!(!owner.evidence.join("seed-lifecycle.json.next").exists());
+    assert_eq!(
+        fs::read(owner.owned.join("artifact")).unwrap(),
+        b"owned bytes retained on refusal"
+    );
+    receipt_destination(&destination, owner.receipt.lock().unwrap().as_ref()).unwrap();
+}
