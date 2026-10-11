@@ -26,7 +26,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 0,
-      "sha256": "sha256:12ab36d5f0dbbbf7d0c243ce7156ca5d537ba55369e2032c76e9265f512966d4",
+      "sha256": "sha256:dcd2a65af798ed9f1ccdc803ac94aaa358256033c14855b6070326b3f04baa15",
       "title": "Changelog",
       "xtask_commands": 0
     },
@@ -505,7 +505,7 @@
       "path": "docs/architecture/JES-EXECUTION.md",
       "relative_links": 1,
       "scope": "JES execution, scheduling, spool, and utility behavior",
-      "sha256": "sha256:36185b99ff17a072338d42faf064bb95c5e34e664b71e4b62da6f76901843df3",
+      "sha256": "sha256:d1e1c43aa53ed709cc53510ab3881ec967b53ebe12659ee217ed5bc1d920c584",
       "status": "Normative from mainframe-env jes.execution",
       "title": "JES execution, scheduling, spool, and utilities",
       "xtask_commands": 1

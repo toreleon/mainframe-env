@@ -194,7 +194,15 @@ owner mismatch) cancels that child and verifies the cancellation before
 continuing, while a transient failure (durable-store capacity or another
 infrastructure problem) leaves the child queued with no work record and
 releases the parent's own work for a later retry, bounded by that work's
-`max_attempts`, instead of completing or dead-lettering it. Reclaiming an
+`max_attempts`. The last admission attempt cancels and verifies a still-unadmitted
+child. Before parent execution, the server retains a durable per-parent obligation
+in `jes-child-admission-recovery-v1`. If terminalization fails, or the final lease
+expires during a crash, worker recovery revisits that obligation and cancels
+unadmitted children without extending admission retries. Failed cancellation
+retains the obligation for a later sweep while siblings and other work continue.
+The obligation retires after the parent is terminal and every child is confirmed
+terminal or has valid live work, covering late child creation while an expired
+worker unwinds. Replay preserves every existing terminal outcome. Reclaiming an
 already-admitted child validates its existing work record against the frozen
 identity recorded at admission time, never against a fresh capability
 recomputation, so a mutable registry change after admission cannot cancel or

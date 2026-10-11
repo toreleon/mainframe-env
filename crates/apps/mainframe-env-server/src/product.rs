@@ -2631,7 +2631,9 @@ impl ProductServer {
     }
 
     fn claim_jes_work(&self, worker: &str) -> Result<Option<WorkRecord>, HostProblem> {
-        claim_durable_work(self.store.as_ref(), worker, self.jes_tick()?).map_err(store_error)
+        let now_tick = self.jes_tick()?;
+        self.recover_child_admissions(now_tick)?;
+        claim_durable_work(self.store.as_ref(), worker, now_tick).map_err(store_error)
     }
 
     fn heartbeat_jes_work(&self, work: &WorkRecord) -> Result<(), HostProblem> {
@@ -2671,6 +2673,7 @@ impl ProductServer {
             if job.priority != work.priority {
                 return Err(HostProblem::Malformed);
             }
+            self.retain_child_admission_recovery(&payload)?;
             match job.state {
                 mainframe_env_batch::JobState::Completed
                 | mainframe_env_batch::JobState::Failed => {
@@ -5659,6 +5662,8 @@ mod tests {
     use super::*;
     #[path = "ims_package_tests.rs"]
     mod ims_package_tests;
+    #[path = "jes_child_recovery_tests.rs"]
+    mod jes_child_recovery_tests;
     #[path = "sequential_layout_admission_tests.rs"]
     mod sequential_layout_admission_tests;
     #[path = "shisam_fixed_admission_tests.rs"]
