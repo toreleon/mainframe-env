@@ -9878,7 +9878,7 @@ fn split_function_arguments<'a>(
                     .checked_sub(1)
                     .ok_or(MachineProblem::InvalidOperation)?
             }
-            "," if depth == 0 => {
+            "," | ";" if depth == 0 => {
                 if start == index {
                     return Err(MachineProblem::InvalidOperation);
                 }
@@ -9892,9 +9892,18 @@ fn split_function_arguments<'a>(
         return Err(MachineProblem::InvalidOperation);
     }
     arguments.push(&tokens[start..]);
-    if arguments.len() > 1 {
-        return Ok(arguments);
+    let mut inferred = Vec::new();
+    for argument in arguments {
+        inferred.extend(infer_function_arguments(machine, argument)?);
     }
+    Ok(inferred)
+}
+
+fn infer_function_arguments<'a>(
+    machine: &ReferenceMachine,
+    tokens: &'a [String],
+) -> Result<Vec<&'a [String]>, MachineProblem> {
+    let arguments = vec![tokens];
     let mut depth = 0usize;
     let mut arithmetic = false;
     for token in tokens {
@@ -9911,9 +9920,11 @@ fn split_function_arguments<'a>(
     let mut inferred = Vec::new();
     let mut at = 0usize;
     while at < tokens.len() {
-        let end = (at + 1..=tokens.len())
-            .rev()
-            .find(|end| machine.eval_function_argument(&tokens[at..*end]).is_ok());
+        let end = (at + 1..=tokens.len()).rev().find(|end| {
+            let argument = &tokens[at..*end];
+            matches!(argument, [keyword] if matches!(keyword.as_str(), "LEADING" | "TRAILING"))
+                || machine.eval_function_argument(argument).is_ok()
+        });
         let Some(end) = end else {
             return if arithmetic && inferred.is_empty() {
                 Ok(arguments)
@@ -12355,6 +12366,70 @@ mod tests {
                     Ok(CobolValue::Decimal(Decimal { coefficient, scale: 0 })) if coefficient == expected
                 ),
                 "{tokens:?}"
+            );
+        }
+    }
+    #[test]
+    fn list_intrinsics_evaluate_space_and_mixed_separators() {
+        let mut machine = display_fixture();
+        machine.implicit.insert("A".into(), integer_value(7));
+        machine.implicit.insert("B".into(), integer_value(-3));
+        for (expression, expected) in [
+            ("FUNCTION MAX ( A B )", 7),
+            ("FUNCTION MAX ( A , B )", 7),
+            ("FUNCTION MAX ( A B 42 )", 42),
+            ("FUNCTION MAX ( A , B 42 )", 42),
+            ("FUNCTION MAX ( A B , 42 )", 42),
+            ("FUNCTION MAX ( A ; B 42 )", 42),
+            ("FUNCTION MAX ( A B * 4 42 )", 42),
+            ("FUNCTION MIN ( A ( B * 4 ) )", -12),
+            ("FUNCTION MAX ( TABLE-ITEM ( 1 ) , TABLE-ITEM ( 2 ) 3 )", 3),
+            ("FUNCTION MIN ( OTHER-ID ( B * 4 ) )", -12),
+        ] {
+            let tokens = expression
+                .split_whitespace()
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            let value = machine.eval_value(&tokens);
+            assert!(
+                matches!(value, Ok(CobolValue::Decimal(Decimal { coefficient, scale: 0 })) if coefficient == expected),
+                "{expression}: {value:?}"
+            );
+        }
+    }
+    #[test]
+    fn space_separated_table_arguments_remain_subscripted() {
+        let machine = display_fixture();
+        let tokens = "FUNCTION MAX ( TABLE-ITEM ( 1 ) TABLE-ITEM ( 2 ) )"
+            .split_whitespace()
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        let arguments = split_function_arguments(&machine, &tokens[3..tokens.len() - 1]).unwrap();
+        assert_eq!(arguments.len(), 2);
+        assert_eq!(arguments[0], ["TABLE-ITEM", "(", "1", ")"]);
+        assert_eq!(arguments[1], ["TABLE-ITEM", "(", "2", ")"]);
+        assert_eq!(
+            machine.eval_value(&tokens),
+            Ok(CobolValue::Bytes(b"00000000002".to_vec()))
+        );
+    }
+
+    #[test]
+    fn intrinsic_separator_inference_preserves_keyword_arguments() {
+        let machine = display_fixture();
+        for separator in [vec![","], vec![";"], vec![]] {
+            let tokens = [
+                vec!["FUNCTION", "TRIM", "(", "' ABC '"],
+                separator,
+                vec!["LEADING", ")"],
+            ]
+            .concat()
+            .into_iter()
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+            assert_eq!(
+                machine.eval_value(&tokens),
+                Ok(CobolValue::Bytes(b"ABC ".to_vec()))
             );
         }
     }
