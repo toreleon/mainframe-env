@@ -184,12 +184,21 @@ class Campaign:
             row['closed_exit_code'] = code
             self.closed = True
         started = time.monotonic()
+        diagnostics = {'observations': [], 'omitted_observations': 0}
+        token = self.supervisor._LINUX_CENSUS_DIAGNOSTICS.set(diagnostics)
         try:
             code, error = self.supervisor._run_owned(command, self.repo, output,
                 timeout_seconds=min(COMMAND_SECONDS, remaining),
                 max_output_bytes=MAX_OUTPUT_BYTES - self.output_bytes,
                 separate_stderr=True, env=env, on_closed=closed)
         finally:
+            self.supervisor._LINUX_CENSUS_DIAGNOSTICS.reset(token)
+            if diagnostics['observations']:
+                row['census_diagnostics'] = {
+                    'schema_version': 'private.carddemo.corpus-census-diagnostic@1',
+                    **diagnostics,
+                    'scope': 'Bounded failed procfs observations only; no closure or test credit.',
+                }
             for stream in streams.values():
                 stream.close()
         self.output_bytes += sum(map(len, buffers.values()))
