@@ -264,6 +264,13 @@ their newer owning progress records and regenerate documentation through the
 existing generator. This sequencing requests review priority; it does not
 merge or publish an implementation branch automatically.
 
+A dry merge against #393 at `a1696e3b` merges the prose and registry changes
+without conflicts. The shared generated documentation manifest requires
+regeneration because both branches changed its navigation metadata. Resolve
+that generated file from the merged registry/documents with the existing docs
+generator and rerun its check; do not choose a whole older manifest and discard
+the other branch's records. The dry merge does not update either working tree.
+
 When updating a phase, maintain its plan/progress authority first and review the
 matching six rows here. Regenerate navigation and the documentation manifest
 normally. Preserve the distinction between planned scope, implemented behavior,
