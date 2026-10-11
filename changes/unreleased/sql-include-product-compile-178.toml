@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Expand available `EXEC SQL INCLUDE` library members by default in CLI and JES compilation, expose CLI SQL precompile overrides, and diagnose missing members explicitly (#178)."
