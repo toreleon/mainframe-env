@@ -1687,6 +1687,12 @@ impl ReferenceMachine {
                 )),
                 (_, problem) => MachineProblem::Host(problem),
             })?;
+        let outcome = match outcome {
+            HostResult::Dataset(result) => {
+                HostResult::Dataset(result.require_complete().map_err(MachineProblem::Host)?)
+            }
+            outcome => outcome,
+        };
         match (pending.kind, outcome) {
             (PendingKind::Accept { target, .. }, HostResult::Terminal(payload)) => {
                 self.condition_status.accept_exception = false;
@@ -13289,6 +13295,7 @@ mod tests {
                     records: vec![vec![b'A'; 12]],
                     identities: vec![b"1".to_vec()],
                     version: 1,
+                    more: false,
                 },
             )),
         })
@@ -13318,6 +13325,7 @@ mod tests {
                     records: vec![vec![b'B'; 39]],
                     identities: vec![b"2".to_vec()],
                     version: 2,
+                    more: false,
                 },
             )),
         })

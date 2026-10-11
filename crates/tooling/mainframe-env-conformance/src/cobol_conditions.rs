@@ -161,6 +161,7 @@ fn execute(f: &Fixture) -> Result<Output, String> {
                         records: Vec::new(),
                         identities: Vec::new(),
                         version: 1,
+                        more: false,
                     })),
                     HostBehavior::CallFailure => Err(HostProblem::NotFound),
                     HostBehavior::StartNotFound => Err(HostProblem::Condition {

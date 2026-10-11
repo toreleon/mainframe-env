@@ -326,6 +326,7 @@ pub(crate) fn effect_result(effect: &EffectRequest) -> Result<EffectResult, Stri
                 records: vec![b"RECORD  ".to_vec(), b"AA01    ".to_vec()],
                 identities: vec![b"RE".to_vec(), b"AA".to_vec()],
                 version: 1,
+                more: false,
             })
         }
         HostRequest::Dataset(DatasetRequest::ReadNext { .. }) => {

@@ -575,6 +575,10 @@ fn file(
         service.nested(run, HostRequest::Dataset(host_request))
     }
     .map_err(|problem| normalize_file_not_found(operation, problem))?;
+    let result = match result {
+        HostResult::Dataset(result) => HostResult::Dataset(result.require_complete()?),
+        result => result,
+    };
     let mut browse_key = None;
     let mut issued_token = None;
     let mut payload = match result {

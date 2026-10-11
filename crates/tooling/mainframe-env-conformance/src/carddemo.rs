@@ -8652,6 +8652,7 @@ async fn exercise_base_batch_routes(
                     max_records: 4_096,
                     control: Default::default(),
                 })
+                .and_then(DatasetResult::require_complete)
                 .map_err(terminal_problem)?
             else {
                 return Err(CorpusProblem::new(
@@ -9193,6 +9194,7 @@ fn base_batch_dataset_digests(
                     records,
                     identities,
                     version,
+                    ..
                 } = server
                     .dataset_service()
                     .invoke(DatasetRequest::Read {
@@ -9202,6 +9204,7 @@ fn base_batch_dataset_digests(
                         max_records: 4_096,
                         control: Default::default(),
                     })
+                    .and_then(DatasetResult::require_complete)
                     .map_err(terminal_problem)?
                 else {
                     return Err(CorpusProblem::new(
@@ -9222,6 +9225,7 @@ fn base_batch_dataset_digests(
                 records,
                 identities,
                 version,
+                ..
             } = server
                 .dataset_service()
                 .invoke(DatasetRequest::Read {
@@ -9231,6 +9235,7 @@ fn base_batch_dataset_digests(
                     max_records: 4_096,
                     control: Default::default(),
                 })
+                .and_then(DatasetResult::require_complete)
                 .map_err(terminal_problem)?
             else {
                 return Err(CorpusProblem::new(
@@ -10313,6 +10318,7 @@ fn utility_records(
             max_records: 4_096,
             control: Default::default(),
         })
+        .and_then(DatasetResult::require_complete)
         .map_err(terminal_problem)?
     {
         DatasetResult::Records { records, .. } => Ok(records),
@@ -11977,6 +11983,7 @@ fn carddemo_dataset_text_records(
             max_records: 4096,
             control: Default::default(),
         })
+        .and_then(DatasetResult::require_complete)
         .map_err(terminal_problem)?;
     let DatasetResult::Records { records, .. } = result else {
         return Err(CorpusProblem::new(

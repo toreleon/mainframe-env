@@ -19,7 +19,7 @@ impl BatchService {
             }
         };
         if invocation.all_effects() {
-            return effect_loan::dispatch(invocation, request, None);
+            return complete_dataset_effect(effect_loan::dispatch(invocation, request, None));
         }
         let result = ScopedHostService::invoke(
             &self.host,
@@ -43,6 +43,14 @@ impl BatchService {
                 outcome: Err(problem),
             };
         }
-        result
+        complete_dataset_effect(result)
     }
+}
+
+fn complete_dataset_effect(mut result: EffectResult) -> EffectResult {
+    result.outcome = result.outcome.and_then(|outcome| match outcome {
+        HostResult::Dataset(dataset) => dataset.require_complete().map(HostResult::Dataset),
+        outcome => Ok(outcome),
+    });
+    result
 }

@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 241,
+    "markdown_documents": 242,
     "navigation_groups": 8,
-    "normative_documents": 99,
+    "normative_documents": 100,
     "xtask_commands": 163
   },
   "documents": [
@@ -26,7 +26,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 0,
-      "sha256": "sha256:12ab36d5f0dbbbf7d0c243ce7156ca5d537ba55369e2032c76e9265f512966d4",
+      "sha256": "sha256:4ab2df5d3d2e8fc2ec769abf56f1fe8081f59c58c099c87d62f427186c6e67c0",
       "title": "Changelog",
       "xtask_commands": 0
     },
@@ -349,8 +349,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 182,
-      "sha256": "sha256:df6fc9bbbd77a7f727823c1cd8a930a4bbef5bd2eab9253dd26d325e2e82ccf0",
+      "relative_links": 183,
+      "sha256": "sha256:4f680568e444f38b5c35ba20f291954ab580831863377fdb55ac8aac0d2996da",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -455,9 +455,9 @@
       "normative": true,
       "owner": "dataset provider maintainers",
       "path": "docs/architecture/DATASET-VSAM-AMS.md",
-      "relative_links": 0,
+      "relative_links": 1,
       "scope": "dataset, VSAM, catalog, and AMS authority",
-      "sha256": "sha256:e69beb77f1a971c3f19e8982d1d8136883c76ca96212e66268eee9b0b4ee31c6",
+      "sha256": "sha256:d17f13b31ca6dfd0c9ddfe67d52aa09bc7167fef2f05e8193132c8755fa798a6",
       "status": "Normative from dataset.data",
       "title": "Dataset, VSAM, catalog, and AMS authority",
       "xtask_commands": 2
@@ -1455,10 +1455,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env dataset result contract @3",
+      "normative": true,
+      "owner": "Dataset and shared host-contract maintainers",
+      "path": "docs/decisions/0051-dataset-read-completeness.md",
+      "relative_links": 0,
+      "scope": "Bounded dataset read results and whole-input consumers",
+      "sha256": "sha256:792b60122a3c6a0b9628cc122012fbada90a3a17075cb31baaaf9a3ff582fb39",
+      "status": "Proposed implementation for issue #186",
+      "title": "ADR-0051: Explicit dataset read completeness",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 53,
-      "sha256": "sha256:43f9927331159d83f380ef579a56c577b54c4fcdc6aae56121dc8a9ebb8b086b",
+      "relative_links": 54,
+      "sha256": "sha256:1ca343f16c93f6224d05971258783cf8289f0f1a7099456760dbf6a4129d4437",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -2782,6 +2794,10 @@
         {
           "label": "ADR-0050: Boxed shared host-effect payloads",
           "path": "docs/decisions/0050-host-effect-envelope-layout.md"
+        },
+        {
+          "label": "ADR-0051: Explicit dataset read completeness",
+          "path": "docs/decisions/0051-dataset-read-completeness.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -3008,7 +3024,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:11657d5b50a3394d2cf58c698e5ce07f83d5dc6bbd8574fe67c2da15b43c86ae",
+  "registry_sha256": "sha256:fef3e9eaf36cbf665e1eb1d8620950e66b2fd85e6c0a1ec9902e2c2a6e6fe814",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

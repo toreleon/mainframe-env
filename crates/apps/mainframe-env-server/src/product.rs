@@ -4482,7 +4482,7 @@ impl ProductServer {
             )
             .persist_with(|audit| self.store.record_audit(audit).map_err(store_error));
         match result.outcome.map_err(gateway_problem)? {
-            HostResult::Dataset(result) => Ok(result),
+            HostResult::Dataset(result) => result.require_complete().map_err(gateway_problem),
             _ => Err(gateway_problem(HostProblem::ProviderFailure)),
         }
     }
@@ -4525,6 +4525,7 @@ impl ProductServer {
                         max_records: 4_096,
                         control: Default::default(),
                     })
+                    .and_then(DatasetResult::require_complete)
                     .map_err(gateway_problem)?
                 {
                     DatasetResult::Records { records, .. } => records,
