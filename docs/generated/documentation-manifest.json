@@ -26,7 +26,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 0,
-      "sha256": "sha256:12ab36d5f0dbbbf7d0c243ce7156ca5d537ba55369e2032c76e9265f512966d4",
+      "sha256": "sha256:8d015a0266f22ab86bf1911d8dab71c5b6ff4aaf82b473760267f1d094d7a43b",
       "title": "Changelog",
       "xtask_commands": 0
     },
@@ -969,7 +969,7 @@
       "path": "docs/decisions/0027-cics-logical-program-frames.md",
       "relative_links": 0,
       "scope": "local LINK and INVOKE APPLICATION on an existing task",
-      "sha256": "sha256:37eff1fed09b50ce3a2e7d211a85df1dd1cde926866b0aba9fc4f51875eff377",
+      "sha256": "sha256:9595e240853f40864c0a8eb38f271b5ac2c4dc6c6af2f3d90224c66b3dc12289",
       "status": "Proposed for CIC-902.program-task.frames; acceptance pending",
       "title": "ADR-0027: CICS task ownership across logical program frames",
       "xtask_commands": 0

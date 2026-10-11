@@ -874,7 +874,7 @@ impl CobolProgram {
             child_execution: &receipt.child_execution,
             native: native.as_ref(),
         };
-        let mut writes = Vec::new();
+        let mut mutations = Vec::new();
         let result = if payload.schema() == "mainframe-env.cobol.call@1" {
             self.execute_admitted(
                 parent,
@@ -882,7 +882,7 @@ impl CobolProgram {
                 admitted,
                 payload,
                 &key,
-                &mut writes,
+                &mut mutations,
                 Some(&original_call),
             )
         } else {
@@ -913,7 +913,7 @@ impl CobolProgram {
         receipt.completion_tick = Some(retention_observation_tick(self, parent)?);
         receipt.metadata_digest = receipt_metadata_digest(&receipt);
         let payload = serde_json::to_vec(&receipt).map_err(|_| HostProblem::UnknownOutcome)?;
-        writes.push(ProviderStateWrite {
+        mutations.push(ProviderStateMutation::Put(ProviderStateWrite {
             record: ProviderStateRecord {
                 namespace: CALL_REPLAY_NAMESPACE.into(),
                 key,
@@ -921,9 +921,9 @@ impl CobolProgram {
                 payload,
             },
             expected_version: Some(1),
-        });
+        }));
         store
-            .put_provider_states_atomic(writes)
+            .mutate_provider_states_atomic(mutations)
             .map_err(|_| HostProblem::UnknownOutcome)?;
         if result.schema() == "mainframe-env.program.output@1" {
             self.finish_run_unit(parent)?;

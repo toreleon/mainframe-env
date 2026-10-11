@@ -9,7 +9,7 @@ impl CobolProgram {
         admitted: AdmittedProgram,
         payload: &BoundedPayload,
         identity: &str,
-        writes: &mut Vec<ProviderStateWrite>,
+        mutations: &mut Vec<ProviderStateMutation>,
         original_call: Option<&replay::WinningInstalledCall<'_>>,
     ) -> Result<BoundedPayload, HostProblem> {
         let store = self.store.get().ok_or(HostProblem::InfrastructureFailure)?;
@@ -145,18 +145,14 @@ impl CobolProgram {
             // Observe untouched raw outcome before cursor/linkage/CALL mapping.
             session.finish(&outcome)?;
         }
-        let cursor_result = persist_batch_file_cursors(
-            store.as_ref(),
-            &cursor_key,
-            machine.dataset_cursors(),
-            cursor_version,
-        );
-        // A secondary persistence failure must not erase an in-doubt effect.
+        let cursor_result =
+            batch_file_cursor_mutation(&cursor_key, machine.dataset_cursors(), cursor_version);
+        // A cursor-staging failure must not erase an in-doubt effect.
         if matches!(&outcome, ExecutionOutcome::ProviderFailure(problem) if problem.has_unknown_outcome())
         {
             return Err(HostProblem::UnknownOutcome);
         }
-        cursor_result
+        let cursor_mutation = cursor_result
             .map_err(|problem| replay::preserve_control_cursor_failure(&outcome, problem))?;
         match outcome {
             ExecutionOutcome::Completed(_) => {
@@ -166,7 +162,15 @@ impl CobolProgram {
                 values.truncate(call_values.len());
                 let result =
                     encode_cobol_call_result(&values).map_err(|_| HostProblem::UnknownOutcome)?;
-                writes.extend(lease.completed(store.as_ref(), &machine)?);
+                // Cursor publication, ready state and cached CALL reply share
+                // one CAS transaction. Failed/interrupted calls publish none.
+                mutations.extend(cursor_mutation);
+                mutations.extend(
+                    lease
+                        .completed(store.as_ref(), &machine)?
+                        .into_iter()
+                        .map(ProviderStateMutation::Put),
+                );
                 Ok(result)
             }
             ExecutionOutcome::Condition(condition) => Err(HostProblem::Condition {
@@ -228,9 +232,11 @@ impl CobolProgram {
         program: &str,
         payload: &BoundedPayload,
         identity: &str,
-        writes: &mut Vec<ProviderStateWrite>,
+        mutations: &mut Vec<ProviderStateMutation>,
     ) -> Result<BoundedPayload, HostProblem> {
         let admitted = self.preflight_installed_program(program, false)?;
-        self.execute_admitted(parent, program, admitted, payload, identity, writes, None)
+        self.execute_admitted(
+            parent, program, admitted, payload, identity, mutations, None,
+        )
     }
 }

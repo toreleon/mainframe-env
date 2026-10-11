@@ -215,11 +215,15 @@ stage its exact initial checkpoint, acquire owned
 same-level admission/instance disposition, then complete handoff and execute.
 Neither failed capture nor cold pending replay may infer a normal return or
 automatically redispatch. Source checkpoint and busy instance remain intact.
-A secondary cursor-write failure before capture also preserves pending
+A cursor-staging failure before capture also preserves pending
 Transfer/Invoke/Suspended as UnknownOutcome, not a known error consumable by
 the caller. A crash before intent publication leaves a protected unstaged
 reservation; this phase does not close that recovery window or authorize
-reconstruction by redispatch.
+reconstruction by redispatch. Installed CALL cursor puts/deletes, ready instance
+state and the replay reply commit in one atomic provider-state mutation batch.
+Recovery accepts existing cursor records only when they agree with retained
+instance state; missing, orphaned or divergent cursors fail closed with
+`INSTALLED-CALL-CURSOR-MISMATCH` before instance acquisition (#189).
 Old pending receipts cannot reconstruct a lost Transfer from the checkpoint
 alone and are not rewritten on read. Old readers reject schema 3; downgrade
 requires drained writers and a compatible reader or verified pre-change backup,

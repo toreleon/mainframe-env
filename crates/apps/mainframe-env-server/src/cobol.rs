@@ -30,7 +30,7 @@ use mainframe_env_source::{
     SourceLimits, materialize_host_abi_libraries,
 };
 use mainframe_env_store_api::{
-    ArtifactStore, PlatformStore, ProviderStateRecord, ProviderStateWrite,
+    ArtifactStore, PlatformStore, ProviderStateMutation, ProviderStateRecord, ProviderStateWrite,
 };
 use runtime_calls::*;
 use std::collections::BTreeMap;
@@ -206,35 +206,33 @@ pub fn default_program_router() -> Arc<DefaultProgramRouter> {
     Arc::new(DefaultProgramRouter { router, cobol })
 }
 
-fn persist_batch_file_cursors(
-    store: &dyn PlatformStore,
+fn batch_file_cursor_mutation(
     key: &str,
     cursors: &BTreeMap<String, String>,
     current_version: Option<u64>,
-) -> Result<(), HostProblem> {
+) -> Result<Option<ProviderStateMutation>, HostProblem> {
     if cursors.is_empty() {
-        if let Some(version) = current_version {
-            store
-                .delete_provider_state("batch-file-cursor", key, version)
-                .map_err(|_| HostProblem::InfrastructureFailure)?;
-        }
-        return Ok(());
+        return Ok(
+            current_version.map(|expected_version| ProviderStateMutation::Delete {
+                namespace: "batch-file-cursor".into(),
+                key: key.into(),
+                expected_version,
+            }),
+        );
     }
     let version = current_version
         .unwrap_or(0)
         .checked_add(1)
         .ok_or(HostProblem::ResourceExhausted)?;
-    store
-        .put_provider_state(
-            ProviderStateRecord {
-                namespace: "batch-file-cursor".into(),
-                key: key.into(),
-                version,
-                payload: serde_json::to_vec(cursors).map_err(|_| HostProblem::ProviderFailure)?,
-            },
-            current_version,
-        )
-        .map_err(|_| HostProblem::InfrastructureFailure)
+    Ok(Some(ProviderStateMutation::Put(ProviderStateWrite {
+        record: ProviderStateRecord {
+            namespace: "batch-file-cursor".into(),
+            key: key.into(),
+            version,
+            payload: serde_json::to_vec(cursors).map_err(|_| HostProblem::ProviderFailure)?,
+        },
+        expected_version: current_version,
+    })))
 }
 
 struct CobolProgram {

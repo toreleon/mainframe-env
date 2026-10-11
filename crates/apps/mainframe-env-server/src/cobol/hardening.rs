@@ -194,6 +194,16 @@ impl Fixture {
         problem: HostProblem,
         delete_cursors: bool,
     ) -> Self {
+        Self::with_providers(root, store, problem, delete_cursors, Vec::new())
+    }
+
+    fn with_providers(
+        root: &TestRoot,
+        store: Arc<dyn PlatformStore>,
+        problem: HostProblem,
+        delete_cursors: bool,
+        mut providers: Vec<Arc<dyn HostProvider>>,
+    ) -> Self {
         let router = default_program_router();
         let faults = Arc::new(FaultRouter {
             descriptor: router.descriptor().clone(),
@@ -203,15 +213,9 @@ impl Fixture {
             delete_cursors,
             observed: Mutex::new(Vec::new()),
         });
+        providers.push(faults.clone() as Arc<dyn HostProvider>);
         let host = Arc::new(ScopedHostService::new(
-            Arc::new(
-                RegistrySnapshot::new(
-                    1,
-                    vec![faults.clone() as Arc<dyn HostProvider>],
-                    InvocationLimits::default(),
-                )
-                .unwrap(),
-            ),
+            Arc::new(RegistrySnapshot::new(1, providers, InvocationLimits::default()).unwrap()),
             HostLimits::default(),
         ));
         let artifacts = Arc::new(LocalArtifactStore::open(&root.0, 64 * 1024 * 1024).unwrap());
@@ -1366,3 +1370,5 @@ fn hardening_47_counter_era_and_replay_only_runs_require_drain_before_upgrade() 
 mod inherited_control {
     include!("hardening/inherited_control.rs");
 }
+
+mod installed_cursor_authority;
