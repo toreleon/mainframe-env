@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Compare each complete CardDemo financial dataset against its exact source-defined F or FB record-format tag instead of a blanket F tag; preserve all original widths, CCSID 37, keys, full record hashes, pagination, version, EOF and lifecycle checks. These local logical format tags provide no IBM physical-blocking or encoding credit."

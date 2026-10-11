@@ -26,6 +26,7 @@ struct DatasetExpected {
     phase: &'static str,
     name: &'static str,
     width: u32,
+    record_format: RecordFormat,
     records: usize,
     key: Option<(u32, u32)>,
     framed_sha256: &'static str,
@@ -274,7 +275,7 @@ fn capture_dataset(
         DatasetOrganization::Sequential
     };
     if before.0.organization != organization
-        || before.0.record_format != RecordFormat::Fixed
+        || before.0.record_format != expected.record_format
         || before.0.logical_record_length != expected.width
         || before.0.ccsid != Some(37)
         || before.0.key_offset != expected.key.map(|key| key.0)
@@ -551,6 +552,7 @@ mod tests {
             phase: "test-only",
             name: "AWS.M2.CARDDEMO.TEST",
             width: 2,
+            record_format: RecordFormat::Fixed,
             records: 2,
             key: None,
             // Independently frozen Python SHA256 of u32(2)+[1,2]+u32(2)+[3,4].
@@ -862,6 +864,103 @@ mod tests {
                 })
             }
             _ => panic!("invalid source layout must refuse before record capture"),
+        });
+        assert!(captured.is_err());
+        assert_exact_source_formats_and_encoding();
+    }
+
+    fn assert_exact_source_formats_and_encoding() {
+        let blocked_names = [
+            "AWS.M2.CARDDEMO.TRANSACT.BKUP.G0001V00",
+            "AWS.M2.CARDDEMO.TRANSACT.BKUP.G0002V00",
+            "AWS.M2.CARDDEMO.TRANSACT.COMBINED.G0001V00",
+            "AWS.M2.CARDDEMO.TRANSACT.DALY.G0001V00",
+            "AWS.M2.CARDDEMO.TRANREPT.G0001V00",
+            "AWS.M2.CARDDEMO.TCATBALF.BKUP.G0001V00",
+            "AWS.M2.CARDDEMO.TCATBALF.REPT",
+            "AWS.M2.CARDDEMO.TRXFL.SEQ",
+            "AWS.M2.CARDDEMO.STATEMNT.PS",
+            "AWS.M2.CARDDEMO.STATEMNT.HTML",
+        ];
+        for expected in fixtures::DATASETS {
+            assert_eq!(
+                expected.record_format,
+                if blocked_names.contains(&expected.name) {
+                    RecordFormat::FixedBlocked
+                } else {
+                    RecordFormat::Fixed
+                }
+            );
+        }
+        for record_format in [RecordFormat::Fixed, RecordFormat::FixedBlocked] {
+            let expected = DatasetExpected {
+                record_format,
+                ..sample().0
+            };
+            let (_, rows, ids) = sample();
+            let mut attributes = layout();
+            attributes.record_format = record_format;
+            let captured = capture_dataset(&expected, |request| match request {
+                DatasetRequest::Attributes { .. } => Ok(DatasetResult::Attributes {
+                    attributes: attributes.clone(),
+                    version: 7,
+                }),
+                DatasetRequest::ReadSequential { start: Some(0), .. } => {
+                    Ok(DatasetResult::Records {
+                        records: rows.clone(),
+                        identities: ids.clone(),
+                        version: 7,
+                    })
+                }
+                DatasetRequest::ReadSequential { start: Some(2), .. } => {
+                    Err(HostProblem::Condition {
+                        name: "NOTFND".into(),
+                        response: 13,
+                        response2: 0,
+                    })
+                }
+                _ => panic!("unexpected format-control request"),
+            })
+            .unwrap();
+            assert_eq!(captured.attributes, attributes);
+            assert_eq!(captured.records, 2);
+            assert_eq!(captured.framed_sha256, expected.framed_sha256);
+            for actual_format in [
+                RecordFormat::Fixed,
+                RecordFormat::FixedBlocked,
+                RecordFormat::FixedBlockedStandard,
+                RecordFormat::Variable,
+                RecordFormat::VariableBlocked,
+                RecordFormat::VariableSpanned,
+                RecordFormat::VariableBlockedSpanned,
+                RecordFormat::Undefined,
+                RecordFormat::Line,
+            ] {
+                if actual_format == record_format {
+                    continue;
+                }
+                let mut wrong = attributes.clone();
+                wrong.record_format = actual_format;
+                assert_format_refuses_before_rows(&expected, wrong);
+            }
+            for ccsid in [None, Some(1047), Some(1208)] {
+                let mut wrong = attributes.clone();
+                wrong.ccsid = ccsid;
+                assert_format_refuses_before_rows(&expected, wrong);
+            }
+        }
+    }
+
+    fn assert_format_refuses_before_rows(
+        expected: &DatasetExpected,
+        attributes: DatasetAttributes,
+    ) {
+        let captured = capture_dataset(expected, |request| match request {
+            DatasetRequest::Attributes { .. } => Ok(DatasetResult::Attributes {
+                attributes: attributes.clone(),
+                version: 7,
+            }),
+            _ => panic!("wrong exact format or CCSID must refuse before rows"),
         });
         assert!(captured.is_err());
     }
