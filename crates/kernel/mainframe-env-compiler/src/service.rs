@@ -736,6 +736,51 @@ mod tests {
     }
 
     #[test]
+    fn compat_rejects_complete_period_literals_before_publication() {
+        assert_complete_literal_rejected("", "1234567890.123456789");
+    }
+
+    #[test]
+    fn compat_rejects_complete_comma_literals_before_publication() {
+        assert_complete_literal_rejected(
+            "ENVIRONMENT DIVISION. CONFIGURATION SECTION. SPECIAL-NAMES. DECIMAL-POINT IS COMMA.",
+            "1234567890,123456789",
+        );
+    }
+
+    fn assert_complete_literal_rejected(configuration: &str, literal: &str) {
+        let source = format!(
+            "PROCESS ARITH(COMPAT)\nIDENTIFICATION DIVISION. PROGRAM-ID. LIMITS. {configuration} DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9. PROCEDURE DIVISION. COMPUTE A = {literal} - {literal}. STOP RUN."
+        );
+        let result = CobolCompiler::default()
+            .compile(request(&source, CompilationMode::Executable))
+            .unwrap();
+        let CompilerResult::Failed {
+            diagnostics,
+            completeness,
+        } = result
+        else {
+            panic!("19-digit literal must fail before publication");
+        };
+        assert_eq!(completeness, Completeness::Failed);
+        assert!(diagnostics.iter().any(|diagnostic| {
+            diagnostic.public_message().contains(literal)
+                && diagnostic
+                    .public_message()
+                    .contains("at most 18 data/literal digits")
+        }));
+    }
+
+    #[test]
+    fn compat_publishes_eighteen_digit_fractional_literals() {
+        let source = "PROCESS ARITH(COMPAT)\nIDENTIFICATION DIVISION. PROGRAM-ID. LIMITS. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9. PROCEDURE DIVISION. COMPUTE A = 1234567890.12345678 - 1234567890.12345678. STOP RUN.";
+        let result = CobolCompiler::default()
+            .compile(request(source, CompilationMode::Executable))
+            .unwrap();
+        assert!(matches!(result, CompilerResult::Published { .. }));
+    }
+
+    #[test]
     fn procedure_using_order_survives_lowering_and_binary_roundtrip() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. ORDER. DATA DIVISION. LINKAGE SECTION. 01 UNUSED-AREA PIC X. 01 ARG-TWO PIC X. 01 ARG-ONE PIC X. PROCEDURE DIVISION USING ARG-ONE ARG-TWO. MOVE 'A' TO ARG-ONE. MOVE 'B' TO ARG-TWO. GOBACK.";
         let result = CobolCompiler::default()
