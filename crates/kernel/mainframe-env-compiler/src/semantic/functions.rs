@@ -55,8 +55,10 @@ pub(super) fn analyze(
     files: &[CobolFileBinding],
     user_functions: &BTreeSet<String>,
     pointer_bytes: usize,
-    cics_context: bool,
 ) -> Result<(Vec<CobolIntrinsicCall>, Vec<CobolSpecialRegisterReference>), SemanticProblem> {
+    let cics_context = super::strip_comments(source)
+        .to_ascii_uppercase()
+        .contains("EXEC CICS");
     Ok((
         intrinsic_calls(
             source,
