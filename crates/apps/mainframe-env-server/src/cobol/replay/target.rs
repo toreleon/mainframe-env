@@ -127,7 +127,11 @@ impl TargetStage {
                 .is_some_and(valid_digest)
             || !valid_digest(&self.context_digest)
             || !valid_digest(&self.checkpoint_digest)
-            || self.checkpoint_schema != "mainframe-env.reference-machine-checkpoint@12"
+            || !matches!(
+                self.checkpoint_schema.as_str(),
+                "mainframe-env.reference-machine-checkpoint@12"
+                    | "mainframe-env.reference-machine-checkpoint@13"
+            )
             || self.checkpoint.len() > MAX_STAGE_BYTES
             || self.invocation.validate_syntax().is_err()
             || self.invocation.digest().ok().as_deref() != Some(&self.context_digest)
@@ -152,7 +156,15 @@ impl TargetStage {
             return false;
         };
         STANDARD.encode(&checkpoint) == self.checkpoint
-            && checkpoint.starts_with(b"MECP0012")
+            && match self.checkpoint_schema.as_str() {
+                "mainframe-env.reference-machine-checkpoint@12" => {
+                    checkpoint.starts_with(b"MECP0012")
+                }
+                "mainframe-env.reference-machine-checkpoint@13" => {
+                    checkpoint.starts_with(b"MECP0013")
+                }
+                _ => false,
+            }
             && self.checkpoint_digest == format!("{:x}", Sha256::digest(checkpoint))
     }
 }

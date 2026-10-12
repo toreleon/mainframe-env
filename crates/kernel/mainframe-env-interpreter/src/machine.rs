@@ -50,6 +50,7 @@ mod corresponding;
 mod decimal_capacity;
 mod decimal_commit;
 mod eib;
+mod float_checkpoint;
 mod float_codec;
 #[cfg(test)]
 mod floating_insertion_tests;
@@ -929,18 +930,7 @@ impl ReferenceMachine {
     /// represented here. This is not a checkpoint version; nonfloating snapshots remain schema 12.
     pub fn snapshot(&self) -> MachineSnapshot {
         MachineSnapshot {
-            schema_version: if self.mqi.is_some() {
-                0
-            } else if self.layouts.values().any(|layout| {
-                matches!(
-                    layout.category,
-                    LayoutCategory::FloatShort | LayoutCategory::FloatLong
-                )
-            }) {
-                13
-            } else {
-                12
-            },
+            schema_version: self.snapshot_version(),
             program_counter: self.pc,
             effect_sequence: self.effect_sequence,
             executed_steps: self.executed_steps,
@@ -1016,26 +1006,7 @@ impl ReferenceMachine {
             random_state: self.random_state.get(),
             storage64: self.storage64.snapshot(),
             storage64_area_bindings: self.storage64_area_bindings.clone(),
-            float_profiles: self
-                .layouts
-                .iter()
-                .filter(|(_, layout)| {
-                    matches!(
-                        layout.category,
-                        LayoutCategory::FloatShort | LayoutCategory::FloatLong
-                    )
-                })
-                .map(|(name, layout)| {
-                    (
-                        name.clone(),
-                        match layout.float_profile {
-                            float_codec::FloatProfile::Hex => mainframe_env_ir::COBOL_FLOAT_HEX,
-                            float_codec::FloatProfile::Ieee => mainframe_env_ir::COBOL_FLOAT_IEEE,
-                        }
-                        .into(),
-                    )
-                })
-                .collect(),
+            float_profiles: self.snapshot_float_profiles(),
         }
     }
 
@@ -1061,33 +1032,7 @@ impl ReferenceMachine {
         {
             return Err(MachineProblem::IncompatibleSnapshot);
         }
-        let floating_names = self
-            .layouts
-            .iter()
-            .filter(|(_, layout)| {
-                matches!(
-                    layout.category,
-                    LayoutCategory::FloatShort | LayoutCategory::FloatLong
-                )
-            })
-            .map(|(name, _)| name.clone())
-            .collect::<BTreeSet<_>>();
-        if snapshot.schema_version >= 13
-            && (snapshot
-                .float_profiles
-                .keys()
-                .cloned()
-                .collect::<BTreeSet<_>>()
-                != floating_names
-                || snapshot.float_profiles.values().any(|profile| {
-                    !matches!(
-                        profile.as_str(),
-                        mainframe_env_ir::COBOL_FLOAT_HEX | mainframe_env_ir::COBOL_FLOAT_IEEE
-                    )
-                }))
-        {
-            return Err(MachineProblem::IncompatibleSnapshot);
-        }
+        let names = self.validate_profiles(snapshot.schema_version, &snapshot.float_profiles)?;
         let mut restored_storage64 = self.new_storage64_arena();
         self.restore_storage64_snapshot(&mut restored_storage64, &snapshot)?;
         let base_used = snapshot
@@ -1291,19 +1236,11 @@ impl ReferenceMachine {
         } else {
             None
         });
-        for name in floating_names {
-            self.layouts
-                .get_mut(&name)
-                .expect("validated floating name")
-                .float_profile = if snapshot.schema_version >= 13
-                && snapshot.float_profiles[&name] == mainframe_env_ir::COBOL_FLOAT_HEX
-            {
-                float_codec::FloatProfile::Hex
-            } else {
-                // Legacy checkpoints contain IEEE bytes, even with a newly compiled module.
-                float_codec::FloatProfile::Ieee
-            };
-        }
+        self.restore_checkpoint_float_profiles(
+            snapshot.schema_version,
+            &snapshot.float_profiles,
+            names,
+        );
         self.install_storage64_snapshot(restored_storage64, area_bindings);
         self.pending = None;
         self.deferred_drive = None;
@@ -8644,16 +8581,7 @@ impl Machine for ReferenceMachine {
     fn checkpoint(&self) -> Option<BoundedPayload> {
         let bytes = self.checkpoint_bytes()?;
         BoundedPayload::new(
-            if self.layouts.values().any(|layout| {
-                matches!(
-                    layout.category,
-                    LayoutCategory::FloatShort | LayoutCategory::FloatLong
-                )
-            }) {
-                "mainframe-env.reference-machine-checkpoint@13"
-            } else {
-                "mainframe-env.reference-machine-checkpoint@12"
-            },
+            self.checkpoint_schema(),
             bytes,
             InvocationLimits {
                 max_payload_bytes: usize::try_from(
@@ -8693,12 +8621,7 @@ fn push_string_list(output: &mut Vec<u8>, values: &[String]) -> Option<()> {
 }
 
 pub(super) fn encode_snapshot_prefix(snapshot: &MachineSnapshot) -> Option<Vec<u8>> {
-    let mut bytes = if snapshot.schema_version == 13 {
-        b"MECP0013"
-    } else {
-        b"MECP0012"
-    }
-    .to_vec();
+    let mut bytes = float_checkpoint::snapshot_header(snapshot.schema_version).to_vec();
     bytes.extend_from_slice(&snapshot.schema_version.to_be_bytes());
     bytes.extend_from_slice(&u64::try_from(snapshot.program_counter).ok()?.to_be_bytes());
     bytes.extend_from_slice(&snapshot.effect_sequence.to_be_bytes());
@@ -9084,25 +9007,7 @@ fn decode_snapshot(
         max_frames,
         &mut remaining_storage,
     )?;
-    let mut float_profiles = BTreeMap::new();
-    if header_version >= 13 {
-        let count =
-            usize::try_from(input.u32()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
-        if count > max_storage {
-            return Err(MachineProblem::IncompatibleSnapshot);
-        }
-        for _ in 0..count {
-            let name = snapshot_string(&mut input, 4096)?;
-            let profile = match input.take(1)?.first() {
-                Some(0) => mainframe_env_ir::COBOL_FLOAT_IEEE,
-                Some(1) => mainframe_env_ir::COBOL_FLOAT_HEX,
-                _ => return Err(MachineProblem::IncompatibleSnapshot),
-            };
-            if float_profiles.insert(name, profile.into()).is_some() {
-                return Err(MachineProblem::IncompatibleSnapshot);
-            }
-        }
-    }
+    let float_profiles = float_checkpoint::decode(&mut input, header_version, max_storage)?;
     if !input.finished() {
         return Err(MachineProblem::IncompatibleSnapshot);
     }

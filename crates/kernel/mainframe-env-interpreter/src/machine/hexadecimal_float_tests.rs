@@ -347,6 +347,48 @@ fn float_checkpoints_preserve_hex_profiles_and_restore_legacy_bytes_as_ieee() {
 }
 
 #[test]
+fn float_checkpoint_legacy12_projection_requires_ieee_and_preserves_exact_state() {
+    let mut machine = checkpoint_machine();
+    let legacy_schema = "mainframe-env.reference-machine-checkpoint@12";
+    assert!(machine.checkpoint_for_schema(legacy_schema).is_none());
+    let current = machine.checkpoint().unwrap();
+    assert_eq!(
+        machine.checkpoint_for_schema(current.schema()),
+        Some(current)
+    );
+    assert!(
+        machine
+            .checkpoint_for_schema("mainframe-env.reference-machine-checkpoint@14")
+            .is_none()
+    );
+
+    let mut snapshot = machine.snapshot();
+    snapshot.schema_version = 12;
+    snapshot.float_profiles.clear();
+    *snapshot.base_storage.last_mut().unwrap() = vec![0x3f, 0x80, 0, 0];
+    let legacy = BoundedPayload::new(
+        legacy_schema,
+        super::snapshot_codec::encode_snapshot(&snapshot).unwrap(),
+        InvocationLimits::default(),
+    )
+    .unwrap();
+    machine.restore_checkpoint(&legacy).unwrap();
+    assert_eq!(
+        machine.checkpoint_for_schema(legacy_schema),
+        Some(legacy.clone())
+    );
+    assert_eq!(
+        machine.checkpoint().unwrap().schema(),
+        "mainframe-env.reference-machine-checkpoint@13"
+    );
+    *machine.bases.last_mut().unwrap() = vec![0x40, 0, 0, 0];
+    assert_ne!(
+        machine.checkpoint_for_schema(legacy_schema).unwrap(),
+        legacy
+    );
+}
+
+#[test]
 fn hex_float_ieee_ingress_truncation_and_decimal_range_adapter() {
     // UNVERIFIED ASSUMPTION (#160), pending licensed differential: truncate
     // the exact IEEE ingress fraction. Binary64 .1 is .1999999999999a hex;
