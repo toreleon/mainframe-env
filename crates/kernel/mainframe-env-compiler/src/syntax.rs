@@ -1,5 +1,6 @@
 mod directives;
 mod replace_scan;
+mod sql_include;
 
 pub use directives::{
     CompilerDirectingNode, CompilerDirectiveNode, CompilerOption, CompilerOptionSet,
@@ -330,11 +331,7 @@ pub(crate) fn decode_and_lex(
     // Detect includes after COPY and conditional processing so every product
     // entry point uses the same normalized, bounded member resolver. An absent
     // option leaves programs without SQL INCLUDE on their original path.
-    let sql_precompile = bundle.options().get("cobol.sql-precompile").map_or_else(
-        || find_sql_include(&expanded.text, 0).map(|include| include.is_some()),
-        |value| Ok(value == "true"),
-    )?;
-    let expanded = if sql_precompile {
+    let expanded = if sql_include::should_precompile(bundle, &expanded.text)? {
         let expanded = expand_sql_includes(
             &expanded,
             bundle,
@@ -2261,22 +2258,7 @@ pub(crate) enum SyntaxProblem {
 }
 impl fmt::Display for SyntaxProblem {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::PrecompilerIncludeNotFound(name) => {
-                write!(
-                    formatter,
-                    "EXEC SQL INCLUDE member {name} was not found in any source library"
-                )?;
-                if matches!(name.as_str(), "SQLCA" | "SQLDA") {
-                    write!(
-                        formatter,
-                        "; automatic precompiler definitions for {name} are unavailable; supply a library member"
-                    )?;
-                }
-                Ok(())
-            }
-            _ => write!(formatter, "COBOL syntax failed: {self:?}"),
-        }
+        sql_include::format_problem(self, formatter)
     }
 }
 impl std::error::Error for SyntaxProblem {}
