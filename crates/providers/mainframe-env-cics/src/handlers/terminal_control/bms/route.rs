@@ -18,6 +18,9 @@ struct RouteHistory {
     due_tick: u64,
 }
 
+/// Title, recipients and due tick retained for a routed terminal message.
+pub type CicsRouteHistory = (Vec<u8>, Vec<String>, u64);
+
 const HISTORY_NAMESPACE: &str = "cics-bms-route-history-v1";
 
 impl CicsService {
@@ -25,7 +28,7 @@ impl CicsService {
     pub fn last_route(
         &self,
         session: &mainframe_env_host_api::SessionId,
-    ) -> Result<Option<(Vec<u8>, Vec<String>, u64)>, HostProblem> {
+    ) -> Result<Option<CicsRouteHistory>, HostProblem> {
         self.store
             .get_provider_state(HISTORY_NAMESPACE, session.as_str())
             .map_err(store_error)?

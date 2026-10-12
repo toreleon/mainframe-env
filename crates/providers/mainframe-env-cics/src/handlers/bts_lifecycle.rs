@@ -80,6 +80,17 @@ pub struct BtsActivity {
     pub abprogram: Option<String>,
 }
 
+/// Borrowed identity of one BTS mutation and its exact replay request.
+/// Validation remains in the receiving authority method, in its original order.
+#[derive(Clone, Copy, Debug)]
+pub struct BtsEffectInput<'a> {
+    pub run_unit: &'a str,
+    pub owner_execution: &'a str,
+    pub owner_principal: &'a str,
+    pub replay_key: &'a str,
+    pub request_digest: [u8; 32],
+}
+
 /// Exact owner and result of one mutating BTS effect.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -988,11 +999,13 @@ mod tests {
             .mutate_process(
                 "TYPE",
                 "ORDER",
-                "UOW1",
-                "EXEC1",
-                "USER",
-                "suspend-root",
-                [1; 32],
+                crate::bts_lifecycle::BtsEffectInput {
+                    run_unit: "UOW1",
+                    owner_execution: "EXEC1",
+                    owner_principal: "USER",
+                    replay_key: "suspend-root",
+                    request_digest: [1; 32],
+                },
                 |process| {
                     process.set_suspended(&root, true)?;
                     Ok(BtsReply::normal())
@@ -1041,11 +1054,13 @@ mod tests {
             .mutate_process(
                 "TYPE",
                 "ORDER",
-                "UOW2",
-                "EXEC2",
-                "USER",
-                "effect-1",
-                [7; 32],
+                crate::bts_lifecycle::BtsEffectInput {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "effect-1",
+                    request_digest: [7; 32],
+                },
                 |process| {
                     process.activities.get_mut(&root).unwrap().suspended = true;
                     Ok(BtsReply::normal())
@@ -1058,11 +1073,13 @@ mod tests {
             .mutate_process(
                 "TYPE",
                 "ORDER",
-                "UOW2",
-                "EXEC2",
-                "USER",
-                "effect-1",
-                [7; 32],
+                crate::bts_lifecycle::BtsEffectInput {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "effect-1",
+                    request_digest: [7; 32],
+                },
                 |_| panic!("replay must not run transition"),
             )
             .unwrap();
@@ -1072,11 +1089,13 @@ mod tests {
                 .mutate_process(
                     "TYPE",
                     "ORDER",
-                    "UOW2",
-                    "EXEC2",
-                    "USER",
-                    "effect-1",
-                    [8; 32],
+                    crate::bts_lifecycle::BtsEffectInput {
+                        run_unit: "UOW2",
+                        owner_execution: "EXEC2",
+                        owner_principal: "USER",
+                        replay_key: "effect-1",
+                        request_digest: [8; 32]
+                    },
                     |_| { Ok(BtsReply::normal()) }
                 )
                 .is_err()
@@ -1290,11 +1309,13 @@ mod tests {
             .mutate_process(
                 "TYPE",
                 "ORDER",
-                "UOW2",
-                "EXEC2",
-                "USER",
-                "suspend",
-                [2; 32],
+                crate::bts_lifecycle::BtsEffectInput {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "suspend",
+                    request_digest: [2; 32],
+                },
                 |row| {
                     row.set_suspended(&root, true)?;
                     Ok(BtsReply::normal())

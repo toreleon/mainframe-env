@@ -60,6 +60,15 @@ pub(super) struct Association {
     version: u64,
 }
 
+/// Borrowed partition event validated by `CicsService::submit_partition_input`.
+#[derive(Clone, Copy, Debug)]
+pub struct CicsPartitionInput<'a> {
+    pub aid: u8,
+    pub partition: &'a str,
+    pub data: &'a [u8],
+    pub cursor: u16,
+}
+
 impl CicsService {
     /// Register immutable partition-set definitions for local BMS tasks.
     pub fn register_partition_sets(
@@ -130,12 +139,15 @@ impl CicsService {
         session: &SessionId,
         principal: &PrincipalId,
         csrf_token: &str,
-        aid: u8,
-        partition: &str,
-        data: &[u8],
-        cursor: u16,
+        input: CicsPartitionInput<'_>,
         now_tick: u64,
     ) -> Result<CicsTerminalSnapshot, HostProblem> {
+        let CicsPartitionInput {
+            aid,
+            partition,
+            data,
+            cursor,
+        } = input;
         if !super::valid_aid(aid) || data.len() > self.limits.max_screen_bytes {
             return Err(HostProblem::Malformed);
         }

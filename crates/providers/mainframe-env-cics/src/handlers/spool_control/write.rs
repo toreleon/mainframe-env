@@ -68,26 +68,25 @@ pub(super) fn invoke(
     }
     let length = usize::try_from(length).map_err(|_| HostProblem::InfrastructureFailure)?;
     let accepted = length.min(report.record_length as usize);
-    if report.user_id.eq_ignore_ascii_case("INTRDR") {
-        if let Some(job_user) = job_card_user(&from[..accepted]) {
-            if !job_user.eq_ignore_ascii_case(run.invocation.principal.id().as_str()) {
-                service
-                    .authorize(
-                        run,
-                        "SURROGAT",
-                        &format!("{job_user}.SUBMIT"),
-                        AccessIntent::Read,
-                    )
-                    .map_err(|problem| match problem {
-                        HostProblem::Unauthorized => HostProblem::Condition {
-                            name: "NOTAUTH".into(),
-                            response: 70,
-                            response2: 1,
-                        },
-                        other => other,
-                    })?;
-            }
-        }
+    if report.user_id.eq_ignore_ascii_case("INTRDR")
+        && let Some(job_user) = job_card_user(&from[..accepted])
+        && !job_user.eq_ignore_ascii_case(run.invocation.principal.id().as_str())
+    {
+        service
+            .authorize(
+                run,
+                "SURROGAT",
+                &format!("{job_user}.SUBMIT"),
+                AccessIntent::Read,
+            )
+            .map_err(|problem| match problem {
+                HostProblem::Unauthorized => HostProblem::Condition {
+                    name: "NOTAUTH".into(),
+                    response: 70,
+                    response2: 1,
+                },
+                other => other,
+            })?;
     }
     let current_version = state.spool.version;
     let mut next = state.spool.clone();

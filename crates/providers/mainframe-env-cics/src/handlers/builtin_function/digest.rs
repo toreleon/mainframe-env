@@ -50,13 +50,11 @@ pub(super) fn invoke(
             "OPTION.NOHANDLE" => {
                 value.schema() == "mainframe-env.cics.option@1" && value.bytes().is_empty()
             }
-            "OPTION.DIGESTHEX" | "OPTION.DIGESTBINARY" | "OPTION.DIGESTBASE64" => {
-                if value.schema() == "mainframe-env.cics.option@1" && value.bytes().is_empty() {
-                    flags.push(name.as_str());
-                    true
-                } else {
-                    false
-                }
+            "OPTION.DIGESTHEX" | "OPTION.DIGESTBINARY" | "OPTION.DIGESTBASE64"
+                if value.schema() == "mainframe-env.cics.option@1" && value.bytes().is_empty() =>
+            {
+                flags.push(name.as_str());
+                true
             }
             _ => false,
         };
