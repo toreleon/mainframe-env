@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add an explicit signed initial local Complete publication held through the real same-store provider commit, with ordinary compiled controller/JES owner controls."

@@ -1550,3 +1550,6 @@ mod mq;
 
 #[path = "local_batch_composition_tests.rs"]
 mod batch;
+
+#[path = "local_complete_publication_tests.rs"]
+mod complete_publication;

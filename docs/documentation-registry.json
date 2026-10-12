@@ -128,7 +128,10 @@
     "docs/decisions/0073-local-batch-controller-composition.md",
     "docs/decisions/0066-cics-current-program-borrowed-task-custody.md",
     "docs/decisions/0067-durable-first-dispatch-borrowed-intent.md",
-    "docs/decisions/0070-compiled-cics-first-protected-dispatch.md"
+    "docs/decisions/0070-compiled-cics-first-protected-dispatch.md",
+    "docs/decisions/0075-local-complete-owned-publication.md",
+    "docs/decisions/0074-local-mq-process-trigger-graph.md",
+    "docs/decisions/0076-local-committed-mq-controller-occurrence.md"
   ],
   "navigation": [
     {
@@ -660,6 +663,18 @@
         {
           "label": "ADR-0070: Compiled CICS first protected dispatch",
           "path": "docs/decisions/0070-compiled-cics-first-protected-dispatch.md"
+        },
+        {
+          "label": "ADR-0075: Owned initial local Complete publication",
+          "path": "docs/decisions/0075-local-complete-owned-publication.md"
+        },
+        {
+          "label": "ADR-0074: Explicit local MQ process/trigger graph admission",
+          "path": "docs/decisions/0074-local-mq-process-trigger-graph.md"
+        },
+        {
+          "label": "ADR 0076: Explicit local committed MQ controller occurrence",
+          "path": "docs/decisions/0076-local-committed-mq-controller-occurrence.md"
         }
       ],
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."

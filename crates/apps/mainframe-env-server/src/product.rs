@@ -1448,69 +1448,6 @@ impl ProductServer {
             .with_publication_write(|writer| self.recover_application_publications_locked(writer))
     }
 
-    fn recover_application_publications_locked(
-        &self,
-        writer: &BatchPublicationWrite<'_>,
-    ) -> Result<(), HostProblem> {
-        for record in self
-            .store
-            .list_provider_state(APPLICATION_PUBLICATION_NAMESPACE, 1_024)
-            .map_err(store_error)?
-        {
-            if record.payload.len() > MAX_APPLICATION_PUBLICATION_BYTES {
-                return Err(HostProblem::ResourceExhausted);
-            }
-            let state = self.decode_application_publication(&record)?;
-            if state.schema_version != APPLICATION_PUBLICATION_CONTRACT
-                || state.package.to_ascii_uppercase() != record.key
-            {
-                return Err(HostProblem::InfrastructureFailure);
-            }
-            let retained = self
-                .applications_v2
-                .lock()
-                .map_err(|_| HostProblem::InfrastructureFailure)?
-                .installer
-                .generation(&state.package, state.generation, &state.identity)
-                .map_err(application_install_problem)?
-                .ok_or(HostProblem::InfrastructureFailure)?;
-            let expected = retained.record().clone();
-            drop(retained);
-            if !state.complete {
-                match state.action {
-                    PublicationAction::Install => {
-                        self.publish_application_generation_locked(&expected, writer)?;
-                    }
-                    PublicationAction::Rollback => {
-                        self.rollback_application_generation_locked(&expected, writer)?;
-                    }
-                }
-            } else {
-                if !state.matches_complete(
-                    &expected.package,
-                    expected.generation,
-                    &expected.identity,
-                ) {
-                    return Err(HostProblem::InfrastructureFailure);
-                }
-                let selected = self.selected_application_v2(&expected)?;
-                let plan =
-                    self.prevalidate_application_publication(&selected, state.action, true)?;
-                if plan.db2.is_some() && state.db2 != PublicationSectionState::Applied
-                    || !plan.controllers.controllers.is_empty()
-                        && state.controllers != PublicationSectionState::Applied
-                    || (selected.package().sections.ims_metadata.is_some()
-                        || selected.package().sections.ims_tm.is_some())
-                        && state.ims != PublicationSectionState::Applied
-                {
-                    return Err(HostProblem::InfrastructureFailure);
-                }
-                self.apply_application_ims_metadata(&selected)?;
-            }
-        }
-        Ok(())
-    }
-
     fn selected_application_v2(
         &self,
         expected: &ApplicationGenerationRecord,

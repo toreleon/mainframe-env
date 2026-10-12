@@ -211,6 +211,9 @@ explicitly names that authority as superseded.
 - [ADR-0066: Borrowed CICS current-program task custody](decisions/0066-cics-current-program-borrowed-task-custody.md)
 - [ADR-0067: Borrowed durable first-dispatch Intent](decisions/0067-durable-first-dispatch-borrowed-intent.md)
 - [ADR-0070: Compiled CICS first protected dispatch](decisions/0070-compiled-cics-first-protected-dispatch.md)
+- [ADR-0075: Owned initial local Complete publication](decisions/0075-local-complete-owned-publication.md)
+- [ADR-0074: Explicit local MQ process/trigger graph admission](decisions/0074-local-mq-process-trigger-graph.md)
+- [ADR 0076: Explicit local committed MQ controller occurrence](decisions/0076-local-committed-mq-controller-occurrence.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.
 

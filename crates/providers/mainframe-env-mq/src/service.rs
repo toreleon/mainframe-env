@@ -100,7 +100,9 @@ mod object_integration;
 use object_integration::{encode_catalog_row, load_catalog_row};
 #[path = "service_catalog_composition.rs"]
 mod catalog_composition;
-pub use catalog_composition::{MqCatalogProjection, PreparedMqCatalog};
+pub use catalog_composition::{
+    MqCatalogProjection, MqCommittedPutOffer, PreparedMqCatalog, PreparedMqCommittedPut,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MqLimits {

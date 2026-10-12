@@ -63,7 +63,7 @@ impl RacfProfileComposition {
             || self.name.is_empty()
             || self.name.len() > 246
             || !self.name.bytes().all(|byte| {
-                byte.is_ascii_uppercase() || byte.is_ascii_digit() || b"@#$.*%_".contains(&byte)
+                byte.is_ascii_uppercase() || byte.is_ascii_digit() || b"@#$.*%_-".contains(&byte)
             })
             || self.permissions.len() > 1024
             || self.permissions.keys().any(|name| !token(name, 8))

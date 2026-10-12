@@ -4,11 +4,13 @@ mod effect_loan;
 mod hex_encoding;
 mod host_dispatch;
 mod ims_controller;
+mod local_controller;
 mod prepared_selection;
 mod problem;
 mod program_dispatch;
 mod publication;
 pub use controller_preparation::{BatchControllerProjection, PreparedBatchControllers};
+pub use local_controller::{PreparedLocalController, validate_local_controller_plan};
 pub use publication::BatchPublicationWrite;
 mod run_retirement;
 mod run_selection;
@@ -236,21 +238,6 @@ pub struct BatchService {
 }
 
 impl BatchService {
-    pub fn open(
-        host: Arc<ScopedHostService>,
-        store: Arc<dyn ProviderStateStore>,
-        jcl_limits: JclLimits,
-        limits: BatchLimits,
-    ) -> Result<Arc<Self>, HostProblem> {
-        Self::open_with_scheduler(
-            host,
-            store,
-            jcl_limits,
-            limits,
-            JesSchedulerConfiguration::single_node(limits.max_active),
-        )
-    }
-
     pub fn open_with_scheduler(
         host: Arc<ScopedHostService>,
         store: Arc<dyn ProviderStateStore>,
@@ -2232,6 +2219,7 @@ impl BatchService {
         let selector = BatchControllerSelector::tso(&program)?;
         let (publication, controller) = self.admit_controller(&selector)?;
         if let Some(controller) = controller {
+            self.require_local_controller_binding(job, &controller)?;
             return match controller.plan {
                 BatchControllerPlan::ProgramCall => {
                     let program = self.verify_controller_program(&controller.program)?;

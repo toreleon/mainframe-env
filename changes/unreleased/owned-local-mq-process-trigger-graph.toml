@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Admit explicitly signed local MQ process and trigger graphs with genuine catalog and controller ownership; retain separate original launch readiness."

@@ -24,7 +24,7 @@
     },
     {
       "path": "crates/apps/mainframe-env-batch/src/service.rs",
-      "max_production_lines": 6781,
+      "max_production_lines": 6769,
       "responsibility": "The batch service coordinates submission, DD allocation, program execution, spool state, and recovery transitions.",
       "split_boundary": "Split submission and routing, DD allocation, step execution, and completion/recovery into state-machine command families."
     },
@@ -36,7 +36,7 @@
     },
     {
       "path": "crates/apps/mainframe-env-server/src/product.rs",
-      "max_production_lines": 4813,
+      "max_production_lines": 4750,
       "responsibility": "Product construction, dependency assembly, application publication, JES control, and HTTP route behavior converge here.",
       "split_boundary": "Extract bootstrap/construction, publication, JES operations, and route-family adapters around the Product state owner."
     },

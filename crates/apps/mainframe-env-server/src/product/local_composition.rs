@@ -1,8 +1,11 @@
 //! Finite local composition of genuine seed/CICS owners and selected online catalog rows.
 //! Other subsystem families require their own held preparation before joining this profile.
 use super::*;
+#[path = "local_composition/runtime_publication.rs"]
+mod runtime_publication;
 #[path = "local_composition/source.rs"]
 mod source;
+use runtime_publication::{decode_local_selection, local_binding};
 pub use source::LocalSourceCompilation;
 #[path = "local_composition/db2.rs"]
 mod db2;
@@ -13,7 +16,7 @@ use mainframe_env_db2::Db2CatalogProjection;
 mod ims;
 use mainframe_env_ims::ImsCatalogProjection;
 #[path = "local_composition/mq.rs"]
-mod mq;
+pub(in crate::product) mod mq;
 use mainframe_env_mq::MqCatalogProjection;
 #[path = "local_composition/batch.rs"]
 mod batch;
@@ -112,12 +115,36 @@ impl ProductServer {
         self.compose_local_application(expected, definition, true)
     }
 
+    /// Publish an explicitly signed initial local generation with its real Complete/Applied row.
+    /// Every original prepared provider owner and the publication writer remain held through one CAS.
+    /// This finite initial-only port grants no automatic trigger, migration or vendor equivalence.
+    pub fn publish_complete_local_application(
+        &self,
+        expected: &ApplicationGenerationRecord,
+        definition: LocalApplicationDefinition,
+    ) -> Result<LocalApplicationReceipt, HostProblem> {
+        self.compose_local_application_mode(expected, definition, false, true)
+    }
+
     fn compose_local_application(
         &self,
         expected: &ApplicationGenerationRecord,
         definition: LocalApplicationDefinition,
         rollback: bool,
     ) -> Result<LocalApplicationReceipt, HostProblem> {
+        self.compose_local_application_mode(expected, definition, rollback, false)
+    }
+
+    fn compose_local_application_mode(
+        &self,
+        expected: &ApplicationGenerationRecord,
+        definition: LocalApplicationDefinition,
+        rollback: bool,
+        complete_initial: bool,
+    ) -> Result<LocalApplicationReceipt, HostProblem> {
+        if complete_initial && (rollback || expected.generation != 1) {
+            return Err(HostProblem::Unsupported);
+        }
         let _publication = self.publication_write()?;
         self.require_local_owner_known()?;
         let mut durable = self
@@ -158,12 +185,17 @@ impl ProductServer {
         }
         let source_bytes = source::source_input_bytes(&definition.compilations)?;
         let mut used = BTreeSet::new();
+
+        if complete_initial {
+            runtime_publication::bind_mode(package, &mut used)?;
+        }
         let profile_bytes =
             security::bind_profiles(package, &definition.security_profiles, &mut used)?;
         let (catalog, catalog_bytes) = db2::bind_catalog(self, &retained, &mut used)?;
         let (ims_catalog, ims_bytes) = ims::bind_catalog(package, &mut used)?;
-        let (mq_catalog, mq_catalog_bytes) = mq::bind_catalog(package, &mut used)?;
         let (batch_generation, batch_bytes) = batch::bind_controllers(self, &retained, &mut used)?;
+        let (mq_catalog, mq_catalog_bytes) =
+            mq::bind_catalog(package, batch_generation.as_ref(), &mut used)?;
         let offered_bytes = definition
             .seeds
             .iter()
@@ -292,11 +324,18 @@ impl ProductServer {
         }
         let name = expected.package.to_ascii_uppercase();
         let previous = self.local_selection(&name)?;
-        if self
+        let existing_publication = self
             .store
             .get_provider_state(APPLICATION_PUBLICATION_NAMESPACE, &name)
-            .map_err(store_error)?
-            .is_some()
+            .map_err(store_error)?;
+        if existing_publication.is_some()
+            && (!complete_initial
+                || !previous.as_ref().is_some_and(|(_, selected)| {
+                    selected
+                        .rows
+                        .iter()
+                        .any(|row| Some(row) == existing_publication.as_ref())
+                }))
             || (previous.is_none() && retained.record().state != InstallState::Staged)
         {
             return Err(HostProblem::IdempotencyConflict);
@@ -367,14 +406,31 @@ impl ProductServer {
             .as_ref()
             .and_then(|(_, selected)| selected.mq.as_ref());
         let mq = if let Some(catalog) = mq_catalog {
-            Some(self.mq.prepare_catalog_composition(
-                &name,
-                expected.generation,
-                &expected.identity,
-                catalog,
-                previous_mq,
-                rollback,
-            )?)
+            // bind_catalog has already authenticated the exact opt-in graph Resource and controller.
+            Some(
+                if catalog
+                    .iter()
+                    .any(|definition| definition.trigger_program.is_some())
+                {
+                    self.mq.prepare_process_graph_composition(
+                        &name,
+                        expected.generation,
+                        &expected.identity,
+                        catalog,
+                        previous_mq,
+                        rollback,
+                    )?
+                } else {
+                    self.mq.prepare_catalog_composition(
+                        &name,
+                        expected.generation,
+                        &expected.identity,
+                        catalog,
+                        previous_mq,
+                        rollback,
+                    )?
+                },
+            )
         } else {
             if previous_mq.is_some() {
                 return Err(HostProblem::IdempotencyConflict);
@@ -480,6 +536,19 @@ impl ProductServer {
                     previous.as_ref(),
                 )?);
             }
+        }
+        let publication = if complete_initial {
+            Some(runtime_publication::prepared(
+                expected,
+                batch_projection.is_some(),
+                catalog_projection.is_some(),
+                ims_projection.is_some(),
+            )?)
+        } else {
+            None
+        };
+        if let Some(write) = &publication {
+            rows.push(write.record.clone());
         }
         rows.extend(route_writes.iter().map(|write| write.record.clone()));
         rows.sort_by(|left, right| {
@@ -607,6 +676,10 @@ impl ProductServer {
             writes.extend_from_slice(prepared.writes());
         }
         writes.extend(route_writes);
+
+        if let Some(write) = &publication {
+            writes.push(write.clone());
+        }
         writes.push(ProviderStateWrite {
             record: ProviderStateRecord {
                 namespace: APPLICATION_V2_STATE_NAMESPACE.into(),
@@ -644,7 +717,7 @@ impl ProductServer {
             self.artifacts.put_artifact(record).map_err(store_error)?;
         }
         let provider_store: Arc<dyn ProviderStateStore> = self.store.clone();
-        let commit = match ProviderCompositionCommit::publish(provider_store, writes) {
+        let commit = match ProviderCompositionCommit::publish(provider_store.clone(), writes) {
             Ok(commit) => commit,
             Err(problem) => {
                 if matches!(
@@ -675,7 +748,10 @@ impl ProductServer {
                 return Err(store_error(problem));
             }
         };
-        if !cics.accepts(&commit)
+        if publication
+            .as_ref()
+            .is_some_and(|write| !commit.covers(&provider_store, std::slice::from_ref(write)))
+            || !cics.accepts(&commit)
             || !seed.accepts(&commit)
             || db2
                 .as_ref()
@@ -826,18 +902,48 @@ impl ProductServer {
         self.selected_local_application_locked(package)
     }
 
+    /// Read back an initial complete local selection through its real retained static/provider owners.
+    /// The returned installer record is evidence of that selection, never an executable permit.
+    pub fn selected_complete_local_application(
+        &self,
+        package: &str,
+    ) -> Result<Option<ApplicationGenerationRecord>, HostProblem> {
+        let _publication = self
+            .application_publication
+            .read()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        self.require_local_owner_known()?;
+        let Some((_, selected)) = self.local_selection(&package.to_ascii_uppercase())? else {
+            return Ok(None);
+        };
+        if runtime_publication::selection_row(&selected)?.is_none() {
+            return Err(HostProblem::NotFound);
+        }
+        self.selected_local_application_mode_locked(package, true)
+    }
+
     fn selected_local_application_locked(
         &self,
         package: &str,
     ) -> Result<Option<ApplicationGenerationRecord>, HostProblem> {
+        self.selected_local_application_mode_locked(package, false)
+    }
+
+    fn selected_local_application_mode_locked(
+        &self,
+        package: &str,
+        complete_allowed: bool,
+    ) -> Result<Option<ApplicationGenerationRecord>, HostProblem> {
         let Some((_, selected)) = self.local_selection(&package.to_ascii_uppercase())? else {
             return Ok(None);
         };
-        if self
+        let owned_publication = runtime_publication::selection_row(&selected)?;
+        let actual_publication = self
             .store
             .get_provider_state(APPLICATION_PUBLICATION_NAMESPACE, &selected.package)
-            .map_err(store_error)?
-            .is_some()
+            .map_err(store_error)?;
+        if !complete_allowed && actual_publication.is_some()
+            || actual_publication.as_ref() != owned_publication
         {
             return Err(HostProblem::IdempotencyConflict);
         }
@@ -880,6 +986,20 @@ impl ProductServer {
             )?
         {
             return Err(HostProblem::IdempotencyConflict);
+        }
+        let retained = durable
+            .installer
+            .generation(&selected.package, selected.generation, &selected.identity)
+            .map_err(application_install_problem)?
+            .ok_or(HostProblem::NotFound)?;
+        mq::matches_graph(retained.package(), &selected)?;
+        if owned_publication.is_some() {
+            let retained = durable
+                .installer
+                .generation(&selected.package, selected.generation, &selected.identity)
+                .map_err(application_install_problem)?
+                .ok_or(HostProblem::NotFound)?;
+            runtime_publication::verify_mode(retained.package())?;
         }
         let row = self
             .store
@@ -935,7 +1055,7 @@ impl ProductServer {
             let selected = decode_local_selection(&row)?;
             if row.key != selected.package
                 || self
-                    .selected_local_application_locked(&selected.package)?
+                    .selected_local_application_mode_locked(&selected.package, true)?
                     .is_none()
             {
                 return Err(HostProblem::InfrastructureFailure);
@@ -1028,162 +1148,10 @@ fn bind_entry(
     Ok(())
 }
 
-fn local_binding(
-    identity: &str,
-    seed: &str,
-    snapshot: &str,
-    sources: &BTreeMap<String, String>,
-    profiles: &[RacfProfileProjection],
-    participants: (
-        Option<&Db2CatalogProjection>,
-        Option<&ImsCatalogProjection>,
-        Option<&MqCatalogProjection>,
-        Option<&BatchControllerProjection>,
-    ),
-    rows: &[ProviderStateRecord],
-) -> Result<String, HostProblem> {
-    let (catalog, ims_catalog, mq_catalog, controllers) = participants;
-    let mut digest = Sha256::new();
-    for field in [
-        LOCAL_CONTRACT.as_bytes(),
-        identity.as_bytes(),
-        seed.as_bytes(),
-        snapshot.as_bytes(),
-    ] {
-        digest_online_field(&mut digest, field);
-    }
-    for (program, source) in sources {
-        digest_online_field(&mut digest, program.as_bytes());
-        digest_online_field(&mut digest, source.as_bytes());
-    }
-    for projection in profiles {
-        digest_online_field(&mut digest, &projection.content_payload()?);
-    }
-    if let Some(catalog) = catalog {
-        digest_online_field(&mut digest, &catalog.content_payload()?);
-    }
-    if let Some(catalog) = ims_catalog {
-        digest_online_field(&mut digest, &catalog.content_payload()?);
-    }
-    if let Some(catalog) = mq_catalog {
-        digest_online_field(&mut digest, &catalog.content_payload()?);
-    }
-    if let Some(controllers) = controllers {
-        digest_online_field(&mut digest, &controllers.content_payload()?);
-    }
-    for row in rows {
-        for field in [
-            row.namespace.as_bytes(),
-            row.key.as_bytes(),
-            row.payload.as_slice(),
-        ] {
-            digest_online_field(&mut digest, field);
-        }
-    }
-    Ok(format!("sha256:{:x}", digest.finalize()))
-}
-
 fn encode_local_selection(selection: &LocalSelection) -> Result<Vec<u8>, HostProblem> {
     let bytes = serde_json::to_vec(selection).map_err(|_| HostProblem::InfrastructureFailure)?;
     if bytes.len() > MAX_PROVIDER_COMPOSITION_BYTES / 2 {
         return Err(HostProblem::ResourceExhausted);
     }
     Ok(bytes)
-}
-
-fn decode_local_selection(row: &ProviderStateRecord) -> Result<LocalSelection, HostProblem> {
-    if row.version == 0 || row.payload.len() > MAX_PROVIDER_COMPOSITION_BYTES / 2 {
-        return Err(HostProblem::InfrastructureFailure);
-    }
-    let value: LocalSelection =
-        serde_json::from_slice(&row.payload).map_err(|_| HostProblem::InfrastructureFailure)?;
-    if !matches!(row.namespace.as_str(), LOCAL_SELECTION | LOCAL_GENERATION)
-        || value.schema_version != LOCAL_CONTRACT
-        || value.package.is_empty()
-        || value.generation == 0
-        || value.rows.is_empty()
-        || value.rows.len() > 16384
-        || value.compiled_sources.is_empty()
-        || value.compiled_sources.len() > 4096
-        || value.compiled_sources.iter().any(|(name, identity)| {
-            normalize_online_name(name, 128).as_deref() != Ok(name.as_str())
-                || identity.len() != 64
-                || !identity
-                    .bytes()
-                    .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
-        })
-        || value
-            .compiled_sources
-            .keys()
-            .map(String::as_str)
-            .collect::<BTreeSet<_>>()
-            != value
-                .rows
-                .iter()
-                .filter(|row| row.namespace == "online-program")
-                .map(|row| row.key.as_str())
-                .collect::<BTreeSet<_>>()
-        || value
-            .db2
-            .as_ref()
-            .is_some_and(|catalog| !db2::valid_projection(catalog, &value))
-        || value
-            .ims
-            .as_ref()
-            .is_some_and(|catalog| !ims::valid_projection(catalog, &value))
-        || value
-            .mq
-            .as_ref()
-            .is_some_and(|catalog| !mq::valid_projection(catalog, &value))
-        || value
-            .batch
-            .as_ref()
-            .is_some_and(|controllers| !batch::valid_projection(controllers, &value))
-        || value.racf.len() > 4096
-        || security::projection_keys(&value.racf).is_err()
-        || value
-            .racf
-            .windows(2)
-            .any(|pair| pair[0].key() >= pair[1].key())
-        || value.binding
-            != local_binding(
-                &value.identity,
-                &value.seed_identity,
-                &value.seed_snapshot,
-                &value.compiled_sources,
-                &value.racf,
-                (
-                    value.db2.as_ref(),
-                    value.ims.as_ref(),
-                    value.mq.as_ref(),
-                    value.batch.as_ref(),
-                ),
-                &value.rows,
-            )?
-        || value
-            .rows
-            .windows(2)
-            .any(|pair| (&pair[0].namespace, &pair[0].key) >= (&pair[1].namespace, &pair[1].key))
-        || (row.namespace == LOCAL_SELECTION && row.key != value.package)
-        || (row.namespace == LOCAL_GENERATION
-            && row.key != format!("{}:{}", value.package, value.generation))
-        || value
-            .rows
-            .iter()
-            .any(|row| row.validate_write(MAX_PROVIDER_COMPOSITION_BYTES).is_err())
-        || value.rows.iter().any(|row| {
-            !matches!(
-                row.namespace.as_str(),
-                "cics-program"
-                    | "cics-map"
-                    | "cics-file-alias"
-                    | "online-program"
-                    | "online-transaction"
-                    | "batch-program"
-            )
-        })
-    {
-        return Err(HostProblem::InfrastructureFailure);
-    }
-    Ok(value)
 }

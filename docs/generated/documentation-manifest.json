@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 260,
+    "markdown_documents": 263,
     "navigation_groups": 8,
-    "normative_documents": 121,
+    "normative_documents": 124,
     "xtask_commands": 162
   },
   "documents": [
@@ -341,8 +341,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 202,
-      "sha256": "sha256:bda036911646e3cd466c0cd6bb7e27693375c3c30486bb872d9e6ff2c000ef98",
+      "relative_links": 205,
+      "sha256": "sha256:14aeacec0dba241ea6df7886a414861c42cb6a9c8a2f64444d0b96c0a033c6f8",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -1723,10 +1723,46 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.2.0",
+      "normative": true,
+      "owner": "MQ provider and application composition maintainers",
+      "path": "docs/decisions/0074-local-mq-process-trigger-graph.md",
+      "relative_links": 0,
+      "scope": "Versioned finite static graph admission under the actual local composition owners",
+      "sha256": "sha256:233f1c05796693f76c95c9495fbcaa3f050c5e890ddf5277f9576304007c2968",
+      "status": "Proposed; source-only draft, uncompiled and unrun.",
+      "title": "ADR-0074: Explicit local MQ process/trigger graph admission",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env explicit local complete-initial profile, generation 1",
+      "normative": true,
+      "owner": "Foundation runtime / application composition",
+      "path": "docs/decisions/0075-local-complete-owned-publication.md",
+      "relative_links": 0,
+      "scope": "Explicit signed initial local Complete/Applied publication and ordinary compiled ProgramCall/JES owner",
+      "sha256": "sha256:1abbc076042703e4041ec00d6d31c0d18d4a513502fcfc7bc5cd15699285ee68",
+      "status": "Proposed",
+      "title": "ADR-0075: Owned initial local Complete publication",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env local composition with this opt-in boundary",
+      "normative": true,
+      "owner": "Mainframe Sandbox runtime",
+      "path": "docs/decisions/0076-local-committed-mq-controller-occurrence.md",
+      "relative_links": 0,
+      "scope": "Local MQ committed PUT1 occurrence and selected Batch/JES controller",
+      "sha256": "sha256:56126a1c1b1976b18c08372311169f8b3671acbf3a9eb8b998e4aacc04e7edd5",
+      "status": "Proposed",
+      "title": "ADR 0076: Explicit local committed MQ controller occurrence",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 64,
-      "sha256": "sha256:947f99075df8675a2e104d4ceefe734ce35699c0f2ccc1e50ebee6bdf4af6122",
+      "relative_links": 67,
+      "sha256": "sha256:776b4b4410e7cec33f4bf0b7ad89a5516daf0ae3d9144903657f753df0e90782",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -3106,6 +3142,18 @@
         {
           "label": "ADR-0070: Compiled CICS first protected dispatch",
           "path": "docs/decisions/0070-compiled-cics-first-protected-dispatch.md"
+        },
+        {
+          "label": "ADR-0075: Owned initial local Complete publication",
+          "path": "docs/decisions/0075-local-complete-owned-publication.md"
+        },
+        {
+          "label": "ADR-0074: Explicit local MQ process/trigger graph admission",
+          "path": "docs/decisions/0074-local-mq-process-trigger-graph.md"
+        },
+        {
+          "label": "ADR 0076: Explicit local committed MQ controller occurrence",
+          "path": "docs/decisions/0076-local-committed-mq-controller-occurrence.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -3328,7 +3376,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:4cc99d00873989e0ead108708a3696bef37156075f9c40cf0a56124676f3be23",
+  "registry_sha256": "sha256:cb2f3478d16a4c7c74ea44603a4c94850958a5fa9c23df4bf497ad009231dfeb",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

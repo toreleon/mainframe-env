@@ -70,6 +70,9 @@ CardDemo participant ownership and batch completion boundary.
 | [0066](0066-cics-current-program-borrowed-task-custody.md) | explicit borrowed current root task custody for one non-CICS dispatch | Proposed |
 | [0067](0067-durable-first-dispatch-borrowed-intent.md) | actual durable first-dispatch Intent with original scoped host call retained internally | Proposed |
 | [0070](0070-compiled-cics-first-protected-dispatch.md) | actual installed first CICS frame, same-store root and borrowed first external dispatch | Proposed |
+| [0074](0074-local-mq-process-trigger-graph.md) | explicit local MQ process/trigger graph admission | Proposed |
+| [0075](0075-local-complete-owned-publication.md) | owned initial local Complete publication | Proposed |
+| [0076](0076-local-committed-mq-controller-occurrence.md) | explicit local committed MQ controller occurrence | Proposed |
 
 Parallel subsystem work allocated the same 0028 and 0029 numeric prefixes.
 Their distinct full filenames and subsystem-qualified labels identify each

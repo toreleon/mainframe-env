@@ -92,3 +92,5 @@ pub use service::{
     BatchControllerProjection, BatchLimits, BatchPublicationWrite, BatchService, JobSnapshot,
     PreparedBatchControllers,
 };
+
+pub use service::{PreparedLocalController, validate_local_controller_plan};

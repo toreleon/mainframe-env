@@ -1,11 +1,20 @@
-//! Fixed local queue catalog in the genuine legacy service and original row codecs.
+//! Fixed local queue/process catalog in the genuine legacy service and original row codecs.
 use super::*;
+#[path = "service_catalog_composition/committed_put.rs"]
+mod committed_put;
+pub use committed_put::{MqCommittedPutOffer, PreparedMqCommittedPut};
 use mainframe_env_store_api::{
     MAX_PROVIDER_COMPOSITION_BYTES, MAX_PROVIDER_STATE_SCAN, ProviderCompositionCommit,
 };
 
 const SELECTION_NAMESPACE: &str = "application-mq-catalog-selection";
 const SELECTION_KEY: &str = "catalog";
+
+// Private admission mode carries the existing rollback bit without widening public signatures.
+enum CatalogPreparation {
+    QueueOnly(bool),
+    ProcessGraph(bool),
+}
 
 /// Signed static queue catalog owned by one retained local application selection.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -17,7 +26,7 @@ pub struct MqCatalogProjection {
     pub generation: u64,
     /// Actual signed package identity.
     pub package_identity: String,
-    /// Full ordered local queue definitions; trigger dispatch is a separate participant.
+    /// Full ordered local queues and process names; launching and completion are separate owners.
     pub definitions: Vec<MqQueueDefinition>,
     /// Digest of the full original typed catalog encoding, including its manager metadata.
     pub catalog_identity: String,
@@ -39,7 +48,7 @@ impl MqCatalogProjection {
         {
             return Err(HostProblem::Malformed);
         }
-        let catalog = fixed_catalog(&self.definitions, MqLimits::default())?;
+        let catalog = fixed_catalog(&self.definitions, MqLimits::default(), true)?;
         if catalog_identity(&catalog)? != self.catalog_identity {
             return Err(HostProblem::IdempotencyConflict);
         }
@@ -73,7 +82,58 @@ impl MqService {
         previous: Option<&MqCatalogProjection>,
         rollback: bool,
     ) -> Result<PreparedMqCatalog<'_>, HostProblem> {
-        let catalog = fixed_catalog(&definitions, self.limits)?;
+        self.prepare_catalog_composition_inner(
+            application,
+            generation,
+            package_identity,
+            definitions,
+            previous,
+            CatalogPreparation::QueueOnly(rollback),
+        )
+    }
+
+    /// Explicit local process-graph catalog preparation, separate from the old queue-only port.
+    /// This borrows the genuine owner/CAS plan; it grants no launch or IBM trigger authority.
+    /// The application caller must separately authenticate its complete signed graph/controller.
+    pub fn prepare_process_graph_composition(
+        &self,
+        application: &str,
+        generation: u64,
+        package_identity: &str,
+        definitions: Vec<MqQueueDefinition>,
+        previous: Option<&MqCatalogProjection>,
+        rollback: bool,
+    ) -> Result<PreparedMqCatalog<'_>, HostProblem> {
+        if !definitions
+            .iter()
+            .any(|definition| definition.trigger_program.is_some())
+        {
+            return Err(HostProblem::Malformed);
+        }
+        self.prepare_catalog_composition_inner(
+            application,
+            generation,
+            package_identity,
+            definitions,
+            previous,
+            CatalogPreparation::ProcessGraph(rollback),
+        )
+    }
+
+    fn prepare_catalog_composition_inner(
+        &self,
+        application: &str,
+        generation: u64,
+        package_identity: &str,
+        definitions: Vec<MqQueueDefinition>,
+        previous: Option<&MqCatalogProjection>,
+        mode: CatalogPreparation,
+    ) -> Result<PreparedMqCatalog<'_>, HostProblem> {
+        let (rollback, allow_process) = match mode {
+            CatalogPreparation::QueueOnly(rollback) => (rollback, false),
+            CatalogPreparation::ProcessGraph(rollback) => (rollback, true),
+        };
+        let catalog = fixed_catalog(&definitions, self.limits, allow_process)?;
         let projection = MqCatalogProjection {
             application: application.into(),
             generation,
@@ -116,8 +176,13 @@ impl MqService {
                 return Err(HostProblem::NotFound);
             }
             for definition in &projection.definitions {
-                next.queues
-                    .insert(definition.name.clone(), Arc::new(Queue::default()));
+                next.queues.insert(
+                    definition.name.clone(),
+                    Arc::new(Queue {
+                        trigger_program: definition.trigger_program.clone(),
+                        messages: Vec::new(),
+                    }),
+                );
             }
             next.catalog = Some(Arc::new(catalog));
         }
@@ -193,11 +258,13 @@ fn valid_identity(value: &str) -> bool {
 fn fixed_catalog(
     definitions: &[MqQueueDefinition],
     limits: MqLimits,
+    allow_process: bool,
 ) -> Result<MqObjectCatalog, HostProblem> {
     validate_definitions(definitions, limits)?;
     if definitions.is_empty()
         || definitions.iter().any(|definition| {
-            definition.trigger_program.is_some() || !is_canonical_name(&definition.name)
+            (!allow_process && definition.trigger_program.is_some())
+                || !is_canonical_name(&definition.name)
         })
         || definitions
             .windows(2)
@@ -254,7 +321,7 @@ fn verify_projection(
     limits: MqLimits,
 ) -> Result<(), HostProblem> {
     expected.content_payload()?;
-    let catalog = fixed_catalog(&expected.definitions, limits)?;
+    let catalog = fixed_catalog(&expected.definitions, limits, true)?;
     if state.catalog.as_deref() != Some(&catalog) {
         return Err(HostProblem::IdempotencyConflict);
     }
