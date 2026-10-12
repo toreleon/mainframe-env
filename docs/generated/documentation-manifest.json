@@ -505,7 +505,7 @@
       "path": "docs/architecture/JES-EXECUTION.md",
       "relative_links": 1,
       "scope": "JES execution, scheduling, spool, and utility behavior",
-      "sha256": "sha256:36185b99ff17a072338d42faf064bb95c5e34e664b71e4b62da6f76901843df3",
+      "sha256": "sha256:50d4a9072b9ac017f62a85470b09c3748445c3b204316831b2dfbf9c358ebe92",
       "status": "Normative from mainframe-env jes.execution",
       "title": "JES execution, scheduling, spool, and utilities",
       "xtask_commands": 1

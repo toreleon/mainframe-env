@@ -8,12 +8,16 @@
 //! exactly one durable work record with the same validity and authority
 //! rules as a z/OSMF submission.
 
-use crate::jes_worker::{JES_WORK_DEADLINE_TICKS, JES_WORK_GENERATION, JesWorkPayload};
+use crate::jes_worker::{
+    JES_WORK_DEADLINE_TICKS, JES_WORK_GENERATION, JesWorkPayload, claim_durable_work,
+};
 use crate::product::{JES_ALLOWED_WORK_CAPABILITIES, ProductServer, job_capabilities, store_error};
-use mainframe_env_batch::JobSnapshot;
+use mainframe_env_batch::{JobSnapshot, JobState};
 use mainframe_env_execution_api::{Invocation, ServiceClass};
 use mainframe_env_host_api::HostProblem;
-use mainframe_env_store_api::{StoreError, WorkRecord, WorkState};
+use mainframe_env_store_api::{ProviderStateRecord, StoreError, WorkRecord, WorkState};
+
+const CHILD_RECOVERY_NAMESPACE: &str = "jes-child-admission-recovery-v1";
 
 /// Whether the parent's own claimed-work item should retire once every
 /// internal-reader child has an admission outcome (`Ok`), or must be
@@ -49,6 +53,25 @@ fn classify(problem: &HostProblem) -> ChildAdmissionFailure {
 }
 
 impl ProductServer {
+    pub(crate) fn claim_jes_work_with_child_recovery(
+        &self,
+        worker: &str,
+        now_tick: u64,
+    ) -> Result<Option<WorkRecord>, HostProblem> {
+        self.recover_child_admissions(now_tick)?;
+        claim_durable_work(self.store.as_ref(), worker, now_tick).map_err(store_error)
+    }
+
+    /// Persist the recovery obligation before handling a parent's batch state.
+    pub(crate) fn child_admission_recovery_state(
+        &self,
+        payload: &JesWorkPayload,
+        state: JobState,
+    ) -> Result<JobState, HostProblem> {
+        self.retain_child_admission_recovery(payload)?;
+        Ok(state)
+    }
+
     /// Construct one durable JES work record for `job` and enqueue it. Both
     /// the z/OSMF submit gateway and internal-reader child admission call
     /// this so their validity and authority rules can't drift.
@@ -118,26 +141,115 @@ impl ProductServer {
                     .get_work(&work_id)
                     .map_err(store_error)?
                     .ok_or(HostProblem::InfrastructureFailure)?;
-                let existing_payload = JesWorkPayload::decode(&existing.payload)
-                    .map_err(|_| HostProblem::InfrastructureFailure)?;
-                if existing.work_id != work_id
-                    || existing.required_selector.as_str() != "zosmf:job-submit"
-                    || existing.required_generation != JES_WORK_GENERATION
-                    || existing.artifact.as_str() != "artifact:none"
-                    || existing.max_attempts != 3
-                    || existing.priority != job.priority
-                    || existing_payload.job_id != job.id
-                    || existing_payload.owner != job.owner
-                    || !existing_payload.capabilities.iter().all(|capability| {
-                        JES_ALLOWED_WORK_CAPABILITIES.contains(&capability.as_str())
-                    })
-                {
+                if !work_matches_child(&existing, job) {
                     return Err(HostProblem::InfrastructureFailure);
                 }
             }
             Err(problem) => return Err(store_error(problem)),
         }
         self.jes_worker_notify.notify_one();
+        Ok(())
+    }
+
+    /// Persist before executing the parent, including before it can create
+    /// children. This obligation survives an exhausted lease, a failed cancel,
+    /// and a crash between child creation and the admission boundary.
+    pub(crate) fn retain_child_admission_recovery(
+        &self,
+        payload: &JesWorkPayload,
+    ) -> Result<(), HostProblem> {
+        let record = ProviderStateRecord {
+            namespace: CHILD_RECOVERY_NAMESPACE.into(),
+            key: payload.job_id.clone(),
+            version: 1,
+            payload: payload.owner.as_bytes().to_vec(),
+        };
+        match self.store.put_provider_state(record.clone(), None) {
+            Ok(()) => Ok(()),
+            Err(StoreError::Conflict) => {
+                if self
+                    .store
+                    .get_provider_state(CHILD_RECOVERY_NAMESPACE, &record.key)
+                    .map_err(store_error)?
+                    == Some(record)
+                {
+                    Ok(())
+                } else {
+                    Err(HostProblem::InfrastructureFailure)
+                }
+            }
+            Err(problem) => Err(store_error(problem)),
+        }
+    }
+
+    pub(crate) fn clear_child_admission_recovery(&self, parent: &str) -> Result<(), HostProblem> {
+        match self
+            .store
+            .delete_provider_state(CHILD_RECOVERY_NAMESPACE, parent, 1)
+        {
+            Ok(()) | Err(StoreError::NotFound) => Ok(()),
+            Err(problem) => Err(store_error(problem)),
+        }
+    }
+
+    /// A recovery sweep performs only terminalization, never another admission
+    /// retry. Failed cancels retain the obligation and do not block siblings or
+    /// ordinary queue claims. Batch cancellation serializes racing transitions.
+    pub(crate) fn recover_child_admissions(&self, now_tick: u64) -> Result<(), HostProblem> {
+        // BatchService admits at most 16,384 jobs, so this cannot silently
+        // truncate the corresponding per-parent obligations.
+        for record in self
+            .store
+            .list_provider_state(CHILD_RECOVERY_NAMESPACE, 16_385)
+            .map_err(store_error)?
+        {
+            if record.version != 1 {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            let work = self
+                .store
+                .get_work(&format!("jes:{}", record.key))
+                .map_err(store_error)?;
+            if let Some(work) = &work {
+                let payload = JesWorkPayload::decode(&work.payload).map_err(store_error)?;
+                if payload.job_id != record.key || payload.owner.as_bytes() != record.payload {
+                    return Err(HostProblem::InfrastructureFailure);
+                }
+                if work_can_run(work, now_tick) {
+                    continue;
+                }
+            }
+            // An expired worker may still be unwinding its batch execution.
+            // Keep the obligation until it can no longer create late children.
+            let parent_terminal = match self.batch.get(&record.key) {
+                Ok(parent) => parent.state.terminal(),
+                Err(HostProblem::NotFound) => true,
+                Err(problem) => return Err(problem),
+            };
+            let mut unresolved = false;
+            for (child, _) in self.batch.internal_reader_children(&record.key)? {
+                if child.state.terminal() {
+                    continue;
+                }
+                if self
+                    .store
+                    .get_work(&format!("jes:{}", child.id))
+                    .map_err(store_error)?
+                    .is_some_and(|work| {
+                        work_matches_child(&work, &child) && work_can_run(&work, now_tick)
+                    })
+                {
+                    // Admission alone cannot retire recovery: this work can
+                    // expire before a worker persists the child's own obligation.
+                    unresolved = true;
+                    continue;
+                }
+                unresolved |= !self.cancel_internal_reader_child(&child);
+            }
+            if !unresolved && parent_terminal {
+                self.clear_child_admission_recovery(&record.key)?;
+            }
+        }
         Ok(())
     }
 
@@ -159,6 +271,9 @@ impl ProductServer {
         let mut needs_retry = false;
         let mut unresolved_children: Vec<String> = Vec::new();
         for (child, plan) in self.batch.internal_reader_children(parent_job_id)? {
+            if child.state.terminal() {
+                continue;
+            }
             let admission = (|| {
                 let capabilities = job_capabilities(self.store.as_ref(), &plan)?;
                 let invocation = self.invocation(
@@ -187,12 +302,8 @@ impl ProductServer {
                 }
             }
         }
-        // A permanent failure whose cancellation could not be verified is
-        // named here rather than through a logging dependency this crate
-        // does not otherwise take on; the caller's `?` dead-letters the
-        // parent's own work immediately (not a bounded retry), which is
-        // conservative: we can no longer prove the child won't sit `Queued`
-        // forever with no record.
+        // The parent may dead-letter here, but its recovery obligation was
+        // persisted before execution and survives until all children resolve.
         if !unresolved_children.is_empty() {
             return Err(HostProblem::InfrastructureFailure);
         }
@@ -204,10 +315,16 @@ impl ProductServer {
 
     /// Cancel an internal-reader child whose admission permanently failed,
     /// and verify the cancellation took effect. Returns `true` once the
-    /// child is confirmed `Cancelled`, regardless of whether `batch.cancel`
+    /// child is confirmed terminal, regardless of whether `batch.cancel`
     /// itself returned `Ok` (a racing terminal transition is still a safe
     /// outcome as long as the child is not left `Queued`).
     pub(crate) fn cancel_internal_reader_child(&self, child: &JobSnapshot) -> bool {
+        // Avoid even dispatching cancel again after a terminal outcome.
+        match self.batch.get(&child.id) {
+            Ok(current) if current.state.terminal() => return true,
+            Ok(_) => {}
+            Err(_) => return false,
+        }
         let Ok(invocation) = self.invocation(
             &child.owner,
             "zosmf:job-submit",
@@ -224,7 +341,50 @@ impl ProductServer {
         let _ = self.batch.cancel(&invocation, &child.id);
         matches!(
             self.batch.get(&child.id),
-            Ok(job) if job.state == mainframe_env_batch::JobState::Cancelled
+            Ok(job) if job.state.terminal()
         )
     }
+}
+
+/// A live final lease may finish, but an expired lease needs another attempt.
+/// Every executable path also requires a deadline that has not passed.
+fn work_can_run(work: &WorkRecord, now_tick: u64) -> bool {
+    if work.deadline_tick <= now_tick {
+        return false;
+    }
+    match work.state {
+        WorkState::Queued => {
+            work.attempt < work.max_attempts && work.available_tick < work.deadline_tick
+        }
+        WorkState::Claimed => {
+            work.attempt < work.max_attempts
+                || (work.attempt == work.max_attempts
+                    && work.lease_epoch != 0
+                    && work.lease_id.is_some()
+                    && work.worker_id.is_some()
+                    && work
+                        .lease_expiry_tick
+                        .is_some_and(|expiry| expiry > now_tick))
+        }
+        WorkState::Completed | WorkState::Cancelled | WorkState::DeadLetter => false,
+    }
+}
+
+/// Validate the frozen identity without recomputing mutable plan capabilities.
+fn work_matches_child(work: &WorkRecord, child: &JobSnapshot) -> bool {
+    let Ok(payload) = JesWorkPayload::decode(&work.payload) else {
+        return false;
+    };
+    work.work_id == format!("jes:{}", child.id)
+        && work.required_selector.as_str() == "zosmf:job-submit"
+        && work.required_generation == JES_WORK_GENERATION
+        && work.artifact.as_str() == "artifact:none"
+        && work.max_attempts == 3
+        && work.priority == child.priority
+        && payload.job_id == child.id
+        && payload.owner == child.owner
+        && payload
+            .capabilities
+            .iter()
+            .all(|capability| JES_ALLOWED_WORK_CAPABILITIES.contains(&capability.as_str()))
 }
