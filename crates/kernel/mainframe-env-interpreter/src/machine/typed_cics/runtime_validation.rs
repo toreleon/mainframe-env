@@ -73,7 +73,7 @@ pub(super) fn validate_runtime_plan(
             machine,
             operation,
             &output.target,
-            names::plan_output_slot_use(plan, output.name),
+            format_time::plan_output_slot_use(plan, output.name),
         )?;
     }
     Ok(())

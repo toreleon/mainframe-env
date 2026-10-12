@@ -1,8 +1,8 @@
 #[cfg(test)]
 use mainframe_env_host_api::CicsOperation;
 use mainframe_env_ir::{
-    BtsBrowseInput, BtsBrowseOutput, CicsAssignOutput, CicsEffectPlan, CicsOperandName,
-    CicsOutputName, CicsPlanOperation, CicsPlanOption,
+    BtsBrowseInput, BtsBrowseOutput, CicsAssignOutput, CicsOperandName, CicsOutputName,
+    CicsPlanOperation, CicsPlanOption,
 };
 
 pub(super) const fn counter_shape(operation: Option<CicsPlanOperation>) -> Option<(usize, bool)> {
@@ -233,22 +233,6 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         CicsOperandName::WebPortNumber => SlotUse::FullwordInput,
         _ => SlotUse::Input,
     }
-}
-
-pub(super) fn plan_output_slot_use(plan: &CicsEffectPlan, name: CicsOutputName) -> SlotUse {
-    let slot_use = output_slot_use(name);
-    let SlotUse::FormatTextOutput(field, _) = slot_use else {
-        return slot_use;
-    };
-    let (operand, option) = if name == CicsOutputName::Time {
-        (CicsOperandName::TimeSep, CicsPlanOption::TimeSep)
-    } else {
-        (CicsOperandName::DateSep, CicsPlanOption::DateSep)
-    };
-    let separated =
-        plan.options.contains(&option) || plan.operands.iter().any(|value| value.name == operand);
-    let separator_count = if name == CicsOutputName::Yyddd { 1 } else { 2 };
-    SlotUse::FormatTextOutput(field, (!separated).then_some(field - separator_count))
 }
 
 pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
