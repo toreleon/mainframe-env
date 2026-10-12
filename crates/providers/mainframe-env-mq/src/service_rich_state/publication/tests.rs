@@ -146,7 +146,7 @@ fn loaded(b: &Backend, fence: u64) -> RichStoredState {
     let StoredAuthority::Rich(r) = read(b.store(), 3, fence, Default::default()).unwrap() else {
         panic!("rich expected")
     };
-    r
+    *r
 }
 fn request(mode: MqGetMode) -> MqGetContract {
     MqGetContract {
@@ -171,7 +171,7 @@ fn rich_from(records: Vec<ProviderStateRecord>, fence: u64) -> RichStoredState {
     else {
         panic!("rich expected")
     };
-    r
+    *r
 }
 fn audit_fixture(b: &Backend) -> AuditedProviderPublication {
     let l = InvocationLimits::default();

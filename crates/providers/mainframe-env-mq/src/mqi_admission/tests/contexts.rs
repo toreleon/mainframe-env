@@ -139,11 +139,11 @@ fn source_exact_syncpoint_matrix_does_not_select_a_coordinator() {
                     || (call == MqMqiCall::Begin && environment == MqHostEnvironment::MqiClient);
                 if forbidden {
                     assert!(
-                        matches!(result, MqMqiAdmission::ForbiddenContext(MqMqiResult {
+                        matches!(result, MqMqiAdmission::ForbiddenContext(result) if matches!(result.as_ref(), MqMqiResult {
                         call: c, outcome: MqMqiOutcome::Completed {
                             status: MqMqiStatus::FailedEnvironment, output: MqMqiOutput::NoOutput,
                         },
-                    }) if c == call)
+                    } if *c == call))
                     );
                     assert_eq!(mainframe_env_host_api::MQCC_FAILED, 2);
                     assert_eq!(mainframe_env_host_api::MQRC_ENVIRONMENT_ERROR, 2012);

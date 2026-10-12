@@ -112,6 +112,7 @@ impl MqLifecycleDirectory {
 
     /// Host-selected process topology only: never infer sharing from principal,
     /// a string hash, an application owner assertion, or equal binding bytes.
+    #[cfg(test)]
     pub(crate) fn mint_process(
         &mut self,
         admitted: &Invocation,
@@ -153,6 +154,7 @@ impl MqLifecycleDirectory {
         })
     }
 
+    #[cfg(test)]
     pub(crate) fn bind_root(
         &mut self,
         process: ProcessLease,
@@ -200,6 +202,7 @@ impl MqLifecycleDirectory {
 
     /// Only an explicitly admitted CICS child inherits its parent task. IMS and
     /// batch subtasks are not silently merged into their parent's nonshared unit.
+    #[cfg(test)]
     pub(crate) fn bind_cics_child(
         &mut self,
         parent: FrameLease,
@@ -263,6 +266,7 @@ impl MqLifecycleDirectory {
 
     /// Lifetime transition only, after the owning IMS coordinator resolves work.
     /// All fallible checks precede retirement; epoch exhaustion changes neither authority.
+    #[cfg(test)]
     pub(crate) fn advance_ims_syncpoint(
         &mut self,
         lease: FrameLease,
@@ -467,6 +471,7 @@ fn within(
         && child.max_events <= parent.max_events
 }
 
+#[cfg(test)]
 fn inspect(invocation: &Invocation, now: u64) -> Result<(usize, AttestedHostContext), HostProblem> {
     inspect_in_mode(invocation, now, ContextMode::Binding)
 }

@@ -139,7 +139,7 @@ fn snapshot(f: &Fixture) -> String {
         .unwrap()
         .handles
         .message_handles_mut();
-    format!("{:?}", &*access)
+    format!("{:?}", *access)
 }
 fn peek(f: &Fixture, request: MqMqiRequest) -> MqMqiOutput {
     let mut guard = f.service.lock_selected().unwrap();

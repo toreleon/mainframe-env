@@ -330,7 +330,7 @@ impl SelectedTerminalPreparation<'_> {
             .commit_root_terminal_step(request)
             .map_err(|_| HostProblem::UnknownOutcome)?;
         let next = self.next.take().ok_or(HostProblem::UnknownOutcome)?;
-        *self.guard = rich_state::StoredAuthority::Rich(next);
+        *self.guard = rich_state::StoredAuthority::Rich(Box::new(next));
         if self
             .service
             .unknown_after_persist

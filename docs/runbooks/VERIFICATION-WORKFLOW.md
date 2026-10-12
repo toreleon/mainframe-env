@@ -61,6 +61,14 @@ changes must retain checkpoint eligibility and serialized bytes. The legacy MQ
 checkpoint regression binds schema-12 bytes to the pre-refactor main fixture;
 typed MQ and pending machines continue to refuse checkpoint encoding.
 
+For MQ provider lint repairs, use
+`cargo clippy -p mainframe-env-mq --all-targets --all-features --locked -- -D warnings`.
+Before gating a private helper with `cfg(test)`, inspect its callers across the
+current tree and relevant reserved dependency heads. Retain production models,
+authority checks and durable codecs; retain fixture helper bodies and exercise
+their consumers. Replay byte goldens and recovery/authorization regressions
+verify private representation refactors without changing storage schemas.
+
 See the [IBM cache guide](IBM-DOCS-CACHE.md).
 
 ## Effective Conformance IR inspection

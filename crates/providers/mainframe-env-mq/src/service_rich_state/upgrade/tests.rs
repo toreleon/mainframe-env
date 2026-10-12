@@ -3,7 +3,7 @@ use crate::{MqLocalQueueUsage, MqObjectDefinition, MqObjectName, MqQueueManagerD
 use mainframe_env_execution_api::{
     ArtifactRef, AuditDecision, AuditRecord, ExecutionId, PrincipalId, RunUnitId, Selector,
 };
-use mainframe_env_host_api::{MqExpiry, MqGetContract, MqGetMode, MqTruncation, MqWait};
+use mainframe_env_host_api::{MqGetContract, MqGetMode, MqTruncation, MqWait};
 use mainframe_env_store::{MemoryStore, SqliteStateStore, StoreLimits};
 use mainframe_env_store_api::{
     AuditedProviderPublication, EffectDigestFormat, EffectIntentMetadata, EffectRecord,
@@ -146,7 +146,7 @@ fn loaded(b: &Backend, fence: u64) -> RichStoredState {
     let StoredAuthority::Rich(r) = read(b.store(), 3, fence, Default::default()).unwrap() else {
         panic!("rich expected")
     };
-    r
+    *r
 }
 fn request(mode: MqGetMode) -> MqGetContract {
     MqGetContract {
@@ -165,13 +165,6 @@ fn candidate(r: &RichStoredState) -> MqDeliveryKernel {
 }
 fn records(b: &Backend) -> Vec<ProviderStateRecord> {
     b.store().list_provider_state_prefix("mq-", 2048).unwrap()
-}
-fn rich_from(records: Vec<ProviderStateRecord>, fence: u64) -> RichStoredState {
-    let StoredAuthority::Rich(r) = decode_records(records, 3, fence, Default::default()).unwrap()
-    else {
-        panic!("rich expected")
-    };
-    r
 }
 fn audit_fixture(b: &Backend) -> AuditedProviderPublication {
     let l = InvocationLimits::default();
