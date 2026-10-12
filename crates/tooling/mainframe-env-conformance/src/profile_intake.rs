@@ -485,15 +485,16 @@ fn analyze_cobol(
             SourceLibrary::new(format!("copybooks{i}"), paths, limits).ok()
         })
         .collect();
+    // INCLUDE may arrive through COPY; application libraries retain precedence.
+    let Ok(abi) = materialize_host_abi_libraries(&[db2_abi_library()], limits) else {
+        member
+            .diagnostics
+            .push(local_error("MEINTAKE001", "invalid Db2 ABI library"));
+        return member;
+    };
+    files.extend(abi.files);
+    libraries.extend(abi.libraries);
     let options = if fixed_source_area(&bytes).contains("EXEC SQL") {
-        let Ok(abi) = materialize_host_abi_libraries(&[db2_abi_library()], limits) else {
-            member
-                .diagnostics
-                .push(local_error("MEINTAKE001", "invalid Db2 ABI library"));
-            return member;
-        };
-        files.extend(abi.files);
-        libraries.extend(abi.libraries);
         BTreeMap::from([("cobol.sql-precompile".into(), "true".into())])
     } else {
         BTreeMap::new()
