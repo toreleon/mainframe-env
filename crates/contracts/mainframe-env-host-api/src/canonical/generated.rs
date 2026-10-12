@@ -4,6 +4,9 @@ use super::*;
 #[path = "wire/db2.rs"]
 mod db2;
 
+#[path = "dataset_records.rs"]
+mod dataset_records;
+
 impl Canonical for SpaceUnit {
     fn encode(&self, out: &mut Encoder<'_>) -> Result<(), HostProblem> {
         match self {
@@ -1952,36 +1955,24 @@ impl Canonical for DatasetResult {
                 identities,
                 records,
                 version,
-            } => {
-                out.variant("DatasetResult", "Records", 3)?;
-                out.text("identities")?;
-                identities.encode(out)?;
-                out.text("records")?;
-                records.encode(out)?;
-                out.text("version")?;
-                version.encode(out)?;
-                Ok(())
-            }
+                more,
+            } => dataset_records::records(out, identities, records, *version, *more),
             Self::MemberGeneration {
                 generation,
                 identities,
                 program_object,
                 records,
                 version,
-            } => {
-                out.variant("DatasetResult", "MemberGeneration", 5)?;
-                out.text("generation")?;
-                generation.encode(out)?;
-                out.text("identities")?;
-                identities.encode(out)?;
-                out.text("program_object")?;
-                program_object.encode(out)?;
-                out.text("records")?;
-                records.encode(out)?;
-                out.text("version")?;
-                version.encode(out)?;
-                Ok(())
-            }
+                more,
+            } => dataset_records::member_generation(
+                out,
+                *generation,
+                identities,
+                *program_object,
+                records,
+                *version,
+                *more,
+            ),
             Self::Rba {
                 data,
                 next_rba,

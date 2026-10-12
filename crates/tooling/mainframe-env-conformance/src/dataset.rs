@@ -695,6 +695,7 @@ fn dataset_records(service: &DatasetService, dataset: &str) -> Result<Vec<Vec<u8
             max_records: 4_096,
             control: Default::default(),
         })
+        .and_then(DatasetResult::require_complete)
         .map_err(|problem| problem.to_string())?
     {
         DatasetResult::Records { records, .. } => Ok(records),
@@ -860,6 +861,7 @@ fn valid_ksds() -> Result<String, String> {
             max_records: 1,
             control: Default::default(),
         })
+        .and_then(DatasetResult::require_complete)
         .map_err(|problem| problem.to_string())?
     {
         DatasetResult::Records {

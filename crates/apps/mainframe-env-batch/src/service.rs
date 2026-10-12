@@ -1,3 +1,4 @@
+mod dataset_input;
 mod dd_allocation;
 mod effect_loan;
 mod hex_encoding;
@@ -4010,38 +4011,6 @@ impl BatchService {
         Ok(allocations)
     }
 
-    fn read_dataset_records(
-        &self,
-        invocation: &(impl RunInput + ?Sized),
-        allocation: &DdRuntimeAllocation,
-        effect_sequence: &mut u64,
-    ) -> Result<Vec<Vec<u8>>, HostProblem> {
-        invocation.check()?;
-        let sequence = next_effect_sequence(invocation, effect_sequence)?;
-        let result = self.invoke_host(
-            invocation,
-            invocation.original().deadline_tick.saturating_sub(1),
-            false,
-            EffectRequest {
-                run_unit: invocation.original().run_unit_id.clone(),
-                sequence,
-                deadline_tick: invocation.original().deadline_tick,
-                idempotency_key: None,
-                request: HostRequest::Dataset(DatasetRequest::Read {
-                    dataset: allocation.dataset.clone(),
-                    member: allocation.member.clone(),
-                    key: None,
-                    max_records: 4_096,
-                    control: Default::default(),
-                }),
-            },
-        );
-        let HostResult::Dataset(DatasetResult::Records { records, .. }) = result.outcome? else {
-            return Err(HostProblem::ProviderFailure);
-        };
-        Ok(records)
-    }
-
     fn hydrate_dds(
         &self,
         invocation: &(impl RunInput + ?Sized),
@@ -4105,7 +4074,7 @@ impl BatchService {
                                 .map(|allocation| allocation.dataset.clone())
                                 .collect(),
                             member: group_allocations[0].member.clone(),
-                            max_records: 4_096,
+                            max_records: dataset_input::MAX_DATASET_INPUT_RECORDS,
                         }),
                     },
                 );
@@ -4140,6 +4109,7 @@ impl BatchService {
                     }
                 }
             }
+            dataset_input::validate_record_count(records.len())?;
             hydrated
                 .entry(name.to_ascii_uppercase())
                 .or_default()
@@ -7103,7 +7073,8 @@ mod tests {
                                     identities: vec![Vec::new(); records.len()],
                                     records,
                                     version: 1,
-                                })
+                                                                    more: false,
+})
                             })
                             .ok_or(HostProblem::NotFound)
                     }),
@@ -7127,7 +7098,8 @@ mod tests {
                             identities: vec![Vec::new(); combined.len()],
                             records: combined,
                             version: 1,
-                        }))
+                                                    more: false,
+}))
                     }),
                 HostRequest::Dataset(DatasetRequest::ListCatalog {
                     pattern,
@@ -8676,6 +8648,85 @@ mod tests {
             records.lock().unwrap()["IBMUSER.OUTPUT"],
             vec![b"FIRST".to_vec(), b"SECOND".to_vec()]
         );
+    }
+
+    #[test]
+    fn iebgener_never_completes_on_truncated_dataset_input() {
+        for (concatenated, input_records) in
+            [(false, 4_096), (false, 4_097), (true, 4_095), (true, 4_096)]
+        {
+            let (batch, dataset) = service_with_real_datasets();
+            seed_real_dataset(
+                &dataset,
+                "IBMUSER.INPUT",
+                vec![b"DATA".to_vec(); input_records],
+                1,
+            );
+            seed_real_dataset(&dataset, "IBMUSER.EXTRA", vec![b"LAST".to_vec()], 3);
+            seed_real_dataset(&dataset, "IBMUSER.OUTPUT", vec![b"OLD".to_vec()], 5);
+            let continuation = if concatenated {
+                "// DD DSN=IBMUSER.EXTRA,DISP=SHR\n"
+            } else {
+                ""
+            };
+            let invocation = invocation();
+            batch
+                .submit(
+                    &invocation,
+                    &JclBundle {
+                        primary: format!(
+                            "//COPYJOB JOB CLASS=A\n//COPY EXEC PGM=IEBGENER\n\
+                             //SYSUT1 DD DSN=IBMUSER.INPUT,DISP=SHR\n{continuation}\
+                             //SYSUT2 DD DSN=IBMUSER.OUTPUT,DISP=OLD\n"
+                        ),
+                        ..Default::default()
+                    },
+                    &IdempotencyKey::new("truncated-copy", InvocationLimits::default()).unwrap(),
+                    false,
+                )
+                .unwrap();
+            let result = batch.run_next(&invocation, false);
+            let total_records = input_records + usize::from(concatenated);
+            if total_records <= 4_096 {
+                let completed = result.unwrap().unwrap();
+                assert_eq!(completed.state, JobState::Completed);
+                assert_eq!(completed.return_code, Some(0));
+                assert!(matches!(dataset.invoke(DatasetRequest::Read {
+                    dataset: DatasetName::new("IBMUSER.OUTPUT", 44).unwrap(), member: None,
+                    key: None, max_records: 4_096, control: Default::default(),
+                }), Ok(DatasetResult::Records { records, .. })
+                    if records.len() == total_records));
+                continue;
+            }
+            let failed = result.unwrap().unwrap();
+            assert_eq!(
+                failed.state,
+                JobState::Failed,
+                "an incomplete input DD must fail before executing IEBGENER"
+            );
+            assert_eq!(failed.steps[0].state, StepState::Failed);
+            assert_ne!(failed.return_code, Some(0));
+            assert!(
+                batch
+                    .spool(&invocation, &failed.id, "JESMSGLG", 0, 20)
+                    .unwrap()
+                    .0
+                    .iter()
+                    .any(
+                        |record| String::from_utf8_lossy(record).contains("DATASET_READ_TRUNCATED")
+                    )
+            );
+            assert!(matches!(
+                dataset.invoke(DatasetRequest::Read {
+                    dataset: DatasetName::new("IBMUSER.OUTPUT", 44).unwrap(),
+                    member: None,
+                    key: None,
+                    max_records: 4_096,
+                    control: Default::default(),
+                }),
+                Ok(DatasetResult::Records { records, .. }) if records == [b"OLD".to_vec()]
+            ));
+        }
     }
 
     #[test]
