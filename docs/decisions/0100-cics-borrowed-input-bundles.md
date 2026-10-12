@@ -3,6 +3,7 @@
 Status: **Proposed for the baseline lint repair**
 Owner: **CICS provider maintainers**
 Scope: **Rust callers of BTS effect transitions and partition input submission**
+Applies from: **mainframe-env unreleased CICS baseline lint integration (pending merge)**
 
 ## Context
 

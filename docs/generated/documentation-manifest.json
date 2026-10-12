@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 243,
+    "markdown_documents": 244,
     "navigation_groups": 8,
-    "normative_documents": 99,
+    "normative_documents": 100,
     "xtask_commands": 163
   },
   "documents": [
@@ -349,8 +349,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 182,
-      "sha256": "sha256:df6fc9bbbd77a7f727823c1cd8a930a4bbef5bd2eab9253dd26d325e2e82ccf0",
+      "relative_links": 183,
+      "sha256": "sha256:28158325238278108924706334a670d0324a7ad094f443455e9acbc6f4d43a65",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -1452,6 +1452,18 @@
       "sha256": "sha256:7d581459f18808111ab7f6871073eebf83e47945e24c6dca652affe87453c05d",
       "status": "Accepted implementation; scoped compatibility validation passed",
       "title": "ADR-0050: Box the largest shared host-effect payloads",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env unreleased CICS baseline lint integration (pending merge)",
+      "normative": true,
+      "owner": "CICS provider maintainers",
+      "path": "docs/decisions/0100-cics-borrowed-input-bundles.md",
+      "relative_links": 0,
+      "scope": "Rust callers of BTS effect transitions and partition input submission",
+      "sha256": "sha256:ce5cbdb328ac3777d962e359030a2cbb8c6e7f9c7032b65b7c2ce4e48abc54d1",
+      "status": "Proposed for the baseline lint repair",
+      "title": "ADR-0100: Group existing CICS arguments into borrowed inputs",
       "xtask_commands": 0
     },
     {
@@ -2798,6 +2810,10 @@
         {
           "label": "ADR-0050: Boxed shared host-effect payloads",
           "path": "docs/decisions/0050-host-effect-envelope-layout.md"
+        },
+        {
+          "label": "ADR-0100: Borrowed CICS input bundles",
+          "path": "docs/decisions/0100-cics-borrowed-input-bundles.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -3024,7 +3040,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:11657d5b50a3394d2cf58c698e5ce07f83d5dc6bbd8574fe67c2da15b43c86ae",
+  "registry_sha256": "sha256:80a9e9352c38b0b208779bf252718ced3398de060482dee9e54e5f99b608962b",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {
