@@ -1,3 +1,3 @@
 schema_version = "mainframe-env.changelog-fragment@1"
 category = "fixed"
-summary = "Retain durable recovery for exhausted JES child admission when cancellation fails, and preserve terminal children across restart and replay (#225)."
+summary = "Retain durable recovery for expired or exhausted JES child work and failed cancellation, and preserve terminal children across restart and replay (#225)."

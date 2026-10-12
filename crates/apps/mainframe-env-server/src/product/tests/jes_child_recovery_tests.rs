@@ -3,6 +3,200 @@ use super::*;
 const RECOVERY_NAMESPACE: &str = "jes-child-admission-recovery-v1";
 const PARENT_JCL: &str = "//PARENT JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILD JOB CLASS=A\n//RUN EXEC PGM=IEFBR14\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n";
 
+fn admitted_child_deadline_recovery(
+    server: &ProductServer,
+    store: &dyn PlatformStore,
+    clock: &ManualJesClock,
+    sweep_while_live: bool,
+    deny_cancel: bool,
+) {
+    server.bootstrap_user("ALICE", b"ALICEPASS").unwrap();
+    let parent = submit_jcl_direct(server, "ALICE", b"ALICEPASS", PARENT_JCL.into());
+    let parent = parent["jobid"].as_str().unwrap();
+    server.run_jes_worker_once("parent").unwrap().unwrap();
+    let (child, _) = only_internal_reader_child(server, parent);
+    let work = store
+        .get_work(&format!("jes:{}", child.id))
+        .unwrap()
+        .unwrap();
+    assert_eq!(work.state, WorkState::Queued);
+    assert_eq!(child.state, mainframe_env_batch::JobState::Queued);
+    if sweep_while_live {
+        server
+            .recover_child_admissions(server.jes_tick().unwrap())
+            .unwrap();
+        assert_eq!(server.batch.get(&child.id).unwrap(), child);
+    }
+    if deny_cancel {
+        deny_child_cancel(server);
+    }
+    clock.advance(work.deadline_tick - server.jes_tick().unwrap() + 1);
+    for _ in 0..2 {
+        assert!(
+            server
+                .run_jes_worker_once("expired-child")
+                .unwrap()
+                .is_none()
+        );
+    }
+    assert_eq!(
+        store.get_work(&work.work_id).unwrap().unwrap().state,
+        WorkState::DeadLetter
+    );
+    assert!(
+        server.batch.get(&child.id).unwrap().state.terminal()
+            || store
+                .get_provider_state(RECOVERY_NAMESPACE, parent)
+                .unwrap()
+                .is_some(),
+        "an expired admitted child must be terminal or retain durable recovery"
+    );
+    if deny_cancel {
+        assert_eq!(
+            server.batch.get(&child.id).unwrap().state,
+            mainframe_env_batch::JobState::Queued
+        );
+        allow_child_cancel(server);
+        assert!(server.run_jes_worker_once("recovery").unwrap().is_none());
+    }
+    let terminal = server.batch.get(&child.id).unwrap();
+    assert_eq!(terminal.state, mainframe_env_batch::JobState::Cancelled);
+    assert!(server.run_jes_worker_once("repeat").unwrap().is_none());
+    assert_eq!(server.batch.get(&child.id).unwrap(), terminal);
+    assert!(
+        store
+            .get_provider_state(RECOVERY_NAMESPACE, parent)
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[test]
+fn review_admitted_child_deadline_keeps_durable_recovery() {
+    for (sweep_while_live, deny_cancel) in [(false, false), (true, false), (true, true)] {
+        let (server, store, clock) = worker_test_server(700);
+        admitted_child_deadline_recovery(
+            &server,
+            store.as_ref(),
+            &clock,
+            sweep_while_live,
+            deny_cancel,
+        );
+    }
+}
+
+#[test]
+fn review_admitted_child_deadline_keeps_durable_recovery_sqlite() {
+    for (sweep_while_live, deny_cancel) in [(false, false), (true, false), (true, true)] {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-child-deadline-225-{}-{nonce}-{sweep_while_live}-{deny_cancel}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let mut settings = config();
+        settings.store_profile = crate::StoreProfile::Sqlite;
+        settings.sqlite_url = url.clone();
+        settings.artifact_root = directory.join("artifacts");
+        let store = Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let clock = Arc::new(ManualJesClock::new(700));
+        let server =
+            ProductServer::open_with_clock(settings, store.clone(), clock.clone()).unwrap();
+        admitted_child_deadline_recovery(
+            &server,
+            store.as_ref(),
+            &clock,
+            sweep_while_live,
+            deny_cancel,
+        );
+        drop((server, store));
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+}
+
+#[test]
+#[ignore = "requires a fresh isolated MAINFRAME_ENV_POSTGRES_TEST_URL"]
+fn review_admitted_child_deadline_keeps_durable_recovery_postgres() {
+    let url = std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL")
+        .expect("fresh isolated PostgreSQL database required for this selector");
+    let store = Arc::new(PostgresStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+    assert!(
+        store
+            .list_provider_state(RECOVERY_NAMESPACE, 1)
+            .unwrap()
+            .is_empty()
+    );
+    let clock = Arc::new(ManualJesClock::new(700));
+    let server = ProductServer::open_with_clock(config(), store.clone(), clock.clone()).unwrap();
+    admitted_child_deadline_recovery(&server, store.as_ref(), &clock, true, true);
+}
+
+#[test]
+fn review_admitted_child_exhausted_lease_keeps_durable_recovery() {
+    let (server, store, clock) = worker_test_server(700);
+    server.bootstrap_user("ALICE", b"ALICEPASS").unwrap();
+    let parent = submit_jcl_direct(&server, "ALICE", b"ALICEPASS", PARENT_JCL.into());
+    let parent = parent["jobid"].as_str().unwrap();
+    server.run_jes_worker_once("parent").unwrap().unwrap();
+    let (child, _) = only_internal_reader_child(&server, parent);
+    let now = server.jes_tick().unwrap();
+    for attempt in 1..=3 {
+        let work = store
+            .claim(
+                "child",
+                Some(JES_WORK_GENERATION),
+                now,
+                crate::jes_worker::JES_LEASE_TICKS,
+            )
+            .unwrap()
+            .unwrap();
+        assert_eq!(work.work_id, format!("jes:{}", child.id));
+        assert_eq!(work.attempt, attempt);
+        if attempt < 3 {
+            store
+                .release(
+                    &work.work_id,
+                    work.lease_id.as_deref().unwrap(),
+                    work.lease_epoch,
+                    now,
+                    now,
+                )
+                .unwrap();
+        }
+    }
+    server.recover_child_admissions(now).unwrap();
+    assert_eq!(
+        server.batch.get(&child.id).unwrap(),
+        child,
+        "a live final lease can still finish"
+    );
+    clock.advance(crate::jes_worker::JES_LEASE_TICKS + 1);
+    for _ in 0..2 {
+        assert!(
+            server
+                .run_jes_worker_once("exhausted-child")
+                .unwrap()
+                .is_none()
+        );
+    }
+    assert!(
+        server.batch.get(&child.id).unwrap().state.terminal()
+            || store
+                .get_provider_state(RECOVERY_NAMESPACE, parent)
+                .unwrap()
+                .is_some(),
+        "an exhausted child lease must be terminal or retain durable recovery"
+    );
+    assert_eq!(
+        server.batch.get(&child.id).unwrap().state,
+        mainframe_env_batch::JobState::Cancelled
+    );
+}
+
 fn exhausted_parent() -> (
     Arc<ProductServer>,
     Arc<MemoryStore>,

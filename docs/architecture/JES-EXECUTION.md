@@ -198,11 +198,14 @@ releases the parent's own work for a later retry, bounded by that work's
 child. Before parent execution, the server retains a durable per-parent obligation
 in `jes-child-admission-recovery-v1`. If terminalization fails, or the final lease
 expires during a crash, worker recovery revisits that obligation and cancels
-unadmitted children without extending admission retries. Failed cancellation
-retains the obligation for a later sweep while siblings and other work continue.
-The obligation retires after the parent is terminal and every child is confirmed
-terminal or has valid live work, covering late child creation while an expired
-worker unwinds. Replay preserves every existing terminal outcome. Reclaiming an
+unadmitted children or children whose work can no longer run, without extending
+admission retries. Work liveness requires an unexpired deadline and remaining
+attempts or a live final lease. Failed cancellation retains the obligation for a
+later sweep while siblings and other work continue.
+The obligation retires after the parent and every child are confirmed terminal.
+It remains while admitted child work is live, covering expiry before the child
+worker persists its own recovery obligation and late child creation while an
+expired worker unwinds. Replay preserves every existing terminal outcome. Reclaiming an
 already-admitted child validates its existing work record against the frozen
 identity recorded at admission time, never against a fresh capability
 recomputation, so a mutable registry change after admission cannot cancel or

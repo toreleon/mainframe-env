@@ -8,9 +8,11 @@
 //! exactly one durable work record with the same validity and authority
 //! rules as a z/OSMF submission.
 
-use crate::jes_worker::{JES_WORK_DEADLINE_TICKS, JES_WORK_GENERATION, JesWorkPayload};
+use crate::jes_worker::{
+    JES_WORK_DEADLINE_TICKS, JES_WORK_GENERATION, JesWorkPayload, claim_durable_work,
+};
 use crate::product::{JES_ALLOWED_WORK_CAPABILITIES, ProductServer, job_capabilities, store_error};
-use mainframe_env_batch::JobSnapshot;
+use mainframe_env_batch::{JobSnapshot, JobState};
 use mainframe_env_execution_api::{Invocation, ServiceClass};
 use mainframe_env_host_api::HostProblem;
 use mainframe_env_store_api::{ProviderStateRecord, StoreError, WorkRecord, WorkState};
@@ -51,6 +53,25 @@ fn classify(problem: &HostProblem) -> ChildAdmissionFailure {
 }
 
 impl ProductServer {
+    pub(crate) fn claim_jes_work_with_child_recovery(
+        &self,
+        worker: &str,
+        now_tick: u64,
+    ) -> Result<Option<WorkRecord>, HostProblem> {
+        self.recover_child_admissions(now_tick)?;
+        claim_durable_work(self.store.as_ref(), worker, now_tick).map_err(store_error)
+    }
+
+    /// Persist the recovery obligation before handling a parent's batch state.
+    pub(crate) fn child_admission_recovery_state(
+        &self,
+        payload: &JesWorkPayload,
+        state: JobState,
+    ) -> Result<JobState, HostProblem> {
+        self.retain_child_admission_recovery(payload)?;
+        Ok(state)
+    }
+
     /// Construct one durable JES work record for `job` and enqueue it. Both
     /// the z/OSMF submit gateway and internal-reader child admission call
     /// this so their validity and authority rules can't drift.
@@ -194,14 +215,7 @@ impl ProductServer {
                 if payload.job_id != record.key || payload.owner.as_bytes() != record.payload {
                     return Err(HostProblem::InfrastructureFailure);
                 }
-                let lease_live = work.state == WorkState::Claimed
-                    && work
-                        .lease_expiry_tick
-                        .is_some_and(|expiry| expiry > now_tick);
-                if !work.state.terminal()
-                    && (lease_live
-                        || (work.attempt < work.max_attempts && work.deadline_tick > now_tick))
-                {
+                if work_can_run(work, now_tick) {
                     continue;
                 }
             }
@@ -221,8 +235,13 @@ impl ProductServer {
                     .store
                     .get_work(&format!("jes:{}", child.id))
                     .map_err(store_error)?
-                    .is_some_and(|work| work_matches_child(&work, &child) && !work.state.terminal())
+                    .is_some_and(|work| {
+                        work_matches_child(&work, &child) && work_can_run(&work, now_tick)
+                    })
                 {
+                    // Admission alone cannot retire recovery: this work can
+                    // expire before a worker persists the child's own obligation.
+                    unresolved = true;
                     continue;
                 }
                 unresolved |= !self.cancel_internal_reader_child(&child);
@@ -324,6 +343,30 @@ impl ProductServer {
             self.batch.get(&child.id),
             Ok(job) if job.state.terminal()
         )
+    }
+}
+
+/// A live final lease may finish, but an expired lease needs another attempt.
+/// Every executable path also requires a deadline that has not passed.
+fn work_can_run(work: &WorkRecord, now_tick: u64) -> bool {
+    if work.deadline_tick <= now_tick {
+        return false;
+    }
+    match work.state {
+        WorkState::Queued => {
+            work.attempt < work.max_attempts && work.available_tick < work.deadline_tick
+        }
+        WorkState::Claimed => {
+            work.attempt < work.max_attempts
+                || (work.attempt == work.max_attempts
+                    && work.lease_epoch != 0
+                    && work.lease_id.is_some()
+                    && work.worker_id.is_some()
+                    && work
+                        .lease_expiry_tick
+                        .is_some_and(|expiry| expiry > now_tick))
+        }
+        WorkState::Completed | WorkState::Cancelled | WorkState::DeadLetter => false,
     }
 }
 
