@@ -141,3 +141,53 @@ class CicsSystemSourceMapTests(unittest.TestCase):
             p.write_text(source_map.shared.pretty(review))
             with self.assertRaisesRegex(source_map.shared.SourceMapError, "reviewed form locator differs"):
                 source_map.build_mapping(root, "spi", self.read("spi", 0, root))
+
+    def test_qualified_perform_joins_reject_ambiguous_or_missing_exact_source_labels(self):
+        # Missing retained bodies leave these joins unresolved; do not infer equivalence.
+        mapping = self.read("spi", 1)
+        used = {row["topic"]["topic_path"] for row in mapping["rows"]}
+        for label in ["PERFORM SECURITY", "PERFORM SSL", "PERFORM STATISTICS"]:
+            row = next(row for row in mapping["rows"] if row["label"] == label)
+            for ambiguous in [False, True]:
+                with self.subTest(label=label, ambiguous=ambiguous):
+                    projection = self.read("spi", 0)
+                    if ambiguous:
+                        topic = next(t for t in projection["topics"] if t["topic_path"] not in used)
+                        topic["toc_label"] = row["topic"]["toc_label"]
+                    else:
+                        topic = next(t for t in projection["topics"]
+                                     if t["topic_path"] == row["topic"]["topic_path"])
+                        topic["toc_label"] += " OTHER FORM"
+                    projection["projection_sha256"] = source_map.shared.canonical_digest(
+                        source_map.PROJECTION_DOMAIN, source_map.core(projection, "projection_sha256"))
+                    with self.assertRaisesRegex(source_map.shared.SourceMapError,
+                                                label + " has no unique reviewed TOC mapping"):
+                        source_map.build_mapping(ROOT, "spi", projection)
+
+    def test_qualified_perform_joins_reject_wrong_review_row_or_retained_hash(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.fixture(root)
+            path = root / source_map.FORM_LOCATORS
+            original = json.loads(path.read_text())
+            for label in ["PERFORM SECURITY", "PERFORM SSL", "PERFORM STATISTICS"]:
+                for field, value in [("official_row", "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0202"),
+                                     ("topic_sha256", "sha256:" + "0" * 64)]:
+                    with self.subTest(label=label, field=field):
+                        review = copy.deepcopy(original)
+                        next(row for row in review["rows"] if row["label"] == label)[field] = value
+                        path.write_text(source_map.shared.pretty(review))
+                        with self.assertRaisesRegex(source_map.shared.SourceMapError,
+                                                    label + " reviewed form locator differs"):
+                            source_map.build_mapping(root, "spi", self.read("spi", 0, root))
+
+    def test_qualified_perform_joins_require_the_pinned_retained_body(self):
+        original = self.read("spi", 1)
+        with tempfile.TemporaryDirectory() as temporary:
+            for label in ["PERFORM SECURITY", "PERFORM SSL", "PERFORM STATISTICS"]:
+                with self.subTest(label=label):
+                    row = next(row for row in original["rows"] if row["label"] == label)
+                    mapping = copy.deepcopy(original)
+                    mapping["rows"] = [row]
+                    with self.assertRaisesRegex(FileNotFoundError, row["topic"]["topic_path"]):
+                        source_map.verify_bodies(ROOT, "spi", mapping, Path(temporary))
