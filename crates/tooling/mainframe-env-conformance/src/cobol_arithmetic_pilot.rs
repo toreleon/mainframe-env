@@ -329,6 +329,23 @@ mod tests {
                 .matched
         );
 
+        let mut wrong_policy = report.clone();
+        wrong_policy.results[0].execution_policies = vec![
+            "decimal34-v1/cobol-numeric-v1/captured-operands-receiver-local-v1/cobol-size-error-v1"
+                .into(),
+        ];
+        let output = DriverOutput::new(
+            serde_json::to_vec(&wrong_policy).unwrap(),
+            ConformanceLimits::default(),
+        )
+        .unwrap();
+        assert!(
+            !ArithmeticContractObservation
+                .evaluate(&output)
+                .unwrap()
+                .matched
+        );
+
         let mut stale = report;
         stale.fixture_digest =
             "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();

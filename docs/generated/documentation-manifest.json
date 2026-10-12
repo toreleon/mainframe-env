@@ -1461,7 +1461,7 @@
       "path": "docs/decisions/0052-cobol-fixed-point-intermediate-precision.md",
       "relative_links": 1,
       "scope": "Typed ADD/COMPUTE plans and compile-time numeric admission",
-      "sha256": "sha256:634c143e2f5c096a2cb569233bfdb1343e1bd06d2aaef30d241d1c8d139fc0d4",
+      "sha256": "sha256:7330331303fda1b1836df881fb365ed73ba46a1e74b5b15c4ffe6fd4f70d5850",
       "status": "Accepted for the bounded #158/#159 repair with documented source assumptions",
       "title": "ADR-0052: Separate COBOL data and intermediate precision",
       "xtask_commands": 0

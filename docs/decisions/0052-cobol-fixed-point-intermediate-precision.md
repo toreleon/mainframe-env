@@ -60,3 +60,10 @@ SIZE ERROR preserving the receiver, different-scale multiple receivers, and
 GnuCOBOL support for IBM's profile-specific declaration limits or prove all
 cap-boundary behavior. Unit regressions separately pin 30/31-digit fractional
 truncation and integer overflow. No licensed execution credit is claimed.
+
+The arithmetic pilot's independent spec checker requires the new
+`cobol-extend-v2` policy for newly compiled EXTEND fixtures. Its independently
+reviewed exact output bytes, operation major 2, captured receiver ordering, and
+SIZE ERROR boundary remain unchanged. Both the checker and runtime comparator
+reject an otherwise matching observation carrying the legacy `decimal34-v1`
+policy; compatibility decoding of persisted legacy plans remains supported.
