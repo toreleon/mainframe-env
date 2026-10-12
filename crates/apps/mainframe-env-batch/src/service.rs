@@ -1,3 +1,4 @@
+mod ams_recordsize;
 mod dd_allocation;
 mod effect_loan;
 mod hex_encoding;
@@ -3627,18 +3628,7 @@ impl BatchService {
                 },
             }
         } else if command == "define-cluster" {
-            validate_vsam_component_clauses(statement)?;
-            // #273: IDCAMS KSDS omission default; preserve other cluster defaults.
-            let default_recordsize = if statement.contains(" LINEAR")
-                || statement.contains("NUMBERED")
-                || statement.contains("NONINDEXED")
-            {
-                (80, 80)
-            } else {
-                (4089, 4089)
-            };
-            let (minimum, maximum) =
-                pair_operand(statement, "RECORDSIZE").unwrap_or(default_recordsize);
+            let (minimum, maximum) = ams_recordsize::cluster_recordsize(statement)?;
             let keys = pair_operand(statement, "KEYS");
             let organization = if statement.contains(" LINEAR") {
                 DatasetOrganization::Linear
@@ -7792,6 +7782,71 @@ mod tests {
         };
         assert_eq!(attributes.record_format, expected_format);
         assert_eq!(attributes.logical_record_length, expected_length);
+    }
+
+    #[test]
+    fn new_dd_unusable_dcb_and_referback_fail_closed() {
+        for (source, dcb) in [
+            ("", "DCB=(DSORG=PS)"),
+            (
+                "//SRC DD DSN=USER.SOURCE,DISP=NEW,DCB=(DSORG=PS)\n",
+                "DCB=*.SRC",
+            ),
+            (
+                "//SRC DD DSN=USER.REFER.IN,DISP=SHR\n",
+                "DCB=(*.SRC,LRECL=0)",
+            ),
+        ] {
+            let (service, dataset) = service_with_real_datasets();
+            dataset
+                .invoke(DatasetRequest::Create {
+                    dataset: DatasetName::new("USER.REFER.IN", 128).unwrap(),
+                    attributes: DatasetAttributes {
+                        organization: DatasetOrganization::Sequential,
+                        record_format: RecordFormat::FixedBlocked,
+                        logical_record_length: 350,
+                        key_offset: None,
+                        key_length: None,
+                        ccsid: Some(37),
+                    },
+                    mutation: dataset_test_mutation(600),
+                })
+                .unwrap();
+            let invocation = invocation();
+            let job = service
+                .submit(
+                    &invocation,
+                    &JclBundle {
+                        primary: format!(
+                            "//J JOB\n//S EXEC PGM=IEFBR14\n{source}//D DD DSN=USER.NEW,DISP=NEW,{dcb}\n"
+                        ),
+                        ..Default::default()
+                    },
+                    &IdempotencyKey::new("unusable-dcb", InvocationLimits::default()).unwrap(),
+                    false,
+                )
+                .unwrap();
+            let job = service.lock().unwrap().jobs[&job.id].clone();
+            let step = &job.plan.steps[0];
+            let result = service.effective_dd_attributes(
+                &invocation,
+                &job,
+                step,
+                step.dds.len() - 1,
+                &mut 0,
+            );
+            assert!(
+                matches!(result, Err(HostProblem::UnsupportedCapability { ref capability, .. })
+                    if capability == "batch.new-dataset-dcb"),
+                "{source}{dcb}: {result:?}"
+            );
+            assert_eq!(
+                dataset.invoke(DatasetRequest::Attributes {
+                    dataset: DatasetName::new("USER.NEW", 128).unwrap(),
+                }),
+                Err(HostProblem::NotFound)
+            );
+        }
     }
 
     #[test]
