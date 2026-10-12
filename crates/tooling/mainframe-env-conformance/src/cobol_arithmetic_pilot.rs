@@ -247,6 +247,8 @@ fn policy_identity(policy: mainframe_env_ir::DecimalExecutionPolicy) -> Result<S
     let context = match policy.arithmetic_context {
         DecimalArithmeticContext::Decimal18V1 => "decimal18-v1",
         DecimalArithmeticContext::Decimal34V1 => "decimal34-v1",
+        DecimalArithmeticContext::CobolCompatV2 => "cobol-compat-v2",
+        DecimalArithmeticContext::CobolExtendV2 => "cobol-extend-v2",
         DecimalArithmeticContext::LegacyCobolModuleV1 => {
             return Err("implicit legacy arithmetic context reached the typed COBOL pilot".into());
         }

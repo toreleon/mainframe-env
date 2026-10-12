@@ -175,6 +175,23 @@ impl LosslessSyntax {
     pub(crate) fn semantic_text(&self) -> &str {
         &self.semantic_text
     }
+    pub(crate) fn oversized_numeric_literal(&self, max_digits: usize) -> Option<&str> {
+        // Check active, COPY/REPLACE-expanded text rather than the lossless
+        // spelling, which may contain inactive branches and pre-expansion values.
+        let mut remaining = self.semantic_text.as_str();
+        while !remaining.is_empty() {
+            let (kind, length) = next_token(remaining);
+            let text = &remaining[..length];
+            if kind == CobolSyntaxKind::Number
+                && text.bytes().filter(u8::is_ascii_digit).count() > max_digits
+            {
+                return Some(text);
+            }
+            remaining = &remaining[length..];
+        }
+        None
+    }
+
     #[must_use]
     pub const fn token_count(&self) -> usize {
         self.token_count

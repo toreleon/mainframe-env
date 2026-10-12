@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 241,
+    "markdown_documents": 242,
     "navigation_groups": 8,
-    "normative_documents": 99,
+    "normative_documents": 100,
     "xtask_commands": 163
   },
   "documents": [
@@ -349,8 +349,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 182,
-      "sha256": "sha256:df6fc9bbbd77a7f727823c1cd8a930a4bbef5bd2eab9253dd26d325e2e82ccf0",
+      "relative_links": 183,
+      "sha256": "sha256:af111bfd83e0b6454d1307c9d42aee073fd055ce634613f79f0333a9f250c889",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -407,9 +407,9 @@
       "normative": true,
       "owner": "compiler and interpreter maintainers",
       "path": "docs/architecture/COBOL-RUNTIME-SEMANTICS.md",
-      "relative_links": 0,
+      "relative_links": 1,
       "scope": "COBOL runtime semantic contracts",
-      "sha256": "sha256:ac91f6e4eec46a346d252ac43e670b59e9f784bf48aff24d10bdf038145ec59a",
+      "sha256": "sha256:09875e21690f8a1307ac10523c32473bd8cc81e8f6ae64e372a356435379e9aa",
       "status": "Frozen for mainframe-env cobol.execution implementation",
       "title": "COBOL runtime semantic contracts",
       "xtask_commands": 0
@@ -1455,10 +1455,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env newly compiled COBOL decimal plans",
+      "normative": true,
+      "owner": "COBOL compiler and decimal runtime maintainers",
+      "path": "docs/decisions/0052-cobol-fixed-point-intermediate-precision.md",
+      "relative_links": 1,
+      "scope": "Typed ADD/COMPUTE plans and compile-time numeric admission",
+      "sha256": "sha256:634c143e2f5c096a2cb569233bfdb1343e1bd06d2aaef30d241d1c8d139fc0d4",
+      "status": "Accepted for the bounded #158/#159 repair with documented source assumptions",
+      "title": "ADR-0052: Separate COBOL data and intermediate precision",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 53,
-      "sha256": "sha256:43f9927331159d83f380ef579a56c577b54c4fcdc6aae56121dc8a9ebb8b086b",
+      "relative_links": 54,
+      "sha256": "sha256:149f70ea3c11478b9e424cea2d9c48e61089d399db75fa9f9df69fdf23e79536",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -2782,6 +2794,10 @@
         {
           "label": "ADR-0050: Boxed shared host-effect payloads",
           "path": "docs/decisions/0050-host-effect-envelope-layout.md"
+        },
+        {
+          "label": "ADR-0052: COBOL fixed-point intermediate precision",
+          "path": "docs/decisions/0052-cobol-fixed-point-intermediate-precision.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -3008,7 +3024,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:11657d5b50a3394d2cf58c698e5ce07f83d5dc6bbd8574fe67c2da15b43c86ae",
+  "registry_sha256": "sha256:fd1100f49636270d2a91e966a8dbd356544aaa3bbda94613d75153399de2979f",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {
