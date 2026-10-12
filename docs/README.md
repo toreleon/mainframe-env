@@ -190,6 +190,7 @@ explicitly names that authority as superseded.
 - [ADR-0029: COBOL storage-entry identity](decisions/0029-cobol-storage-entry-identity.md)
 - [ADR-0030: Common CICS source condition authority](decisions/0030-cics-source-condition-authority.md)
 - [ADR-0050: Boxed shared host-effect payloads](decisions/0050-host-effect-envelope-layout.md)
+- [ADR-0053: COBOL HFP storage and checkpoint profiles](decisions/0053-cobol-hex-float-storage.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.
 

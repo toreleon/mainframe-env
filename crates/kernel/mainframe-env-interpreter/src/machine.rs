@@ -50,8 +50,11 @@ mod corresponding;
 mod decimal_capacity;
 mod decimal_commit;
 mod eib;
+mod float_codec;
 #[cfg(test)]
 mod floating_insertion_tests;
+#[cfg(test)]
+mod hexadecimal_float_tests;
 mod layout_admission;
 mod layout_resolution;
 mod legacy_mq;
@@ -136,6 +139,7 @@ struct LayoutMetadata {
     digits: usize,
     scale: u32,
     native_binary: bool,
+    float_profile: float_codec::FloatProfile,
     signed: bool,
     sign_separate: bool,
     justified_right: bool,
@@ -445,6 +449,8 @@ pub struct MachineSnapshot {
     pub random_state: Option<u64>,
     pub storage64: Storage64Snapshot,
     pub storage64_area_bindings: BTreeMap<String, u64>,
+    /// Schema 13 representation by floating layout name; schemas 1..=12 imply IEEE.
+    pub float_profiles: BTreeMap<String, String>,
 }
 
 pub type MachineSnapshotSortIo = (
@@ -920,10 +926,21 @@ impl ReferenceMachine {
 
     #[must_use]
     /// Typed MQ frames export diagnostic schema zero because their live authority is not
-    /// represented here. This is not a checkpoint version; legacy snapshots remain schema 12.
+    /// represented here. This is not a checkpoint version; nonfloating snapshots remain schema 12.
     pub fn snapshot(&self) -> MachineSnapshot {
         MachineSnapshot {
-            schema_version: if self.mqi.is_some() { 0 } else { 12 },
+            schema_version: if self.mqi.is_some() {
+                0
+            } else if self.layouts.values().any(|layout| {
+                matches!(
+                    layout.category,
+                    LayoutCategory::FloatShort | LayoutCategory::FloatLong
+                )
+            }) {
+                13
+            } else {
+                12
+            },
             program_counter: self.pc,
             effect_sequence: self.effect_sequence,
             executed_steps: self.executed_steps,
@@ -999,6 +1016,26 @@ impl ReferenceMachine {
             random_state: self.random_state.get(),
             storage64: self.storage64.snapshot(),
             storage64_area_bindings: self.storage64_area_bindings.clone(),
+            float_profiles: self
+                .layouts
+                .iter()
+                .filter(|(_, layout)| {
+                    matches!(
+                        layout.category,
+                        LayoutCategory::FloatShort | LayoutCategory::FloatLong
+                    )
+                })
+                .map(|(name, layout)| {
+                    (
+                        name.clone(),
+                        match layout.float_profile {
+                            float_codec::FloatProfile::Hex => mainframe_env_ir::COBOL_FLOAT_HEX,
+                            float_codec::FloatProfile::Ieee => mainframe_env_ir::COBOL_FLOAT_IEEE,
+                        }
+                        .into(),
+                    )
+                })
+                .collect(),
         }
     }
 
@@ -1009,7 +1046,7 @@ impl ReferenceMachine {
             return Err(MachineProblem::IncompatibleSnapshot);
         }
         self.validate_return_restore(&snapshot)?;
-        if !matches!(snapshot.schema_version, 1..=12)
+        if !matches!(snapshot.schema_version, 1..=13)
             || snapshot.program_counter > self.operations.len()
             || snapshot.base_storage.iter().map(Vec::len).sum::<usize>()
                 > self.invocation.limits.max_storage_bytes as usize
@@ -1021,6 +1058,33 @@ impl ReferenceMachine {
                 .zip(snapshot.base_storage.iter())
                 .any(|(expected, actual)| expected.len() != actual.len())
             || snapshot.last_file_status.len() != 2
+        {
+            return Err(MachineProblem::IncompatibleSnapshot);
+        }
+        let floating_names = self
+            .layouts
+            .iter()
+            .filter(|(_, layout)| {
+                matches!(
+                    layout.category,
+                    LayoutCategory::FloatShort | LayoutCategory::FloatLong
+                )
+            })
+            .map(|(name, _)| name.clone())
+            .collect::<BTreeSet<_>>();
+        if snapshot.schema_version >= 13
+            && (snapshot
+                .float_profiles
+                .keys()
+                .cloned()
+                .collect::<BTreeSet<_>>()
+                != floating_names
+                || snapshot.float_profiles.values().any(|profile| {
+                    !matches!(
+                        profile.as_str(),
+                        mainframe_env_ir::COBOL_FLOAT_HEX | mainframe_env_ir::COBOL_FLOAT_IEEE
+                    )
+                }))
         {
             return Err(MachineProblem::IncompatibleSnapshot);
         }
@@ -1227,6 +1291,19 @@ impl ReferenceMachine {
         } else {
             None
         });
+        for name in floating_names {
+            self.layouts
+                .get_mut(&name)
+                .expect("validated floating name")
+                .float_profile = if snapshot.schema_version >= 13
+                && snapshot.float_profiles[&name] == mainframe_env_ir::COBOL_FLOAT_HEX
+            {
+                float_codec::FloatProfile::Hex
+            } else {
+                // Legacy checkpoints contain IEEE bytes, even with a newly compiled module.
+                float_codec::FloatProfile::Ieee
+            };
+        }
         self.install_storage64_snapshot(restored_storage64, area_bindings);
         self.pending = None;
         self.deferred_drive = None;
@@ -1249,6 +1326,7 @@ impl ReferenceMachine {
                 | "mainframe-env.reference-machine-checkpoint@10"
                 | "mainframe-env.reference-machine-checkpoint@11"
                 | "mainframe-env.reference-machine-checkpoint@12"
+                | "mainframe-env.reference-machine-checkpoint@13"
         ) {
             return Err(MachineProblem::IncompatibleSnapshot);
         }
@@ -8566,7 +8644,16 @@ impl Machine for ReferenceMachine {
     fn checkpoint(&self) -> Option<BoundedPayload> {
         let bytes = self.checkpoint_bytes()?;
         BoundedPayload::new(
-            "mainframe-env.reference-machine-checkpoint@12",
+            if self.layouts.values().any(|layout| {
+                matches!(
+                    layout.category,
+                    LayoutCategory::FloatShort | LayoutCategory::FloatLong
+                )
+            }) {
+                "mainframe-env.reference-machine-checkpoint@13"
+            } else {
+                "mainframe-env.reference-machine-checkpoint@12"
+            },
             bytes,
             InvocationLimits {
                 max_payload_bytes: usize::try_from(
@@ -8606,7 +8693,12 @@ fn push_string_list(output: &mut Vec<u8>, values: &[String]) -> Option<()> {
 }
 
 pub(super) fn encode_snapshot_prefix(snapshot: &MachineSnapshot) -> Option<Vec<u8>> {
-    let mut bytes = b"MECP0012".to_vec();
+    let mut bytes = if snapshot.schema_version == 13 {
+        b"MECP0013"
+    } else {
+        b"MECP0012"
+    }
+    .to_vec();
     bytes.extend_from_slice(&snapshot.schema_version.to_be_bytes());
     bytes.extend_from_slice(&u64::try_from(snapshot.program_counter).ok()?.to_be_bytes());
     bytes.extend_from_slice(&snapshot.effect_sequence.to_be_bytes());
@@ -8661,6 +8753,7 @@ fn decode_snapshot(
         b"MECP0010" => 10,
         b"MECP0011" => 11,
         b"MECP0012" => 12,
+        b"MECP0013" => 13,
         _ => return Err(MachineProblem::IncompatibleSnapshot),
     };
     let schema_version = input.u32()?;
@@ -8991,6 +9084,25 @@ fn decode_snapshot(
         max_frames,
         &mut remaining_storage,
     )?;
+    let mut float_profiles = BTreeMap::new();
+    if header_version >= 13 {
+        let count =
+            usize::try_from(input.u32()?).map_err(|_| MachineProblem::IncompatibleSnapshot)?;
+        if count > max_storage {
+            return Err(MachineProblem::IncompatibleSnapshot);
+        }
+        for _ in 0..count {
+            let name = snapshot_string(&mut input, 4096)?;
+            let profile = match input.take(1)?.first() {
+                Some(0) => mainframe_env_ir::COBOL_FLOAT_IEEE,
+                Some(1) => mainframe_env_ir::COBOL_FLOAT_HEX,
+                _ => return Err(MachineProblem::IncompatibleSnapshot),
+            };
+            if float_profiles.insert(name, profile.into()).is_some() {
+                return Err(MachineProblem::IncompatibleSnapshot);
+            }
+        }
+    }
     if !input.finished() {
         return Err(MachineProblem::IncompatibleSnapshot);
     }
@@ -9020,6 +9132,7 @@ fn decode_snapshot(
         random_state,
         storage64,
         storage64_area_bindings,
+        float_profiles,
     })
 }
 
@@ -9324,6 +9437,15 @@ fn layout_metadata(operations: &[Operation]) -> Result<LayoutState, MachineProbl
             digits: usize_attribute(operation, "digits")?,
             scale: u32::try_from(usize_attribute(operation, "scale")?)
                 .map_err(|_| MachineProblem::InvalidOperation)?,
+            float_profile: match optional_text_attribute(operation, "float_profile") {
+                Some(mainframe_env_ir::COBOL_FLOAT_HEX) => float_codec::FloatProfile::Hex,
+                Some(mainframe_env_ir::COBOL_FLOAT_IEEE) | None => float_codec::FloatProfile::Ieee,
+                _ => {
+                    return Err(MachineProblem::InvalidArtifact(
+                        "unknown floating profile".into(),
+                    ));
+                }
+            },
             native_binary: optional_integer_attribute(operation, "native_binary")
                 .unwrap_or_default()
                 != 0,
@@ -10787,44 +10909,15 @@ fn decode_decimal(layout: &LayoutMetadata, bytes: &[u8]) -> Result<Decimal, Mach
                 .ok_or(MachineProblem::DataException)?
                 .coefficient
         }
-        LayoutCategory::FloatShort => {
-            let bytes: [u8; 4] = bytes
-                .try_into()
-                .map_err(|_| MachineProblem::DataException)?;
-            decimal_from_float(f64::from(f32::from_be_bytes(bytes)))?.coefficient
-        }
-        LayoutCategory::FloatLong => {
-            let bytes: [u8; 8] = bytes
-                .try_into()
-                .map_err(|_| MachineProblem::DataException)?;
-            decimal_from_float(f64::from_be_bytes(bytes))?.coefficient
+        LayoutCategory::FloatShort | LayoutCategory::FloatLong => {
+            return float_codec::decode(layout, bytes);
         }
         _ => return Err(MachineProblem::DataException),
     };
-    if matches!(
-        layout.category,
-        LayoutCategory::FloatShort | LayoutCategory::FloatLong
-    ) {
-        let value = match layout.category {
-            LayoutCategory::FloatShort => f64::from(f32::from_be_bytes(
-                bytes
-                    .try_into()
-                    .map_err(|_| MachineProblem::DataException)?,
-            )),
-            LayoutCategory::FloatLong => f64::from_be_bytes(
-                bytes
-                    .try_into()
-                    .map_err(|_| MachineProblem::DataException)?,
-            ),
-            _ => unreachable!(),
-        };
-        decimal_from_float(value)
-    } else {
-        Ok(Decimal {
-            coefficient,
-            scale: layout.scale,
-        })
-    }
+    Ok(Decimal {
+        coefficient,
+        scale: layout.scale,
+    })
 }
 
 fn decode_display(bytes: &[u8], separate: bool) -> Result<i128, MachineProblem> {
@@ -10980,14 +11073,9 @@ fn encode_decimal(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Ma
             Ok(output)
         }
         LayoutCategory::NumericEdited => encode_edited(layout, value),
-        LayoutCategory::FloatShort => {
-            let value = decimal_to_float(value)?;
-            if !value.is_finite() || value < f64::from(f32::MIN) || value > f64::from(f32::MAX) {
-                return Err(MachineProblem::SizeError);
-            }
-            Ok((value as f32).to_be_bytes().to_vec())
+        LayoutCategory::FloatShort | LayoutCategory::FloatLong => {
+            float_codec::encode(layout, value)
         }
-        LayoutCategory::FloatLong => Ok(decimal_to_float(value)?.to_be_bytes().to_vec()),
         _ => Err(MachineProblem::DataException),
     }
 }
@@ -11783,6 +11871,7 @@ mod tests {
                     digits: 9,
                     scale: 2,
                     native_binary: false,
+                    float_profile: float_codec::FloatProfile::Hex,
                     signed: true,
                     sign_separate: false,
                     justified_right: false,
@@ -12036,6 +12125,7 @@ mod tests {
                 digits: 11,
                 scale: 0,
                 native_binary: false,
+                float_profile: float_codec::FloatProfile::Hex,
                 signed: false,
                 sign_separate: false,
                 justified_right: false,
@@ -12456,6 +12546,7 @@ mod tests {
             digits: length,
             scale,
             native_binary: false,
+            float_profile: float_codec::FloatProfile::Hex,
             signed,
             sign_separate: false,
             justified_right: false,
@@ -12776,6 +12867,7 @@ mod tests {
             digits: 11,
             scale: 2,
             native_binary: false,
+            float_profile: float_codec::FloatProfile::Hex,
             signed: true,
             sign_separate: false,
             justified_right: false,
@@ -13064,6 +13156,7 @@ mod tests {
             digits,
             scale,
             native_binary: false,
+            float_profile: float_codec::FloatProfile::Hex,
             signed: true,
             sign_separate: false,
             justified_right: false,
@@ -13098,6 +13191,7 @@ mod tests {
             digits: 5,
             scale: 0,
             native_binary: false,
+            float_profile: float_codec::FloatProfile::Hex,
             signed: true,
             sign_separate: false,
             justified_right: false,
@@ -13234,6 +13328,7 @@ mod tests {
                 digits: 4,
                 scale: 0,
                 native_binary: false,
+                float_profile: float_codec::FloatProfile::Hex,
                 signed: false,
                 sign_separate: false,
                 justified_right: false,

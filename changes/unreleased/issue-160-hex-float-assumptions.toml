@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "HFP COMP-1/COMP-2 conversion assumptions pending a licensed differential: fraction truncation toward zero, overflow raises size error, underflow becomes zero (#160)."
