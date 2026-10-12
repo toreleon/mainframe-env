@@ -63,8 +63,9 @@ The authorized source-only slice uses branch `codex/spi-perform-source-joins-413
 and base `a688045a` (origin/main). The base still marks all three joins
 `candidate-unresolved`; none is already fixed. GitHub issue retrieval was
 unavailable, so scope follows the supplied #413 contract. PR #393 overlap review
-excludes `system-api-plan.md`, shared registries and the documentation manifest
-from this slice.
+excludes `system-api-plan.md` and shared registries from this slice. The
+documentation manifest is regenerated normally for this status update; its
+shared path is routine generated overlap, with no reserved Foundation claim.
 
 Offline searches and exact SHA-selected reads against
 `MAINFRAME_ENV_IBM_DOCS_CACHE=$HOME/.cache/mainframe-env/ibm-docs` found no matching
@@ -110,9 +111,9 @@ SPI-1001 still requires these three exact joins and complete source-reviewed
 grammar, option, condition, lifecycle/context and registry obligations. The
 private projection remains 266 SPI/39 FEPI identities; the official denominator
 remains 269 SPI/39 FEPI. Public admission is unchanged, with no SPI/FEPI runtime
-and zero licensed credit. Documentation manifest regeneration requires a
-coordinated exception to the #393 path exclusion before the updated status can
-pass the documentation freshness gate.
+and zero licensed credit. Integration regenerates the shared documentation
+manifest after combining source changes, following the existing coordination
+workflow.
 
 ## Checks and remaining obligations
 
