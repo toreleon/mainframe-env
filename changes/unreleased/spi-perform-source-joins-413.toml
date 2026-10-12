@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Recorded three missing pinned PERFORM bodies and added private source-join rejection controls for #413; candidate equivalences remain unverified, public admission unchanged and licensed credit zero."
