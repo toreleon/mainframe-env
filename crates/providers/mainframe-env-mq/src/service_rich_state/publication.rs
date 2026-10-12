@@ -98,6 +98,7 @@ impl RichPublicationPlan {
         Ok(additions)
     }
 
+    #[cfg(test)]
     pub(in crate::service) fn mutations(&self) -> &[ProviderStateMutation] {
         &self.mutations
     }
@@ -112,6 +113,7 @@ impl RichPublicationPlan {
 impl RichStoredState {
     /// Ordinary logical publication at the EXACT captured identity. The caller
     /// supplies only a delivery candidate, never old hashes/versions/owners.
+    #[cfg(test)]
     pub(in crate::service) fn plan_delivery(
         &self,
         candidate: &MqDeliveryKernel,
@@ -133,6 +135,7 @@ impl RichStoredState {
 
     /// Explicit next persisted fence, same catalog/generation and live state.
     /// No implicit backout/cold recovery, coordinator permit or owner retirement.
+    #[cfg(test)]
     pub(in crate::service) fn plan_next_fence(
         &self,
         limits: PublicationLimits,
@@ -288,7 +291,10 @@ impl RichStoredState {
         {
             return Err(PublicationError::Source);
         }
-        Ok(RichPublicationPlan { mutations, next })
+        Ok(RichPublicationPlan {
+            mutations,
+            next: *next,
+        })
     }
 }
 

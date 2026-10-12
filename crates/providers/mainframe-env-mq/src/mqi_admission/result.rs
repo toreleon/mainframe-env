@@ -7,12 +7,23 @@ use mainframe_env_host_api::{
 
 /// Borrowed existing effect result and original. Outcome identities remain unchanged.
 /// The service must still translate uncertainty through the shared effect authority.
-#[derive(Debug)]
 pub(crate) struct MqMqiResultPreflight<'a> {
     pub(crate) original: &'a EffectRequest,
     pub(crate) reply: &'a EffectResult,
     pub(crate) host_result_bytes: usize,
     pub(crate) host_result_digest: [u8; 32],
+}
+
+// Keep retained original identity visible in private diagnostic formatting.
+impl std::fmt::Debug for MqMqiResultPreflight<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MqMqiResultPreflight")
+            .field("original", &self.original)
+            .field("reply", &self.reply)
+            .field("host_result_bytes", &self.host_result_bytes)
+            .field("host_result_digest", &self.host_result_digest)
+            .finish()
+    }
 }
 
 impl MqMqiAdmitted<'_> {

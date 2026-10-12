@@ -697,9 +697,8 @@ fn memory_sqlite_strict_source_fields_and_catalog_trigger_mismatch_fail_closed()
                 r.payload = serde_json::to_vec(&v).unwrap();
             });
             let before = all(&b);
-            match MqService::open(b.arc(), Default::default()) {
-                Ok(s) => assert_plan_error(&s, Default::default()),
-                Err(_) => {}
+            if let Ok(s) = MqService::open(b.arc(), Default::default()) {
+                assert_plan_error(&s, Default::default())
             }
             assert_eq!(all(&b), before);
         }

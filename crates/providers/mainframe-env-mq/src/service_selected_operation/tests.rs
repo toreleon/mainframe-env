@@ -881,10 +881,10 @@ fn memory_sqlite_changed_receipt_payload_and_expired_controls_cannot_publish_aga
         f.seed(&e);
         f.execute(&e).unwrap();
         let rows = f.rows();
-        if let HostRequest::MqMqi(r) = &mut e.request {
-            if let MqMqiRequest::Put { put, .. } = &mut r.envelope.request {
-                put.message.body.push(7);
-            }
+        if let HostRequest::MqMqi(r) = &mut e.request
+            && let MqMqiRequest::Put { put, .. } = &mut r.envelope.request
+        {
+            put.message.body.push(7);
         }
         assert_eq!(f.execute(&e), Err(HostProblem::IdempotencyConflict));
         assert_eq!(f.rows(), rows);

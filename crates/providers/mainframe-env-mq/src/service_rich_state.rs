@@ -16,6 +16,7 @@ mod strict;
 #[path = "service_rich_state/publication.rs"]
 pub(super) mod publication;
 #[path = "service_rich_state/upgrade.rs"]
+#[cfg(test)]
 mod upgrade;
 
 /// Physical snapshot budget, separately from each original authority's limits.
@@ -131,7 +132,7 @@ impl From<DeliveryRowError> for ReadError {
 
 pub(super) enum StoredAuthority {
     Legacy(DurableState),
-    Rich(RichStoredState),
+    Rich(Box<RichStoredState>),
 }
 
 pub(super) struct RichStoredState {
@@ -387,7 +388,7 @@ pub(super) fn decode_records(
                 limits.default_persistence,
             )?;
             ownership.validate_delivery(&delivery, &rows)?;
-            Ok(StoredAuthority::Rich(RichStoredState {
+            Ok(StoredAuthority::Rich(Box::new(RichStoredState {
                 catalog,
                 delivery,
                 rows,
@@ -399,7 +400,7 @@ pub(super) fn decode_records(
                 receipts,
                 runtime: None,
                 limits,
-            }))
+            })))
         }
         _ => Err(ReadError::Corrupt),
     }

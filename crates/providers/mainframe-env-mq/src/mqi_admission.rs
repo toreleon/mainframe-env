@@ -80,7 +80,6 @@ impl<'a> MqMqiServiceScope<'a> {
 }
 
 /// Borrowed original identity; no request/state snapshot or replacement payload.
-#[derive(Debug)]
 pub(crate) struct MqMqiAdmitted<'a> {
     invocation: &'a Invocation,
     trusted_invocation: &'a Invocation,
@@ -96,6 +95,28 @@ pub(crate) struct MqMqiAdmitted<'a> {
     effect: &'a EffectRequest,
     provider: &'a CapabilityDescriptor,
     host_limits: HostLimits,
+}
+
+// Keep retained original identity visible in private diagnostic formatting.
+impl std::fmt::Debug for MqMqiAdmitted<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MqMqiAdmitted")
+            .field("invocation", &self.invocation)
+            .field("trusted_invocation", &self.trusted_invocation)
+            .field("envelope", &self.envelope)
+            .field("mutation", &self.mutation)
+            .field("owner", &self.owner)
+            .field("host_request_digest", &self.host_request_digest)
+            .field("host_request_bytes", &self.host_request_bytes)
+            .field("observed_tick", &self.observed_tick)
+            .field("origin", &self.origin)
+            .field("outer_effect_key", &self.outer_effect_key)
+            .field("capability", &self.capability)
+            .field("effect", &self.effect)
+            .field("provider", &self.provider)
+            .field("host_limits", &self.host_limits)
+            .finish()
+    }
 }
 
 impl MqMqiAdmitted<'_> {
@@ -120,7 +141,6 @@ impl MqMqiAdmitted<'_> {
     }
 }
 
-#[derive(Debug)]
 #[must_use = "admission does not execute an MQI call or authorize resource mutation"]
 pub(crate) enum MqMqiAdmission<'a> {
     ServiceValidation(MqMqiAdmitted<'a>),
@@ -129,7 +149,27 @@ pub(crate) enum MqMqiAdmission<'a> {
         reason: MqMqiPending,
     },
     /// Source-exact direct-call condition. No provider state was inspected.
-    ForbiddenContext(MqMqiResult),
+    ForbiddenContext(Box<MqMqiResult>),
+}
+
+// Preserve diagnostics for unsupported admissions, including their retained
+// original identity and pending reason.
+impl std::fmt::Debug for MqMqiAdmission<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ServiceValidation(identity) => {
+                f.debug_tuple("ServiceValidation").field(identity).finish()
+            }
+            Self::Pending { identity, reason } => f
+                .debug_struct("Pending")
+                .field("identity", identity)
+                .field("reason", reason)
+                .finish(),
+            Self::ForbiddenContext(result) => {
+                f.debug_tuple("ForbiddenContext").field(result).finish()
+            }
+        }
+    }
 }
 
 fn controls(
@@ -294,13 +334,13 @@ pub(crate) fn admit_mqi<'a>(
         )
     {
         controls(invocation, effect, now_tick)?;
-        return Ok(MqMqiAdmission::ForbiddenContext(MqMqiResult {
+        return Ok(MqMqiAdmission::ForbiddenContext(Box::new(MqMqiResult {
             call: envelope.request.call(),
             outcome: MqMqiOutcome::Completed {
                 status: MqMqiStatus::FailedEnvironment,
                 output: MqMqiOutput::NoOutput,
             },
-        }));
+        })));
     }
     let identity = MqMqiAdmitted {
         invocation,
