@@ -3,7 +3,7 @@
     "markdown_documents": 242,
     "navigation_groups": 8,
     "normative_documents": 100,
-    "xtask_commands": 163
+    "xtask_commands": 164
   },
   "documents": [
     {
@@ -82,9 +82,9 @@
       "normative": false,
       "path": "conformance/spec/README.md",
       "relative_links": 0,
-      "sha256": "sha256:b9c8b2ea1272a51a174b8b54366351ca211ef3caf578576b7e6991d6ca1ea424",
+      "sha256": "sha256:d1546a76e2cf1ee7c9a7a98b7fadc92b184a19a87249e57221eea55f8905c2c6",
       "title": "Shared Conformance IR v1",
-      "xtask_commands": 3
+      "xtask_commands": 4
     },
     {
       "normative": false,

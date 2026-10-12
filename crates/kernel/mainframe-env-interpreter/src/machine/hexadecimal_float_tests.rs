@@ -491,3 +491,21 @@ fn artifact_float_profile_is_append_only_and_absence_selects_ieee() {
         Err(MachineProblem::InvalidArtifact(_))
     ));
 }
+
+#[test]
+fn comp1_usage_fixture_15_has_independently_derived_hex_bytes() {
+    // 1.5 = 0x.18 * 16^1. E = 64 + 1 = 0x41; the 24-bit fraction is
+    // 0x180000. Integer cross-multiplication proves 0x180000 / 2^24 * 16 = 3/2.
+    let expected = [0x41, 0x18, 0x00, 0x00];
+    assert_eq!(0x18_0000_u64 * 16 * 2, 3 * (1_u64 << 24));
+    let layout = float_layout(LayoutCategory::FloatShort, 4);
+    let value = Decimal {
+        coefficient: 15,
+        scale: 1,
+    };
+    assert_eq!(encode_decimal(&layout, value), Ok(expected.to_vec()));
+    assert_eq!(decode_decimal(&layout, &expected), Ok(value));
+    // IEEE 1.5 must remain a different storage contract.
+    assert_ne!(expected, 1.5_f32.to_be_bytes());
+    assert_ne!(decode_decimal(&layout, &1.5_f32.to_be_bytes()), Ok(value));
+}
