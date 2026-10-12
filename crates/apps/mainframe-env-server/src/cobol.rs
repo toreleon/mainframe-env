@@ -837,6 +837,8 @@ fn source_bundle(input: &ProgramInput) -> Result<SourceBundle, HostProblem> {
 
 #[cfg(test)]
 mod hardening;
+#[cfg(test)]
+mod installed_cursor_authority;
 
 mod replay;
 #[allow(dead_code, reason = "R-11 product integration seam")]

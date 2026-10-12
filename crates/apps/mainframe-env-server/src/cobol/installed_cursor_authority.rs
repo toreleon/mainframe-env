@@ -1,6 +1,133 @@
 //! Cursor ownership at the installed executor's staged completion boundary.
+use super::hardening::{TestRoot, call_payload, input, parent};
 use super::*;
+use mainframe_env_execution_api::CapabilityId;
+use mainframe_env_host_api::*;
+use mainframe_env_store::{LocalArtifactStore, MemoryStore, SqliteStateStore};
 use mainframe_env_store_api::ProviderStateStore;
+use std::path::PathBuf;
+use std::sync::Weak;
+
+// Forward without retaining a router -> host -> router Arc cycle.
+struct ProgramProvider {
+    descriptor: CapabilityDescriptor,
+    router: Weak<DefaultProgramRouter>,
+}
+impl HostProvider for ProgramProvider {
+    fn descriptor(&self) -> &CapabilityDescriptor {
+        &self.descriptor
+    }
+    fn invoke(&self, invocation: &Invocation, effect: EffectRequest) -> EffectResult {
+        self.router
+            .upgrade()
+            .expect("live installed-program router")
+            .invoke(invocation, effect)
+    }
+}
+
+struct Fixture {
+    store: Arc<dyn PlatformStore>,
+    host: Arc<ScopedHostService>,
+    router: Arc<DefaultProgramRouter>,
+    root: PathBuf,
+}
+impl Fixture {
+    fn with_providers(
+        root: &TestRoot,
+        store: Arc<dyn PlatformStore>,
+        mut providers: Vec<Arc<dyn HostProvider>>,
+    ) -> Self {
+        let router = default_program_router();
+        providers.push(Arc::new(ProgramProvider {
+            descriptor: router.descriptor().clone(),
+            router: Arc::downgrade(&router),
+        }));
+        let host = Arc::new(ScopedHostService::new(
+            Arc::new(RegistrySnapshot::new(1, providers, InvocationLimits::default()).unwrap()),
+            HostLimits::default(),
+        ));
+        let artifacts = Arc::new(LocalArtifactStore::open(&root.0, 64 * 1024 * 1024).unwrap());
+        router
+            .bind_runtime(host.clone(), store.clone(), artifacts)
+            .unwrap();
+        Self {
+            store,
+            host,
+            router,
+            root: root.0.clone(),
+        }
+    }
+
+    fn install(&self, name: &str, source: &str) {
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: source_bundle(&input(source)).unwrap(),
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("executable artifact required");
+        };
+        let record = artifact::published_artifact_record(&artifact).unwrap();
+        let id = record.artifact.clone();
+        LocalArtifactStore::open(&self.root, 64 * 1024 * 1024)
+            .unwrap()
+            .put_artifact(record)
+            .unwrap();
+        self.store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "batch-program".into(),
+                    key: name.into(),
+                    version: 1,
+                    payload: id.as_str().as_bytes().to_vec(),
+                },
+                None,
+            )
+            .unwrap();
+    }
+
+    fn call(
+        &self,
+        parent: &Invocation,
+        program: &str,
+        sequence: u64,
+        payload: BoundedPayload,
+    ) -> EffectResult {
+        // Keep the router alive without a router -> host -> router Arc cycle.
+        assert!(Arc::strong_count(&self.router) >= 1);
+        self.host
+            .invoke(
+                parent,
+                0,
+                false,
+                EffectRequest {
+                    run_unit: parent.run_unit_id.clone(),
+                    sequence,
+                    deadline_tick: parent.deadline_tick,
+                    idempotency_key: Some(
+                        IdempotencyKey::new(
+                            format!("{}:{sequence}", parent.idempotency_key),
+                            InvocationLimits::default(),
+                        )
+                        .unwrap(),
+                    ),
+                    request: HostRequest::Program(ProgramRequest::Call {
+                        program: ProgramName::new(program, 128).unwrap(),
+                        payload,
+                        service: None,
+                    }),
+                },
+            )
+            .persist_with(|audit| {
+                self.store
+                    .record_audit(audit)
+                    .map_err(|_| HostProblem::InfrastructureFailure)
+            })
+    }
+}
 
 const SOURCE: &str = "IDENTIFICATION DIVISION. PROGRAM-ID. CURSOR-LEAF.
 ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL.
@@ -96,8 +223,7 @@ fn new_fixture(
     store: Arc<dyn PlatformStore>,
     provider: Arc<CursorProvider>,
 ) -> Fixture {
-    let fixture =
-        Fixture::with_providers(root, store, HostProblem::NotFound, false, vec![provider]);
+    let fixture = Fixture::with_providers(root, store, vec![provider]);
     fixture.install("CURSOR-LEAF", SOURCE);
     fixture
 }
@@ -188,8 +314,6 @@ fn installed_call_interrupted_completion_never_publishes_cursor_ahead_of_retaine
     let fixture = Fixture::with_providers(
         &root,
         Arc::new(reopened),
-        HostProblem::NotFound,
-        false,
         vec![Arc::new(CursorProvider::new())],
     );
     assert_eq!(
@@ -262,13 +386,7 @@ fn installed_call_cursors_advance_once_and_committed_replay_never_advances_again
             drop(store);
             let reopened =
                 Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
-            let fixture = Fixture::with_providers(
-                &root,
-                reopened,
-                HostProblem::NotFound,
-                false,
-                vec![provider.clone()],
-            );
+            let fixture = Fixture::with_providers(&root, reopened, vec![provider.clone()]);
             assert_eq!(
                 fixture.call(&actor(), "CURSOR-LEAF", 3, payload).outcome,
                 reply(b'C')
