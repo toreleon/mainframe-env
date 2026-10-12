@@ -538,12 +538,19 @@ rejections.
 `CURSOR` and `FREEKB` are admitted and forwarded but are not yet modeled by the
 terminal provider (`#210`). `ERASE` coincides with the provider's existing
 full-screen replacement behavior (`#203`).
-`PURGE MESSAGE` is a separate typed terminal mutation. Because this runtime has
-no ACCUM or page-building route, its reachable full-BMS logical-message state
-is empty: local purge succeeds idempotently without changing the already
-displayed screen or current map. DPL use returns `INVREQ` 16/200. Deleting a
-nonempty accumulated message and surfacing temporary-storage `TSIOERR` remain
-unready until that logical-message authority exists.
+`PURGE MESSAGE` is a separate typed terminal mutation over durable BMS state.
+Local purge discards pending `SEND CONTROL ACCUM` frames and succeeds
+idempotently on empty state, preserving the displayed screen and current map.
+It allows a new logical message in the same task. DPL use returns `INVREQ`
+16/200. Selected compiled-route tests cover zero, one, and several control
+frames, checkpoint/provider restart, and replay while a later message is active.
+These are control frames, not multiple accumulated pages: SEND MAP/TEXT ACCUM
+and overflow page construction remain unready. Pages retained after SEND PAGE
+belong to completed messages and are not evidence of an incomplete multi-page
+message. Temporary-storage `TSIOERR` 35 remains unverified because there is no
+deterministic BMS I/O failure injection; corrupt platform storage fails closed
+as infrastructure failure. This is partial #198 evidence, with no whole-command
+or licensed equivalence claim.
 The typed ASSIGN subset carries each of its 92 admitted context values as a
 pre-resolved output binding under one bounded output-name authority. It retains
 the existing 16-option maximum, exact receiver checks, partial-INVREQ behavior,

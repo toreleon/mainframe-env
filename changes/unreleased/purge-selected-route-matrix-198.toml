@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added partial PURGE MESSAGE selected-route control-frame, restart/replay, and fail-closed storage evidence (#198); true multi-page accumulation and TSIOERR remain unverified."

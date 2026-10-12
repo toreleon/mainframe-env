@@ -5957,6 +5957,31 @@ mod tests {
     }
 
     #[test]
+    fn purge_message_matrix_cannot_claim_unready_map_or_text_accumulation() {
+        // #198: SEND CONTROL ACCUM frames do not establish page overflow.
+        // Pin the current admission boundary, not IBM's full BMS capability.
+        for command in [
+            "SEND MAP('MENU') ACCUM PAGING",
+            "SEND TEXT FROM(TEXT-X) ACCUM PAGING",
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. PURGEPG. DATA DIVISION. \
+                 WORKING-STORAGE SECTION. 01 TEXT-X PIC X(5) VALUE 'HELLO'. \
+                 PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| { diagnostic.public_message().contains("ACCUM") }),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+
+    #[test]
     fn cics_registry_enforces_known_dependencies_and_groups() {
         let cases = [
             ("RETURN RESP2(RESP-X)", "option RESP2 requires RESP"),
