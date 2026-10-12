@@ -421,7 +421,7 @@
       "path": "docs/architecture/COMPILER-AND-IR.md",
       "relative_links": 1,
       "scope": "compiler stages, IR contracts, and publication pipeline",
-      "sha256": "sha256:76d3b6017452017e912750e5688c646b60bc502d37972b4ce309f0dff7244165",
+      "sha256": "sha256:e788d62e803f605f7939d0b0496f744016815e37651c037979e7ca1752967ded",
       "status": "Accepted by repository owner",
       "title": "Compiler and IR Architecture",
       "xtask_commands": 0

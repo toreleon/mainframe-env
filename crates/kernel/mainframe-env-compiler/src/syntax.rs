@@ -779,11 +779,34 @@ fn expand_copies(
         if stack.len() >= limits.max_copy_depth {
             return Err(SyntaxProblem::CopyDepthExceeded);
         }
-        let dependency = resolve_copy_member(bundle, &name, parsed.library.as_deref())?;
+        let (dependency, generated) =
+            match resolve_copy_member(bundle, &name, parsed.library.as_deref()) {
+                Ok(file) => (file, None),
+                Err(SyntaxProblem::CopyNotFound(_)) => {
+                    resolve_bms_copy(bundle, &name, parsed.library.as_deref(), limits)?
+                }
+                Err(problem) => return Err(problem),
+            };
         stack.push(stack_key);
-        let decoded = decode_file(dependency, limits)?;
-        let normalized =
-            normalize_decoded_source(&decoded, dependency, debugging_mode(bundle), limits)?;
+        let format = if generated.is_some() {
+            SourceFormat::Free
+        } else {
+            dependency.format()
+        };
+        let normalized = if let Some(text) = generated {
+            let mut normalized = NormalizedSource::default();
+            push_origin(
+                &mut normalized.origins,
+                0..text.len(),
+                dependency.path(),
+                0..dependency.bytes().len(),
+            );
+            normalized.text = text;
+            normalized
+        } else {
+            let decoded = decode_file(dependency, limits)?;
+            normalize_decoded_source(&decoded, dependency, debugging_mode(bundle), limits)?
+        };
         let prepared = directives::prepare_source(&normalized, false, artifacts, limits)?;
         let mut expanded = expand_copies(
             &prepared,
@@ -793,7 +816,7 @@ fn expand_copies(
             directive_state,
             artifacts,
             replacing_active || !parsed.replacements.is_empty(),
-            dependency.format(),
+            format,
         )?;
         stack.pop();
         if !parsed.replacements.is_empty() {
@@ -838,42 +861,84 @@ fn resolve_copy_member<'a>(
     name: &str,
     library: Option<&str>,
 ) -> Result<&'a SourceFile, SyntaxProblem> {
-    let Some(library_name) = library else {
-        return bundle
-            .resolve_library_member(name)
-            .map_err(|problem| match problem {
-                LibraryProblem::MissingMember(_) => SyntaxProblem::CopyNotFound(name.into()),
-                LibraryProblem::AmbiguousMember { .. } => SyntaxProblem::AmbiguousCopy(name.into()),
-                _ => SyntaxProblem::InvalidCopy,
-            });
-    };
-    let Some(library) = bundle
+    for library in bundle
         .libraries()
         .iter()
-        .find(|library| library.name().eq_ignore_ascii_case(library_name))
-    else {
-        return Err(SyntaxProblem::CopyNotFound(name.into()));
-    };
-    let matches = library
-        .members()
-        .iter()
-        .filter_map(|path| bundle.files().iter().find(|file| file.path() == path))
-        .filter(|file| {
-            file.path()
-                .as_str()
-                .rsplit('/')
-                .next()
-                .unwrap_or(file.path().as_str())
-                .split('.')
-                .next()
-                .is_some_and(|stem| stem.eq_ignore_ascii_case(name))
-        })
-        .collect::<Vec<_>>();
-    match matches.as_slice() {
-        [file] => Ok(*file),
-        [] => Err(SyntaxProblem::CopyNotFound(name.into())),
-        _ => Err(SyntaxProblem::AmbiguousCopy(name.into())),
+        .filter(|candidate| library.is_none_or(|name| candidate.name().eq_ignore_ascii_case(name)))
+    {
+        let matches = library
+            .members()
+            .iter()
+            .filter_map(|path| bundle.files().iter().find(|file| file.path() == path))
+            .filter(|file| !is_bms(file))
+            .filter(|file| {
+                file.path()
+                    .as_str()
+                    .rsplit('/')
+                    .next()
+                    .unwrap_or(file.path().as_str())
+                    .split('.')
+                    .next()
+                    .is_some_and(|stem| stem.eq_ignore_ascii_case(name))
+            })
+            .collect::<Vec<_>>();
+        match matches.as_slice() {
+            [file] => return Ok(*file),
+            [] => {}
+            _ => return Err(SyntaxProblem::AmbiguousCopy(name.into())),
+        }
     }
+    Err(SyntaxProblem::CopyNotFound(name.into()))
+}
+
+fn is_bms(file: &SourceFile) -> bool {
+    file.path()
+        .as_str()
+        .rsplit('.')
+        .next()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("bms"))
+}
+
+fn resolve_bms_copy<'a>(
+    bundle: &'a SourceBundle,
+    name: &str,
+    library: Option<&str>,
+    limits: SyntaxLimits,
+) -> Result<(&'a SourceFile, Option<String>), SyntaxProblem> {
+    for library in bundle
+        .libraries()
+        .iter()
+        .filter(|candidate| library.is_none_or(|name| candidate.name().eq_ignore_ascii_case(name)))
+    {
+        let mut matches = Vec::new();
+        for file in library
+            .members()
+            .iter()
+            .filter_map(|path| bundle.files().iter().find(|file| file.path() == path))
+            .filter(|file| is_bms(file))
+        {
+            let decoded = decode_file(file, limits)?;
+            let mapset = crate::bms::source_mapset_name(&decoded.text)
+                .map_err(SyntaxProblem::BmsSymbolic)?;
+            if mapset.is_some_and(|mapset| mapset.eq_ignore_ascii_case(name)) {
+                matches.push((file, decoded.text));
+            }
+        }
+        match matches.as_slice() {
+            [(file, source)] => {
+                let text = crate::BmsMapset::parse(source)
+                    .and_then(|mapset| mapset.symbolic_copybook())
+                    .map_err(SyntaxProblem::BmsSymbolic)?;
+                if text.len() > limits.max_expanded_bytes {
+                    return Err(SyntaxProblem::SourceLimitExceeded);
+                }
+                return Ok((file, Some(text)));
+            }
+            [] => {}
+            _ => return Err(SyntaxProblem::AmbiguousCopy(name.into())),
+        }
+    }
+    Err(SyntaxProblem::CopyNotFound(name.into()))
 }
 
 fn append_conditional_slice(
@@ -2215,6 +2280,7 @@ pub(crate) enum SyntaxProblem {
     InvalidEncoding,
     UnsupportedEncoding,
     CopyNotFound(String),
+    BmsSymbolic(crate::BmsSymbolicProblem),
     AmbiguousCopy(String),
     CircularCopy(String),
     CopyDepthExceeded,
@@ -2258,6 +2324,9 @@ pub(crate) enum SyntaxProblem {
 }
 impl fmt::Display for SyntaxProblem {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Self::BmsSymbolic(problem) = self {
+            return problem.fmt(formatter);
+        }
         write!(formatter, "COBOL syntax failed: {self:?}")
     }
 }
@@ -2592,6 +2661,63 @@ mod tests {
                 .compiler_directing_statements()
                 .iter()
                 .any(|node| { node.kind == CompilerDirectingKind::Replace })
+        );
+    }
+    #[test]
+    fn copy_mapset_name_resolves_symbolic_map_from_bms_library_source() {
+        let limits = SourceLimits::default();
+        let primary = LogicalPath::new("main.cbl", limits.max_path_bytes).unwrap();
+        let mapset = LogicalPath::new("maps/terminal.bms", limits.max_path_bytes).unwrap();
+        let files = vec![
+            SourceFile::input(
+                primary.as_str(),
+                b"IDENTIFICATION DIVISION. PROGRAM-ID. MAPCOPY.\n\
+                  DATA DIVISION. WORKING-STORAGE SECTION.\n\
+                  COPY SSMAP.\n\
+                  PROCEDURE DIVISION.\n\
+                  MOVE 8 TO USERIDL. MOVE 'USER' TO USERIDO.\n\
+                  DISPLAY USERIDI. STOP RUN.\n"
+                    .to_vec(),
+                SourceFormat::Free,
+                SourceEncoding::Utf8,
+                limits,
+            )
+            .unwrap(),
+            SourceFile::input(
+                mapset.as_str(),
+                b"SSMAP    DFHMSD TYPE=DSECT,MODE=INOUT,LANG=COBOL2,TIOAPFX=YES\n\
+                  SSMAP1   DFHMDI SIZE=(24,80)\n\
+                  USERID   DFHMDF POS=(1,1),LENGTH=8,ATTRB=(UNPROT)\n\
+                           DFHMSD TYPE=FINAL\n"
+                    .to_vec(),
+                SourceFormat::Free,
+                SourceEncoding::Utf8,
+                limits,
+            )
+            .unwrap(),
+        ];
+        let source = SourceBundle::with_libraries(
+            &primary,
+            files,
+            vec![SourceLibrary::new("MAPS", vec![mapset], limits).unwrap()],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let syntax = decode_and_lex(&source, SyntaxLimits::default())
+            .expect("COPY SSMAP must resolve the symbolic map from its BMS library source");
+        assert!(syntax.semantic_text().contains("SSMAP1I"));
+        assert!(syntax.semantic_text().contains("SSMAP1O"));
+        let analysis = crate::CobolCompiler::default().analyze(&source);
+        assert!(
+            analysis.diagnostics.is_empty(),
+            "{:?}",
+            analysis.diagnostics
+        );
+        assert_eq!(
+            analysis.completeness,
+            mainframe_env_diagnostics::Completeness::Complete
         );
     }
     #[test]
