@@ -129,3 +129,152 @@ fn host_call_failure_names_performed_statement_after_return() {
         1,
     );
 }
+
+fn sort_machine() -> ReferenceMachine {
+    let mut machine = machine(&[
+        (
+            "sort",
+            &[
+                "SORT-X", "USING", "INPUT1", "INPUT2", "GIVING", "OUTPUT1", "OUTPUT2",
+            ],
+        ),
+        ("halt", &[]),
+    ]);
+    machine.files.insert(
+        "SORT-X".into(),
+        FileMetadata {
+            assignment: "SORT-X".into(),
+            record_name: Some("SORT-RECORD".into()),
+            record_names: vec!["SORT-RECORD".into()],
+            organization: "SEQUENTIAL".into(),
+            access_mode: "SEQUENTIAL".into(),
+            record_key: None,
+            alternate_record_keys: Vec::new(),
+            relative_key: None,
+            file_status: None,
+            sort_merge: true,
+            description: String::new(),
+            record_min: None,
+            record_max: None,
+            ccsid: None,
+            linage: None,
+        },
+    );
+    machine.layouts.insert(
+        "SORT-RECORD".into(),
+        LayoutMetadata {
+            name: "SORT-RECORD".into(),
+            simple_name: "SORT-RECORD".into(),
+            category: LayoutCategory::Alphanumeric,
+            picture: "X(4)".into(),
+            digits: 0,
+            scale: 0,
+            native_binary: false,
+            signed: false,
+            sign_separate: false,
+            justified_right: false,
+            blank_when_zero: false,
+            linkage: false,
+            offset: 0,
+            length: 4,
+            element_length: 4,
+            occurs: 1,
+            occurs_min: 1,
+            unbounded: false,
+            depending_on: None,
+            indexes: Vec::new(),
+            keys: Vec::new(),
+            dynamic: false,
+            dynamic_limit: 0,
+            parent: None,
+            alias_of: None,
+            occurs_clause: false,
+            condition_values: Vec::new(),
+            object_class: None,
+        },
+    );
+    machine
+}
+
+fn assert_sort_failure_position(successful_effects: usize) {
+    use mainframe_env_host_api::DatasetResult;
+
+    let mut machine = sort_machine();
+    let quantum = Quantum::new(100, 1024).unwrap();
+    let mut drive = machine.drive(MachineResume::Start, quantum);
+    for (index, expected_dataset) in ["INPUT1", "INPUT2", "OUTPUT1", "OUTPUT2"]
+        .into_iter()
+        .enumerate()
+        .take(successful_effects + 1)
+    {
+        let MachineDrive::HostCall(effect) = drive else {
+            panic!("expected SORT effect {index}: {drive:?}");
+        };
+        assert_eq!(effect.sequence, index as u64 + 1);
+        let outcome = match &effect.request {
+            HostRequest::Dataset(DatasetRequest::Read { dataset, .. }) if index < 2 => {
+                assert_eq!(dataset.as_str(), expected_dataset);
+                HostResult::Dataset(DatasetResult::Records {
+                    records: vec![b"AA01".to_vec()],
+                    identities: vec![vec![1]],
+                    version: 1,
+                })
+            }
+            HostRequest::Dataset(DatasetRequest::Write {
+                dataset, records, ..
+            }) if index >= 2 => {
+                assert_eq!(dataset.as_str(), expected_dataset);
+                assert_eq!(records, &vec![b"AA01".to_vec(), b"AA01".to_vec()]);
+                HostResult::Dataset(DatasetResult::Mutated { version: 2 })
+            }
+            _ => panic!("unexpected SORT effect {index}: {effect:?}"),
+        };
+        assert_eq!(machine.snapshot().program_counter, 1);
+        if index == successful_effects {
+            let snapshot = machine.snapshot();
+            let MachineDrive::Failed(problem) = machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: effect.sequence,
+                    outcome: Err(HostProblem::ResourceExhausted),
+                }),
+                quantum,
+            ) else {
+                panic!("expected an unhandled SORT host failure");
+            };
+            assert_eq!(
+                problem.public_message,
+                "host provider failed: ResourceExhausted"
+            );
+            let position = machine.position_summary();
+            assert!(
+                position.starts_with("pc=0 sort [\"SORT-X\", \"USING\""),
+                "{position}"
+            );
+            assert_eq!(machine.snapshot(), snapshot);
+            return;
+        }
+        drive = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: effect.sequence,
+                outcome: Ok(outcome),
+            }),
+            quantum,
+        );
+    }
+    panic!("expected the selected SORT effect to fail");
+}
+
+#[test]
+fn sort_host_call_failure_names_original_statement_on_second_read() {
+    assert_sort_failure_position(1);
+}
+
+#[test]
+fn sort_host_call_failure_names_original_statement_on_first_write() {
+    assert_sort_failure_position(2);
+}
+
+#[test]
+fn sort_host_call_failure_names_original_statement_on_later_write() {
+    assert_sort_failure_position(3);
+}

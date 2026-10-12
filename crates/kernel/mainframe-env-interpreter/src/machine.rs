@@ -52,6 +52,7 @@ mod decimal_commit;
 mod eib;
 #[cfg(test)]
 mod floating_insertion_tests;
+mod host_call_position;
 mod layout_admission;
 mod layout_resolution;
 mod legacy_mq;
@@ -1602,25 +1603,6 @@ impl ReferenceMachine {
             .iter()
             .map(|name| self.read(name))
             .collect()
-    }
-
-    #[must_use]
-    pub fn position_summary(&self) -> String {
-        let pc = self.host_failure_pc.unwrap_or(self.pc);
-        self.operations.get(pc).map_or_else(
-            || format!("pc={pc} completed"),
-            |operation| {
-                format!(
-                    "pc={} {} {:?} role={:?} scope={:?} text={:?}",
-                    pc,
-                    operation.identity.name(),
-                    arguments(operation),
-                    optional_text_attribute(operation, "control_role"),
-                    optional_text_attribute(operation, "control_scope"),
-                    optional_text_attribute(operation, "control_text")
-                )
-            },
-        )
     }
 
     fn resume_host(&mut self, result: EffectResult) -> Result<(), MachineProblem> {
@@ -4525,11 +4507,11 @@ impl ReferenceMachine {
         effect
             .validate(HostLimits::default())
             .map_err(MachineProblem::Host)?;
+        self.pending_pc = Some(self.host_call_issuing_pc(&kind));
         self.pending = Some(Pending {
             sequence: self.effect_sequence,
             kind,
         });
-        self.pending_pc = Some(self.pc);
         Ok(Step::Effect(Box::new(effect)))
     }
     fn mutation(&self) -> Result<Mutation, MachineProblem> {
