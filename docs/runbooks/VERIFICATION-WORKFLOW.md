@@ -69,6 +69,13 @@ authority checks and durable codecs; retain fixture helper bodies and exercise
 their consumers. Replay byte goldens and recovery/authorization regressions
 verify private representation refactors without changing storage schemas.
 
+For server lint repairs, run
+`cargo clippy -p mainframe-env-server --all-targets --all-features --locked -- -D warnings`
+and select server tests for the touched configured MQ/native, replay and scoped
+state consumers. Private retained-root topology holds opaque claims in process.
+Representation changes must preserve the original claim cloned into native child
+admission and retain the existing store, canonical setup and checkpoint codecs.
+
 See the [IBM cache guide](IBM-DOCS-CACHE.md).
 
 ## Effective Conformance IR inspection
