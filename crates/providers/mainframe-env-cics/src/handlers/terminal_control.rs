@@ -249,6 +249,8 @@ pub(super) fn send(
     }
     partition_set::persist_send(service, run, &current, &next)?;
     state.sessions.insert(run.session.clone(), next);
+    // SEND TEXT WAIT completes here: the virtual screen is durably replaced
+    // before returning control. This provider has no asynchronous output queue.
     service.response(
         run,
         CicsDisposition::Complete,
@@ -335,6 +337,7 @@ pub(super) fn validate_send_request(request: &CicsRequest) -> Result<(), HostPro
         "LENGTH",
         "OPTION.ERASE",
         "OPTION.FREEKB",
+        "OPTION.WAIT",
         "OPTION.NOHANDLE",
         "RESP",
         "RESP2",
@@ -368,7 +371,7 @@ pub(super) fn validate_send_request(request: &CicsRequest) -> Result<(), HostPro
                 || match name.as_str() {
                     "LENGTH" => value.schema() != "mainframe-env.cics.decimal@1",
                     "OPTION.CURSOR" | "OPTION.DATAONLY" | "OPTION.ERASE" | "OPTION.FREEKB"
-                    | "OPTION.MAPONLY" | "OPTION.NOHANDLE" => {
+                    | "OPTION.MAPONLY" | "OPTION.NOHANDLE" | "OPTION.WAIT" => {
                         value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
                     }
                     "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",

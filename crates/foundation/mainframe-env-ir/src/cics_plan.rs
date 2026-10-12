@@ -5076,7 +5076,7 @@ mod tests {
             Some(CicsOperandValue::Storage(slot))
                 if slot.qualified_layout_name == "REQUEST.KEY"
         ));
-        assert_eq!(CICS_ASSIGN_OUTPUT_NAMES.len(), 92);
+        assert_eq!(CICS_ASSIGN_OUTPUT_NAMES.len(), 93);
         assert!(
             CICS_ASSIGN_OUTPUT_NAMES[..78]
                 .windows(2)
@@ -5117,11 +5117,7 @@ mod tests {
                 .windows(2)
                 .all(|pair| pair[0] < pair[1])
         );
-        assert!(
-            CICS_ASSIGN_OUTPUT_NAMES[91..]
-                .windows(2)
-                .all(|pair| pair[0] < pair[1])
-        );
+        assert_eq!(&CICS_ASSIGN_OUTPUT_NAMES[91..], &["TNADDR", "STARTCODE"]);
         assert_eq!(
             CICS_ASSIGN_OUTPUT_NAMES
                 .iter()
@@ -5145,6 +5141,7 @@ mod tests {
             ("FACILITY", 107),
             ("NETNAME", 108),
             ("TNADDR", 109),
+            ("STARTCODE", 110),
         ] {
             let output = CicsAssignOutput::from_name(name).unwrap();
             assert_eq!(output_tag(CicsOutputName::Assign(output)), tag);
@@ -5169,6 +5166,35 @@ mod tests {
                 plan
             );
         }
+    }
+
+    #[test]
+    fn send_text_wait_completion_option_round_trips_issue_312() {
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::SendText,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::From,
+                value: CicsOperandValue::Storage(slot(17, "BMS.TEXT")),
+            }],
+            options: BTreeSet::from([CicsPlanOption::Wait]),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
+            plan
+        );
+        let mut receive = plan;
+        receive.operation = CicsPlanOperation::ReceiveMap;
+        receive.operands = vec![CicsNamedOperand {
+            name: CicsOperandName::Map,
+            value: CicsOperandValue::Literal(b"MENU".to_vec()),
+        }];
+        assert_eq!(
+            encode_cics_effect_plan(&receive, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
     }
 
     #[test]
