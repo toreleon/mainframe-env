@@ -28,14 +28,17 @@ contract explicitly permits it.
 
 ## Values and storage
 
-- Fixed decimal uses a bounded 36-digit `dec::Decimal<12>` primitive behind an
-  owned adapter that admits at most 34 digits. The pinned cobol.execution execution/oracle
-  profile is `ARITH(EXTEND)` and the main arithmetic path uses its 34-digit
-  context. The primitive spike also freezes the 18-digit `ARITH(COMPAT)`
-  context, but propagating that compiler option into executable artifacts is an
-  open completion-audit item. The adapter owns COBOL PICTURE, scale,
-  intermediate precision, `ROUNDED` modes, truncation, `SIZE ERROR`,
-  packed/zoned/binary encoding, and forbidden mutation.
+- Fixed decimal uses a bounded 36-digit `dec::Decimal<12>` primitive. Newly
+  compiled typed ADD/COMPUTE plans explicitly select COMPAT (18 data/literal
+  digits, 30 intermediate digits) or EXTEND (31 data/literal and intermediate
+  digits). Division uses the full intermediate digit budget; receiver scale,
+  `ROUNDED` and `SIZE ERROR` conversion apply after expression evaluation.
+  Excess fractional intermediate digits truncate toward zero. Historical
+  18/34-digit plan policies remain readable with their original arithmetic
+  behavior. [ADR-0052](../decisions/0052-cobol-fixed-point-intermediate-precision.md)
+  records the append-only tags, offline Programming Guide source gap and
+  approved assumptions. The adapter owns COBOL PICTURE, packed/zoned/binary
+  encoding and receiver mutation.
 - Decimal floating uses canonical IEEE decimal128 bytes. Binary short/long
   floating uses explicit big-endian IEEE bit wrappers so negative zero, NaN
   payloads, and infinities survive storage and checkpoint round trips.

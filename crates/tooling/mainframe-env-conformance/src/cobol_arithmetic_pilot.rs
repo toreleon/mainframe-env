@@ -247,6 +247,8 @@ fn policy_identity(policy: mainframe_env_ir::DecimalExecutionPolicy) -> Result<S
     let context = match policy.arithmetic_context {
         DecimalArithmeticContext::Decimal18V1 => "decimal18-v1",
         DecimalArithmeticContext::Decimal34V1 => "decimal34-v1",
+        DecimalArithmeticContext::CobolCompatV2 => "cobol-compat-v2",
+        DecimalArithmeticContext::CobolExtendV2 => "cobol-extend-v2",
         DecimalArithmeticContext::LegacyCobolModuleV1 => {
             return Err("implicit legacy arithmetic context reached the typed COBOL pilot".into());
         }
@@ -317,6 +319,23 @@ mod tests {
         wrong_plan.results[1].decimal_plan_assignment_counts = vec![99];
         let output = DriverOutput::new(
             serde_json::to_vec(&wrong_plan).unwrap(),
+            ConformanceLimits::default(),
+        )
+        .unwrap();
+        assert!(
+            !ArithmeticContractObservation
+                .evaluate(&output)
+                .unwrap()
+                .matched
+        );
+
+        let mut wrong_policy = report.clone();
+        wrong_policy.results[0].execution_policies = vec![
+            "decimal34-v1/cobol-numeric-v1/captured-operands-receiver-local-v1/cobol-size-error-v1"
+                .into(),
+        ];
+        let output = DriverOutput::new(
+            serde_json::to_vec(&wrong_policy).unwrap(),
             ConformanceLimits::default(),
         )
         .unwrap();

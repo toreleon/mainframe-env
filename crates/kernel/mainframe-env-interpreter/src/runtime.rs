@@ -3,7 +3,8 @@ use mainframe_env_execution_api::{Invocation, ResourceLimits};
 use std::fmt;
 
 /// The bounded decNumber backing size. `Decimal<12>` stores at most 36 digits;
-/// the owned COBOL adapter admits at most the ARITH(EXTEND) 34-digit contract.
+/// the historical decimal adapter admits at most 34 digits. Typed COBOL plans
+/// select their separate 30/31-digit fixed-point intermediate contexts.
 const DECIMAL_UNITS: usize = 12;
 pub const MAX_COBOL_DECIMAL_DIGITS: usize = 34;
 pub const MAX_LOCALE_BYTES: usize = 64;
@@ -136,9 +137,16 @@ impl CobolArithmetic {
         mode: CobolArithmeticMode,
         rounding: CobolRounding,
     ) -> Result<Self, RuntimeContractProblem> {
+        Self::with_precision(mode.precision(), rounding)
+    }
+
+    pub(crate) fn with_precision(
+        precision: usize,
+        rounding: CobolRounding,
+    ) -> Result<Self, RuntimeContractProblem> {
         let mut context = Context::<Decimal<DECIMAL_UNITS>>::default();
         context
-            .set_precision(mode.precision())
+            .set_precision(precision)
             .map_err(|_| RuntimeContractProblem::InvalidArithmeticContext)?;
         context
             .set_max_exponent(9_999)

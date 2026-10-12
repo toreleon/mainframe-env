@@ -45,6 +45,11 @@ pub enum DecimalArithmeticContext {
     /// 34 digits, exponent range -9999..=9999, primitive truncation, and nine
     /// guard places for division.
     Decimal34V1,
+    /// COBOL COMPAT fixed-point expressions: 30 significant digits, truncating
+    /// excess fractional digits, with division using the full digit budget.
+    CobolCompatV2,
+    /// COBOL EXTEND fixed-point expressions: the same rules with 31 digits.
+    CobolExtendV2,
 }
 
 /// ABI used to decode and encode storage referenced by a decimal plan.
@@ -87,7 +92,7 @@ pub struct DecimalExecutionPolicy {
 }
 
 impl DecimalExecutionPolicy {
-    /// Current explicit policy matching COBOL `ARITH(COMPAT)` arithmetic.
+    /// Historical explicit 18-digit policy retained for existing v2 artifacts.
     #[must_use]
     pub const fn decimal18_v1() -> Self {
         Self {
@@ -98,7 +103,7 @@ impl DecimalExecutionPolicy {
         }
     }
 
-    /// Current explicit policy matching COBOL `ARITH(EXTEND)` arithmetic.
+    /// Historical explicit 34-digit policy retained for existing v2 artifacts.
     #[must_use]
     pub const fn decimal34_v1() -> Self {
         Self {
@@ -106,6 +111,24 @@ impl DecimalExecutionPolicy {
             storage_abi: DecimalStorageAbi::CobolNumericV1,
             receiver_update: DecimalReceiverUpdatePolicy::CapturedOperandsReceiverLocalV1,
             condition: DecimalConditionPolicy::CobolSizeErrorV1,
+        }
+    }
+
+    /// Fixed-point policy for newly compiled COBOL `ARITH(COMPAT)` programs.
+    #[must_use]
+    pub const fn cobol_compat_v2() -> Self {
+        Self {
+            arithmetic_context: DecimalArithmeticContext::CobolCompatV2,
+            ..Self::decimal18_v1()
+        }
+    }
+
+    /// Fixed-point policy for newly compiled COBOL `ARITH(EXTEND)` programs.
+    #[must_use]
+    pub const fn cobol_extend_v2() -> Self {
+        Self {
+            arithmetic_context: DecimalArithmeticContext::CobolExtendV2,
+            ..Self::decimal34_v1()
         }
     }
 
@@ -407,7 +430,10 @@ fn validate_policy(
         }
         (
             DecimalPlanWireVersion::PolicyV2,
-            DecimalArithmeticContext::Decimal18V1 | DecimalArithmeticContext::Decimal34V1,
+            DecimalArithmeticContext::Decimal18V1
+            | DecimalArithmeticContext::Decimal34V1
+            | DecimalArithmeticContext::CobolCompatV2
+            | DecimalArithmeticContext::CobolExtendV2,
         ) if policy.storage_abi == DecimalStorageAbi::CobolNumericV1
             && policy.receiver_update
                 == DecimalReceiverUpdatePolicy::CapturedOperandsReceiverLocalV1
@@ -436,6 +462,8 @@ fn encode_policy(
     writer.byte(match policy.arithmetic_context {
         DecimalArithmeticContext::Decimal18V1 => 1,
         DecimalArithmeticContext::Decimal34V1 => 2,
+        DecimalArithmeticContext::CobolCompatV2 => 3,
+        DecimalArithmeticContext::CobolExtendV2 => 4,
         DecimalArithmeticContext::LegacyCobolModuleV1 => {
             return Err(DecimalPlanCodecProblem::UnsupportedPolicy);
         }
@@ -463,6 +491,8 @@ fn decode_policy(
     let arithmetic_context = match reader.byte()? {
         1 => DecimalArithmeticContext::Decimal18V1,
         2 => DecimalArithmeticContext::Decimal34V1,
+        3 => DecimalArithmeticContext::CobolCompatV2,
+        4 => DecimalArithmeticContext::CobolExtendV2,
         _ => return Err(DecimalPlanCodecProblem::UnsupportedPolicy),
     };
     let storage_abi = match reader.byte()? {
@@ -1197,6 +1227,26 @@ mod tests {
             encode_legacy_decimal_assignment_plan(&noop, limits),
             Err(DecimalPlanCodecProblem::Malformed)
         );
+    }
+
+    #[test]
+    fn appended_cobol_policy_tags_round_trip_without_reinterpreting_old_tags() {
+        for (tag, policy) in [
+            (1, DecimalExecutionPolicy::decimal18_v1()),
+            (2, DecimalExecutionPolicy::decimal34_v1()),
+            (3, DecimalExecutionPolicy::cobol_compat_v2()),
+            (4, DecimalExecutionPolicy::cobol_extend_v2()),
+        ] {
+            let mut plan = complete_plan();
+            plan.policy = policy;
+            let bytes =
+                encode_decimal_assignment_plan(&plan, DecimalPlanLimits::default()).unwrap();
+            assert_eq!(bytes[7], tag);
+            assert_eq!(
+                decode_decimal_assignment_plan(&bytes, DecimalPlanLimits::default()).unwrap(),
+                plan
+            );
+        }
     }
 
     proptest! {

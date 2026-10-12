@@ -60,6 +60,8 @@ CardDemo participant ownership and batch completion boundary.
 | [0032](0032-selected-secondary-checkpoint-position.md) | selected secondary checkpoint occurrence witnesses composed with existing local backout | Proposed |
 | [0050](0050-host-effect-envelope-layout.md) | exclusive boxed outer MQI host payloads with unchanged canonical encoding | Proposed; compatibility validation pending |
 
+| [0052](0052-cobol-fixed-point-intermediate-precision.md) | explicit COBOL 30/31-digit intermediate policies separate from 18/31-digit data limits | Accepted with documented source assumptions |
+
 Parallel subsystem work allocated the same 0028 and 0029 numeric prefixes.
 Their distinct full filenames and subsystem-qualified labels identify each
 proposal; no historical decision body or reference has been replaced.

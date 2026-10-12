@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Separate COBOL fixed-point intermediate precision (COMPAT 30 digits, EXTEND 31) from declared-data limits (18/31), keep division digits until receiver conversion, and reject over-limit declarations and complete numeric literals with the selected decimal separator before publication (#158, #159). Programming Guide topics were unavailable offline; caps follow public IBM documentation and GnuCOBOL cross-checks."
