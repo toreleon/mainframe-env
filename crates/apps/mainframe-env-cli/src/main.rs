@@ -286,10 +286,6 @@ fn bundle(
         limits,
     )
     .map_err(|error| error.to_string())?;
-    if library_roots.is_empty() {
-        return SourceBundle::new(&logical, vec![file], sql.options(), Vec::new(), limits)
-            .map_err(|error| error.to_string());
-    }
     let mut files = vec![file];
     let mut libraries = Vec::with_capacity(library_roots.len() + 1);
     for (index, root) in library_roots.iter().enumerate() {
@@ -307,11 +303,15 @@ fn bundle(
         );
         files.extend(loaded.into_iter().map(|(_, file)| file));
     }
-    let abi = materialize_host_abi_libraries(
-        &[cics_abi_library(), db2_abi_library(), mq_abi_library()],
-        limits,
-    )
-    .map_err(|error| error.to_string())?;
+    let definitions = [cics_abi_library(), db2_abi_library(), mq_abi_library()];
+    // Db2 supplies SQLCA even when the application has no source libraries.
+    let definitions = if library_roots.is_empty() {
+        &definitions[1..2]
+    } else {
+        &definitions[..]
+    };
+    let abi =
+        materialize_host_abi_libraries(definitions, limits).map_err(|error| error.to_string())?;
     files.extend(abi.files);
     libraries.extend(abi.libraries);
     SourceBundle::with_libraries(
@@ -445,6 +445,137 @@ mod tests {
     #[test]
     fn cli_contract_is_well_formed() {
         Cli::command().debug_assert();
+    }
+
+    #[test]
+    fn sqlca_is_product_supplied_without_application_libraries() {
+        let fixture = Fixture::new();
+        let source = fixture.0.join("LGACDB01.cbl");
+        // GenApp-style fixed-format fragment. Db2 13 SQLCA topic unavailable
+        // offline; the existing Db2-owned host ABI is the layout authority.
+        fs::write(&source, "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. LGACDB01.\n       DATA DIVISION.\n       WORKING-STORAGE SECTION.\n           EXEC SQL INCLUDE SQLCA END-EXEC.\n       PROCEDURE DIVISION.\n           MOVE 0 TO SQLCODE.\n           MOVE '00000' TO SQLSTATE.\n           EXEC SQL SELECT 1 END-EXEC.\n           GOBACK.\n").unwrap();
+        let bundle = bundle(
+            &source,
+            Format::Fixed,
+            &[],
+            SqlPrecompile {
+                sql_precompile: true,
+                no_sql_precompile: false,
+            },
+        )
+        .unwrap();
+        let analysis = CobolCompiler::default().analyze(&bundle);
+        assert!(
+            analysis.diagnostics.is_empty(),
+            "{:?}",
+            analysis.diagnostics
+        );
+        assert_eq!(
+            bundle.resolve_library_member("SQLCA").unwrap().bytes(),
+            db2_abi_library().members[0].source.as_bytes(),
+        );
+        let semantic = analysis.semantic.unwrap();
+        assert_eq!(semantic.layout("SQLCA").unwrap().length, 136);
+        for (name, offset, length) in [
+            ("SQLCAID", 0, 8),
+            ("SQLCABC", 8, 4),
+            ("SQLCODE", 12, 4),
+            ("SQLERRM", 16, 72),
+            ("SQLERRML", 16, 2),
+            ("SQLERRMC", 18, 70),
+            ("SQLERRP", 88, 8),
+            ("SQLERRD", 96, 24),
+            ("SQLWARN", 120, 11),
+            ("SQLSTATE", 131, 5),
+        ] {
+            let layout = semantic.layout(name).unwrap();
+            assert_eq!((layout.offset, layout.length), (offset, length), "{name}");
+        }
+        for (index, suffix) in "0123456789A".chars().enumerate() {
+            let layout = semantic.layout(&format!("SQLWARN{suffix}")).unwrap();
+            assert_eq!((layout.offset, layout.length), (120 + index, 1));
+        }
+        for (name, digits) in [
+            ("SQLCABC", 9),
+            ("SQLCODE", 9),
+            ("SQLERRML", 4),
+            ("SQLERRD", 9),
+        ] {
+            let layout = semantic.layout(name).unwrap();
+            assert_eq!(
+                layout.usage,
+                mainframe_env_compiler::CobolUsage::NativeBinary
+            );
+            assert_eq!(layout.digits, digits);
+            assert!(layout.signed);
+        }
+        let sqlerrd = semantic.layout("SQLERRD").unwrap();
+        assert_eq!((sqlerrd.occurs, sqlerrd.element_length), (6, 4));
+        for flag in [None, Some("--sql-precompile")] {
+            let mut args = vec![
+                "mainframe-env",
+                "compile",
+                source.to_str().unwrap(),
+                "--format",
+                "fixed",
+            ];
+            if let Some(flag) = flag {
+                args.push(flag);
+            }
+            assert!(run(Cli::try_parse_from(args).unwrap()).is_ok());
+        }
+    }
+
+    #[test]
+    fn application_sqlca_precedes_product_sqlca_and_other_missing_includes_fail() {
+        let fixture = Fixture::new();
+        let source = fixture.0.join("SQLTEST.cbl");
+        let library = fixture.0.join("copybooks");
+        fs::create_dir_all(&library).unwrap();
+        fs::write(
+            library.join("SQLCA.cpy"),
+            "01 SQLCA. 05 APP-SQLCA PIC X VALUE 'A'.",
+        )
+        .unwrap();
+        let program = "IDENTIFICATION DIVISION. PROGRAM-ID. SQLTEST. DATA DIVISION. \
+            WORKING-STORAGE SECTION. EXEC SQL INCLUDE SQLCA END-EXEC. \
+            PROCEDURE DIVISION. DISPLAY APP-SQLCA. GOBACK.";
+        fs::write(&source, program).unwrap();
+        let result = compile(
+            &source,
+            Format::Free,
+            std::slice::from_ref(&library),
+            SqlPrecompile::default(),
+            CompilationMode::Executable,
+        )
+        .unwrap();
+        assert!(
+            matches!(result, CompilerResult::Published { .. }),
+            "{result:?}"
+        );
+        for member in ["SQLDA", "MISSING"] {
+            fs::write(
+                &source,
+                program.replace("INCLUDE SQLCA", &format!("INCLUDE {member}")),
+            )
+            .unwrap();
+            let CompilerResult::Failed { diagnostics, .. } = compile(
+                &source,
+                Format::Free,
+                &[],
+                SqlPrecompile::default(),
+                CompilationMode::Executable,
+            )
+            .unwrap() else {
+                panic!("missing {member} must fail");
+            };
+            assert!(
+                diagnostics.iter().any(|d| d
+                    .public_message()
+                    .contains(&format!("EXEC SQL INCLUDE member {member} was not found"))),
+                "{diagnostics:?}"
+            );
+        }
     }
 
     #[test]

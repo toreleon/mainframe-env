@@ -41,7 +41,8 @@ fn profile_intake_maps_gaps_and_verifies_pin() {
         "       05 ROW-KEY PIC X(2).\n",
     )
     .unwrap();
-    fs::write(dir.join("base/src/SQLCA.cbl"), "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. SQLCA.\n       DATA DIVISION.\n       WORKING-STORAGE SECTION.\n           EXEC SQL INCLUDE SQLCA END-EXEC.\n       PROCEDURE DIVISION.\n           GOBACK.\n").unwrap();
+    fs::write(dir.join("base/src/SQLCA.cbl"), "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. SQLCA.\n       DATA DIVISION.\n       WORKING-STORAGE SECTION.\n           EXEC SQL INCLUDE SQLCA END-EXEC.\n       PROCEDURE DIVISION.\n           MOVE 0 TO SQLCODE.\n           MOVE '00000' TO SQLSTATE.\n           GOBACK.\n").unwrap();
+    fs::write(dir.join("base/src/SQLDA.cbl"), "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. SQLDA.\n       DATA DIVISION.\n       WORKING-STORAGE SECTION.\n           EXEC SQL INCLUDE SQLDA END-EXEC.\n       PROCEDURE DIVISION.\n           GOBACK.\n").unwrap();
     fs::write(dir.join("base/src/TEST.jcl"), "//TEST JOB 1\n//STEP EXEC PGM=IDCAMS\n//SYSIN DD *\n DEFINE CLUSTER (NAME(TEST))\n/*\n//OTHER EXEC PGM=UNKNOWN\n//COPY EXEC PGM=IEBGENER\n//OUT DD DSNAME=<HLQ>.X,DISP=SHR\n//LIB JCLLIB ORDER=(<HLQ>.PROC)\n//PROC EXEC EXTERNAL\n").unwrap();
     fs::write(
         dir.join("base/src/TEST.bms"),
@@ -174,18 +175,27 @@ fn profile_intake_maps_gaps_and_verifies_pin() {
         "SQL include under group",
         &mut missing,
     );
+    let sqlca = members
+        .iter()
+        .find(|m| m["path"] == "base/src/SQLCA.cbl")
+        .unwrap();
+    assert_eq!(
+        sqlca["status"], "complete",
+        "product-supplied SQLCA: {sqlca}"
+    );
+    assert!(sqlca["diagnostics"].as_array().unwrap().is_empty());
     check(
         members
             .iter()
-            .find(|m| m["path"] == "base/src/SQLCA.cbl")
+            .find(|m| m["path"] == "base/src/SQLDA.cbl")
             .is_some_and(|m| {
                 m["diagnostics"]
                     .as_array()
                     .unwrap()
                     .iter()
-                    .any(|d| d["message"].as_str().unwrap_or("").contains("SQLCA"))
+                    .any(|d| d["message"].as_str().unwrap_or("").contains("SQLDA"))
             }),
-        "missing SQLCA explicit",
+        "missing SQLDA explicit",
         &mut missing,
     );
     check(

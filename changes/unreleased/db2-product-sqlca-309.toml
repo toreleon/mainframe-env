@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Supplied the Db2-owned 136-byte SQLCA for EXEC SQL INCLUDE in standalone CLI compilation and SQL corpus intake, preserving application precedence (#309); layout grounded in the existing host ABI and GnuCOBOL, with pinned Db2 13 SQLCA topics unavailable offline."
