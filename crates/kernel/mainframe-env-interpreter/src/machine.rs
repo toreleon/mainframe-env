@@ -52,6 +52,8 @@ mod decimal_commit;
 mod eib;
 #[cfg(test)]
 mod floating_insertion_tests;
+mod intrinsic_arguments;
+use intrinsic_arguments::split_function_arguments;
 mod layout_admission;
 mod layout_resolution;
 mod legacy_mq;
@@ -9860,84 +9862,6 @@ fn integer_value(coefficient: i128) -> CobolValue {
     })
 }
 
-fn split_function_arguments<'a>(
-    machine: &ReferenceMachine,
-    tokens: &'a [String],
-) -> Result<Vec<&'a [String]>, MachineProblem> {
-    if tokens.is_empty() {
-        return Ok(Vec::new());
-    }
-    let mut arguments = Vec::new();
-    let mut start = 0usize;
-    let mut depth = 0usize;
-    for (index, token) in tokens.iter().enumerate() {
-        match token.as_str() {
-            "(" => depth = depth.saturating_add(1),
-            ")" => {
-                depth = depth
-                    .checked_sub(1)
-                    .ok_or(MachineProblem::InvalidOperation)?
-            }
-            "," | ";" if depth == 0 => {
-                if start == index {
-                    return Err(MachineProblem::InvalidOperation);
-                }
-                arguments.push(&tokens[start..index]);
-                start = index + 1;
-            }
-            _ => {}
-        }
-    }
-    if depth != 0 || start == tokens.len() {
-        return Err(MachineProblem::InvalidOperation);
-    }
-    arguments.push(&tokens[start..]);
-    let mut inferred = Vec::new();
-    for argument in arguments {
-        inferred.extend(infer_function_arguments(machine, argument)?);
-    }
-    Ok(inferred)
-}
-
-fn infer_function_arguments<'a>(
-    machine: &ReferenceMachine,
-    tokens: &'a [String],
-) -> Result<Vec<&'a [String]>, MachineProblem> {
-    let arguments = vec![tokens];
-    let mut depth = 0usize;
-    let mut arithmetic = false;
-    for token in tokens {
-        match token.as_str() {
-            "(" => depth += 1,
-            ")" => depth = depth.saturating_sub(1),
-            "+" | "-" | "*" | "/" if depth == 0 => arithmetic = true,
-            _ => {}
-        }
-    }
-    if arithmetic && machine.eval_expression(tokens).is_ok() {
-        return Ok(arguments);
-    }
-    let mut inferred = Vec::new();
-    let mut at = 0usize;
-    while at < tokens.len() {
-        let end = (at + 1..=tokens.len()).rev().find(|end| {
-            let argument = &tokens[at..*end];
-            matches!(argument, [keyword] if matches!(keyword.as_str(), "LEADING" | "TRAILING"))
-                || machine.eval_function_argument(argument).is_ok()
-        });
-        let Some(end) = end else {
-            return if arithmetic && inferred.is_empty() {
-                Ok(arguments)
-            } else {
-                Err(MachineProblem::InvalidOperation)
-            };
-        };
-        inferred.push(&tokens[at..end]);
-        at = end;
-    }
-    Ok(inferred)
-}
-
 fn decimal_abs(mut value: Decimal) -> Result<Decimal, MachineProblem> {
     value.coefficient = value
         .coefficient
@@ -12370,6 +12294,67 @@ mod tests {
         }
     }
     #[test]
+    fn intrinsic_random_argument_is_evaluated_once() {
+        let machine = display_fixture();
+        let expected = CobolValue::Decimal(Decimal {
+            coefficient: 481999410520547004,
+            scale: 18,
+        });
+        // The standalone RANDOM path is unchanged from origin/main.
+        machine.random_state.set(Some(42));
+        assert_eq!(
+            machine.eval_value(&["FUNCTION".into(), "RANDOM".into()]),
+            Ok(expected.clone())
+        );
+        assert_eq!(machine.random_state.get(), Some(10481999410520546993));
+
+        for expression in [
+            "FUNCTION MAX ( FUNCTION RANDOM , 0 )",
+            "FUNCTION MAX ( FUNCTION RANDOM 0 )",
+            "FUNCTION MAX ( FUNCTION RANDOM ; 0 0 )",
+            "FUNCTION MAX ( FUNCTION RANDOM ( ) + 0 , 0 )",
+            "FUNCTION MAX ( FUNCTION MIN ( FUNCTION RANDOM , 1 ) , 0 )",
+        ] {
+            machine.random_state.set(Some(42));
+            let tokens = expression
+                .split_whitespace()
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            assert_eq!(
+                machine.eval_value(&tokens),
+                Ok(expected.clone()),
+                "{expression}"
+            );
+            assert_eq!(
+                machine.random_state.get(),
+                Some(10481999410520546993),
+                "{expression}"
+            );
+        }
+    }
+
+    #[test]
+    fn intrinsic_argument_boundaries_do_not_evaluate_functions() {
+        let machine = display_fixture();
+        for expression in [
+            "FUNCTION RANDOM , 0",
+            "FUNCTION RANDOM 0",
+            "FUNCTION RANDOM ( ) + 0 , 0",
+            "FUNCTION MIN ( FUNCTION RANDOM , 1 ) , 0",
+        ] {
+            machine.random_state.set(Some(42));
+            let tokens = expression
+                .split_whitespace()
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            let arguments = split_function_arguments(&machine, &tokens).unwrap();
+            assert_eq!(arguments.len(), 2, "{expression}");
+            assert_eq!(arguments[1], ["0"], "{expression}");
+            assert_eq!(machine.random_state.get(), Some(42), "{expression}");
+        }
+    }
+
+    #[test]
     fn list_intrinsics_evaluate_space_and_mixed_separators() {
         let mut machine = display_fixture();
         machine.implicit.insert("A".into(), integer_value(7));
@@ -12385,6 +12370,7 @@ mod tests {
             ("FUNCTION MIN ( A ( B * 4 ) )", -12),
             ("FUNCTION MAX ( TABLE-ITEM ( 1 ) , TABLE-ITEM ( 2 ) 3 )", 3),
             ("FUNCTION MIN ( OTHER-ID ( B * 4 ) )", -12),
+            ("FUNCTION MAX ( DFHRESP ( NORMAL ) , 1 )", 1),
         ] {
             let tokens = expression
                 .split_whitespace()
