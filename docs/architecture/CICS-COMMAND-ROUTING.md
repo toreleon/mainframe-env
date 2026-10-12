@@ -592,19 +592,25 @@ It returns terminal origin `TD`, retained local START origin `S ` or `SD`,
 bound START ATTACH origin `U `, or DPL origin `D ` or `DS`. Existing start-code
 bindings are validated and padded to two bytes. A facility-less task without
 retained origin, or a DPL context without SYNCONRETURN identity, fails closed.
-This follows IBM CICS TS 6.x
+The source reference is IBM CICS TS 6.x
 [`ASSIGN`, STARTCODE](https://www.ibm.com/docs/en/SSJL4D_6.x/reference-applications/commands-api/dfhp4_assign.html),
 catalog row `0011`, pinned in `ibm-cics-ts-6x-application-api-sources-a-2026-09-10`
-(`#312`). The output uses append-only tag `110`; existing tags retain their meaning.
+(`#312`). The pinned body was unavailable locally to the independent PR `#427`
+reviewer, so that review did not verify the STARTCODE value matrix against the
+body. The implemented values above still require verified source/effect evidence
+at acceptance. The output uses append-only tag `110`; existing tags retain their
+meaning.
 
 The GenApp `WRITEQ TS FROM(WRITE-MSG-L) LENGTH(23)` rejection remains when
 `WRITE-MSG-L` is `PIC X(13)`: LENGTH selects the number of bytes supplied by FROM,
 so this requests ten bytes beyond the owned area. The compiler reports
 `CICS WRITEQ TS LENGTH exceeds the FROM data area`; a length of 13 is admitted.
-This bounds protection follows the FROM/LENGTH contract in IBM CICS TS 6.x
+The FROM/LENGTH source reference is IBM CICS TS 6.x
 [`WRITEQ TS`](https://www.ibm.com/docs/en/SSJL4D_6.x/reference-applications/commands-api/dfhp4_writeqts.html),
 catalog row `0258`, pinned in `ibm-cics-ts-6x-application-api-sources-c-2026-09-10`
-(`#312`). It is a compiler safety check, not a claim that IBM diagnoses the same
+(`#312`). The pinned body was unavailable locally to the independent PR `#427`
+reviewer; the citation does not claim source verification by that review. The
+rejection is a compiler safety check, not a claim that IBM diagnoses the same
 source as a translation error. The caller must supply a sufficiently large area
 or correct the requested length.
 The legacy route admits only the source-valid option subset whose behavior is
