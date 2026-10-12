@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 241,
+    "markdown_documents": 244,
     "navigation_groups": 8,
-    "normative_documents": 99,
+    "normative_documents": 100,
     "xtask_commands": 163
   },
   "documents": [
@@ -349,8 +349,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 182,
-      "sha256": "sha256:df6fc9bbbd77a7f727823c1cd8a930a4bbef5bd2eab9253dd26d325e2e82ccf0",
+      "relative_links": 183,
+      "sha256": "sha256:28158325238278108924706334a670d0324a7ad094f443455e9acbc6f4d43a65",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -1455,6 +1455,18 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env unreleased CICS baseline lint integration (pending merge)",
+      "normative": true,
+      "owner": "CICS provider maintainers",
+      "path": "docs/decisions/0100-cics-borrowed-input-bundles.md",
+      "relative_links": 0,
+      "scope": "Rust callers of BTS effect transitions and partition input submission",
+      "sha256": "sha256:ce5cbdb328ac3777d962e359030a2cbb8c6e7f9c7032b65b7c2ce4e48abc54d1",
+      "status": "Proposed for the baseline lint repair",
+      "title": "ADR-0100: Group existing CICS arguments into borrowed inputs",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
       "relative_links": 53,
@@ -2196,6 +2208,22 @@
     },
     {
       "normative": false,
+      "path": "docs/reviews/BATCH-BASELINE-LINT-20261012.md",
+      "relative_links": 0,
+      "sha256": "sha256:7adb69a1832ce6a71ac3b5e701a54d278ba79a295acc115c2a72a84ff0ce00ff",
+      "title": "Batch baseline strict lint repair",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "docs/reviews/CICS-BASELINE-LINT-20261012.md",
+      "relative_links": 0,
+      "sha256": "sha256:1656b75a863d6d23e13feb7e757fcffd0d7d6b6df2df38e2c8de7c68efc0968e",
+      "title": "CICS baseline lint repair and Rust caller migration",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
       "path": "docs/reviews/CICS-COMMAND-BOUNDARIES.md",
       "relative_links": 0,
       "sha256": "sha256:b5aab20482f852f652eceefdb7a0ab9295e41ee6568046948585a6f279698ca8",
@@ -2310,7 +2338,7 @@
       "normative": false,
       "path": "docs/runbooks/VERIFICATION-WORKFLOW.md",
       "relative_links": 1,
-      "sha256": "sha256:ed0c332c80c2105c2c770f7af68f9101b86af63d644693b4f89d6aeb0ef70df9",
+      "sha256": "sha256:2c1579b0a6aca317de5869fd468254dd00110fe0d46d51338455d8a2e988ed71",
       "title": "Verification workflow",
       "xtask_commands": 1
     },
@@ -2782,6 +2810,10 @@
         {
           "label": "ADR-0050: Boxed shared host-effect payloads",
           "path": "docs/decisions/0050-host-effect-envelope-layout.md"
+        },
+        {
+          "label": "ADR-0100: Borrowed CICS input bundles",
+          "path": "docs/decisions/0100-cics-borrowed-input-bundles.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -3008,7 +3040,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:11657d5b50a3394d2cf58c698e5ce07f83d5dc6bbd8574fe67c2da15b43c86ae",
+  "registry_sha256": "sha256:80a9e9352c38b0b208779bf252718ced3398de060482dee9e54e5f99b608962b",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

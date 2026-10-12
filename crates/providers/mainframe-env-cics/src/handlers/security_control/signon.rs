@@ -218,9 +218,9 @@ fn language(request: &CicsRequest) -> Result<(String, [u8; 1]), HostProblem> {
         return Err(condition("INVREQ", 16, 28));
     }
     let (code, nat) = match (long.as_deref(), short.as_deref()) {
-        (Some("ENU"), _) | (None, None) | (None, Some("E")) => ("ENU", [b'E']),
-        (Some("CHS"), _) | (None, Some("C")) => ("CHS", [b'C']),
-        (Some("JPN"), _) | (None, Some("J")) => ("JPN", [b'J']),
+        (Some("ENU"), _) | (None, None) | (None, Some("E")) => ("ENU", *b"E"),
+        (Some("CHS"), _) | (None, Some("C")) => ("CHS", *b"C"),
+        (Some("JPN"), _) | (None, Some("J")) => ("JPN", *b"J"),
         _ => return Err(condition("INVREQ", 16, 28)),
     };
     Ok((code.into(), nat))

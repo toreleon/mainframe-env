@@ -167,7 +167,7 @@ impl DefaultProgramRouter {
                 fence: mq.fence,
                 mq_limits: &profile,
                 content_digest: admitted.executable.content_id().as_bytes(),
-                semantic_identity: &semantic,
+                semantic_identity: semantic,
                 manifest_payload_digest: &admitted.metadata.manifest_payload_digest,
                 catalog: exact(catalog),
             },
@@ -467,7 +467,7 @@ impl NativeRootHooks for Hooks<'_, '_> {
                 RootEntry::Retained {
                     root: root.clone(),
                     frame: frame.clone(),
-                    native: Some(proof.claim().clone()),
+                    native: Some(Box::new(proof.claim().clone())),
                 },
             );
         }

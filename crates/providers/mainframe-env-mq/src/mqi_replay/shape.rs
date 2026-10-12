@@ -222,7 +222,8 @@ pub(super) enum Output {
     PublicationsRequested {
         count: usize,
     },
-    NoOutput {},
+    #[serde(rename = "NoOutput")]
+    Empty {},
     Connected {
         connection: MqHandleObservation,
     },
@@ -327,7 +328,7 @@ impl Output {
             MqMqiOutput::PublicationsRequested { count } => {
                 Self::PublicationsRequested { count: *count }
             }
-            MqMqiOutput::NoOutput => Self::NoOutput {},
+            MqMqiOutput::NoOutput => Self::Empty {},
             MqMqiOutput::Connected(value) => Self::Connected {
                 connection: MqHandleObservation::capture_connection(*value)?,
             },
@@ -420,7 +421,7 @@ impl Output {
             },
             Self::UnitOfWork { unit } => MqMqiOutput::UnitOfWork { unit },
             Self::PublicationsRequested { count } => MqMqiOutput::PublicationsRequested { count },
-            Self::NoOutput {} => MqMqiOutput::NoOutput,
+            Self::Empty {} => MqMqiOutput::NoOutput,
             Self::Connected { connection } => {
                 MqMqiOutput::Connected(connection.historical_connection()?)
             }

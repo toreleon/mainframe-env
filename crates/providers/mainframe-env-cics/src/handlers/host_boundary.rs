@@ -217,13 +217,12 @@ fn command_ready(state: &State, run_unit: &RunUnitId) -> Result<(), HostProblem>
             .task_dispatch
             .require_available_session(&task.session)?;
     }
-    if let Some(claim) = state.task_dispatch.claims.get(run_unit) {
-        if claim.thread != std::thread::current().id()
+    if let Some(claim) = state.task_dispatch.claims.get(run_unit)
+        && (claim.thread != std::thread::current().id()
             || claim.commands != claim.loans.len()
-            || claim.loans.last().is_none_or(|loan| loan.actor.is_none())
-        {
-            return Err(HostProblem::Unauthorized);
-        }
+            || claim.loans.last().is_none_or(|loan| loan.actor.is_none()))
+    {
+        return Err(HostProblem::Unauthorized);
     }
     Ok(())
 }
@@ -594,8 +593,7 @@ impl CicsService {
                     .program_occurrence
                     .checked_add(1)
                     .filter(|value| {
-                        *value
-                            <= u64::from(run.current_program.effect_invocation.limits.max_effects)
+                        *value <= run.current_program.effect_invocation.limits.max_effects
                     })
                     .ok_or(HostProblem::ResourceExhausted)?;
                 let sequence = run.current_program.program_occurrence;

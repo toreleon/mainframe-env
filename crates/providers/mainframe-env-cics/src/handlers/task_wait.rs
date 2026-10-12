@@ -509,12 +509,12 @@ fn request_events(
     }
     let count = u32::try_from(count).map_err(|_| invreq(3))?;
     let bytes = request.arguments["ECBLIST"].bytes();
-    if bytes.is_empty() || bytes.len() % 8 != 0 {
+    if bytes.is_empty() || !bytes.len().is_multiple_of(8) {
         return Err(HostProblem::Malformed);
     }
     let mut indices = BTreeSet::new();
     let mut events = Vec::with_capacity(bytes.len() / 8);
-    for entry in bytes.chunks_exact(8) {
+    for entry in bytes.as_chunks::<8>().0 {
         let index = u32::from_be_bytes(entry[..4].try_into().expect("four-byte chunk"));
         let address = entry[4..].try_into().expect("four-byte chunk");
         if index >= count || !indices.insert(index) {

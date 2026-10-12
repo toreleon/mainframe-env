@@ -17,6 +17,7 @@ impl MqDeliveryKernel {
     /// Private migration projection of already queued data without issuing PUT.
     /// Reuses the sole entry allocator and checkpoint validation, including
     /// narrowed target limits.
+    #[cfg(test)]
     pub(crate) fn import_legacy_queues(
         catalog: &MqObjectCatalog,
         limits: MqDeliveryLimits,

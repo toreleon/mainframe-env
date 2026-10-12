@@ -227,7 +227,9 @@ fn validate_request(request: &CicsRequest) -> Result<&'static str, HostProblem> 
     Ok(selected[0])
 }
 
-pub(super) fn url_encoded_pairs(bytes: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>, HostProblem> {
+type UrlEncodedPairs = Vec<(Vec<u8>, Vec<u8>)>;
+
+pub(super) fn url_encoded_pairs(bytes: &[u8]) -> Result<UrlEncodedPairs, HostProblem> {
     if bytes.len() > 4096 {
         return Err(HostProblem::ResourceExhausted);
     }

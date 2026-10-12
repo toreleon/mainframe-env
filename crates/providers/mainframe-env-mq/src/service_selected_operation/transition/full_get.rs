@@ -71,20 +71,23 @@ fn controls(get: &MqMqiFullGet) -> Result<MqGetContract, HostProblem> {
 }
 
 pub(super) fn prepare(
-    state: &rich_state::RichStoredState,
-    runtime: &mut SelectedRuntime,
-    invocation: &Invocation,
-    logical: &LogicalBatchOwner,
-    owner: MqHandleOwner,
+    context: Preparation<'_, '_>,
     get: &MqMqiFullGet,
-    now: u64,
-    authorizer: &dyn EnterpriseAuthorizer,
     next: &mut Candidate,
     qualified: bool,
-    service: &MqService,
-    frame: FrameLease,
-    admitted: &crate::mqi_admission::MqMqiAdmitted<'_>,
 ) -> Result<(), HostProblem> {
+    let Preparation {
+        state,
+        runtime,
+        invocation,
+        logical,
+        owner,
+        now,
+        authorizer,
+        service,
+        frame,
+        admitted,
+    } = context;
     let request = controls(get)?;
     let binding = require_object(
         runtime,

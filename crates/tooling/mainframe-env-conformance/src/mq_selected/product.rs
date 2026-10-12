@@ -45,10 +45,11 @@ impl HostProvider for Port {
             _ => return failed(HostProblem::Malformed),
         };
         let before = self.store.list_provider_state_prefix("mq-", 4096).unwrap();
-        if self.deny_put && occurrence.envelope().request.call() == MqMqiCall::Put {
-            if let Err(e) = self.saf.revoke() {
-                return failed(e);
-            }
+        if self.deny_put
+            && occurrence.envelope().request.call() == MqMqiCall::Put
+            && let Err(e) = self.saf.revoke()
+        {
+            return failed(e);
         }
         let observed = match self.saf.scope(invocation, &effect, "original") {
             Ok(scope) => {

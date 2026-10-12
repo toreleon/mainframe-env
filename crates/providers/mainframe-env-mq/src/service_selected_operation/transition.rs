@@ -86,22 +86,38 @@ pub(super) fn remove_retired_bindings(runtime: &mut SelectedRuntime, connection:
         .retain(|binding| binding.connection != connection);
 }
 
+pub(super) struct Preparation<'a, 'effect> {
+    pub(super) state: &'a rich_state::RichStoredState,
+    pub(super) runtime: &'a mut SelectedRuntime,
+    pub(super) invocation: &'a Invocation,
+    pub(super) logical: &'a LogicalBatchOwner,
+    pub(super) owner: MqHandleOwner,
+    pub(super) now: u64,
+    pub(super) authorizer: &'a dyn EnterpriseAuthorizer,
+    pub(super) service: &'a MqService,
+    pub(super) frame: FrameLease,
+    pub(super) admitted: &'a crate::mqi_admission::MqMqiAdmitted<'effect>,
+}
+
 pub(super) fn prepare(
-    state: &rich_state::RichStoredState,
-    runtime: &mut SelectedRuntime,
-    invocation: &Invocation,
-    logical: &LogicalBatchOwner,
-    owner: MqHandleOwner,
+    context: Preparation<'_, '_>,
     request: &MqMqiRequest,
     key: &str,
-    now: u64,
-    authorizer: &dyn EnterpriseAuthorizer,
     limits: MqLimits,
-    service: &MqService,
-    frame: FrameLease,
-    admitted: &crate::mqi_admission::MqMqiAdmitted<'_>,
     capture_rfh2: &mut dyn FnMut() -> Result<Option<MqRfh2Profile>, HostProblem>,
 ) -> Result<Candidate, HostProblem> {
+    let Preparation {
+        state,
+        runtime,
+        invocation,
+        logical,
+        owner,
+        now,
+        authorizer,
+        service,
+        frame,
+        admitted,
+    } = context;
     if logical.owner() != owner {
         return Err(HostProblem::Unauthorized);
     }
@@ -178,19 +194,21 @@ pub(super) fn prepare(
         // Complete profile/payload preflight occurs before clock, pending or
         // cursor changes can become a publication candidate.
         full_get::prepare(
-            state,
-            runtime,
-            invocation,
-            logical,
-            owner,
+            Preparation {
+                state,
+                runtime,
+                invocation,
+                logical,
+                owner,
+                now,
+                authorizer,
+                service,
+                frame,
+                admitted,
+            },
             get,
-            now,
-            authorizer,
             &mut next,
             matches!(request, MqMqiRequest::QualifiedFullGet(_)),
-            service,
-            frame,
-            admitted,
         )?;
         return Ok(next);
     }
@@ -200,8 +218,20 @@ pub(super) fn prepare(
     ) {
         // Complete producer/profile/source checks precede even candidate expiry.
         full_put::prepare(
-            state, runtime, invocation, logical, owner, request, now, authorizer, &mut next,
-            service, frame, admitted,
+            Preparation {
+                state,
+                runtime,
+                invocation,
+                logical,
+                owner,
+                now,
+                authorizer,
+                service,
+                frame,
+                admitted,
+            },
+            request,
+            &mut next,
         )?;
         return Ok(next);
     }

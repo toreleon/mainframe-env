@@ -19,7 +19,7 @@ pub use outboard::{
     CicsOutboardDestinationDefinition, CicsOutboardKind, CicsOutboardRecord, CicsOutboardSnapshot,
 };
 pub(in crate::service) use partition_set::release_task as release_partition_set_for_task;
-pub use partition_set::{CicsPartitionDefinition, CicsPartitionSetDefinition};
+pub use partition_set::{CicsPartitionDefinition, CicsPartitionInput, CicsPartitionSetDefinition};
 
 #[derive(Clone, Debug, Default)]
 pub(in crate::service) struct TerminalInput {

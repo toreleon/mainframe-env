@@ -54,6 +54,28 @@ parallel full Cargo invocations just to seek reassurance. Cleanup is for measure
 pressure; cache and parallelism changes need elapsed-time and peak-storage
 measurements first.
 
+For compiler/interpreter lint-only refactors, check all targets and features with
+`cargo clippy -p mainframe-env-compiler -p mainframe-env-interpreter --all-targets --all-features --locked -- -D warnings`
+and select regressions from the changed consumers. Private pending-state layout
+changes must retain checkpoint eligibility and serialized bytes. The legacy MQ
+checkpoint regression binds schema-12 bytes to the pre-refactor main fixture;
+typed MQ and pending machines continue to refuse checkpoint encoding.
+
+For MQ provider lint repairs, use
+`cargo clippy -p mainframe-env-mq --all-targets --all-features --locked -- -D warnings`.
+Before gating a private helper with `cfg(test)`, inspect its callers across the
+current tree and relevant reserved dependency heads. Retain production models,
+authority checks and durable codecs; retain fixture helper bodies and exercise
+their consumers. Replay byte goldens and recovery/authorization regressions
+verify private representation refactors without changing storage schemas.
+
+For server lint repairs, run
+`cargo clippy -p mainframe-env-server --all-targets --all-features --locked -- -D warnings`
+and select server tests for the touched configured MQ/native, replay and scoped
+state consumers. Private retained-root topology holds opaque claims in process.
+Representation changes must preserve the original claim cloned into native child
+admission and retain the existing store, canonical setup and checkpoint codecs.
+
 See the [IBM cache guide](IBM-DOCS-CACHE.md).
 
 ## Effective Conformance IR inspection

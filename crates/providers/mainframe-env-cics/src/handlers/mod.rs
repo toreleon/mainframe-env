@@ -359,7 +359,8 @@ pub use task_enqueue::CicsEnqueueModelDefinition;
 pub(super) use task_enqueue::{load_enqueue_models, release_uow as release_uow_enqueues};
 pub use terminal_control::{
     CicsBmsControlSnapshot, CicsOutboardDestinationDefinition, CicsOutboardKind,
-    CicsOutboardRecord, CicsOutboardSnapshot, CicsPartitionDefinition, CicsPartitionSetDefinition,
+    CicsOutboardRecord, CicsOutboardSnapshot, CicsPartitionDefinition, CicsPartitionInput,
+    CicsPartitionSetDefinition,
 };
 pub(super) use terminal_control::{
     TerminalInput, invoke as invoke_terminal_control, release_bms_message_for_task,

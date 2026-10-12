@@ -276,10 +276,10 @@ impl ExecutionCoordinator {
                 ))
             });
         }
-        if !progress.retained {
-            if let Some(store) = &self.store {
-                progress.protect(store, progress.last_tick);
-            }
+        if !progress.retained
+            && let Some(store) = &self.store
+        {
+            progress.protect(store, progress.last_tick);
         }
         failed_outcome(problem(
             FailureCategory::UnknownOutcome,
@@ -349,13 +349,13 @@ impl NativeProgress<'_> {
             return;
         }
         self.retained = true;
-        if let Some(claim) = &self.claim {
-            if let Ok(Some(execution)) = store.get_execution(&self.original.execution_id) {
-                // A failed clock observation does not guess a newer tick. Keep
-                // the actual durable owner even when fencing cannot be written.
-                if tick != 0 {
-                    let _ = store.fence_root_driver(claim, &execution, tick);
-                }
+        if let Some(claim) = &self.claim
+            && let Ok(Some(execution)) = store.get_execution(&self.original.execution_id)
+        {
+            // A failed clock observation does not guess a newer tick. Keep
+            // the actual durable owner even when fencing cannot be written.
+            if tick != 0 {
+                let _ = store.fence_root_driver(claim, &execution, tick);
             }
         }
         let _ = catch_unwind(AssertUnwindSafe(|| {

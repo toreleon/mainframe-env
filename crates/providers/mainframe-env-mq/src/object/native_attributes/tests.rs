@@ -234,13 +234,17 @@ fn catalog_native2_strict_required_unknown_duplicate_schema_counts_and_bytes() {
         MqObjectCatalog::decode(&[bytes.as_slice(), b" null"].concat(), Default::default())
             .is_err()
     );
-    let mut limits = MqObjectLimits::default();
-    limits.max_persisted_bytes = bytes.len() - 1;
+    let limits = MqObjectLimits {
+        max_persisted_bytes: bytes.len() - 1,
+        ..Default::default()
+    };
     assert!(MqObjectCatalog::decode(&bytes, limits).is_err());
     let mut wrong = v;
     wrong["native_attributes"]["queues"] =
         serde_json::json!(vec![wrong["native_attributes"]["queues"][0].clone(); 2]);
-    let mut limits = MqObjectLimits::default();
-    limits.max_objects = 1;
+    let limits = MqObjectLimits {
+        max_objects: 1,
+        ..Default::default()
+    };
     assert!(MqObjectCatalog::decode(&serde_json::to_vec(&wrong).unwrap(), limits).is_err());
 }

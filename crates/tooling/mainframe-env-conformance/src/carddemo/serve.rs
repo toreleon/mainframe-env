@@ -31,7 +31,7 @@ pub fn serve_carddemo_application(
     state_dir: &Path,
     listen: SocketAddr,
 ) -> Result<(), CorpusProblem> {
-    verify_carddemo_corpus(&corpus_dir, inventory_path)?;
+    verify_carddemo_corpus(corpus_dir, inventory_path)?;
     fs::create_dir_all(state_dir).map_err(serve_problem)?;
     let state_dir = fs::canonicalize(state_dir).map_err(serve_problem)?;
     let database = state_dir.join("state.db");
@@ -88,7 +88,7 @@ pub fn serve_carddemo_application(
             }
             installed
         } else {
-            install_base_online_authorities(&server, &corpus_dir, &definition)?;
+            install_base_online_authorities(&server, corpus_dir, &definition)?;
             let installed = server.install_online_application(definition).map_err(terminal_problem)?;
             store.put_provider_state(ProviderStateRecord {
                 namespace: "carddemo-live-install".into(),

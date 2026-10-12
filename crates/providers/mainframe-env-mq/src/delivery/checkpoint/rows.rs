@@ -8,8 +8,10 @@
 
 use super::*;
 use crate::service::{OBJECT_ROW_SCHEMA, ObjectRow, encode_object_row};
+#[cfg(test)]
+use mainframe_env_store_api::ProviderStateStore;
 use mainframe_env_store_api::{
-    ProviderStateMutation, ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
+    ProviderStateMutation, ProviderStateRecord, ProviderStateWrite, StoreError,
 };
 use serde::de::DeserializeOwned;
 use sha2::{Digest, Sha256};
@@ -167,6 +169,7 @@ pub(crate) struct DeliveryRowDelta {
 }
 
 impl DeliveryRowDelta {
+    #[cfg(test)]
     pub(crate) fn mutations(&self) -> &[ProviderStateMutation] {
         &self.mutations
     }
@@ -228,6 +231,7 @@ impl DeliveryRows {
     /// Explicit creation only. The service must authorize creating/migrating this
     /// authority and reconcile legacy state before calling this. Never falls back
     /// from failed restore. Orphan rich rows prohibit initialization.
+    #[cfg(test)]
     pub(crate) fn initialize(
         store: &dyn ProviderStateStore,
         kernel: &MqDeliveryKernel,
@@ -244,6 +248,7 @@ impl DeliveryRows {
 
     /// A single prefix scan is a backend snapshot across all row families.
     /// `expected` must come from the service's current catalog/lease authority.
+    #[cfg(test)]
     pub(crate) fn load(
         store: &dyn ProviderStateStore,
         catalog: &MqObjectCatalog,

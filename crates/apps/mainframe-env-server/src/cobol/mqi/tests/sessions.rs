@@ -6,6 +6,12 @@ use mainframe_env_execution_api::{
 };
 mod lookup;
 
+type SessionFixture = (
+    SessionGuard,
+    Arc<Mutex<Vec<ExecutionOutcome>>>,
+    Arc<Mutex<Vec<HostProblem>>>,
+);
+
 struct Stop;
 impl Machine for Stop {
     type Effect = EffectRequest;
@@ -115,14 +121,7 @@ impl InstalledMqFrameSession for ObserveSession {
         }
     }
 }
-fn guard(
-    fail: bool,
-    panic: bool,
-) -> (
-    SessionGuard,
-    Arc<Mutex<Vec<ExecutionOutcome>>>,
-    Arc<Mutex<Vec<HostProblem>>>,
-) {
+fn guard(fail: bool, panic: bool) -> SessionFixture {
     let events = Arc::new(Mutex::new(vec![]));
     let aborts = Arc::new(Mutex::new(vec![]));
     (
@@ -148,7 +147,10 @@ fn every_raw_category_is_preserved_once_before_transport_invalidation() {
         let frame = guard.frame(&invocation).unwrap();
         assert!(frame.profile(&invocation).is_ok());
         assert_eq!(guard.finish(&raw), Ok(()));
-        assert_eq!(events.lock().unwrap().as_slice(), &[raw.clone()]);
+        assert_eq!(
+            events.lock().unwrap().as_slice(),
+            std::slice::from_ref(&raw)
+        );
         assert_eq!(frame.profile(&invocation), Err(HostProblem::Unauthorized));
         assert_eq!(guard.finish(&raw), Err(HostProblem::UnknownOutcome));
         assert_eq!(

@@ -394,7 +394,7 @@ impl ReferenceMachine {
                 },
                 mutation: self.mutation()?,
             })),
-            PendingKind::MqMqi(targets),
+            PendingKind::MqMqi(Box::new(targets)),
         )?;
         if let Some(Pending {
             kind: PendingKind::MqMqi(targets),
@@ -649,10 +649,10 @@ impl ReferenceMachine {
             .mqi
             .as_mut()
             .ok_or(MachineProblem::UnexpectedHostResult)?;
-        if let (Some(connection), Some(wire)) = (connection, wire) {
-            if state.connections.insert(wire, connection).is_none() {
-                state.next_connection += 1;
-            }
+        if let (Some(connection), Some(wire)) = (connection, wire)
+            && state.connections.insert(wire, connection).is_none()
+        {
+            state.next_connection += 1;
         }
         if completed && let Some(wire) = targets.disconnected {
             state.connections.remove(&wire);

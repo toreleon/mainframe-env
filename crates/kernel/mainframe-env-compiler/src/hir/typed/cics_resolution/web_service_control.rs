@@ -138,15 +138,18 @@ pub(super) fn validate(clauses: &Clauses, operation: P) -> Resolution<()> {
         ("REFPARMS", "REFPARMSLEN"),
         ("METADATA", "METADATALEN"),
     ] {
-        let applies = match (data, operation) {
+        let applies = matches!(
+            (data, operation),
             ("SCOPE", P::InvokeService)
-            | ("FAULTCODESTR" | "ROLE" | "FAULTACTOR" | "DETAIL", P::SoapFaultCreate)
-            | ("SUBCODESTR", P::SoapFaultAdd)
-            | ("REFPARMS" | "METADATA", P::WsaEprCreate)
-            | ("EPRFROM", P::WsaContextBuild) => true,
-            ("FAULTSTRING", P::SoapFaultCreate | P::SoapFaultAdd) => true,
-            _ => false,
-        };
+                | (
+                    "FAULTCODESTR" | "ROLE" | "FAULTACTOR" | "DETAIL",
+                    P::SoapFaultCreate
+                )
+                | ("SUBCODESTR", P::SoapFaultAdd)
+                | ("REFPARMS" | "METADATA", P::WsaEprCreate)
+                | ("EPRFROM", P::WsaContextBuild)
+                | ("FAULTSTRING", P::SoapFaultCreate | P::SoapFaultAdd)
+        );
         if applies && clauses.contains_key(data) != clauses.contains_key(length) {
             return Err(ResolutionFailure::Invalid(format!(
                 "CICS {operation:?} requires {data} with {length}"

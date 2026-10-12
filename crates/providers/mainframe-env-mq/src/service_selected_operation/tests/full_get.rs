@@ -99,7 +99,7 @@ fn rich(store: &dyn PlatformStore) -> rich_state::RichStoredState {
     else {
         panic!("rich authority")
     };
-    state
+    *state
 }
 impl FullFixture {
     fn new(sqlite: bool, version: i32, cp: bool, messages: Vec<MqFullMessage>) -> Self {
