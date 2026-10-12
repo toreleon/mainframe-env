@@ -218,14 +218,14 @@ impl LosslessSyntax {
 }
 
 #[derive(Clone, Debug, Default)]
-struct NormalizedSource {
-    text: String,
-    origins: Vec<SourceOrigin>,
+pub(super) struct NormalizedSource {
+    pub(super) text: String,
+    pub(super) origins: Vec<SourceOrigin>,
 }
 
 #[derive(Clone, Debug)]
-struct DecodedSource {
-    text: String,
+pub(super) struct DecodedSource {
+    pub(super) text: String,
     source_offsets: Option<Vec<usize>>,
 }
 
@@ -516,7 +516,7 @@ fn normalize_source(
     Ok(output)
 }
 
-fn normalize_decoded_source(
+pub(super) fn normalize_decoded_source(
     source: &DecodedSource,
     file: &SourceFile,
     debugging: bool,
@@ -652,7 +652,7 @@ fn unclosed_quote(text: &str) -> Option<u8> {
     quote
 }
 
-fn push_origin(
+pub(super) fn push_origin(
     origins: &mut Vec<SourceOrigin>,
     output: Range<usize>,
     source: &LogicalPath,
@@ -670,7 +670,10 @@ fn push_origin(
     });
 }
 
-fn decode_file(file: &SourceFile, limits: SyntaxLimits) -> Result<DecodedSource, SyntaxProblem> {
+pub(super) fn decode_file(
+    file: &SourceFile,
+    limits: SyntaxLimits,
+) -> Result<DecodedSource, SyntaxProblem> {
     match file.encoding() {
         SourceEncoding::Utf8 => Ok(DecodedSource {
             text: String::from_utf8(file.bytes().to_vec())
@@ -695,7 +698,7 @@ fn decode_file(file: &SourceFile, limits: SyntaxLimits) -> Result<DecodedSource,
     }
 }
 
-fn debugging_mode(bundle: &SourceBundle) -> bool {
+pub(super) fn debugging_mode(bundle: &SourceBundle) -> bool {
     bundle
         .options()
         .get("cobol.debugging-mode")
@@ -779,34 +782,9 @@ fn expand_copies(
         if stack.len() >= limits.max_copy_depth {
             return Err(SyntaxProblem::CopyDepthExceeded);
         }
-        let (dependency, generated) =
-            match resolve_copy_member(bundle, &name, parsed.library.as_deref()) {
-                Ok(file) => (file, None),
-                Err(SyntaxProblem::CopyNotFound(_)) => {
-                    resolve_bms_copy(bundle, &name, parsed.library.as_deref(), limits)?
-                }
-                Err(problem) => return Err(problem),
-            };
+        let (dependency, normalized, format) =
+            crate::bms::prepare_copy(bundle, &name, parsed.library.as_deref(), limits)?;
         stack.push(stack_key);
-        let format = if generated.is_some() {
-            SourceFormat::Free
-        } else {
-            dependency.format()
-        };
-        let normalized = if let Some(text) = generated {
-            let mut normalized = NormalizedSource::default();
-            push_origin(
-                &mut normalized.origins,
-                0..text.len(),
-                dependency.path(),
-                0..dependency.bytes().len(),
-            );
-            normalized.text = text;
-            normalized
-        } else {
-            let decoded = decode_file(dependency, limits)?;
-            normalize_decoded_source(&decoded, dependency, debugging_mode(bundle), limits)?
-        };
         let prepared = directives::prepare_source(&normalized, false, artifacts, limits)?;
         let mut expanded = expand_copies(
             &prepared,
@@ -854,91 +832,6 @@ fn expand_copies(
         return Err(SyntaxProblem::SourceLimitExceeded);
     }
     Ok(output)
-}
-
-fn resolve_copy_member<'a>(
-    bundle: &'a SourceBundle,
-    name: &str,
-    library: Option<&str>,
-) -> Result<&'a SourceFile, SyntaxProblem> {
-    for library in bundle
-        .libraries()
-        .iter()
-        .filter(|candidate| library.is_none_or(|name| candidate.name().eq_ignore_ascii_case(name)))
-    {
-        let matches = library
-            .members()
-            .iter()
-            .filter_map(|path| bundle.files().iter().find(|file| file.path() == path))
-            .filter(|file| !is_bms(file))
-            .filter(|file| {
-                file.path()
-                    .as_str()
-                    .rsplit('/')
-                    .next()
-                    .unwrap_or(file.path().as_str())
-                    .split('.')
-                    .next()
-                    .is_some_and(|stem| stem.eq_ignore_ascii_case(name))
-            })
-            .collect::<Vec<_>>();
-        match matches.as_slice() {
-            [file] => return Ok(*file),
-            [] => {}
-            _ => return Err(SyntaxProblem::AmbiguousCopy(name.into())),
-        }
-    }
-    Err(SyntaxProblem::CopyNotFound(name.into()))
-}
-
-fn is_bms(file: &SourceFile) -> bool {
-    file.path()
-        .as_str()
-        .rsplit('.')
-        .next()
-        .is_some_and(|extension| extension.eq_ignore_ascii_case("bms"))
-}
-
-fn resolve_bms_copy<'a>(
-    bundle: &'a SourceBundle,
-    name: &str,
-    library: Option<&str>,
-    limits: SyntaxLimits,
-) -> Result<(&'a SourceFile, Option<String>), SyntaxProblem> {
-    for library in bundle
-        .libraries()
-        .iter()
-        .filter(|candidate| library.is_none_or(|name| candidate.name().eq_ignore_ascii_case(name)))
-    {
-        let mut matches = Vec::new();
-        for file in library
-            .members()
-            .iter()
-            .filter_map(|path| bundle.files().iter().find(|file| file.path() == path))
-            .filter(|file| is_bms(file))
-        {
-            let decoded = decode_file(file, limits)?;
-            let mapset = crate::bms::source_mapset_name(&decoded.text)
-                .map_err(SyntaxProblem::BmsSymbolic)?;
-            if mapset.is_some_and(|mapset| mapset.eq_ignore_ascii_case(name)) {
-                matches.push((file, decoded.text));
-            }
-        }
-        match matches.as_slice() {
-            [(file, source)] => {
-                let text = crate::BmsMapset::parse(source)
-                    .and_then(|mapset| mapset.symbolic_copybook())
-                    .map_err(SyntaxProblem::BmsSymbolic)?;
-                if text.len() > limits.max_expanded_bytes {
-                    return Err(SyntaxProblem::SourceLimitExceeded);
-                }
-                return Ok((file, Some(text)));
-            }
-            [] => {}
-            _ => return Err(SyntaxProblem::AmbiguousCopy(name.into())),
-        }
-    }
-    Err(SyntaxProblem::CopyNotFound(name.into()))
 }
 
 fn append_conditional_slice(

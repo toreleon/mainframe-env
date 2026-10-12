@@ -1,3 +1,3 @@
 schema_version = "mainframe-env.changelog-fragment@1"
 category = "added"
-summary = "Generate COBOL BMS symbolic-map copybooks and resolve COPY <mapset> from BMS library inputs (#310). DFHMDF and ADS topics were unavailable offline; layouts are verified against 17 shipped CardDemo copybook pairs, and unverified editing pictures and extended attributes fail closed."
+summary = "Generate COBOL BMS symbolic-map copybooks and resolve COPY <mapset> from BMS library inputs (#310). COPY discovery tolerates unsupported operands in unrelated BMS members while selected sources fail closed. DFHMDF and ADS topics were unavailable offline; layouts are verified against 17 shipped CardDemo copybook pairs, and unverified editing pictures and extended attributes fail closed."

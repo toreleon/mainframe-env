@@ -4,6 +4,12 @@
 //! DFHMDF and ADS topic bodies were unavailable offline; field layouts are
 //! corroborated by the external assembled copybooks, never by a licensed run.
 
+use crate::syntax::{
+    NormalizedSource, SyntaxLimits, SyntaxProblem, debugging_mode, decode_file,
+    normalize_decoded_source, push_origin,
+};
+use mainframe_env_source::{SourceBundle, SourceFile, SourceFormat};
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{self, Write};
 
@@ -258,6 +264,120 @@ impl BmsMapset {
     }
 }
 
+/// Resolves ordinary COPY members first, then generates a selected BMS mapset.
+pub(crate) fn prepare_copy<'a>(
+    bundle: &'a SourceBundle,
+    name: &str,
+    library: Option<&str>,
+    limits: SyntaxLimits,
+) -> std::result::Result<(&'a SourceFile, NormalizedSource, SourceFormat), SyntaxProblem> {
+    let (dependency, generated) = match resolve_copy_member(bundle, name, library) {
+        Ok(file) => (file, None),
+        Err(SyntaxProblem::CopyNotFound(_)) => resolve_bms_copy(bundle, name, library, limits)?,
+        Err(problem) => return Err(problem),
+    };
+    if let Some(text) = generated {
+        let mut normalized = NormalizedSource::default();
+        push_origin(
+            &mut normalized.origins,
+            0..text.len(),
+            dependency.path(),
+            0..dependency.bytes().len(),
+        );
+        normalized.text = text;
+        Ok((dependency, normalized, SourceFormat::Free))
+    } else {
+        let decoded = decode_file(dependency, limits)?;
+        let normalized =
+            normalize_decoded_source(&decoded, dependency, debugging_mode(bundle), limits)?;
+        Ok((dependency, normalized, dependency.format()))
+    }
+}
+
+fn resolve_copy_member<'a>(
+    bundle: &'a SourceBundle,
+    name: &str,
+    library: Option<&str>,
+) -> std::result::Result<&'a SourceFile, SyntaxProblem> {
+    for library in bundle
+        .libraries()
+        .iter()
+        .filter(|candidate| library.is_none_or(|name| candidate.name().eq_ignore_ascii_case(name)))
+    {
+        let matches = library
+            .members()
+            .iter()
+            .filter_map(|path| bundle.files().iter().find(|file| file.path() == path))
+            .filter(|file| !is_bms(file))
+            .filter(|file| {
+                file.path()
+                    .as_str()
+                    .rsplit('/')
+                    .next()
+                    .unwrap_or(file.path().as_str())
+                    .split('.')
+                    .next()
+                    .is_some_and(|stem| stem.eq_ignore_ascii_case(name))
+            })
+            .collect::<Vec<_>>();
+        match matches.as_slice() {
+            [file] => return Ok(*file),
+            [] => {}
+            _ => return Err(SyntaxProblem::AmbiguousCopy(name.into())),
+        }
+    }
+    Err(SyntaxProblem::CopyNotFound(name.into()))
+}
+
+fn is_bms(file: &SourceFile) -> bool {
+    file.path()
+        .as_str()
+        .rsplit('.')
+        .next()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("bms"))
+}
+
+fn resolve_bms_copy<'a>(
+    bundle: &'a SourceBundle,
+    name: &str,
+    library: Option<&str>,
+    limits: SyntaxLimits,
+) -> std::result::Result<(&'a SourceFile, Option<String>), SyntaxProblem> {
+    for library in bundle
+        .libraries()
+        .iter()
+        .filter(|candidate| library.is_none_or(|name| candidate.name().eq_ignore_ascii_case(name)))
+    {
+        let mut matches = Vec::new();
+        for file in library
+            .members()
+            .iter()
+            .filter_map(|path| bundle.files().iter().find(|file| file.path() == path))
+            .filter(|file| is_bms(file))
+        {
+            let decoded = decode_file(file, limits)?;
+            let mapset = source_mapset_name(&decoded.text).map_err(SyntaxProblem::BmsSymbolic)?;
+            if mapset.is_some_and(|mapset| mapset.eq_ignore_ascii_case(name)) {
+                matches.push((file, decoded.text));
+            }
+        }
+        match matches.as_slice() {
+            [(file, source)] => {
+                let text = BmsMapset::parse(source)
+                    .and_then(|mapset| mapset.symbolic_copybook())
+                    .map_err(SyntaxProblem::BmsSymbolic)?;
+                if text.len() > limits.max_expanded_bytes {
+                    return Err(SyntaxProblem::SourceLimitExceeded);
+                }
+                return Ok((file, Some(text)));
+            }
+            [] => {}
+            _ => return Err(SyntaxProblem::AmbiguousCopy(name.into())),
+        }
+    }
+    Err(SyntaxProblem::CopyNotFound(name.into()))
+}
+
 fn prefix(text: &mut String, enabled: bool) {
     if enabled {
         text.push_str("           02 FILLER PIC X(12).\n");
@@ -365,10 +485,47 @@ fn picture(options: &BTreeMap<String, String>, key: &str, length: usize) -> Resu
 }
 
 pub(crate) fn source_mapset_name(source: &str) -> Result<Option<String>> {
-    Ok(statements(source)?
-        .into_iter()
-        .find(|s| s.operation == "DFHMSD")
-        .and_then(|s| s.name))
+    if source.len() > 4 * 1024 * 1024 {
+        return Err(BmsSymbolicProblem::LimitExceeded);
+    }
+    if !source.is_ascii() {
+        return invalid("non-ASCII BMS source");
+    }
+    // Discovery reads only statement headers. Unselected members need not use
+    // supported operands; the selected source still goes through full parsing.
+    let mut continued = false;
+    for line in source.lines() {
+        if line.trim().is_empty() || line.starts_with('*') {
+            continue;
+        }
+        let continuation = line
+            .as_bytes()
+            .get(71)
+            .is_some_and(|b| matches!(b, b'-' | b'X' | b'*'));
+        let was_continued = std::mem::replace(&mut continued, continuation);
+        if was_continued {
+            continue;
+        }
+        let content = if continuation { &line[..71] } else { line };
+        let mut words = content.split_ascii_whitespace();
+        let Some(first) = words.next() else { continue };
+        if first.eq_ignore_ascii_case("DFHMSD") {
+            return Ok(None);
+        }
+        if ["DFHMDI", "DFHMDF", "TITLE", "END"]
+            .iter()
+            .any(|operation| first.eq_ignore_ascii_case(operation))
+        {
+            continue;
+        }
+        if words
+            .next()
+            .is_some_and(|word| word.eq_ignore_ascii_case("DFHMSD"))
+        {
+            return Ok(Some(first.to_ascii_uppercase()));
+        }
+    }
+    Ok(None)
 }
 
 fn statements(source: &str) -> Result<Vec<Statement>> {

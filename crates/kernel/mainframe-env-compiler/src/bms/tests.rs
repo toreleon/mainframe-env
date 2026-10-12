@@ -202,6 +202,53 @@ fn malformed_sources_and_inconsistent_extensions_are_rejected() {
 }
 
 #[test]
+fn mapset_name_discovery_does_not_parse_unrelated_operands() {
+    let unrelated = "OTHER DFHMSD TYPE=MAP\nX MYMAC 1,2\n DFHMSD TYPE=FINAL\n";
+    assert_eq!(
+        source_mapset_name(unrelated).unwrap().as_deref(),
+        Some("OTHER")
+    );
+}
+
+#[test]
+fn copy_requested_mapset_ignores_unsupported_unrelated_member() {
+    let requested = source(
+        "MODE=INOUT",
+        "SCREEN DFHMDI SIZE=(24,80)\nFIELD DFHMDF LENGTH=1\n",
+    );
+    let unrelated = "OTHER DFHMSD TYPE=MAP\nX MYMAC 1,2\n DFHMSD TYPE=FINAL\n";
+    let main = program("TESTSET", "MOVE 'A' TO FIELDO.");
+    let analysis = CobolCompiler::default().analyze(&bundle(
+        &main,
+        &[(
+            "MAPS",
+            &[("requested.bms", &requested), ("unrelated.bms", unrelated)],
+        )],
+    ));
+    assert!(
+        analysis.diagnostics.is_empty(),
+        "{:?}",
+        analysis.diagnostics
+    );
+    assert!(analysis.syntax.unwrap().semantic_text().contains("SCREENI"));
+}
+
+#[test]
+fn copy_selected_mapset_with_unsupported_operands_fails_closed() {
+    let selected = "TESTSET DFHMSD TYPE=MAP\nX MYMAC 1,2\n DFHMSD TYPE=FINAL\n";
+    let main = program("TESTSET", "");
+    let analysis = CobolCompiler::default()
+        .analyze(&bundle(&main, &[("MAPS", &[("selected.bms", selected)])]));
+    assert!(analysis.syntax.is_none());
+    assert_eq!(analysis.diagnostics.len(), 1);
+    assert!(
+        analysis.diagnostics[0]
+            .public_message()
+            .contains("invalid BMS symbolic map: operand 1")
+    );
+}
+
+#[test]
 fn copybook_precedence_library_qualification_ambiguity_and_diagnostics() {
     let bms = source(
         "MODE=INOUT",
@@ -304,13 +351,9 @@ fn descriptions(text: &str) -> Vec<Description> {
 }
 
 #[test]
+#[ignore = "requires CARDDEMO_CORPUS_DIR; run explicitly with --ignored; shipped-copybook comparison earns no conformance credit"]
 fn carddemo_all_shipped_symbolic_copybooks_match_structurally() {
-    let Some(corpus) = std::env::var_os("CARDDEMO_CORPUS_DIR") else {
-        eprintln!(
-            "SKIP: CARDDEMO_CORPUS_DIR unset; shipped-copybook comparison earns no conformance credit"
-        );
-        return;
-    };
+    let corpus = std::env::var_os("CARDDEMO_CORPUS_DIR").expect("CARDDEMO_CORPUS_DIR required");
     let root = Path::new(&corpus).join("app");
     let mut sources = std::fs::read_dir(root.join("bms"))
         .unwrap()
@@ -343,13 +386,9 @@ fn carddemo_all_shipped_symbolic_copybooks_match_structurally() {
 }
 
 #[test]
+#[ignore = "requires GENAPP_CORPUS_DIR; run explicitly with --ignored; external ssmap compile earns no conformance credit"]
 fn genapp_ssmap_library_source_compiles_and_publishes_copy_ssmap() {
-    let Some(corpus) = std::env::var_os("GENAPP_CORPUS_DIR") else {
-        eprintln!(
-            "SKIP: GENAPP_CORPUS_DIR unset; external ssmap compile earns no conformance credit"
-        );
-        return;
-    };
+    let corpus = std::env::var_os("GENAPP_CORPUS_DIR").expect("GENAPP_CORPUS_DIR required");
     let bms = std::fs::read_to_string(Path::new(&corpus).join("base/src/ssmap.bms")).unwrap();
     let mapset = BmsMapset::parse(&bms).unwrap();
     assert_eq!(mapset.name(), "SSMAP");
