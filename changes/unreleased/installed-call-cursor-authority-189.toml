@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Commit installed CALL dataset cursors atomically with retained instance state and the replay receipt; reject divergent legacy cursor recovery records instead of restoring stale cursors (#189)."
