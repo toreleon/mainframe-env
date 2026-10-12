@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Updated server regression consumers of named CICS effect and partition inputs and removed redundant test imports without changing product behavior."

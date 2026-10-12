@@ -521,6 +521,8 @@ fn load_receipt(
 /// Reclaim only receipts past an operator-supplied safe watermark and absent
 /// from retained checkpoint/effect references. A full scan is an explicit
 /// saturation error rather than an unsafe partial deletion.
+// Private fixture retention control; no new embedding API is promoted by lint cleanup.
+#[cfg(test)]
 pub fn prune_issue_device_receipts(
     store: &dyn ProviderStateStore,
     safe_watermark_tick: u64,

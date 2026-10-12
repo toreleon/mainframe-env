@@ -16,7 +16,6 @@ pub use conversation_protocol::{
 pub use event_wait::{CicsEventPostMode, CicsEventPurgeMode};
 pub use service::bts_browse;
 pub use service::bts_lifecycle;
-pub use service::issue_device;
 pub use service::{
     CONVERSATION_RECORD_VERSION, CONVERSATION_REPLAY_NAMESPACE, CONVERSATION_STATE_NAMESPACE,
     CicsConversationTransport, ConversationAttachHeader, ConversationConnectFrame,

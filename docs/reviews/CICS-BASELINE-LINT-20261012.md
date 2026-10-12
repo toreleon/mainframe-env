@@ -23,18 +23,20 @@ The receiving methods still validate these values in the original order.
 csrf_token, input, now_tick)` accepts that input without changing authentication,
 partition selection, cursor bounds, session CAS, or expiry handling.
 
-CICS callers are migrated here. Embeddings must wrap their existing argument
-expressions in these named inputs; a manager-owned server migration is required
-before checking the integrated tree. No durable data migration is required.
+CICS and server regression callers are migrated here. Embeddings must wrap their
+existing argument expressions in these named inputs. No durable data migration
+is required.
 
 ## Compiled source authorities
 
-The existing device provisioning, LU6.1 owner assignment, and safe receipt pruning
-functions remain production code. The `issue_device` module and its pruning
-function are exported so embeddings can use those authorities. This is an additive
-Rust surface, not an implementation of an embedding configuration workflow or a
-promotion of whole-command compatibility. Existing validation and retention
-watermark/protected-key rules remain unchanged.
+The existing private fixture setup, LU6.1 owner assignment setup, and receipt
+pruning controls retain their implementations under `cfg(test)`. Their call sites
+are test-only in current main and the reserved Foundation branch. The lint repair
+does not export the private device module or promote its embedding configuration
+workflow. Production load/invoke/finish validation and durable state stay intact;
+the Foundation owner still controls future public provisioning and retention
+integration. The named effect and partition inputs above are the only new public
+Rust types needed for caller migration.
 
 Private process-definition retry options, operator message options, parsed calendar
 fields, supplemental web-service writes, and simple return-type aliases replace

@@ -32,7 +32,7 @@ pub(in crate::service) use host_boundary::{
 };
 mod interval;
 mod interval_control;
-pub mod issue_device;
+mod issue_device;
 pub use issue_device::IssuePassTransfer;
 #[cfg(test)]
 pub(in crate::service) use issue_device::{

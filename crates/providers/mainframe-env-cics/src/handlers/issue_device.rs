@@ -12,7 +12,6 @@ use std::collections::BTreeSet;
 mod route;
 pub(in crate::service) use route::finish_task;
 pub(in crate::service) use route::invoke;
-pub use route::prune_issue_device_receipts;
 
 pub const ISSUE_DEVICE_NAMESPACE: &str = "cics-issue-device-v1";
 const MAX_ROW_BYTES: usize = 64 * 1024;
@@ -172,6 +171,8 @@ impl IssueDeviceDefinition {
 }
 
 impl IssueDeviceRecord {
+    // Fixture setup; source authority stays private until its owning work is integrated.
+    #[cfg(test)]
     pub fn new(definition: IssueDeviceDefinition) -> Result<Self, IssueDeviceProblem> {
         let record = Self {
             schema_version: 1,
@@ -258,6 +259,8 @@ impl IssueDeviceRecord {
         }))
     }
 
+    // Fixture setup; source authority stays private until its owning work is integrated.
+    #[cfg(test)]
     pub fn install(&self, store: &dyn ProviderStateStore) -> Result<(), StoreError> {
         if self.version != 1 {
             return Err(StoreError::IncompatibleVersion);
@@ -595,6 +598,8 @@ impl IssueDeviceRecord {
         Ok(())
     }
 
+    // Fixture setup; source authority stays private until its owning work is integrated.
+    #[cfg(test)]
     pub fn assign_lu61_owner(&mut self, run_unit: &str) -> Result<(), IssueDeviceProblem> {
         self.active()?;
         if self.definition.kind != IssueDeviceKind::Lu61 {
