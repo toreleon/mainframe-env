@@ -89,11 +89,13 @@ pub(in crate::service) fn invoke(
         run.invocation.run_unit_id.as_str(),
         run.invocation.principal.id().as_str(),
         text,
-        console,
-        routes,
-        action,
-        maximum_reply,
-        deadline_tick,
+        authority::MessageOptions {
+            console,
+            routes,
+            action,
+            maximum_reply,
+            deadline_tick,
+        },
         mutation.idempotency_key.as_str(),
         digest,
     )?;

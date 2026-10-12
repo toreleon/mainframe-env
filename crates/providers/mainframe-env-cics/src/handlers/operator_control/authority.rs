@@ -42,20 +42,31 @@ pub(in crate::service::handlers) struct OperatorMessage {
     pub version: u64,
 }
 
+pub(super) struct MessageOptions {
+    pub console: Option<String>,
+    pub routes: Vec<u8>,
+    pub action: Option<u8>,
+    pub maximum_reply: Option<usize>,
+    pub deadline_tick: Option<u64>,
+}
+
 impl OperatorMessage {
     pub(super) fn new(
         execution: &str,
         run_unit: &str,
         principal: &str,
         text: Vec<u8>,
-        console: Option<String>,
-        routes: Vec<u8>,
-        action: Option<u8>,
-        maximum_reply: Option<usize>,
-        deadline_tick: Option<u64>,
+        options: MessageOptions,
         effect_key: &str,
         request_digest: [u8; 32],
     ) -> Result<Self, HostProblem> {
+        let MessageOptions {
+            console,
+            routes,
+            action,
+            maximum_reply,
+            deadline_tick,
+        } = options;
         let hash = Sha256::digest([effect_key.as_bytes(), &request_digest].concat());
         let record = Self {
             schema: SCHEMA.into(),
@@ -340,11 +351,13 @@ mod tests {
             "run-1",
             "ALICE",
             b"READY FOR OPERATOR".to_vec(),
-            Some("OPER".into()),
-            vec![],
-            Some(2),
-            maximum_reply,
-            maximum_reply.map(|_| 50),
+            MessageOptions {
+                console: Some("OPER".into()),
+                routes: vec![],
+                action: Some(2),
+                maximum_reply,
+                deadline_tick: maximum_reply.map(|_| 50),
+            },
             "effect-1",
             [7; 32],
         )

@@ -37,14 +37,17 @@ impl<'a> BtsLifecycleStore<'a> {
         process_name: &str,
         parent_id: &str,
         definition: &BtsChildDefinition,
-        run_unit: &str,
-        owner_execution: &str,
-        owner_principal: &str,
-        replay_key: &str,
-        request_digest: [u8; 32],
+        effect: BtsEffectInput<'_>,
     ) -> Result<String, HostProblem> {
         definition.validate()?;
         validate_activity_id(parent_id)?;
+        let BtsEffectInput {
+            run_unit,
+            owner_execution,
+            owner_principal,
+            replay_key,
+            request_digest,
+        } = effect;
         validate_identifier(run_unit, 256)?;
         validate_identifier(owner_execution, 256)?;
         validate_identifier(owner_principal, 256)?;
@@ -310,11 +313,13 @@ mod tests {
             .mutate_process(
                 "TYPE",
                 "ORDER",
-                "UOW2",
-                "EXEC2",
-                "USER",
-                "start",
-                [1; 32],
+                crate::bts_lifecycle::BtsEffectInput {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "start",
+                    request_digest: [1; 32],
+                },
                 |process| {
                     process.start(&root, None, true)?;
                     Ok(BtsReply::normal())
@@ -338,7 +343,17 @@ mod tests {
         };
         let id = authority
             .define_child(
-                "TYPE", "ORDER", &root, &child, "UOW2", "EXEC2", "USER", "define", [2; 32],
+                "TYPE",
+                "ORDER",
+                &root,
+                &child,
+                crate::bts_lifecycle::BtsEffectInput {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "define",
+                    request_digest: [2; 32],
+                },
             )
             .unwrap();
         assert_eq!(id.len(), 52);
@@ -349,7 +364,17 @@ mod tests {
         ));
         let replay = authority
             .define_child(
-                "TYPE", "ORDER", &root, &child, "UOW2", "EXEC2", "USER", "define", [2; 32],
+                "TYPE",
+                "ORDER",
+                &root,
+                &child,
+                crate::bts_lifecycle::BtsEffectInput {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "define",
+                    request_digest: [2; 32],
+                },
             )
             .unwrap();
         assert_eq!(replay, id);
@@ -360,11 +385,13 @@ mod tests {
                     "ORDER",
                     &root,
                     &child,
-                    "UOW2",
-                    "EXEC2",
-                    "USER",
-                    "different",
-                    [3; 32]
+                    crate::bts_lifecycle::BtsEffectInput {
+                        run_unit: "UOW2",
+                        owner_execution: "EXEC2",
+                        owner_principal: "USER",
+                        replay_key: "different",
+                        request_digest: [3; 32]
+                    }
                 )
                 .is_err()
         );
@@ -411,7 +438,17 @@ mod tests {
         };
         let id = authority
             .define_child(
-                "TYPE", "ORDER", &root, &child, "UOW2", "EXEC2", "USER", "define", [2; 32],
+                "TYPE",
+                "ORDER",
+                &root,
+                &child,
+                crate::bts_lifecycle::BtsEffectInput {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "define",
+                    request_digest: [2; 32],
+                },
             )
             .unwrap();
         authority
@@ -442,22 +479,26 @@ mod tests {
                     transid: "BTS2".into(),
                     userid: "USER".into(),
                 },
-                "UOW2",
-                "EXEC2",
-                "USER",
-                "define",
-                [2; 32],
+                crate::bts_lifecycle::BtsEffectInput {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "define",
+                    request_digest: [2; 32],
+                },
             )
             .unwrap();
         authority
             .mutate_process(
                 "TYPE",
                 "ORDER",
-                "UOW2",
-                "EXEC2",
-                "USER",
-                "suspend-child",
-                [3; 32],
+                crate::bts_lifecycle::BtsEffectInput {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "suspend-child",
+                    request_digest: [3; 32],
+                },
                 |process| {
                     process.set_suspended(&child, true)?;
                     Ok(BtsReply::normal())

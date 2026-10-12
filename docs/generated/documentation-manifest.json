@@ -1,6 +1,6 @@
 {
   "counts": {
-    "markdown_documents": 241,
+    "markdown_documents": 242,
     "navigation_groups": 8,
     "normative_documents": 99,
     "xtask_commands": 163
@@ -2192,6 +2192,14 @@
       "relative_links": 0,
       "sha256": "sha256:1072431b2e885c84a5a683fd4c4ac55698ad7830f88ca5352595563c9c528112",
       "title": "Publication source probe",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "docs/reviews/CICS-BASELINE-LINT-20261012.md",
+      "relative_links": 0,
+      "sha256": "sha256:a319a7dd15ec95e24ab330ff893a254c17953ab8e995b759aaab84de5d4297ea",
+      "title": "CICS baseline lint repair and Rust caller migration",
       "xtask_commands": 0
     },
     {

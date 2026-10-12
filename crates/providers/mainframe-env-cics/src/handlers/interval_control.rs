@@ -1264,7 +1264,6 @@ mod tests {
         reader.optional_text(8).unwrap();
         reader.boolean().unwrap();
         let state_at = reader.at;
-        drop(reader);
         let mut unknown = encoded;
         unknown[state_at] = 8;
         assert_eq!(

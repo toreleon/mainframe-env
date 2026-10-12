@@ -169,10 +169,7 @@ pub(super) fn text_name(
             {
                 return Err(HostProblem::Malformed);
             }
-            Ok(
-                String::from_utf8(bytes.to_ascii_uppercase())
-                    .map_err(|_| HostProblem::Malformed)?,
-            )
+            String::from_utf8(bytes.to_ascii_uppercase()).map_err(|_| HostProblem::Malformed)
         })
         .transpose()
 }
@@ -196,7 +193,7 @@ pub(super) fn recipients(
     let mut candidates = BTreeSet::new();
     let mut failed = 0;
     if let Some(list) = request.arguments.get("LIST") {
-        for entry in list.bytes().chunks_exact(16) {
+        for entry in list.bytes().as_chunks::<16>().0 {
             if entry[10..16] != [b' '; 6] {
                 return Err(condition("INVREQ", 16));
             }

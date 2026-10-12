@@ -340,8 +340,8 @@ fn validate_context(context: &CicsTcpipContext) -> Result<(), HostProblem> {
     {
         return Err(HostProblem::Malformed);
     }
-    if let Some(certificate) = &context.certificate {
-        if context.ssl_type != CicsTcpipSslType::Clientauth
+    if let Some(certificate) = &context.certificate
+        && (context.ssl_type != CicsTcpipSslType::Clientauth
             || context.authenticate != CicsTcpipAuthenticate::Certificauth
             || certificate.der.len() > MAX_CERTIFICATE_BYTES
             || !valid_der_envelope(&certificate.der)
@@ -357,10 +357,9 @@ fn validate_context(context: &CicsTcpipContext) -> Result<(), HostProblem> {
                     })
             })
             || !valid_certificate_name(&certificate.owner)
-            || !valid_certificate_name(&certificate.issuer)
-        {
-            return Err(HostProblem::Malformed);
-        }
+            || !valid_certificate_name(&certificate.issuer))
+    {
+        return Err(HostProblem::Malformed);
     }
     Ok(())
 }

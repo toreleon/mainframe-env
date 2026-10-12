@@ -58,10 +58,10 @@ pub(super) fn invoke(
         run.invocation.run_unit_id.as_str(),
         run.invocation.execution_id.as_str(),
         run.invocation.principal.id().as_str(),
-    )? {
-        if current.process_type == process_type && current.process_name == process_name {
-            return Err(condition("INVREQ", 16, 22));
-        }
+    )? && current.process_type == process_type
+        && current.process_name == process_name
+    {
+        return Err(condition("INVREQ", 16, 22));
     }
     service.authorize(
         run,
