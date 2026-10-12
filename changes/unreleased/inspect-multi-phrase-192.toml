@@ -1,3 +1,3 @@
 schema_version = "mainframe-env.changelog-fragment@1"
 category = "fixed"
-summary = "Apply every INSPECT TALLYING and REPLACING phrase in scan order, consuming matched characters once and rejecting malformed trailing phrases (#192)."
+summary = "Apply every INSPECT TALLYING and REPLACING phrase in scan order, consuming matched characters once and rejecting malformed trailing phrases (#192). Retain the mixed LEADING/ALL/CHARACTERS tally of 6 based on hash-verified IBM Enterprise COBOL 6.5 baseline ibm-enterprise-cobol-6.5-2026-05-31 topics rlpsinsp, rlpsinspa and rlpsinspb; the reported GnuCOBOL result of 7 is not the oracle for this assertion."

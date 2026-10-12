@@ -116,9 +116,7 @@ fn inspect_unparseable_trailing_phrase_is_rejected_before_mutation() {
 }
 
 #[test]
-fn inspect_mixed_tallying_consumes_each_character_once() {
-    // Pinned IBM 6.5 rlpsinspb comparison cycle: CHARACTERS is the fallback.
-    // GnuCOBOL 3.2 returns 7 here; IBM's first-match consumption gives 6.
+fn inspect_rlpsinspb_mixed_tallying_consumes_each_character_once() {
     let mut machine = inspect_machine("AABACA");
     machine
         .inspect_op(&arguments("TALLYING R FOR LEADING 'A' ALL 'B' CHARACTERS"))
