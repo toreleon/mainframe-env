@@ -1,6 +1,6 @@
 {
   "counts": {
-    "markdown_documents": 242,
+    "markdown_documents": 243,
     "navigation_groups": 8,
     "normative_documents": 99,
     "xtask_commands": 163
@@ -2192,6 +2192,14 @@
       "relative_links": 0,
       "sha256": "sha256:1072431b2e885c84a5a683fd4c4ac55698ad7830f88ca5352595563c9c528112",
       "title": "Publication source probe",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "docs/reviews/BATCH-BASELINE-LINT-20261012.md",
+      "relative_links": 0,
+      "sha256": "sha256:7adb69a1832ce6a71ac3b5e701a54d278ba79a295acc115c2a72a84ff0ce00ff",
+      "title": "Batch baseline strict lint repair",
       "xtask_commands": 0
     },
     {
