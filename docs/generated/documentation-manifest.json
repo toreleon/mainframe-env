@@ -385,7 +385,7 @@
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
       "relative_links": 25,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:b7d66ce43c278928cb3e63488945b8d7bcb9c9731e2b2d01b0634f832cdb4f0d",
+      "sha256": "sha256:9b253ea2f3362d2e6999e50d7c82b4454a50a56d42935ee01b92a2d61590fd15",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -1526,7 +1526,7 @@
       "normative": false,
       "path": "docs/delivery/WORK-AUDIT-2026-10-11.md",
       "relative_links": 81,
-      "sha256": "sha256:3520c46266fc97af3d51ca60da7cbe46e0e603d79d24c296aa10abc58485122c",
+      "sha256": "sha256:27d59095f72a116ae45046f03684055541530830d6fbe474285ae395ac51de08",
       "title": "Roadmap and contribution audit — 2026-10-11",
       "xtask_commands": 0
     },
@@ -1637,8 +1637,8 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/cics/application-api-status.md",
-      "relative_links": 34,
-      "sha256": "sha256:e3f3393deb90c99696ea028e276dad937001af74f1bb73c56d0a87b63a8b0fc3",
+      "relative_links": 35,
+      "sha256": "sha256:342de3f6eba6414d6861142d1b7a800cb4a3dbc5edfba45419d0609c1704b19a",
       "title": "CICS — Application API progress",
       "xtask_commands": 5
     },

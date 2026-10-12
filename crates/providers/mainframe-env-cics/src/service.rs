@@ -3361,6 +3361,8 @@ impl<'a> Reader<'a> {
 
 #[cfg(test)]
 mod tests {
+    mod purge_message;
+
     fn activate_get_scope_process(cics: &CicsService, invocation: &Invocation) {
         use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess, BtsReply};
         let authority = BtsLifecycleStore::new(cics.store.as_ref());
