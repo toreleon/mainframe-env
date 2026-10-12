@@ -15,6 +15,7 @@ mod recovery_tests;
 mod retention_maintenance;
 
 pub use cobol::{
+    CicsProtectedCompiledDispatch, CicsProtectedCompiledHost, CicsProtectedCompiledProgram,
     ConfiguredInstalledMqHost, DefaultProgramRouter, InstalledBatchAdmission,
     InstalledMqFrameSession, InstalledMqHostBounds, ProgramExecutionControl,
     ProgramMqHostAdmission, compatible_system_services, default_program_router,

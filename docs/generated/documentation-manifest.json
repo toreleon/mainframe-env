@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 257,
+    "markdown_documents": 260,
     "navigation_groups": 8,
-    "normative_documents": 118,
+    "normative_documents": 121,
     "xtask_commands": 162
   },
   "documents": [
@@ -341,8 +341,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 199,
-      "sha256": "sha256:99b91719557595b187e1b50b716ce09ca49af99059f786cb4177ecad2fc85ef1",
+      "relative_links": 202,
+      "sha256": "sha256:bda036911646e3cd466c0cd6bb7e27693375c3c30486bb872d9e6ff2c000ef98",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -1627,6 +1627,30 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env optional trusted Rust dispatch embedding; ordinary CICS command paths remain unchanged",
+      "normative": true,
+      "owner": "CICS runtime and privileged compiled-program embedding maintainers",
+      "path": "docs/decisions/0066-cics-current-program-borrowed-task-custody.md",
+      "relative_links": 0,
+      "scope": "explicit per-effect borrowed custody of an already registered and synchronized current root Run",
+      "sha256": "sha256:3ed5412ae75c1279098039e990d258fb4e64eac0488cfcd96b9b342f3482c3b0",
+      "status": "proposed; infrastructure prerequisite, not MQ application or subsystem semantic acceptance.",
+      "title": "0066. Borrowed current CICS program task custody",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env optional execute_resumable_with_dispatch_control entry",
+      "normative": true,
+      "owner": "interpreter coordinator and privileged Rust dispatch embedding maintainers",
+      "path": "docs/decisions/0067-durable-first-dispatch-borrowed-intent.md",
+      "relative_links": 0,
+      "scope": "opt-in wrapping of the actual first keyed durable HostCall dispatch",
+      "sha256": "sha256:5ccb20e61aa8e6179ace9bb2090adf1d0ddb92b9584d4046dc835742eaae53c1",
+      "status": "proposed; infrastructure prerequisite, not protected native-root or MQ acceptance.",
+      "title": "0067. Borrowed durable first-dispatch Intent",
+      "xtask_commands": 0
+    },
+    {
       "applies_from": "mainframe-env 0.2.0 local application profile composition",
       "normative": true,
       "owner": "application composition and RACF storage maintainers",
@@ -1648,6 +1672,18 @@
       "sha256": "sha256:bdef10d0fa35db2319dacd5d466df8cf1cc5d0d37f2507f1618391fe60409a39",
       "status": "proposed finite first-party contract; implementation and controls unrun",
       "title": "ADR-0069: Owned local Db2 catalog composition",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env opt-in compiled CICS first protected dispatch",
+      "normative": true,
+      "owner": "CICS task, compiled program router and coordinator/store boundary maintainers",
+      "path": "docs/decisions/0070-compiled-cics-first-protected-dispatch.md",
+      "relative_links": 0,
+      "scope": "one validated installed initial CICS machine and its first protected external dispatch",
+      "sha256": "sha256:bdee360c2dce4db42dd830958516fd94ae69e51cf5cfffdbf5546491eb85c02c",
+      "status": "Proposed; source-only draft, not integrated or executed.",
+      "title": "ADR 0070: compiled CICS first protected dispatch",
       "xtask_commands": 0
     },
     {
@@ -1689,8 +1725,8 @@
     {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 61,
-      "sha256": "sha256:244b503aafe8655d130cb44f94095e1ec8d8054e19608840e1cfb7b8de2cd36a",
+      "relative_links": 64,
+      "sha256": "sha256:947f99075df8675a2e104d4ceefe734ce35699c0f2ccc1e50ebee6bdf4af6122",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -3058,6 +3094,18 @@
         {
           "label": "ADR-0073: Owned local TSO ProgramCall controller composition",
           "path": "docs/decisions/0073-local-batch-controller-composition.md"
+        },
+        {
+          "label": "ADR-0066: Borrowed CICS current-program task custody",
+          "path": "docs/decisions/0066-cics-current-program-borrowed-task-custody.md"
+        },
+        {
+          "label": "ADR-0067: Borrowed durable first-dispatch Intent",
+          "path": "docs/decisions/0067-durable-first-dispatch-borrowed-intent.md"
+        },
+        {
+          "label": "ADR-0070: Compiled CICS first protected dispatch",
+          "path": "docs/decisions/0070-compiled-cics-first-protected-dispatch.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -3280,7 +3328,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:f4bd7893cbcbbfd816001cc9b85f9f972398f89e91df93a687cebbe85243b746",
+  "registry_sha256": "sha256:4cc99d00873989e0ead108708a3696bef37156075f9c40cf0a56124676f3be23",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

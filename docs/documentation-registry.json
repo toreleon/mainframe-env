@@ -125,7 +125,10 @@
     "docs/decisions/0069-local-db2-catalog-composition.md",
     "docs/decisions/0071-local-fixed-ims-catalog-composition.md",
     "docs/decisions/0072-local-fixed-mq-queue-composition.md",
-    "docs/decisions/0073-local-batch-controller-composition.md"
+    "docs/decisions/0073-local-batch-controller-composition.md",
+    "docs/decisions/0066-cics-current-program-borrowed-task-custody.md",
+    "docs/decisions/0067-durable-first-dispatch-borrowed-intent.md",
+    "docs/decisions/0070-compiled-cics-first-protected-dispatch.md"
   ],
   "navigation": [
     {
@@ -645,6 +648,18 @@
         {
           "label": "ADR-0073: Owned local TSO ProgramCall controller composition",
           "path": "docs/decisions/0073-local-batch-controller-composition.md"
+        },
+        {
+          "label": "ADR-0066: Borrowed CICS current-program task custody",
+          "path": "docs/decisions/0066-cics-current-program-borrowed-task-custody.md"
+        },
+        {
+          "label": "ADR-0067: Borrowed durable first-dispatch Intent",
+          "path": "docs/decisions/0067-durable-first-dispatch-borrowed-intent.md"
+        },
+        {
+          "label": "ADR-0070: Compiled CICS first protected dispatch",
+          "path": "docs/decisions/0070-compiled-cics-first-protected-dispatch.md"
         }
       ],
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."

@@ -274,7 +274,7 @@ impl ExecutionCoordinator {
                 false,
                 Some(&mut progress),
                 Some(&mut prepare),
-                None,
+                DriveDispatch::default(),
             )
         }));
         if progress.committed.is_some() {

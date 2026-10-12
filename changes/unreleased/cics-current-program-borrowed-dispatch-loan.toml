@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added an opt-in borrowed CICS current-program task loan backed by the existing exclusive command lease, retaining exact actor checks, same-thread custody and unknown-outcome fencing without MQ or unit-of-work settlement."

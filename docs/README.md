@@ -208,6 +208,9 @@ explicitly names that authority as superseded.
 - [ADR-0071: Owned local fixed IMS catalog composition](decisions/0071-local-fixed-ims-catalog-composition.md)
 - [ADR-0072: Owned local fixed MQ queue catalog composition](decisions/0072-local-fixed-mq-queue-composition.md)
 - [ADR-0073: Owned local TSO ProgramCall controller composition](decisions/0073-local-batch-controller-composition.md)
+- [ADR-0066: Borrowed CICS current-program task custody](decisions/0066-cics-current-program-borrowed-task-custody.md)
+- [ADR-0067: Borrowed durable first-dispatch Intent](decisions/0067-durable-first-dispatch-borrowed-intent.md)
+- [ADR-0070: Compiled CICS first protected dispatch](decisions/0070-compiled-cics-first-protected-dispatch.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.
 

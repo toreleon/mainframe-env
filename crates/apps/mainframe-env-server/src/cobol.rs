@@ -40,8 +40,12 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 pub(crate) mod artifact;
 mod mqi;
+mod protected_cics;
 mod runtime;
 mod selected_link;
+pub use protected_cics::{
+    CicsProtectedCompiledDispatch, CicsProtectedCompiledHost, CicsProtectedCompiledProgram,
+};
 mod staged_invocation;
 mod storage_scope;
 use artifact::{AdmittedProgram, admit_published_artifact};

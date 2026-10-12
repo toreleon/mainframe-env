@@ -70,6 +70,7 @@ impl ExecutionCoordinator {
             version: exact_suspended_version,
             sequence: last.sequence,
             native: None,
+            storage: None,
         };
         journal.record(
             Some(ExecutionState::Completed),

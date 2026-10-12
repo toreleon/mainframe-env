@@ -16,6 +16,8 @@ mod readonly_journal_tests;
 #[path = "host_boundary/frame_tests.rs"]
 mod tests;
 
+mod current_program_loan;
+pub use current_program_loan::CicsCurrentProgramLoan;
 mod link_entry;
 mod replacement;
 pub use link_entry::{CicsLocalLinkCallAttestation, CicsLocalLinkEntryAttestation};

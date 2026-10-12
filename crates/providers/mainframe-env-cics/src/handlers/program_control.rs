@@ -936,7 +936,7 @@ fn validate_commarea_reply(reply: &BoundedPayload, limit: usize) -> Result<(), H
     }
 }
 
-fn local_link_selection(
+pub(in crate::service) fn local_link_selection(
     service: &CicsService,
     target: &str,
 ) -> Result<Option<ProgramLinkSelection>, HostProblem> {

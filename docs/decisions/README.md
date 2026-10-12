@@ -67,6 +67,9 @@ CardDemo participant ownership and batch completion boundary.
 | [0056](0056-cics-first-reverse-position.md) | additive retained-position Dataset observation for the implicit CICS first reverse read | Accepted bounded design; verification pending |
 | [0061](0061-cobol-chunked-initializer-carrier.md) | versioned byte-preserving bounded COBOL initializer carrier | Proposed |
 | [0065](0065-local-exec-dli-exact-storage-copyback.md) | exact admitted fixed storage on the existing local EXEC DLI route | Proposed |
+| [0066](0066-cics-current-program-borrowed-task-custody.md) | explicit borrowed current root task custody for one non-CICS dispatch | Proposed |
+| [0067](0067-durable-first-dispatch-borrowed-intent.md) | actual durable first-dispatch Intent with original scoped host call retained internally | Proposed |
+| [0070](0070-compiled-cics-first-protected-dispatch.md) | actual installed first CICS frame, same-store root and borrowed first external dispatch | Proposed |
 
 Parallel subsystem work allocated the same 0028 and 0029 numeric prefixes.
 Their distinct full filenames and subsystem-qualified labels identify each

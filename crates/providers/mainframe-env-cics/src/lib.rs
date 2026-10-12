@@ -32,8 +32,8 @@ pub use service::{
     SignalLuType, load_conversation_replay, prune_conversation_replays,
 };
 pub use service::{
-    CicsLocalLinkCallAttestation, CicsLocalLinkEntryAttestation, IssuePassTransfer,
-    prune_issue_device_receipts,
+    CicsCurrentProgramLoan, CicsLocalLinkCallAttestation, CicsLocalLinkEntryAttestation,
+    IssuePassTransfer, prune_issue_device_receipts,
 };
 
 pub use retention::{
