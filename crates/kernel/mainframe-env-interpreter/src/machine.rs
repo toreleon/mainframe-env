@@ -56,6 +56,7 @@ mod layout_admission;
 mod layout_resolution;
 mod legacy_mq;
 mod observability;
+mod sign_placement;
 #[cfg(test)]
 mod sign_placement_tests;
 mod snapshot_codec;
@@ -9331,16 +9332,7 @@ fn layout_metadata(operations: &[Operation]) -> Result<LayoutState, MachineProbl
                 .unwrap_or_default()
                 != 0,
             signed: integer_attribute(operation, "signed")? != 0,
-            // Older executable layouts default to the COBOL trailing sign.
-            sign_leading: match operation.attributes.get("sign_leading") {
-                None | Some(Attribute::Integer(0)) => false,
-                Some(Attribute::Integer(1)) => true,
-                _ => {
-                    return Err(MachineProblem::InvalidArtifact(
-                        "invalid sign_leading".into(),
-                    ));
-                }
-            },
+            sign_leading: sign_placement::sign_leading(operation)?,
             sign_separate: integer_attribute(operation, "sign_separate")? != 0,
             justified_right: optional_integer_attribute(operation, "justified_right")
                 .unwrap_or_default()
@@ -10946,28 +10938,13 @@ fn encode_decimal(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Ma
             let copy = digits.len().min(output.len());
             let start = output.len() - copy;
             output[start..].copy_from_slice(&digits.as_bytes()[digits.len() - copy..]);
-            if layout.signed && !layout.sign_separate {
-                let sign_digit = if layout.sign_leading {
-                    output.first_mut()
-                } else {
-                    output.last_mut()
-                }
-                .ok_or(MachineProblem::SizeError)?;
-                let overpunch = if value.coefficient < 0 {
-                    b"}JKLMNOPQR"
-                } else {
-                    b"{ABCDEFGHI"
-                };
-                *sign_digit = overpunch[usize::from(*sign_digit - b'0')];
-            }
-            if layout.sign_separate {
-                let sign = if value.coefficient < 0 { b'-' } else { b'+' };
-                if layout.sign_leading {
-                    output.insert(0, sign);
-                } else {
-                    output.push(sign);
-                }
-            }
+            sign_placement::encode_sign(
+                &mut output,
+                layout.signed,
+                layout.sign_leading,
+                layout.sign_separate,
+                value.coefficient < 0,
+            )?;
             Ok(output)
         }
         LayoutCategory::PackedDecimal => {
