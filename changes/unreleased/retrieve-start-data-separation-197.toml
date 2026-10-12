@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "RETRIEVE compatibility requests consume durable START data once and return ENDDATA when exhausted, keeping continuation COMMAREA separate (#197)."
