@@ -1731,6 +1731,53 @@ mod tests {
     }
 
     #[test]
+    fn file_read_length_literals_round_trip_without_output_storage() {
+        for operation in [
+            CicsPlanOperation::Read,
+            CicsPlanOperation::ReadNext,
+            CicsPlanOperation::ReadPrev,
+        ] {
+            for length in [0, 8, 32_767] {
+                let mut plan = read_plan();
+                plan.operation = operation;
+                plan.options.clear();
+                plan.outputs
+                    .retain(|output| output.name != CicsOutputName::Length);
+                if operation != CicsPlanOperation::Read {
+                    plan.outputs.push(CicsOutputBinding {
+                        name: CicsOutputName::Ridfld,
+                        target: slot(5, "REQUEST.KEY"),
+                    });
+                }
+                plan.operands
+                    .iter_mut()
+                    .find(|operand| operand.name == CicsOperandName::Length)
+                    .unwrap()
+                    .value = CicsOperandValue::Integer(length);
+                let limits = CicsPlanLimits::default();
+                let bytes = encode_cics_effect_plan(&plan, limits).expect("literal capacity plan");
+                let decoded = decode_cics_effect_plan(&bytes, limits).unwrap();
+                assert_eq!(encode_cics_effect_plan(&decoded, limits).unwrap(), bytes);
+                for invalid in [-1, 32_768, i64::MAX] {
+                    let mut invalid_plan = plan.clone();
+                    invalid_plan
+                        .operands
+                        .iter_mut()
+                        .find(|operand| operand.name == CicsOperandName::Length)
+                        .unwrap()
+                        .value = CicsOperandValue::Integer(invalid);
+                    assert!(encode_cics_effect_plan(&invalid_plan, limits).is_err());
+                }
+                plan.outputs.push(CicsOutputBinding {
+                    name: CicsOutputName::Length,
+                    target: slot(4, "RESULT.LENGTH"),
+                });
+                assert!(encode_cics_effect_plan(&plan, limits).is_err());
+            }
+        }
+    }
+
+    #[test]
     fn legacy_plan_golden_decodes_and_migrates_to_canonical_v2() {
         let limits = CicsPlanLimits::default();
         let plan = CicsEffectPlan {
@@ -4868,7 +4915,7 @@ mod tests {
             .iter_mut()
             .find(|operand| operand.name == CicsOperandName::Length)
             .unwrap()
-            .value = CicsOperandValue::Integer(8);
+            .value = CicsOperandValue::Integer(-1);
         read_with_literal_length
             .outputs
             .retain(|output| output.name != CicsOutputName::Length);

@@ -251,16 +251,17 @@ RIDFLD without returning a record and admits the default-equivalent `GTEQ` or
 exact-key `EQUAL` relation as an exclusive choice; READNEXT and READPREV require INTO and
 model RIDFLD as the same input/output storage identity so the host-updated key
 feeds the next browse request; ENDBR closes the resource browse. REQID/SYSID,
-KEYLENGTH/LENGTH, SET, alternate RBA/RRN/XRBA and generic key modes, and
+SET, alternate RBA/RRN/XRBA and generic key modes, and
 UPDATE/TOKEN/RLS locking remain explicit compiler rejections.
 The typed keyed-mutation subset admits DELETE with either an explicit RIDFLD or
 the record held by the task's latest `READ UPDATE` on that file. WRITE FILE
 requires explicit FROM and RIDFLD data areas; REWRITE consumes the held record
 identity and an explicit FROM area. Optional WRITE or REWRITE LENGTH is a
 bounded literal, halfword-binary value, or matching `LENGTH OF` and selects the
-exact record prefix before mutation. READ LENGTH is the same writable halfword
-capacity on input and actual-record-length output. Optional READ, WRITE, or
-explicit-key DELETE KEYLENGTH uses the same positive halfword forms against
+exact record prefix before mutation. READ, READNEXT, and READPREV LENGTH accept
+a halfword integer literal capacity (0–32767) or matching `LENGTH OF` without
+write-back; writable halfword storage receives the actual record length. Optional
+READ, WRITE, or explicit-key DELETE KEYLENGTH uses the same positive halfword forms against
 RIDFLD and is validated against the durable definition. All use the same single
 FILE/DATASET resource binding and typed mutation envelope. TOKEN correlation,
 SYSID, generic and alternate record identities, WRITE MASSINSERT, and RLS
