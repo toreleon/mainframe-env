@@ -577,6 +577,19 @@ impl Program for CobolProgram {
             })
             .map_err(|_| HostProblem::ProviderFailure)?;
         let CompilerResult::Published { artifact, .. } = compiled else {
+            if let CompilerResult::Failed { diagnostics, .. } = compiled
+                && let Some(diagnostic) = diagnostics.iter().find(|diagnostic| {
+                    diagnostic
+                        .public_message()
+                        .starts_with("EXEC SQL INCLUDE member ")
+                })
+            {
+                return Err(HostProblem::Condition {
+                    name: diagnostic.public_message().to_owned(),
+                    response: -2,
+                    response2: 0,
+                });
+            }
             return Err(HostProblem::Malformed);
         };
         let executable = admit_published_artifact(&artifact)?;
@@ -1238,6 +1251,40 @@ mod tests {
         .unwrap();
         assert_eq!(abend.schema(), "mainframe-env.program.abend@1");
         assert_eq!(abend.bytes(), b"U0999");
+    }
+
+    #[test]
+    fn jes_sql_include_expands_dcl_from_syslib_and_reports_missing_member() {
+        let plan = mainframe_env_batch::parse_jcl(
+            &mainframe_env_batch::JclBundle {
+                primary: "//J JOB\n//S EXEC PGM=COBOL,PARM='FORMAT=FIXED'\n\
+                          //SYSIN DD *\nSOURCE\n/*\n//SYSLIB DD DSN=DCLROW\n"
+                    .into(),
+                ..Default::default()
+            },
+            mainframe_env_batch::JclLimits::default(),
+        )
+        .unwrap();
+        let mut input = ProgramInput {
+            parameter: plan.steps[0].parameter.clone(),
+            dds: plan.steps[0].dds.clone(),
+            dd_records: BTreeMap::new(),
+            execution: None,
+        };
+        input.dds[0].inline_data = b"       IDENTIFICATION DIVISION.\n       PROGRAM-ID. DCLTEST.\n       DATA DIVISION.\n       WORKING-STORAGE SECTION.\n       EXEC SQL INCLUDE DCLROW END-EXEC.\n       PROCEDURE DIVISION.\n       ADD 1 TO DCL-TR-DESCRIPTION-LEN.\n       DISPLAY DCL-TR-DESCRIPTION-LEN.\n       STOP RUN.\n".to_vec();
+        input.dds[1].inline_data = b"       01 DCL-TR-DESCRIPTION-LEN PIC 9(4) VALUE 0.\n".to_vec();
+        let output = CobolProgram::new().execute(&parent(), &input).unwrap();
+        assert_eq!(output.records, vec![b"0001".to_vec()]);
+        input.dds.pop();
+        let Err(HostProblem::Condition { name, .. }) =
+            CobolProgram::new().execute(&parent(), &input)
+        else {
+            panic!("missing SQL INCLUDE member must return a compile diagnostic");
+        };
+        assert!(
+            name.contains("SQL INCLUDE member DCLROW was not found"),
+            "{name}"
+        );
     }
 
     #[test]
