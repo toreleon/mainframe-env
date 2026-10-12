@@ -2,7 +2,10 @@ use super::super::{
     HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsValue, Resolution,
     ResolutionFailure,
 };
-use super::{Clauses, cics_value, complete_data_reference, numeric_value::cics_integer_value};
+use super::{
+    Clauses, cics_value, complete_data_reference, numeric_value::cics_integer_value,
+    terminal_display,
+};
 use crate::{CobolUsage, DataCategory, SemanticModel};
 
 pub(super) const SEND_CONTROL_OPTIONS: &[&str] = &[
@@ -45,6 +48,7 @@ pub(super) fn validate_constraints(
     options: &[String],
     operation: HirCicsOperation,
 ) -> Resolution<()> {
+    terminal_display::validate_cursor(clauses, options, operation)?;
     if operation == HirCicsOperation::SendControl {
         let present = |name: &str| options.iter().any(|option| option == name);
         if present("CURSOR") && !clauses.contains_key("CURSOR")
@@ -165,9 +169,13 @@ pub(super) fn operands(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
+    let mut operands = Vec::new();
     if matches!(
         operation,
-        HirCicsOperation::SendControl | HirCicsOperation::SendPage
+        HirCicsOperation::SendControl
+            | HirCicsOperation::SendPage
+            | HirCicsOperation::SendMap
+            | HirCicsOperation::SendText
     ) {
         let specs: &[(&str, HirCicsOperandName, usize, usize)] =
             if operation == HirCicsOperation::SendControl {
@@ -179,14 +187,15 @@ pub(super) fn operands(
                     ("LDC", HirCicsOperandName::Ldc, 2, 2),
                     ("REQID", HirCicsOperandName::ReqId, 2, 2),
                 ]
-            } else {
+            } else if operation == HirCicsOperation::SendPage {
                 &[
                     ("TRANSID", HirCicsOperandName::TransId, 1, 4),
                     ("TRAILER", HirCicsOperandName::Trailer, 4, 32_767),
                     ("FMHPARM", HirCicsOperandName::Fmhparm, 1, 8),
                 ]
+            } else {
+                &[("CURSOR", HirCicsOperandName::ControlCursor, 2, 2)]
             };
-        let mut operands = Vec::new();
         for (name, identity, minimum, maximum) in specs {
             let Some(tokens) = clauses.get(*name) else {
                 continue;
@@ -197,7 +206,14 @@ pub(super) fn operands(
                 cics_value(tokens, semantic)?
             };
             let valid = match &value {
-                HirCicsValue::Integer(number) => *name == "CURSOR" && (0..=32_766).contains(number),
+                HirCicsValue::Integer(number) => {
+                    let maximum = if operation == HirCicsOperation::SendControl {
+                        32_766
+                    } else {
+                        32_767
+                    };
+                    *name == "CURSOR" && (0..=maximum).contains(number)
+                }
                 HirCicsValue::Literal(bytes) => {
                     *name != "TRAILER"
                         && *name != "CURSOR"
@@ -234,7 +250,12 @@ pub(super) fn operands(
                 value,
             });
         }
-        return Ok(operands);
+        if matches!(
+            operation,
+            HirCicsOperation::SendControl | HirCicsOperation::SendPage
+        ) {
+            return Ok(operands);
+        }
     }
     if operation == HirCicsOperation::ReceivePartn {
         let Some(tokens) = clauses.get("LENGTH") else {
@@ -289,7 +310,6 @@ pub(super) fn operands(
     ) {
         return Ok(Vec::new());
     }
-    let mut operands = Vec::new();
     for (name, identity) in [
         ("MAP", HirCicsOperandName::Map),
         ("MAPSET", HirCicsOperandName::Mapset),

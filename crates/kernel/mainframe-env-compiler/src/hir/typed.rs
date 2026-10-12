@@ -5223,6 +5223,46 @@ mod tests {
         }));
     }
 
+    #[test]
+    fn cics_send_display_valued_cursor_binds_halfword_or_literal() {
+        for command in [
+            "SEND MAP('MENU') CURSOR(CUR-X)",
+            "SEND TEXT FROM(DATA-X) CURSOR(7)",
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. SENDCUR. DATA DIVISION. WORKING-STORAGE SECTION. 01 CUR-X PIC S9(4) COMP. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC."
+            );
+            let analysis = analyze(&source);
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{command}: {:?}", analysis.diagnostics));
+            let command = hir
+                .statements
+                .iter()
+                .find_map(|statement| match statement.resolved.as_ref() {
+                    Some(HirResolvedStatement::Cics(command)) => Some(command),
+                    _ => None,
+                })
+                .unwrap();
+            assert!(
+                command
+                    .operands
+                    .iter()
+                    .any(|operand| operand.name == HirCicsOperandName::ControlCursor)
+            );
+        }
+        for command in [
+            "SEND MAP('MENU') CURSOR(-1)",
+            "SEND TEXT FROM(DATA-X) CURSOR(FULL-X)",
+            "SEND TEXT FROM(DATA-X) CURSOR",
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADCUR. DATA DIVISION. WORKING-STORAGE SECTION. 01 FULL-X PIC S9(9) COMP. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC."
+            );
+            assert!(analyze(&source).hir.is_none(), "{command}");
+        }
+    }
+
     /// Issues #203 and #206: CardDemo SEND display controls and bounded lengths stay typed.
     #[test]
     fn cics_send_map_admits_erase_cursor_and_freekb() {
