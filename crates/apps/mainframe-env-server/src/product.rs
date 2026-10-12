@@ -10,8 +10,13 @@ mod dataset_input;
 use dataset_input::wildcard;
 mod cics_security;
 mod ims;
+mod local_composition;
+mod online_install;
 mod services;
 use cics_security::{MAX_AUTH_SESSIONS_PER_USER, terminal_principal};
+pub use local_composition::{
+    LocalApplicationDefinition, LocalApplicationReceipt, LocalSourceCompilation,
+};
 
 use crate::cobol::{artifact::admit_executable_artifact, bind_compatible_runtime_services};
 use crate::console_retention::{decode_console_log_rows, encode_console_log};
@@ -415,6 +420,7 @@ pub struct ProductServer {
     jes_worker_failures: AtomicU64,
     outbox_delivery: Mutex<()>,
     accepting: AtomicBool,
+    local_composition_uncertain: AtomicBool,
     requests: AtomicU64,
     failures: AtomicU64,
     active: AtomicUsize,
@@ -865,141 +871,16 @@ impl ProductServer {
             jes_worker_failures: AtomicU64::new(0),
             outbox_delivery: Mutex::new(()),
             accepting: AtomicBool::new(true),
+            local_composition_uncertain: AtomicBool::new(false),
             requests: AtomicU64::new(0),
             failures: AtomicU64::new(0),
             active: AtomicUsize::new(0),
             outbox_delivered: AtomicU64::new(0),
         });
+        product.validate_local_compositions()?;
         product.recover_application_publications()?;
         product.recover_local_wakeups()?;
         Ok(product)
-    }
-
-    pub fn install_online_application(
-        &self,
-        definition: OnlineApplicationDefinition,
-    ) -> Result<OnlineInstallReceipt, HostProblem> {
-        if definition.programs.is_empty()
-            || definition.transactions.is_empty()
-            || definition.maps.is_empty()
-            || definition.programs.len() > 4096
-            || definition.transactions.len() > 4096
-        {
-            return Err(HostProblem::Malformed);
-        }
-        let mut programs = BTreeMap::new();
-        let mut artifact_records = Vec::with_capacity(definition.programs.len());
-        let mut identity = Sha256::new();
-        for definition in &definition.programs {
-            let name = normalize_online_name(&definition.name, 128)?;
-            if programs
-                .insert(name.clone(), definition.artifact.clone())
-                .is_some()
-            {
-                return Err(HostProblem::IdempotencyConflict);
-            }
-            let record = artifact::admitted_record(
-                &definition.artifact,
-                &definition.payload,
-                &definition.manifest,
-                &definition.semantic_identity,
-            )?;
-            if let Some(existing) = artifact_records
-                .iter()
-                .find(|existing: &&ArtifactRecord| existing.artifact == record.artifact)
-            {
-                if existing != &record {
-                    return Err(HostProblem::IdempotencyConflict);
-                }
-            } else {
-                artifact_records.push(record);
-            }
-            digest_online_field(&mut identity, name.as_bytes());
-            digest_online_field(&mut identity, definition.artifact.as_str().as_bytes());
-        }
-        for record in artifact_records {
-            self.artifacts.put_artifact(record).map_err(store_error)?;
-        }
-        let mut transactions = BTreeMap::new();
-        for (transaction, program) in &definition.transactions {
-            let transaction = normalize_online_name(transaction, 16)?;
-            let program = normalize_online_name(program, 128)?;
-            if !programs.contains_key(&program)
-                || transactions
-                    .insert(transaction.clone(), program.clone())
-                    .is_some()
-            {
-                return Err(HostProblem::NotFound);
-            }
-            digest_online_field(&mut identity, transaction.as_bytes());
-            digest_online_field(&mut identity, program.as_bytes());
-        }
-        let program_names = programs.keys().cloned().collect::<BTreeSet<_>>();
-        self.cics.register_programs(&program_names)?;
-        for map in &definition.maps {
-            self.cics.register_map(map.clone())?;
-            digest_online_field(&mut identity, map.mapset.as_bytes());
-            digest_online_field(&mut identity, map.map.as_bytes());
-            digest_online_field(&mut identity, &(map.fields.len() as u64).to_be_bytes());
-        }
-        let mut current_programs = self
-            .online_programs
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let mut current_transactions = self
-            .online_transactions
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let mut writes = Vec::new();
-        for (name, artifact) in &programs {
-            if let Some(existing) = current_programs.get(name) {
-                if existing != artifact {
-                    return Err(HostProblem::IdempotencyConflict);
-                }
-            } else {
-                writes.push(ProviderStateWrite {
-                    record: ProviderStateRecord {
-                        namespace: "online-program".into(),
-                        key: name.clone(),
-                        version: 1,
-                        payload: artifact.as_str().as_bytes().to_vec(),
-                    },
-                    expected_version: None,
-                });
-            }
-        }
-        for (transaction, program) in &transactions {
-            if let Some(existing) = current_transactions.get(transaction) {
-                if existing != program {
-                    return Err(HostProblem::IdempotencyConflict);
-                }
-            } else {
-                writes.push(ProviderStateWrite {
-                    record: ProviderStateRecord {
-                        namespace: "online-transaction".into(),
-                        key: transaction.clone(),
-                        version: 1,
-                        payload: program.as_bytes().to_vec(),
-                    },
-                    expected_version: None,
-                });
-            }
-        }
-        let replayed = writes.is_empty();
-        if !replayed {
-            self.store
-                .put_provider_states_atomic(writes)
-                .map_err(store_error)?;
-        }
-        current_programs.extend(programs);
-        current_transactions.extend(transactions);
-        Ok(OnlineInstallReceipt {
-            programs: definition.programs.len(),
-            transactions: definition.transactions.len(),
-            maps: definition.maps.len(),
-            identity: format!("sha256:{:x}", identity.finalize()),
-            replayed,
-        })
     }
 
     pub fn install_batch_programs(
@@ -1082,6 +963,7 @@ impl ProductServer {
         &self,
         package: &ApplicationPackageV2,
     ) -> Result<ApplicationGenerationRecord, HostProblem> {
+        self.require_local_owner_known()?;
         let _publication = self.publication_write()?;
         let mut durable = self
             .applications_v2
@@ -1123,6 +1005,7 @@ impl ProductServer {
         expected: &ApplicationGenerationRecord,
         writer: &BatchPublicationWrite<'_>,
     ) -> Result<ApplicationPublicationReceipt, HostProblem> {
+        self.refuse_local_legacy_selection(&expected.package)?;
         let selected = self.application_generation_v2(expected)?;
         // A Ready commit retry preserves selection; only explicit retained rollback
         // can reselect another Ready generation. Refuse before provider publication.
@@ -1288,6 +1171,7 @@ impl ProductServer {
         expected: &ApplicationGenerationRecord,
         writer: &BatchPublicationWrite<'_>,
     ) -> Result<ApplicationPublicationReceipt, HostProblem> {
+        self.refuse_local_legacy_selection(&expected.package)?;
         let selected = self
             .applications_v2
             .lock()
@@ -2438,41 +2322,6 @@ impl ProductServer {
     #[must_use]
     pub fn ready(&self) -> bool {
         self.readiness().ready()
-    }
-
-    #[must_use]
-    pub fn readiness(&self) -> ProductReadiness {
-        let capacity = self
-            .config
-            .retention
-            .policy()
-            .ok()
-            .and_then(|policy| self.store.retention_capacity_health(policy).ok());
-        let retention_capacity = capacity
-            .as_ref()
-            .map_or(ProductCapacityStatus::Unavailable, |health| {
-                health.saturation.into()
-            });
-        ProductReadiness {
-            accepting: self.accepting.load(Ordering::SeqCst),
-            writable_store: capacity.is_some(),
-            retention_capacity,
-            retention_warning: retention_capacity.warning(),
-            bootstrap_identity: self.bootstrap_principal_ready(),
-            host_capabilities: [
-                "host.cics.execute",
-                "host.db2.read",
-                "host.db2.write",
-                "host.ims.read",
-                "host.ims.write",
-                "host.mq.read",
-                "host.mq.write",
-            ]
-            .into_iter()
-            .all(|capability| self.host.capability_ready(capability)),
-            artifact_store: self.artifacts.is_ready(),
-            jes_workers: self.jes_workers_ready(),
-        }
     }
 
     fn bootstrap_principal_ready(&self) -> bool {
@@ -4964,6 +4813,7 @@ fn install_publication_state(
 
 #[cfg(test)]
 mod tests {
+    mod local_composition_tests;
     #[path = "package_state_schema_tests.rs"]
     mod package_state_schema_tests;
     include!("product/bts_browse.rs");

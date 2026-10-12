@@ -119,7 +119,13 @@
     "docs/decisions/0061-cobol-chunked-initializer-carrier.md",
     "docs/decisions/0062-passive-db2-copyback.md",
     "docs/decisions/0063-readonly-dispatch-ownership.md",
-    "docs/decisions/0065-local-exec-dli-exact-storage-copyback.md"
+    "docs/decisions/0064-local-application-composition.md",
+    "docs/decisions/0065-local-exec-dli-exact-storage-copyback.md",
+    "docs/decisions/0068-local-racf-profile-composition.md",
+    "docs/decisions/0069-local-db2-catalog-composition.md",
+    "docs/decisions/0071-local-fixed-ims-catalog-composition.md",
+    "docs/decisions/0072-local-fixed-mq-queue-composition.md",
+    "docs/decisions/0073-local-batch-controller-composition.md"
   ],
   "navigation": [
     {
@@ -613,8 +619,32 @@
           "path": "docs/decisions/0063-readonly-dispatch-ownership.md"
         },
         {
+          "label": "ADR-0064: Owned local application composition",
+          "path": "docs/decisions/0064-local-application-composition.md"
+        },
+        {
           "label": "ADR-0065: Local EXEC DLI exact storage copyback",
           "path": "docs/decisions/0065-local-exec-dli-exact-storage-copyback.md"
+        },
+        {
+          "label": "ADR-0068: Owned local RACF profile composition",
+          "path": "docs/decisions/0068-local-racf-profile-composition.md"
+        },
+        {
+          "label": "ADR-0069: Owned local Db2 catalog composition",
+          "path": "docs/decisions/0069-local-db2-catalog-composition.md"
+        },
+        {
+          "label": "ADR-0071: Owned local fixed IMS catalog composition",
+          "path": "docs/decisions/0071-local-fixed-ims-catalog-composition.md"
+        },
+        {
+          "label": "ADR-0072: Owned local fixed MQ queue catalog composition",
+          "path": "docs/decisions/0072-local-fixed-mq-queue-composition.md"
+        },
+        {
+          "label": "ADR-0073: Owned local TSO ProgramCall controller composition",
+          "path": "docs/decisions/0073-local-batch-controller-composition.md"
         }
       ],
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."

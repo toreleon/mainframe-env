@@ -58,7 +58,8 @@ pub use retention::{
 };
 
 pub use service::{
-    MqInstallReceipt, MqLimits, MqQueueDefinition, MqReplayClock, MqService, mq_providers,
+    MqCatalogProjection, MqInstallReceipt, MqLimits, MqQueueDefinition, MqReplayClock, MqService,
+    PreparedMqCatalog, mq_providers,
 };
 pub use trusted_batch_embedding::{
     MqBatchLeDllCodesetSource, MqPreparedRootTerminal, MqTrustedBatchFrame,

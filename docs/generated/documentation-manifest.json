@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 251,
+    "markdown_documents": 257,
     "navigation_groups": 8,
-    "normative_documents": 112,
+    "normative_documents": 118,
     "xtask_commands": 162
   },
   "documents": [
@@ -341,8 +341,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 193,
-      "sha256": "sha256:33d311f77782ac552a17b0991fe098533f5555e9fb151321b8276c272490a9ea",
+      "relative_links": 199,
+      "sha256": "sha256:99b91719557595b187e1b50b716ce09ca49af99059f786cb4177ecad2fc85ef1",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -351,9 +351,9 @@
       "normative": true,
       "owner": "application-package maintainers",
       "path": "docs/architecture/APPLICATION-PACKAGES.md",
-      "relative_links": 3,
+      "relative_links": 5,
       "scope": "application package generation and installation contract",
-      "sha256": "sha256:ce26a82908ee259576c71b27042705977825124a7feca83e202d9b9c9e63ed18",
+      "sha256": "sha256:897a1ba0aa082e7cabf18b9dd324707e6686abab3c2c18d73b6a6912e93b79b1",
       "status": "Frozen for mainframe-env coverage.foundation",
       "title": "Application package generation contract",
       "xtask_commands": 0
@@ -1603,6 +1603,18 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env owned local application composition profile",
+      "normative": true,
+      "owner": "application package, dataset and CICS maintainers",
+      "path": "docs/decisions/0064-local-application-composition.md",
+      "relative_links": 0,
+      "scope": "finite local signed-content selection through one shared provider-state store",
+      "sha256": "sha256:bab685a444eecce786b987674478963f769ca7a5e4cbdf538f3c9a81acf53ddb",
+      "status": "proposed; implementation and controls unrun",
+      "title": "0064. Owned local application composition",
+      "xtask_commands": 0
+    },
+    {
       "applies_from": "mainframe-env local typed EXEC DLI storage proposal",
       "normative": true,
       "owner": "interpreter and IMS assurance maintainers",
@@ -1612,6 +1624,66 @@
       "sha256": "sha256:72dec8c8bcc731640bf5dd4352f27b5c85560a90e6e7cba73b353681ccdf272b",
       "status": "proposed. Unrun local storage admission; no first-party or IBM acceptance.",
       "title": "0065. Local EXEC DLI exact storage copyback",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.2.0 local application profile composition",
+      "normative": true,
+      "owner": "application composition and RACF storage maintainers",
+      "path": "docs/decisions/0068-local-racf-profile-composition.md",
+      "relative_links": 0,
+      "scope": "finite signed profiles in one genuine local provider-state transaction",
+      "sha256": "sha256:1c5c7aec051937e6c53b4338a627930c9cbf808d7f5e162061e316b5153198c5",
+      "status": "proposed local first-party contract; implementation and controls unrun",
+      "title": "ADR-0068: Owned local RACF profile composition",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.2.0 finite local Db2 application composition",
+      "normative": true,
+      "owner": "application composition and Db2 storage maintainers",
+      "path": "docs/decisions/0069-local-db2-catalog-composition.md",
+      "relative_links": 0,
+      "scope": "signed selected catalog in one genuine local provider-state transaction",
+      "sha256": "sha256:bdef10d0fa35db2319dacd5d466df8cf1cc5d0d37f2507f1618391fe60409a39",
+      "status": "proposed finite first-party contract; implementation and controls unrun",
+      "title": "ADR-0069: Owned local Db2 catalog composition",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.2.0 local owned application composition profile",
+      "normative": true,
+      "owner": "Application package and IMS maintainers",
+      "path": "docs/decisions/0071-local-fixed-ims-catalog-composition.md",
+      "relative_links": 0,
+      "scope": "Finite local owned application composition with the existing fixed IMS catalog and retained provider state",
+      "sha256": "sha256:6f83906f8ffee5d4afd85e407fb783d010a7a76da30b0170c3152d308f70bf16",
+      "status": "Proposed",
+      "title": "ADR-0071: Owned local fixed IMS catalog composition",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.2.0 local owned application composition profile",
+      "normative": true,
+      "owner": "MQ and product application maintainers",
+      "path": "docs/decisions/0072-local-fixed-mq-queue-composition.md",
+      "relative_links": 0,
+      "scope": "local signed queue declaration and same-store application selection",
+      "sha256": "sha256:89e2f3ff5b829bb1d46bfd226974bc9f5f242355e765fbcf67f1d35e84e443bb",
+      "status": "Proposed",
+      "title": "ADR-0072: Owned local fixed MQ queue catalog composition",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.2.0 local owned application composition profile",
+      "normative": true,
+      "owner": "Application package and batch maintainers",
+      "path": "docs/decisions/0073-local-batch-controller-composition.md",
+      "relative_links": 0,
+      "scope": "Finite local controller-registry and compiled program-mapping selection",
+      "sha256": "sha256:2ab28ec217abb11df8f7690c9861b7c483c1f8f580e413935d3c037c8d6f33a8",
+      "status": "Proposed",
+      "title": "ADR-0073: Owned local TSO ProgramCall controller composition",
       "xtask_commands": 0
     },
     {
@@ -2960,8 +3032,32 @@
           "path": "docs/decisions/0063-readonly-dispatch-ownership.md"
         },
         {
+          "label": "ADR-0064: Owned local application composition",
+          "path": "docs/decisions/0064-local-application-composition.md"
+        },
+        {
           "label": "ADR-0065: Local EXEC DLI exact storage copyback",
           "path": "docs/decisions/0065-local-exec-dli-exact-storage-copyback.md"
+        },
+        {
+          "label": "ADR-0068: Owned local RACF profile composition",
+          "path": "docs/decisions/0068-local-racf-profile-composition.md"
+        },
+        {
+          "label": "ADR-0069: Owned local Db2 catalog composition",
+          "path": "docs/decisions/0069-local-db2-catalog-composition.md"
+        },
+        {
+          "label": "ADR-0071: Owned local fixed IMS catalog composition",
+          "path": "docs/decisions/0071-local-fixed-ims-catalog-composition.md"
+        },
+        {
+          "label": "ADR-0072: Owned local fixed MQ queue catalog composition",
+          "path": "docs/decisions/0072-local-fixed-mq-queue-composition.md"
+        },
+        {
+          "label": "ADR-0073: Owned local TSO ProgramCall controller composition",
+          "path": "docs/decisions/0073-local-batch-controller-composition.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -3184,7 +3280,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:40b48a0db09187a469ef0ea84413f736083934782d113bef74258fdcc163308a",
+  "registry_sha256": "sha256:f4bd7893cbcbbfd816001cc9b85f9f972398f89e91df93a687cebbe85243b746",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

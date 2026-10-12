@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add finite owned local TSO ProgramCall controller registry and compiled mapping composition with genuine CAS acknowledgement."

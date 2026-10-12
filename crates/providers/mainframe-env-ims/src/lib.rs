@@ -28,9 +28,10 @@ pub use retention::{
 };
 
 pub use service::{
-    ImsApplicationDefinition, ImsDatabaseDefinition, ImsGenericLoadImage, ImsGenericLoadRecord,
-    ImsInstallReceipt, ImsLimits, ImsLoadImage, ImsLoadRoot, ImsPcbDefinition, ImsPsbDefinition,
-    ImsReplayClock, ImsSegmentDefinition, ImsService, ims_providers, ims_providers_with_recovery,
+    ImsApplicationDefinition, ImsCatalogProjection, ImsDatabaseDefinition, ImsGenericLoadImage,
+    ImsGenericLoadRecord, ImsInstallReceipt, ImsLimits, ImsLoadImage, ImsLoadRoot,
+    ImsPcbDefinition, ImsPsbDefinition, ImsReplayClock, ImsSegmentDefinition, ImsService,
+    PreparedImsCatalog, ims_providers, ims_providers_with_recovery,
 };
 
 pub use tm::{

@@ -98,6 +98,9 @@ pub(crate) fn selected_terminal_namespaces() -> Vec<String> {
 #[path = "service_object_integration.rs"]
 mod object_integration;
 use object_integration::{encode_catalog_row, load_catalog_row};
+#[path = "service_catalog_composition.rs"]
+mod catalog_composition;
+pub use catalog_composition::{MqCatalogProjection, PreparedMqCatalog};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MqLimits {
@@ -371,44 +374,6 @@ impl MqService {
         }))
     }
 
-    pub fn install(
-        &self,
-        definitions: Vec<MqQueueDefinition>,
-    ) -> Result<MqInstallReceipt, HostProblem> {
-        let definitions = (definitions.into_iter().map(canonical_definition))
-            .collect::<Result<Vec<_>, HostProblem>>()?;
-        validate_definitions(&definitions, self.limits)?;
-        let identity = format!(
-            "sha256:{:x}",
-            Sha256::digest(
-                serde_json::to_vec(&definitions).map_err(|_| HostProblem::ProviderFailure)?
-            )
-        );
-        let catalog = legacy_catalog(&definitions, self.limits)?;
-        let mut durable = self.lock()?;
-        if let Some(current) = &durable.state.catalog {
-            return if *current.as_ref() == catalog {
-                Ok(install_receipt(&definitions, identity, true))
-            } else {
-                Err(HostProblem::IdempotencyConflict)
-            };
-        }
-        let mut next = durable.state.scoped_snapshot();
-        for definition in &definitions {
-            next.queues.insert(
-                definition.name.clone(),
-                Arc::new(Queue {
-                    trigger_program: definition.trigger_program.clone(),
-                    messages: Vec::new(),
-                }),
-            );
-        }
-        next.catalog = Some(Arc::new(catalog));
-        validate_state(&next, self.limits)?;
-        self.persist(&mut durable, next)?;
-        Ok(install_receipt(&definitions, identity, false))
-    }
-
     pub fn execute(
         &self,
         invocation: &Invocation,
@@ -618,11 +583,13 @@ impl MqService {
         if self.selected_store.is_some() {
             return Err(HostProblem::Unsupported);
         }
-        LegacyAccess::new(
-            self.durable
-                .lock()
-                .map_err(|_| HostProblem::InfrastructureFailure)?,
-        )
+        self.require_selected_live()?;
+        let guard = self
+            .durable
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        self.require_selected_live()?;
+        LegacyAccess::new(guard)
     }
 
     fn persist(&self, durable: &mut DurableState, state: State) -> Result<(), HostProblem> {

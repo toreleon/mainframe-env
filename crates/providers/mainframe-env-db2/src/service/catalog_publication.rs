@@ -118,3 +118,51 @@ impl Db2Service {
         Ok(next)
     }
 }
+
+// Original public catalog transitions, relocated byte-exact to their existing child.
+impl Db2Service {
+    /// Validate a prospective install using the same current-state checks, without persistence.
+    pub fn validate_catalog_install(
+        &self,
+        catalog: &Db2CatalogGeneration,
+    ) -> Result<(), HostProblem> {
+        catalog.validate(self.limits)?;
+        let durable = self.lock()?;
+        self.prospective_catalog_install(&durable.state, catalog.clone())?;
+        Ok(())
+    }
+
+    pub fn install_catalog(&self, catalog: Db2CatalogGeneration) -> Result<(), HostProblem> {
+        catalog.validate(self.limits)?;
+        let mut durable = self.lock()?;
+        match self.prospective_catalog_install(&durable.state, catalog)? {
+            Some(next) => self.persist(&mut durable, next),
+            None => Ok(()),
+        }
+    }
+
+    /// Validate retained rollback selection without applying forward-generation rules.
+    pub fn validate_catalog_rollback(
+        &self,
+        application: &str,
+        generation: u64,
+        identity: &str,
+    ) -> Result<(), HostProblem> {
+        let durable = self.lock()?;
+        let next = self.prospective_catalog_rollback(&durable.state, application, generation)?;
+        if next
+            .installations
+            .get(&application.to_ascii_uppercase())
+            .is_none_or(|installed| installed.identity != identity)
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        Ok(())
+    }
+
+    pub fn rollback_catalog(&self, application: &str, generation: u64) -> Result<(), HostProblem> {
+        let mut durable = self.lock()?;
+        let next = self.prospective_catalog_rollback(&durable.state, application, generation)?;
+        self.persist(&mut durable, next)
+    }
+}

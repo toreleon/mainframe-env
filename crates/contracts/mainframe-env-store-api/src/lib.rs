@@ -46,6 +46,7 @@
 mod audited_publication;
 mod checked_read;
 mod model;
+mod provider_composition;
 mod replay_refusal;
 mod root_custody;
 mod root_preparation;
@@ -67,6 +68,8 @@ pub use root_terminal::{
     RootDriverAdmission, RootDriverClaim, RootProviderRowAdmission, RootTerminalCommit,
     RootTerminalPublication, RootTerminalStep, TerminalRowDependency,
 };
+
+pub use provider_composition::{MAX_PROVIDER_COMPOSITION_BYTES, ProviderCompositionCommit};
 
 pub use model::{
     ArchivedRetentionRow, ArtifactRecord, ArtifactStoreHealth, CheckpointRecord,

@@ -1,3 +1,4 @@
+mod controller_preparation;
 mod dd_allocation;
 mod effect_loan;
 mod hex_encoding;
@@ -7,6 +8,7 @@ mod prepared_selection;
 mod problem;
 mod program_dispatch;
 mod publication;
+pub use controller_preparation::{BatchControllerProjection, PreparedBatchControllers};
 pub use publication::BatchPublicationWrite;
 mod run_retirement;
 mod run_selection;
@@ -229,6 +231,7 @@ pub struct BatchService {
     scheduler: Mutex<DurableScheduler>,
     topology: Mutex<DurableTopology>,
     controllers: Mutex<DurableControllers>,
+    controller_composition_uncertain: std::sync::atomic::AtomicBool,
     state: Mutex<State>,
 }
 
@@ -537,6 +540,7 @@ impl BatchService {
                 store_version: topology_store_version,
                 configuration: topology,
             }),
+            controller_composition_uncertain: std::sync::atomic::AtomicBool::new(false),
             controllers: Mutex::new(DurableControllers {
                 store_version: controller_store_version,
                 registry: controller_registry,
@@ -5276,32 +5280,6 @@ impl BatchService {
                 payload,
             })
             .map_err(|_| HostProblem::UnknownOutcome)
-    }
-
-    fn persist_controllers(
-        &self,
-        durable: &mut DurableControllers,
-        registry: BatchControllerRegistry,
-    ) -> Result<(), HostProblem> {
-        let payload = registry.state_payload()?;
-        let version = durable
-            .store_version
-            .checked_add(1)
-            .ok_or(HostProblem::ResourceExhausted)?;
-        self.store
-            .put_provider_state(
-                ProviderStateRecord {
-                    namespace: CONTROLLER_STATE_NAMESPACE.into(),
-                    key: CONTROLLER_STATE_KEY.into(),
-                    version,
-                    payload,
-                },
-                (durable.store_version != 0).then_some(durable.store_version),
-            )
-            .map_err(store_error)?;
-        durable.store_version = version;
-        durable.registry = registry;
-        Ok(())
     }
 
     pub(crate) fn lock(&self) -> Result<std::sync::MutexGuard<'_, State>, HostProblem> {

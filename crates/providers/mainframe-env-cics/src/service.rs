@@ -298,6 +298,10 @@ pub enum CicsFileFaultPoint {
     AfterMutation,
 }
 
+#[path = "handlers/registration_preparation.rs"]
+mod registration_preparation;
+pub use registration_preparation::PreparedCicsRegistration;
+
 pub struct CicsService {
     host: Arc<ScopedHostService>,
     store: Arc<dyn ProviderStateStore>,
@@ -309,6 +313,7 @@ pub struct CicsService {
     pub(crate) security_authority: OnceLock<Arc<dyn handlers::CicsSecurityAuthority>>,
     replay_unknown_after_persist: AtomicBool,
     diagnostic_run_opened: AtomicBool,
+    composition_uncertain: AtomicBool,
 }
 
 /// Trusted durable logical-time source used after CICS work is durably resolved.
@@ -450,6 +455,7 @@ impl CicsService {
             security_authority: OnceLock::new(),
             replay_unknown_after_persist: AtomicBool::new(false),
             diagnostic_run_opened: AtomicBool::new(false),
+            composition_uncertain: AtomicBool::new(false),
             state: Mutex::new(State {
                 sessions,
                 runs: BTreeMap::new(),
@@ -1238,83 +1244,6 @@ impl CicsService {
         Ok(())
     }
 
-    pub fn register_file_aliases(
-        &self,
-        aliases: &BTreeMap<String, DatasetName>,
-    ) -> Result<(), HostProblem> {
-        self.register_file_definitions(
-            &aliases
-                .iter()
-                .map(|(name, dataset)| {
-                    (
-                        name.clone(),
-                        CicsFileDefinition {
-                            dataset: dataset.clone(),
-                            ccsid: None,
-                        },
-                    )
-                })
-                .collect(),
-        )
-    }
-
-    pub fn register_file_definitions(
-        &self,
-        aliases: &BTreeMap<String, CicsFileDefinition>,
-    ) -> Result<(), HostProblem> {
-        let mut state = self.lock()?;
-        let new_aliases = aliases
-            .keys()
-            .filter(|name| !state.file_aliases.contains_key(*name))
-            .count();
-        if state
-            .file_aliases
-            .len()
-            .checked_add(new_aliases)
-            .is_none_or(|total| total > self.limits.max_file_aliases)
-        {
-            return Err(HostProblem::ResourceExhausted);
-        }
-        let mut writes = Vec::new();
-        for (name, definition) in aliases {
-            let name = name.trim().to_ascii_uppercase();
-            if name.is_empty()
-                || name.len() > 16
-                || !name
-                    .bytes()
-                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
-            {
-                return Err(HostProblem::Malformed);
-            }
-            if let Some(existing) = state.file_aliases.get(&name) {
-                if existing != definition {
-                    return Err(HostProblem::IdempotencyConflict);
-                }
-                continue;
-            }
-            writes.push(ProviderStateWrite {
-                record: ProviderStateRecord {
-                    namespace: "cics-file-alias".into(),
-                    key: name,
-                    version: 1,
-                    payload: encode_file_definition(definition)?,
-                },
-                expected_version: None,
-            });
-        }
-        if !writes.is_empty() {
-            self.store
-                .put_provider_states_atomic(writes)
-                .map_err(store_error)?;
-        }
-        for (name, definition) in aliases {
-            state
-                .file_aliases
-                .insert(name.trim().to_ascii_uppercase(), definition.clone());
-        }
-        Ok(())
-    }
-
     pub fn submit_input(
         &self,
         session: &SessionId,
@@ -1384,12 +1313,6 @@ impl CicsService {
         let state = self.lock()?;
         let counts = state.transient.counts();
         Ok(counts)
-    }
-    pub fn register_transform_definition(
-        &self,
-        definition: CicsTransformDefinition,
-    ) -> Result<(), HostProblem> {
-        handlers::register_transform_definition(self, definition)
     }
 
     pub fn put_transform_container(
@@ -1668,12 +1591,6 @@ impl CicsService {
             HostResult::Security(_) => Err(HostProblem::Unauthorized),
             _ => Err(HostProblem::ProviderFailure),
         }
-    }
-
-    fn lock(&self) -> Result<std::sync::MutexGuard<'_, State>, HostProblem> {
-        self.state
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)
     }
 
     fn load_undo(

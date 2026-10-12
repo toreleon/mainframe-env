@@ -155,3 +155,45 @@ selecting the prior ready generation or by continuing to read an accepted v1
 package. Version 2 now persists retained installer and explicit publication
 recovery state; migration remains additive and does not select partial provider
 state.
+
+## Finite owned local composition
+
+The proposed local composition profile ([ADR 0064](../decisions/0064-local-application-composition.md)) prepares actual dataset seed and CICS definition owners and commits their exact provider rows with the ordinary installer selection in one shared-store atomic call. It binds full signed program, explicit resource, transaction target and raw seed bytes. Its full seed snapshot binding includes attributes. Exact successful retries preserve runtime edits; retained rollback and reopening join the original generation and full static rows. Unknown atomic returns fence live owners until authoritative reopen.
+
+This finite profile refuses sections without a genuine held preparation. Complete signed raw Source files and their dependency closure now pass through the actual bounded compiler and must reproduce the entire offered publisher result; full SourceIds join the local selection, retry and receipt. The explicit finite first-party profile signs exact canonical Resource commitments at `source-commitment/{PROGRAM}` and requires the Program dependency: actual SourceId plus executable mode/target/full request options/logical Source mapping must match before compilation. SourceId authenticates all immutable bundle metadata, including format/encoding/provenance/COPY order; the existing signed Resource hash authenticates the remaining declaration. A same-payload metadata change requires a genuinely newly signed commitment. This establishes identity admission; package-only SourceBundle reconstruction still requires a separate encoding, and vendor/global equivalence is not inferred. Verified Profile and Migration content does not establish external policy installation or migration execution. Its implementation controls remain unrun, and it does not change the frozen global application, V3, seed, rollback, oracle, vendor or Foundation acceptance criteria.
+
+### Finite owned RACF profile participant
+
+ADR-0068 extends the ADR-0064 local composition with a genuine held SecurityDatabase
+participant. The new first-party `mainframe-env.application-local-racf-profile@1`
+payload is authenticated as an exact signed Profile entry and must agree with the
+original class/profile/owner section. Complete UACC and unconditional grants are
+explicit; existing principals, classes and templates are required. The provider's
+real MERACF2 codec validates the full prepared snapshot and the same-store atomic
+acknowledgement controls release of its writer.
+
+The selected authority is a full participating-profile/class/template projection,
+not a copy of mutable audit/session/token state. Exact retry preserves runtime
+updates, while upgrade and rollback assign monotonic profile versions to the signed
+content in the current snapshot. CURRENT foreign package ownership refuses before
+retry, even after trusted administration empties or removes the profile. Unknown
+publication quarantines the live provider until reopen. Raclisted classes, arbitrary
+segments/conditions and vendor syntax are outside this finite local profile.
+
+### Finite owned local Db2 participant
+
+ADR-0069 joins the existing signed `data/db2/catalog` codec and all typed SQL
+sections through an actual held Db2 catalog preparation and the genuine shared
+store acknowledgement. Full static definitions/CURRENT ownership and actual
+provider versions determine finite readiness; original runtime rows and retained
+rollback snapshots remain real provider state. The lock precedes the RACF writer.
+This Put-only fixed-name profile refuses legacy adoption, foreign ownership, stale
+state and unknown outcomes. Its bounded history admission does not change legacy
+provider limits. SQLCA/IBM interpretation, full V3 and Foundation acceptance remain
+separate original obligations; no new complete flag or component PASS is substituted.
+
+The finite local composition profile may include the full existing IMS metadata catalog using ADR-0071. Its genuine initial generic engine images and retained metadata-generation selection are committed with the same held provider transaction. Package-generation changes and rollback preserve the byte-equal catalog and all actual runtime records; changed catalog schemas, legacy IMS seed declarations and TM installation remain separate participants. No complete application-publication state or vendor semantics are inferred from this local Ready composition.
+
+The proposed finite local MQ participant authenticates full signed queue Resource bytes and retains one unchanged original typed catalog across generation changes and rollback. It holds the genuine MQ durable owner before RACF, compares complete original rows, advances the original runtime manifest in the shared CAS and requires same-store acknowledgement. Native MQI, Process/Trigger graph mapping and controller dispatch remain separate local work. See [ADR-0072](../decisions/0072-local-fixed-mq-queue-composition.md).
+
+The finite owned local composition may additionally select exact signed TSO ProgramCall controller definitions and their genuine compiled `batch-program` bindings. The batch provider holds its actual registry owner, validates the original full registry and retained-generation rules, joins the exact CAS row to the same-store commit, and fences unknown acknowledgement. Readiness compares full selected content and mappings; unrelated controllers and JES runtime remain owned by their original services. This installation profile preserves the separate genuine Complete-publication requirement for controller execution; it grants no execution or global CD009 completion authority. The explicit signed Resource contract and finite snapshot budgets are specified in ADR-0073.

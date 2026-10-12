@@ -201,7 +201,13 @@ explicitly names that authority as superseded.
 - [ADR-0061: Bounded COBOL initializer byte carrier](decisions/0061-cobol-chunked-initializer-carrier.md)
 - [ADR-0062: Provisional passive Db2 machine copyback trace](decisions/0062-passive-db2-copyback.md)
 - [ADR-0063: Actual dispatch ownership for selected readonly effects](decisions/0063-readonly-dispatch-ownership.md)
+- [ADR-0064: Owned local application composition](decisions/0064-local-application-composition.md)
 - [ADR-0065: Local EXEC DLI exact storage copyback](decisions/0065-local-exec-dli-exact-storage-copyback.md)
+- [ADR-0068: Owned local RACF profile composition](decisions/0068-local-racf-profile-composition.md)
+- [ADR-0069: Owned local Db2 catalog composition](decisions/0069-local-db2-catalog-composition.md)
+- [ADR-0071: Owned local fixed IMS catalog composition](decisions/0071-local-fixed-ims-catalog-composition.md)
+- [ADR-0072: Owned local fixed MQ queue catalog composition](decisions/0072-local-fixed-mq-queue-composition.md)
+- [ADR-0073: Owned local TSO ProgramCall controller composition](decisions/0073-local-batch-controller-composition.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.
 

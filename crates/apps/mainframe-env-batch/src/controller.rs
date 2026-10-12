@@ -7,7 +7,7 @@ pub(crate) const BATCH_CONTROLLER_STATE_CONTRACT: &str = "mainframe-env.batch-co
 const MAX_APPLICATIONS: usize = 1_024;
 const MAX_ACTIVE_CONTROLLERS: usize = 16_384;
 const MAX_RETAINED_GENERATIONS: usize = 64;
-const MAX_CONTROLLERS_PER_GENERATION: usize = 4_096;
+pub(crate) const MAX_CONTROLLERS_PER_GENERATION: usize = 4_096;
 const MAX_RETAINED_GENERATIONS_TOTAL: usize = 4_096;
 const MAX_RETAINED_CONTROLLERS: usize = 65_536;
 pub(crate) const MAX_CONTROLLER_STATE_BYTES: usize = 64 * 1024 * 1024;
@@ -825,6 +825,8 @@ fn validate_identity(value: &str) -> Result<(), HostProblem> {
         Ok(())
     }
 }
+
+mod composition;
 
 #[cfg(test)]
 mod tests {

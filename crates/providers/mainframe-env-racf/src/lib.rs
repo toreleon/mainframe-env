@@ -26,7 +26,10 @@ pub use command::{
     validate_command,
 };
 pub use command_processor::{CommandContext, CommandObjectKind, CommandRecord, CommandResult};
-pub use database::{SecurityDatabase, SecurityDatabaseSummary, SecuritySemanticProjection};
+pub use database::{
+    PreparedRacfProfiles, RacfProfileComposition, RacfProfileProjection, SecurityDatabase,
+    SecurityDatabaseSummary, SecuritySemanticProjection,
+};
 pub use model::{
     AccessCondition, AccessControlEntry, AccessLevel, Acee, AceeState, AssociationState,
     AuditFieldValue, AuditPolicy, CertificateReference, ClassDescriptor, DatabaseSharingMode,

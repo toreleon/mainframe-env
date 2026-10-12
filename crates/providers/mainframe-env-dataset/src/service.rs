@@ -26,6 +26,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
 
 mod browse_ops;
+mod seed_preparation;
+pub use seed_preparation::PreparedSeedSelection;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct DatasetLimits {
@@ -732,6 +734,7 @@ pub struct DatasetService {
     limits: DatasetLimits,
     state: Mutex<State>,
     replay_clock: Option<Arc<dyn DatasetReplayClock>>,
+    composition_uncertain: std::sync::atomic::AtomicBool,
 }
 
 /// Trusted durable logical-time source used after a replay result is persisted.
@@ -1075,6 +1078,7 @@ impl DatasetService {
             store,
             limits,
             replay_clock,
+            composition_uncertain: std::sync::atomic::AtomicBool::new(false),
             state: Mutex::new(State {
                 entries,
                 alternate_indexes,
@@ -1111,204 +1115,12 @@ impl DatasetService {
         validate_seed_label(package)?;
         validate_seed_label(generation)?;
         let planned = self
-            .state
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .lock_state()?
             .seed_generations
             .get(&(package.to_ascii_uppercase(), generation.to_string()))
             .cloned()
             .ok_or(HostProblem::NotFound)?;
         self.select_seed_generation(planned, false)
-    }
-
-    pub fn selected_seed_generation(&self, package: &str) -> Result<Option<String>, HostProblem> {
-        validate_seed_label(package)?;
-        Ok(self
-            .state
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?
-            .seed_selections
-            .get(&package.to_ascii_uppercase())
-            .map(|selection| selection.generation.clone()))
-    }
-
-    fn select_seed_generation(
-        &self,
-        planned: SeedGeneration,
-        retain_new: bool,
-    ) -> Result<SeedInstallReceipt, HostProblem> {
-        let mut state = self
-            .state
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let package = planned.package.clone();
-        let generation = planned.generation.clone();
-        let key = (package.clone(), generation.clone());
-        if let Some(existing) = state.seed_generations.get(&key)
-            && existing != &planned
-        {
-            return Err(HostProblem::IdempotencyConflict);
-        }
-        let current_selection = state.seed_selections.get(&package).cloned();
-        if current_selection
-            .as_ref()
-            .is_some_and(|selection| selection.generation == generation)
-        {
-            return Ok(seed_receipt(&planned, true));
-        }
-        let previous_entries = current_selection
-            .as_ref()
-            .and_then(|selection| {
-                state
-                    .seed_generations
-                    .get(&(package.clone(), selection.generation.clone()))
-            })
-            .map(|generation| generation.entries.keys().cloned().collect::<Vec<_>>())
-            .unwrap_or_default();
-        let next_entries = planned.entries.keys().cloned().collect::<Vec<_>>();
-        if !previous_entries.is_empty() && previous_entries != next_entries {
-            return Err(HostProblem::IdempotencyConflict);
-        }
-        let mut installed = BTreeMap::new();
-        let mut writes = Vec::new();
-        for (name, snapshot) in &planned.entries {
-            let current = state.entries.get(name);
-            if current_selection.is_none()
-                && current.is_some_and(|entry| {
-                    entry.attributes != snapshot.attributes
-                        || !entry.records.is_empty()
-                        || !entry.members.is_empty()
-                        || !entry.relative_records.is_empty()
-                        || !entry.member_generations.is_empty()
-                        || !entry.member_aliases.is_empty()
-                })
-            {
-                return Err(HostProblem::IdempotencyConflict);
-            }
-            let mut entry = snapshot.clone();
-            entry.version = current.map_or(1, |entry| entry.version.saturating_add(1));
-            validate_entry_shape(&entry, self.limits)?;
-            writes.push(ProviderStateWrite {
-                record: ProviderStateRecord {
-                    namespace: "dataset".into(),
-                    key: name.clone(),
-                    version: entry.version,
-                    payload: encode(&entry).map_err(|_| HostProblem::InfrastructureFailure)?,
-                },
-                expected_version: current.map(|entry| entry.version),
-            });
-            installed.insert(name.clone(), entry);
-        }
-        if state
-            .entries
-            .len()
-            .checked_add(
-                installed
-                    .keys()
-                    .filter(|name| !state.entries.contains_key(*name))
-                    .count(),
-            )
-            .and_then(|total| total.checked_add(state.alternate_indexes.len()))
-            .and_then(|total| total.checked_add(state.generation_groups.len()))
-            .is_none_or(|total| total > self.limits.max_datasets)
-        {
-            return Err(HostProblem::ResourceExhausted);
-        }
-        let mut updated_indexes = Vec::new();
-        for (name, index) in &state.alternate_indexes {
-            let Some(entry) = installed.get(&index.base) else {
-                continue;
-            };
-            validate_alternate_index(entry, index)?;
-            let mut updated = index.clone();
-            if updated.upgrade {
-                updated.identities = build_alternate_identities(entry, &updated)?;
-            }
-            validate_index_identities(entry, &updated)?;
-            updated.version = updated
-                .version
-                .checked_add(1)
-                .ok_or(HostProblem::ResourceExhausted)?;
-            writes.push(ProviderStateWrite {
-                record: ProviderStateRecord {
-                    namespace: "dataset-aix".into(),
-                    key: name.clone(),
-                    version: updated.version,
-                    payload: encode_alternate_index(&updated)?,
-                },
-                expected_version: Some(index.version),
-            });
-            updated_indexes.push((name.clone(), updated));
-        }
-        if retain_new && !state.seed_generations.contains_key(&key) {
-            writes.push(ProviderStateWrite {
-                record: ProviderStateRecord {
-                    namespace: "dataset-seed-generation".into(),
-                    key: seed_generation_key(&package, &generation),
-                    version: 1,
-                    payload: encode_seed_generation(&planned)?,
-                },
-                expected_version: None,
-            });
-        }
-        let next_selection = SeedSelection {
-            generation: generation.clone(),
-            version: current_selection
-                .as_ref()
-                .map_or(1, |selection| selection.version.saturating_add(1)),
-        };
-        let mut dependencies = state.dependencies.clone();
-        for (name, entry) in &installed {
-            dependencies.set_direct_dependencies(
-                name,
-                entry
-                    .catalog
-                    .catalog
-                    .iter()
-                    .map(|catalog| catalog.as_str().to_string()),
-                dependency_limits(self.limits),
-            )?;
-        }
-        writes.push(ProviderStateWrite {
-            record: ProviderStateRecord {
-                namespace: "dataset-seed-selection".into(),
-                key: package.clone(),
-                version: next_selection.version,
-                payload: encode_seed_selection(&next_selection)?,
-            },
-            expected_version: current_selection
-                .as_ref()
-                .map(|selection| selection.version),
-        });
-        if let Err(error) = self.store.put_provider_states_atomic(writes) {
-            if matches!(
-                error,
-                StoreError::CapacityExceeded | StoreError::PayloadTooLarge
-            ) {
-                return Err(HostProblem::ResourceExhausted);
-            }
-            if error == StoreError::Conflict {
-                return Err(HostProblem::IdempotencyConflict);
-            }
-            let selected = self
-                .store
-                .get_provider_state("dataset-seed-selection", &package)
-                .map_err(store_error)?
-                .ok_or(HostProblem::UnknownOutcome)?;
-            if decode_seed_selection(&selected.payload, selected.version)? != next_selection {
-                return Err(HostProblem::UnknownOutcome);
-            }
-        }
-        state.entries.extend(installed);
-        state.dependencies = dependencies;
-        for (name, index) in updated_indexes {
-            state.alternate_indexes.insert(name, index);
-        }
-        if retain_new {
-            state.seed_generations.insert(key, planned.clone());
-        }
-        state.seed_selections.insert(package, next_selection);
-        Ok(seed_receipt(&planned, false))
     }
 
     pub fn invoke(&self, request: DatasetRequest) -> Result<DatasetResult, HostProblem> {
@@ -1323,10 +1135,7 @@ impl DatasetService {
     /// or changed row is fully validated before publication; corruption
     /// leaves the old index unchanged and fails closed.
     pub fn refresh_replay_index(&self) -> Result<usize, HostProblem> {
-        let mut state = self
-            .state
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let mut state = self.lock_state()?;
         state.replay.sync(&*self.store, self.limits)?;
         Ok(state.replay.len())
     }
@@ -1337,10 +1146,7 @@ impl DatasetService {
         mut trusted_metadata: Option<ReplayRetentionMetadata>,
         request: DatasetRequest,
     ) -> Result<DatasetResult, HostProblem> {
-        let mut state = self
-            .state
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let mut state = self.lock_state()?;
         state.replay.sync(&*self.store, self.limits)?;
         HostRequest::Dataset(request.clone()).validate(mainframe_env_host_api::HostLimits {
             max_record_bytes: self.limits.max_record_bytes,
@@ -4827,10 +4633,7 @@ impl DatasetService {
         if max == 0 || max > self.limits.max_members {
             return Err(HostProblem::ResourceExhausted);
         }
-        let state = self
-            .state
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let state = self.lock_state()?;
         let entry = entry(&state, dataset)?;
         if !partitioned(entry.attributes.organization) {
             return Err(HostProblem::Unsupported);

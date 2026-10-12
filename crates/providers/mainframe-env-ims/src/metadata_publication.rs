@@ -1,4 +1,6 @@
 use crate::ImsService;
+
+pub(crate) mod composition;
 use mainframe_env_host_api::{
     HostProblem, ImsMetadataCatalog, ImsMetadataLimits, validate_ims_metadata,
 };
@@ -80,108 +82,113 @@ impl ImsService {
         package_identity: &str,
         catalog: Option<&ImsMetadataCatalog>,
     ) -> Result<ImsMetadataPublicationReceipt, HostProblem> {
-        let application = normalize_application(application)?;
-        validate_generation_identity(generation, package_identity)?;
-        let validated = catalog
-            .map(|catalog| {
-                self.validate_secondary_metadata(catalog)?;
-                validate_ims_metadata(catalog, ImsMetadataLimits::default())
-                    .map(|identity| (catalog.clone(), identity.digest))
-                    .map_err(|_| HostProblem::Malformed)
-            })
-            .transpose()?;
-        let metadata_identity = validated.as_ref().map(|(_, identity)| identity.clone());
-        let desired = SelectedGeneration {
-            schema_version: SELECTION_SCHEMA.into(),
-            application: application.clone(),
-            generation,
-            package_identity: package_identity.into(),
-            metadata_identity: metadata_identity.clone(),
-        };
-        let selection = self
-            .store
-            .get_provider_state(SELECTION_NAMESPACE, &application)
-            .map_err(store_error)?;
-        let selection_replayed = selection
-            .as_ref()
-            .map(decode_selection)
-            .transpose()?
-            .as_ref()
-            == Some(&desired);
-
-        let generation_namespace = generation_namespace(&application);
-        let generation_key = generation_key(generation);
-        let existing_generation = self
-            .store
-            .get_provider_state(&generation_namespace, &generation_key)
-            .map_err(store_error)?;
-        let generation_write = if let Some((catalog, identity)) = validated {
-            let stored = StoredGeneration {
-                schema_version: GENERATION_SCHEMA.into(),
+        self.with_catalog_composition_owner(|| {
+            let application = normalize_application(application)?;
+            validate_generation_identity(generation, package_identity)?;
+            let validated = catalog
+                .map(|catalog| {
+                    self.validate_secondary_metadata(catalog)?;
+                    validate_ims_metadata(catalog, ImsMetadataLimits::default())
+                        .map(|identity| (catalog.clone(), identity.digest))
+                        .map_err(|_| HostProblem::Malformed)
+                })
+                .transpose()?;
+            let metadata_identity = validated.as_ref().map(|(_, identity)| identity.clone());
+            let desired = SelectedGeneration {
+                schema_version: SELECTION_SCHEMA.into(),
                 application: application.clone(),
                 generation,
                 package_identity: package_identity.into(),
-                metadata_identity: identity,
-                catalog,
+                metadata_identity: metadata_identity.clone(),
             };
-            match existing_generation {
-                Some(record) if decode_generation(&record)? == stored => None,
-                Some(_) => return Err(HostProblem::IdempotencyConflict),
-                None => {
-                    if self
-                        .store
-                        .list_provider_state(&generation_namespace, MAX_RETAINED_GENERATIONS + 1)
-                        .map_err(store_error)?
-                        .len()
-                        >= MAX_RETAINED_GENERATIONS
-                    {
-                        return Err(HostProblem::ResourceExhausted);
+            let selection = self
+                .store
+                .get_provider_state(SELECTION_NAMESPACE, &application)
+                .map_err(store_error)?;
+            let selection_replayed = selection
+                .as_ref()
+                .map(decode_selection)
+                .transpose()?
+                .as_ref()
+                == Some(&desired);
+
+            let generation_namespace = generation_namespace(&application);
+            let generation_key = generation_key(generation);
+            let existing_generation = self
+                .store
+                .get_provider_state(&generation_namespace, &generation_key)
+                .map_err(store_error)?;
+            let generation_write = if let Some((catalog, identity)) = validated {
+                let stored = StoredGeneration {
+                    schema_version: GENERATION_SCHEMA.into(),
+                    application: application.clone(),
+                    generation,
+                    package_identity: package_identity.into(),
+                    metadata_identity: identity,
+                    catalog,
+                };
+                match existing_generation {
+                    Some(record) if decode_generation(&record)? == stored => None,
+                    Some(_) => return Err(HostProblem::IdempotencyConflict),
+                    None => {
+                        if self
+                            .store
+                            .list_provider_state(
+                                &generation_namespace,
+                                MAX_RETAINED_GENERATIONS + 1,
+                            )
+                            .map_err(store_error)?
+                            .len()
+                            >= MAX_RETAINED_GENERATIONS
+                        {
+                            return Err(HostProblem::ResourceExhausted);
+                        }
+                        Some(ProviderStateWrite {
+                            record: ProviderStateRecord {
+                                namespace: generation_namespace,
+                                key: generation_key,
+                                version: 1,
+                                payload: encode(&stored)?,
+                            },
+                            expected_version: None,
+                        })
                     }
-                    Some(ProviderStateWrite {
-                        record: ProviderStateRecord {
-                            namespace: generation_namespace,
-                            key: generation_key,
-                            version: 1,
-                            payload: encode(&stored)?,
-                        },
-                        expected_version: None,
-                    })
                 }
-            }
-        } else {
-            if existing_generation.is_some() {
-                return Err(HostProblem::IdempotencyConflict);
-            }
-            None
-        };
+            } else {
+                if existing_generation.is_some() {
+                    return Err(HostProblem::IdempotencyConflict);
+                }
+                None
+            };
 
-        if selection_replayed && generation_write.is_none() {
-            return Ok(publication_receipt(desired, true));
-        }
+            if selection_replayed && generation_write.is_none() {
+                return Ok(publication_receipt(desired, true));
+            }
 
-        let selection_version = selection.as_ref().map_or(Ok(1), |record| {
-            record
-                .version
-                .checked_add(1)
-                .ok_or(HostProblem::ResourceExhausted)
-        })?;
-        let mut writes = Vec::with_capacity(2);
-        if let Some(write) = generation_write {
-            writes.push(write);
-        }
-        writes.push(ProviderStateWrite {
-            record: ProviderStateRecord {
-                namespace: SELECTION_NAMESPACE.into(),
-                key: application,
-                version: selection_version,
-                payload: encode(&desired)?,
-            },
-            expected_version: selection.as_ref().map(|record| record.version),
-        });
-        self.store
-            .put_provider_states_atomic(writes)
-            .map_err(store_error)?;
-        Ok(publication_receipt(desired, false))
+            let selection_version = selection.as_ref().map_or(Ok(1), |record| {
+                record
+                    .version
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)
+            })?;
+            let mut writes = Vec::with_capacity(2);
+            if let Some(write) = generation_write {
+                writes.push(write);
+            }
+            writes.push(ProviderStateWrite {
+                record: ProviderStateRecord {
+                    namespace: SELECTION_NAMESPACE.into(),
+                    key: application,
+                    version: selection_version,
+                    payload: encode(&desired)?,
+                },
+                expected_version: selection.as_ref().map(|record| record.version),
+            });
+            self.store
+                .put_provider_states_atomic(writes)
+                .map_err(store_error)?;
+            Ok(publication_receipt(desired, false))
+        })
     }
 
     pub fn selected_metadata_generation(

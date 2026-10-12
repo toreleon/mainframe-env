@@ -1,4 +1,6 @@
+mod catalog_preparation;
 mod catalog_publication;
+pub use catalog_preparation::{Db2CatalogProjection, PreparedDb2Catalog};
 mod cursor;
 
 use cursor::open_cursor;
@@ -280,6 +282,7 @@ pub struct Db2Service {
     durable: Mutex<DurableState>,
     authorizer: Option<Arc<dyn EnterpriseAuthorizer>>,
     replay_clock: Option<Arc<dyn Db2ReplayClock>>,
+    composition_uncertain: std::sync::atomic::AtomicBool,
 }
 
 impl Db2Service {
@@ -330,52 +333,8 @@ impl Db2Service {
             durable: Mutex::new(DurableState { versions, state }),
             authorizer,
             replay_clock,
+            composition_uncertain: std::sync::atomic::AtomicBool::new(false),
         }))
-    }
-
-    /// Validate a prospective install using the same current-state checks, without persistence.
-    pub fn validate_catalog_install(
-        &self,
-        catalog: &Db2CatalogGeneration,
-    ) -> Result<(), HostProblem> {
-        catalog.validate(self.limits)?;
-        let durable = self.lock()?;
-        self.prospective_catalog_install(&durable.state, catalog.clone())?;
-        Ok(())
-    }
-
-    pub fn install_catalog(&self, catalog: Db2CatalogGeneration) -> Result<(), HostProblem> {
-        catalog.validate(self.limits)?;
-        let mut durable = self.lock()?;
-        match self.prospective_catalog_install(&durable.state, catalog)? {
-            Some(next) => self.persist(&mut durable, next),
-            None => Ok(()),
-        }
-    }
-
-    /// Validate retained rollback selection without applying forward-generation rules.
-    pub fn validate_catalog_rollback(
-        &self,
-        application: &str,
-        generation: u64,
-        identity: &str,
-    ) -> Result<(), HostProblem> {
-        let durable = self.lock()?;
-        let next = self.prospective_catalog_rollback(&durable.state, application, generation)?;
-        if next
-            .installations
-            .get(&application.to_ascii_uppercase())
-            .is_none_or(|installed| installed.identity != identity)
-        {
-            return Err(HostProblem::IdempotencyConflict);
-        }
-        Ok(())
-    }
-
-    pub fn rollback_catalog(&self, application: &str, generation: u64) -> Result<(), HostProblem> {
-        let mut durable = self.lock()?;
-        let next = self.prospective_catalog_rollback(&durable.state, application, generation)?;
-        self.persist(&mut durable, next)
     }
 
     pub fn execute(
@@ -584,12 +543,6 @@ impl Db2Service {
         commit_row_changes(&*self.store, changes, &mut durable.versions)?;
         durable.state = state;
         Ok(())
-    }
-
-    fn lock(&self) -> Result<MutexGuard<'_, DurableState>, HostProblem> {
-        self.durable
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)
     }
 }
 

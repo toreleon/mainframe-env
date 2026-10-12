@@ -110,7 +110,9 @@ pub use retention::{
     Db2ReplayOwnerKind, Db2ReplayRetentionDescriptor, Db2ReplayRetentionError,
     Db2ReplayRetentionState, describe_db2_replay_row,
 };
-pub use service::{Db2Limits, Db2ReplayClock, Db2Service, db2_providers};
+pub use service::{
+    Db2CatalogProjection, Db2Limits, Db2ReplayClock, Db2Service, PreparedDb2Catalog, db2_providers,
+};
 pub use statement::{
     Db2BoundColumnDefault, Db2BoundColumnDefaultResult, Db2BoundCreateTableColumnDefaults,
     Db2ColumnDefaultBindingError, Db2ColumnDefaultBindingErrorCode, Db2ColumnDefaultBindingLimits,

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Join signed fixed local MQ queue declarations and original provider rows to owned application composition."

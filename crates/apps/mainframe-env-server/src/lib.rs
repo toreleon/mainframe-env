@@ -26,7 +26,8 @@ pub use config::{
 pub use environment_secrets::EnvironmentSecretResolver;
 pub use product::{
     ApplicationPublicationReceipt, BatchInstallReceipt, BatchProgramDefinition,
-    HmacSha256PackageTrust, OnlineApplicationDefinition, OnlineInstallReceipt,
+    HmacSha256PackageTrust, LocalApplicationDefinition, LocalApplicationReceipt,
+    LocalSourceCompilation, OnlineApplicationDefinition, OnlineInstallReceipt,
     OnlineProgramDefinition, ProductCapacityStatus, ProductMetrics, ProductReadiness,
     ProductServer,
 };

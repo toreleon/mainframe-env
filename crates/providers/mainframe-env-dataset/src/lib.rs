@@ -18,7 +18,8 @@ pub use retention::{
     DatasetReplayValidationError,
 };
 pub use service::{
-    DatasetLimits, DatasetReplayClock, DatasetSeedObject, DatasetService, SeedInstallReceipt,
-    dataset_providers, describe_dataset_replay_row, describe_dataset_replay_row_with_limits,
-    reconcile_dataset_replay_row, validate_dataset_replay_effect,
+    DatasetLimits, DatasetReplayClock, DatasetSeedObject, DatasetService, PreparedSeedSelection,
+    SeedInstallReceipt, dataset_providers, describe_dataset_replay_row,
+    describe_dataset_replay_row_with_limits, reconcile_dataset_replay_row,
+    validate_dataset_replay_effect,
 };

@@ -54,10 +54,7 @@ impl BatchService {
         &self,
         generation: &BatchControllerGeneration,
     ) -> Result<(), HostProblem> {
-        let durable = self
-            .controllers
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let durable = self.controller_composition_lock()?;
         durable.registry.preflight_install(generation)?;
         let mut prospective = durable.registry.clone();
         prospective.install(generation.clone())?;
@@ -71,10 +68,7 @@ impl BatchService {
         generation: u64,
         identity: &str,
     ) -> Result<(), HostProblem> {
-        let durable = self
-            .controllers
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let durable = self.controller_composition_lock()?;
         let mut prospective = durable.registry.clone();
         let receipt = prospective.select(application, generation)?;
         if receipt.identity != identity {
@@ -136,10 +130,7 @@ impl BatchService {
         &self,
         generation: BatchControllerGeneration,
     ) -> Result<BatchControllerInstallReceipt, HostProblem> {
-        let mut durable = self
-            .controllers
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let mut durable = self.controller_composition_lock()?;
         durable.registry.preflight_install(&generation)?;
         let mut replacement = durable.registry.clone();
         let receipt = replacement.install(generation)?;
@@ -160,10 +151,7 @@ impl BatchService {
         application: &str,
         generation: u64,
     ) -> Result<BatchControllerInstallReceipt, HostProblem> {
-        let mut durable = self
-            .controllers
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let mut durable = self.controller_composition_lock()?;
         let mut replacement = durable.registry.clone();
         let receipt = replacement.select(application, generation)?;
         self.persist_controllers(&mut durable, replacement)?;
@@ -174,9 +162,7 @@ impl BatchService {
         &self,
         selector: &BatchControllerSelector,
     ) -> Result<Option<ResolvedBatchController>, HostProblem> {
-        self.controllers
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)
+        self.controller_composition_lock()
             .map(|durable| durable.registry.resolve(selector))
     }
 
