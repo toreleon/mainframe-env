@@ -1,3 +1,4 @@
+mod dataset_input;
 mod dd_allocation;
 mod effect_loan;
 mod hex_encoding;
@@ -71,7 +72,6 @@ const SCHEDULER_STATE_NAMESPACE: &str = "jes-scheduler";
 const TOPOLOGY_STATE_NAMESPACE: &str = "jes-topology";
 const CONFIGURATION_STATE_KEY: &str = "configuration";
 const MAX_DURABLE_JOB_EVENTS: usize = 65_536;
-const MAX_DATASET_INPUT_RECORDS: u32 = 4_096;
 const MAX_JOB_EVENT_BYTES: usize = 4_096;
 const MAX_JOB_NUMBER: u64 = 99_999_999;
 const DCOLLECT_PAGE_SIZE: u32 = 256;
@@ -4011,38 +4011,6 @@ impl BatchService {
         Ok(allocations)
     }
 
-    fn read_dataset_records(
-        &self,
-        invocation: &(impl RunInput + ?Sized),
-        allocation: &DdRuntimeAllocation,
-        effect_sequence: &mut u64,
-    ) -> Result<Vec<Vec<u8>>, HostProblem> {
-        invocation.check()?;
-        let sequence = next_effect_sequence(invocation, effect_sequence)?;
-        let result = self.invoke_host(
-            invocation,
-            invocation.original().deadline_tick.saturating_sub(1),
-            false,
-            EffectRequest {
-                run_unit: invocation.original().run_unit_id.clone(),
-                sequence,
-                deadline_tick: invocation.original().deadline_tick,
-                idempotency_key: None,
-                request: HostRequest::Dataset(DatasetRequest::Read {
-                    dataset: allocation.dataset.clone(),
-                    member: allocation.member.clone(),
-                    key: None,
-                    max_records: MAX_DATASET_INPUT_RECORDS,
-                    control: Default::default(),
-                }),
-            },
-        );
-        let HostResult::Dataset(DatasetResult::Records { records, .. }) = result.outcome? else {
-            return Err(HostProblem::ProviderFailure);
-        };
-        Ok(records)
-    }
-
     fn hydrate_dds(
         &self,
         invocation: &(impl RunInput + ?Sized),
@@ -4106,7 +4074,7 @@ impl BatchService {
                                 .map(|allocation| allocation.dataset.clone())
                                 .collect(),
                             member: group_allocations[0].member.clone(),
-                            max_records: MAX_DATASET_INPUT_RECORDS,
+                            max_records: dataset_input::MAX_DATASET_INPUT_RECORDS,
                         }),
                     },
                 );
@@ -4141,13 +4109,7 @@ impl BatchService {
                     }
                 }
             }
-            if records.len() > MAX_DATASET_INPUT_RECORDS as usize {
-                return Err(HostProblem::Condition {
-                    name: "DATASET_READ_TRUNCATED".into(),
-                    response: 16,
-                    response2: 0,
-                });
-            }
+            dataset_input::validate_record_count(records.len())?;
             hydrated
                 .entry(name.to_ascii_uppercase())
                 .or_default()

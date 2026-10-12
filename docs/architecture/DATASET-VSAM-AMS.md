@@ -31,7 +31,9 @@ condition `DATASET_READ_TRUNCATED` (response 16, response2 0).
 Batch hydration has a fixed invocation budget of 4,096 records per input DD,
 including all entries of a concatenation. An input beyond that budget fails
 before program execution or output writes. AMS, server whole-input reads,
-interpreter input and conformance observations also reject incomplete results.
+interpreter SORT input and conformance observations also reject incomplete results.
+Single-record CICS and COBOL READ operations consume their requested record even
+when `more` is true, retaining ordinary record and update behavior.
 Cursor-based reads retain their existing explicit end-of-input behavior.
 See [ADR-0051](../decisions/0051-dataset-read-completeness.md) for compatibility.
 

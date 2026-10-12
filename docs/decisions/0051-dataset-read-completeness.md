@@ -19,6 +19,10 @@ budget condition with response 16 and response2 0. Batch retains an explicit
 step before executing a program on incomplete input. Cursor readers already
 have continuation and end-of-input observations.
 
+Single-record CICS and COBOL READ operations consume the requested record even
+when `more` is true, preserving record areas, status and update context. The
+interpreter requires completeness for SORT input, which needs the whole dataset.
+
 ## Compatibility
 
 The provider advertises dataset result contract `@3`. Rust constructors must add

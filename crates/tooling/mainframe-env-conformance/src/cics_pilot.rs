@@ -31,6 +31,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 mod coordinator;
+mod readback;
+use readback::read_record_hex;
 
 use coordinator::{PilotExecution, drive_artifact};
 
@@ -945,23 +947,6 @@ fn set_file_status(
         .map_err(|problem| problem.to_string())
 }
 
-fn read_record_hex(dataset: &DatasetService) -> Result<String, String> {
-    match dataset
-        .invoke(DatasetRequest::Read {
-            dataset: dataset_name()?,
-            member: None,
-            key: Some(encode("AA")?),
-            max_records: 1,
-            control: Default::default(),
-        })
-        .and_then(DatasetResult::require_complete)
-        .map_err(|problem| problem.to_string())?
-    {
-        DatasetResult::Records { records, .. } if records.len() == 1 => Ok(hex(&records[0])),
-        other => Err(format!("CICS pilot readback returned {other:?}")),
-    }
-}
-
 fn parse_command(
     output: &str,
     label: &str,
@@ -1326,6 +1311,7 @@ fn hex(bytes: &[u8]) -> String {
 mod tests {
     use super::*;
 
+    mod bounded_reads;
     mod contract_consumption;
     use mainframe_env_cics::{CicsReplayClock, CicsUowState, describe_cics_uow_row};
     use mainframe_env_store_api::{EffectDigestFormat, EffectState, IdempotencyStore};

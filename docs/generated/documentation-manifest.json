@@ -457,7 +457,7 @@
       "path": "docs/architecture/DATASET-VSAM-AMS.md",
       "relative_links": 1,
       "scope": "dataset, VSAM, catalog, and AMS authority",
-      "sha256": "sha256:d17f13b31ca6dfd0c9ddfe67d52aa09bc7167fef2f05e8193132c8755fa798a6",
+      "sha256": "sha256:94a54ec04c0f4bb623885f366266deedc0b53ea0aa3529d4229f4764486079bb",
       "status": "Normative from dataset.data",
       "title": "Dataset, VSAM, catalog, and AMS authority",
       "xtask_commands": 2
@@ -1461,7 +1461,7 @@
       "path": "docs/decisions/0051-dataset-read-completeness.md",
       "relative_links": 0,
       "scope": "Bounded dataset read results and whole-input consumers",
-      "sha256": "sha256:792b60122a3c6a0b9628cc122012fbada90a3a17075cb31baaaf9a3ff582fb39",
+      "sha256": "sha256:6191c7d6b87abd9c57ea9a214a2933c1bb30d0a9e20c25e25b32f2d9a00027b1",
       "status": "Proposed implementation for issue #186",
       "title": "ADR-0051: Explicit dataset read completeness",
       "xtask_commands": 0

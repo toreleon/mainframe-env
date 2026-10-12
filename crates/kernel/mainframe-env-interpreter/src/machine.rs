@@ -2,6 +2,7 @@ mod call_codec;
 pub use call_codec::encode_cobol_call_result;
 use call_codec::*;
 mod dataset_codec;
+mod dataset_reply;
 use dataset_codec::{dataset_file_status, decode_dataset_record, encode_dataset_record};
 
 mod date_helpers;
@@ -1687,12 +1688,7 @@ impl ReferenceMachine {
                 )),
                 (_, problem) => MachineProblem::Host(problem),
             })?;
-        let outcome = match outcome {
-            HostResult::Dataset(result) => {
-                HostResult::Dataset(result.require_complete().map_err(MachineProblem::Host)?)
-            }
-            outcome => outcome,
-        };
+        let outcome = dataset_reply::complete_whole_input(&pending.kind, outcome)?;
         match (pending.kind, outcome) {
             (PendingKind::Accept { target, .. }, HostResult::Terminal(payload)) => {
                 self.condition_status.accept_exception = false;
@@ -4262,28 +4258,6 @@ impl ReferenceMachine {
         Ok(record)
     }
 
-    fn finish_dataset_read(
-        &mut self,
-        target: &str,
-        into: Option<&str>,
-        depending_on: Option<&str>,
-        record: &[u8],
-    ) -> Result<(), MachineProblem> {
-        self.write(target, record)?;
-        if let Some(depending_on) = depending_on {
-            self.write_decimal(
-                depending_on,
-                Decimal {
-                    coefficient: record.len() as i128,
-                    scale: 0,
-                },
-            )?;
-        }
-        if let Some(into) = into {
-            self.write(into, record)?;
-        }
-        Ok(())
-    }
     fn ims_effect(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
         let opcode = args
             .iter()
@@ -11758,6 +11732,8 @@ mod size_truncation_tests;
 
 #[cfg(test)]
 mod tests {
+    mod dataset_completeness;
+
     use super::*;
     use mainframe_env_execution_api::{
         ArtifactRef, CapabilityId, ExecutionId, IdempotencyKey, Principal, PrincipalId, RequestId,
