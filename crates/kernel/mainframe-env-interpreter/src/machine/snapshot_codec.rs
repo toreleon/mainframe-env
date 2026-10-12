@@ -177,6 +177,21 @@ pub(super) fn encode_snapshot(snapshot: &MachineSnapshot) -> Option<Vec<u8>> {
         push_bytes(&mut bytes, name.as_bytes())?;
         bytes.extend_from_slice(&address.to_be_bytes());
     }
+    if snapshot.schema_version >= 13 {
+        bytes.extend_from_slice(
+            &u32::try_from(snapshot.float_profiles.len())
+                .ok()?
+                .to_be_bytes(),
+        );
+        for (name, profile) in &snapshot.float_profiles {
+            push_bytes(&mut bytes, name.as_bytes())?;
+            bytes.push(match profile.as_str() {
+                mainframe_env_ir::COBOL_FLOAT_IEEE => 0,
+                mainframe_env_ir::COBOL_FLOAT_HEX => 1,
+                _ => return None,
+            });
+        }
+    }
     Some(bytes)
 }
 

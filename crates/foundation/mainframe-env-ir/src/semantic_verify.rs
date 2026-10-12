@@ -1694,6 +1694,31 @@ mod tests {
     }
 
     #[test]
+    fn cobol_float_profiles_accept_legacy_and_named_representations_only() {
+        for category in ["float_short", "float_long"] {
+            let length = if category == "float_short" { 4 } else { 8 };
+            let base = layout_attributes("FLOAT-X", category, "", 0, 0, false, length);
+            assert!(verify_layout_definitions(vec![base.clone()]).is_ok());
+            for profile in [crate::COBOL_FLOAT_HEX, crate::COBOL_FLOAT_IEEE] {
+                let mut definition = base.clone();
+                definition.insert("float_profile".into(), Attribute::Text(profile.into()));
+                assert!(verify_layout_definitions(vec![definition]).is_ok());
+            }
+            for invalid in [Attribute::Text("unknown".into()), Attribute::Integer(0)] {
+                let mut definition = base.clone();
+                definition.insert("float_profile".into(), invalid);
+                assert!(verify_layout_definitions(vec![definition]).is_err());
+            }
+        }
+        let mut display = layout_attributes("DISPLAY-X", "numeric_display", "99", 2, 0, false, 2);
+        display.insert(
+            "float_profile".into(),
+            Attribute::Text(crate::COBOL_FLOAT_HEX.into()),
+        );
+        assert!(verify_layout_definitions(vec![display]).is_err());
+    }
+
+    #[test]
     fn cobol_layout_schema_rejects_wrong_types_domains_shapes_and_duplicates() {
         let base = || layout_attributes("RESULT", "numeric_display", "9(3)", 3, 0, false, 3);
         let mut invalid = Vec::new();

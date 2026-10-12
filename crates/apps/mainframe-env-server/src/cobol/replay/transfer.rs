@@ -69,9 +69,11 @@ impl TransferIntent {
             && self.source_artifact == source.artifact.as_str()
             && self.source_attempt == source.attempt
             && self.checkpoint_sequence == machine.effect_sequence()
-            && machine.checkpoint().is_some_and(|checkpoint| {
-                self.checkpoint_digest == format!("{:x}", Sha256::digest(checkpoint.bytes()))
-            })
+            && machine
+                .checkpoint_for_schema(&self.checkpoint_schema)
+                .is_some_and(|checkpoint| {
+                    self.checkpoint_digest == format!("{:x}", Sha256::digest(checkpoint.bytes()))
+                })
     }
 
     /// Recheck retained proof; a staged intent digest alone is not authority.
@@ -88,7 +90,9 @@ impl TransferIntent {
         if !observed.replace_frame {
             return Err(HostProblem::UnknownOutcome);
         }
-        let current = machine.checkpoint().ok_or(HostProblem::UnknownOutcome)?;
+        let current = machine
+            .checkpoint_for_schema(&self.checkpoint_schema)
+            .ok_or(HostProblem::UnknownOutcome)?;
         if !self.valid()
             || !self.matches(invocation, machine, observed)
             || execution.version != self.source_version
@@ -145,7 +149,11 @@ impl TransferIntent {
             && valid_digest(&self.checkpoint_digest)
             && self.checkpoint_sequence > 0
             && self.checkpoint_machine_schema == 1
-            && self.checkpoint_schema == "mainframe-env.reference-machine-checkpoint@12"
+            && matches!(
+                self.checkpoint_schema.as_str(),
+                "mainframe-env.reference-machine-checkpoint@12"
+                    | "mainframe-env.reference-machine-checkpoint@13"
+            )
     }
 
     pub(super) fn metadata_digest(&self) -> String {

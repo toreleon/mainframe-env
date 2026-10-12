@@ -20,6 +20,10 @@ mod tests {
 
     impl Proof {
         fn new() -> Self {
+            Self::with_floats(false)
+        }
+
+        fn with_floats(floating: bool) -> Self {
             let root = TestRoot::new();
             let fixture = Fixture::new(
                 &root,
@@ -27,7 +31,12 @@ mod tests {
                 HostProblem::NotFound,
                 false,
             );
-            fixture.install("EXIT", "IDENTIFICATION DIVISION. PROGRAM-ID. EXIT. DATA DIVISION. LINKAGE SECTION. 01 DFHCOMMAREA PIC X(4). PROCEDURE DIVISION USING DFHCOMMAREA. MOVE 'GOOD' TO DFHCOMMAREA. GOBACK.");
+            let data = if floating {
+                "WORKING-STORAGE SECTION. 01 F COMP-1. 01 D COMP-2."
+            } else {
+                ""
+            };
+            fixture.install("EXIT", &format!("IDENTIFICATION DIVISION. PROGRAM-ID. EXIT. DATA DIVISION. {data} LINKAGE SECTION. 01 DFHCOMMAREA PIC X(4). PROCEDURE DIVISION USING DFHCOMMAREA. MOVE 'GOOD' TO DFHCOMMAREA. GOBACK."));
             let admitted = fixture
                 .router
                 .cobol
@@ -132,6 +141,139 @@ mod tests {
                 payload: serde_json::to_vec(&self.receipt).unwrap(),
             }
         }
+    }
+
+    #[test]
+    fn float_checkpoint_target_constructor_accepts_schema13_and_legacy12() {
+        for floating in [false, true] {
+            let proof = Proof::with_floats(floating);
+            let schema = if floating {
+                "mainframe-env.reference-machine-checkpoint@13"
+            } else {
+                "mainframe-env.reference-machine-checkpoint@12"
+            };
+            assert_eq!(
+                proof.receipt.target.as_ref().unwrap().checkpoint_schema,
+                schema
+            );
+            assert!(decode_receipt(&proof.row()).is_ok());
+            assert_eq!(
+                proof.attest().unwrap().1.checkpoint().unwrap().schema(),
+                schema
+            );
+        }
+    }
+
+    #[test]
+    fn float_checkpoint_target_rejects_rehashed_schema_header_mismatch() {
+        for floating in [false, true] {
+            let mut proof = Proof::with_floats(floating);
+            proof.receipt.target.as_mut().unwrap().checkpoint_schema = if floating {
+                "mainframe-env.reference-machine-checkpoint@12"
+            } else {
+                "mainframe-env.reference-machine-checkpoint@13"
+            }
+            .into();
+            proof.receipt.metadata_digest = receipt_metadata_digest(&proof.receipt);
+            assert!(decode_receipt(&proof.row()).is_err());
+            assert!(matches!(proof.attest(), Err(HostProblem::UnknownOutcome)));
+        }
+    }
+
+    fn legacy_ieee_executable(
+        executable: &mainframe_env_compiler_api::ValidatedArtifact,
+    ) -> mainframe_env_compiler_api::ValidatedArtifact {
+        use mainframe_env_ir::{IrLimits, ModuleBuilder, decode_binary, encode_binary};
+        let module = decode_binary(executable.payload(), CodecLimits::default()).unwrap();
+        let mut builder = ModuleBuilder::new(IrLimits::default());
+        for storage in module.storage() {
+            builder
+                .add_storage(&storage.name, storage.size, storage.alias_of.clone())
+                .unwrap();
+        }
+        for region in module.regions() {
+            let region_id = builder.add_region().unwrap();
+            for block in &region.blocks {
+                let block_id = builder.add_block(region_id).unwrap();
+                for operation in &block.operations {
+                    let mut attributes = operation.attributes.clone();
+                    // Historical artifacts have no profile attribute, hence IEEE storage.
+                    attributes.remove("float_profile");
+                    builder
+                        .add_operation(
+                            block_id,
+                            operation.identity.clone(),
+                            operation.operands.clone(),
+                            operation.results.len(),
+                            attributes,
+                            operation.effects.clone(),
+                            operation.storage.clone(),
+                            operation.location.clone(),
+                        )
+                        .unwrap();
+                }
+            }
+        }
+        let binary = encode_binary(&builder.finish().unwrap(), CodecLimits::default()).unwrap();
+        mainframe_env_compiler_api::ValidatedArtifact::read(
+            mainframe_env_compiler_api::VersionedArtifactManifest::V3(
+                executable.manifest().clone(),
+            ),
+            &binary,
+            &mainframe_env_compiler::core_mir_catalog(),
+            &mainframe_env_compiler::core_mir_profile(),
+            CodecLimits::default(),
+            mainframe_env_compiler_api::ArtifactLimits::default(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn float_checkpoint_legacy12_floating_target_attests_constructor() {
+        let mut proof = Proof::with_floats(true);
+        proof.executable = legacy_ieee_executable(&proof.executable);
+        proof.selection.artifact = ArtifactRef::new(
+            proof.executable.content_id().to_reference(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let next = target_invocation(
+            &proof.source,
+            &proof.receipt,
+            &proof.selection,
+            &proof.observed,
+        )
+        .unwrap();
+        let saved = StagedInvocation::capture(&next).unwrap();
+        let machine =
+            ReferenceMachine::from_binary(proof.executable.payload(), next, CodecLimits::default())
+                .unwrap();
+        let checkpoint = machine.checkpoint().unwrap();
+        let profiles = machine.snapshot().float_profiles;
+        assert!(
+            profiles
+                .values()
+                .all(|profile| profile == mainframe_env_ir::COBOL_FLOAT_IEEE)
+        );
+        let trailer = 4 + profiles
+            .keys()
+            .map(|name| 8 + name.len() + 1)
+            .sum::<usize>();
+        let mut bytes = checkpoint.bytes().to_vec();
+        bytes.truncate(bytes.len() - trailer);
+        bytes[..8].copy_from_slice(b"MECP0012");
+        bytes[8..12].copy_from_slice(&12u32.to_be_bytes());
+        let target = proof.receipt.target.as_mut().unwrap();
+        target.artifact = proof.selection.artifact.as_str().into();
+        target.context_digest = saved.digest().unwrap();
+        target.invocation = saved;
+        target.checkpoint_schema = "mainframe-env.reference-machine-checkpoint@12".into();
+        target.checkpoint = STANDARD.encode(&bytes);
+        target.checkpoint_digest = format!("{:x}", Sha256::digest(&bytes));
+        proof.receipt.metadata_digest = receipt_metadata_digest(&proof.receipt);
+        assert!(decode_receipt(&proof.row()).is_ok());
+        let (_, constructor) = proof.attest().unwrap();
+        assert_eq!(constructor.checkpoint().unwrap(), checkpoint);
     }
 
     #[test]

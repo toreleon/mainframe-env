@@ -64,7 +64,37 @@ mod tests {
         pending_control(Some(required_postgres_route_url()), PendingControl::Suspend);
     }
 
+    #[test]
+    fn float_checkpoint_installed_xctl_source_survives_sqlite_cold_recovery() {
+        pending_control_with_floats(None, PendingControl::Xctl, true, false);
+    }
+
+    #[test]
+    fn float_checkpoint_installed_xctl_target_survives_sqlite_cold_recovery() {
+        pending_control_with_floats(None, PendingControl::Xctl, false, true);
+    }
+
+    #[test]
+    fn float_checkpoint_installed_xctl_both_survive_sqlite_cold_recovery() {
+        pending_control_with_floats(None, PendingControl::Xctl, true, true);
+    }
+
     fn pending_control(postgres: Option<String>, control: PendingControl) {
+        pending_control_with_floats(postgres, control, false, false);
+    }
+
+    fn pending_control_with_floats(
+        postgres: Option<String>,
+        control: PendingControl,
+        source_float: bool,
+        target_float: bool,
+    ) {
+        let source_data = if source_float { "01 F COMP-1." } else { "" };
+        let target_data = if target_float {
+            "WORKING-STORAGE SECTION. 01 D COMP-2."
+        } else {
+            ""
+        };
         let parent = published_source_fixture(
             "PCROOT",
             "IDENTIFICATION DIVISION. PROGRAM-ID. PCROOT. DATA DIVISION. \
@@ -92,7 +122,7 @@ mod tests {
             "PCMID",
             &format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. PCMID. DATA DIVISION. \
-             WORKING-STORAGE SECTION. 01 LEAF-AREA PIC X(4) VALUE 'LEAF'. \
+             WORKING-STORAGE SECTION. 01 LEAF-AREA PIC X(4) VALUE 'LEAF'. {source_data} \
              LINKAGE SECTION. 01 DFHCOMMAREA PIC X(4). \
              PROCEDURE DIVISION USING DFHCOMMAREA. {middle_control} \
              MOVE 'WRNG' TO DFHCOMMAREA. GOBACK."
@@ -107,9 +137,11 @@ mod tests {
         );
         let exit = published_source_fixture(
             "PCEXIT",
-            "IDENTIFICATION DIVISION. PROGRAM-ID. PCEXIT. DATA DIVISION. \
+            &format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. PCEXIT. DATA DIVISION. {target_data} \
              LINKAGE SECTION. 01 DFHCOMMAREA PIC X(4). \
-             PROCEDURE DIVISION USING DFHCOMMAREA. MOVE 'GOOD' TO DFHCOMMAREA. GOBACK.",
+             PROCEDURE DIVISION USING DFHCOMMAREA. MOVE 'GOOD' TO DFHCOMMAREA. GOBACK."
+            ),
         );
         let root = std::env::temp_dir().join(format!(
             "mainframe-pending-control-{}-{control:?}-{}",
@@ -332,7 +364,11 @@ mod tests {
                 assert_eq!(target["artifact"], exit.content_id().to_reference());
                 assert_eq!(
                     target["checkpoint_schema"],
-                    "mainframe-env.reference-machine-checkpoint@12"
+                    if target_float {
+                        "mainframe-env.reference-machine-checkpoint@13"
+                    } else {
+                        "mainframe-env.reference-machine-checkpoint@12"
+                    }
                 );
                 assert!(
                     target["checkpoint"]
@@ -345,6 +381,14 @@ mod tests {
                         .is_some_and(|digest| digest.len() == 64)
                 );
                 let transfer = &mid_value["transfer"];
+                assert_eq!(
+                    transfer["checkpoint_schema"],
+                    if source_float {
+                        "mainframe-env.reference-machine-checkpoint@13"
+                    } else {
+                        "mainframe-env.reference-machine-checkpoint@12"
+                    }
+                );
                 assert_eq!(transfer["selector"], "PCEXIT");
                 assert_eq!(transfer["schema"], "mainframe-env.cics.payload@1");
                 assert_eq!(transfer["bytes"], serde_json::json!(b"ROOT".to_vec()));

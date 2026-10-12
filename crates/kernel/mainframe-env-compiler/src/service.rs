@@ -1251,7 +1251,7 @@ mod tests {
     }
 
     #[test]
-    fn comp1_and_comp2_publish_through_the_owned_ieee_adapter() {
+    fn comp1_and_comp2_publish_explicit_hex_storage_profile() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. FLOATS. DATA DIVISION. WORKING-STORAGE SECTION. 01 SHORT-X COMP-1. 01 LONG-X COMP-2. PROCEDURE DIVISION. DISPLAY SHORT-X LONG-X. STOP RUN.";
         let compiler = CobolCompiler::default();
         let analysis = compiler.analyze(&bundle(source));
@@ -1266,12 +1266,27 @@ mod tests {
         );
         assert!(analysis.hir.is_some());
         assert_eq!(analysis.completeness, Completeness::Complete);
-        assert!(matches!(
-            compiler
-                .compile(request(source, CompilationMode::Executable))
-                .unwrap(),
-            CompilerResult::Published { .. }
-        ));
+        let CompilerResult::Published { artifact, .. } = compiler
+            .compile(request(source, CompilationMode::Executable))
+            .unwrap()
+        else {
+            panic!("floats did not publish")
+        };
+        let module = decode_binary(artifact.payload(), CodecLimits::default()).unwrap();
+        let definitions = module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .filter(|operation| operation.identity.name() == "define")
+            .collect::<Vec<_>>();
+        assert_eq!(definitions.len(), 2);
+        for definition in definitions {
+            assert_eq!(
+                definition.attributes.get("float_profile"),
+                Some(&Attribute::Text(mainframe_env_ir::COBOL_FLOAT_HEX.into()))
+            );
+        }
     }
 
     #[test]

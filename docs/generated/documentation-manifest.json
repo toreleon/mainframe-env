@@ -1,9 +1,9 @@
 {
   "counts": {
-    "markdown_documents": 241,
+    "markdown_documents": 242,
     "navigation_groups": 8,
-    "normative_documents": 99,
-    "xtask_commands": 163
+    "normative_documents": 100,
+    "xtask_commands": 164
   },
   "documents": [
     {
@@ -82,9 +82,9 @@
       "normative": false,
       "path": "conformance/spec/README.md",
       "relative_links": 0,
-      "sha256": "sha256:b9c8b2ea1272a51a174b8b54366351ca211ef3caf578576b7e6991d6ca1ea424",
+      "sha256": "sha256:d1546a76e2cf1ee7c9a7a98b7fadc92b184a19a87249e57221eea55f8905c2c6",
       "title": "Shared Conformance IR v1",
-      "xtask_commands": 3
+      "xtask_commands": 4
     },
     {
       "normative": false,
@@ -349,8 +349,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 182,
-      "sha256": "sha256:df6fc9bbbd77a7f727823c1cd8a930a4bbef5bd2eab9253dd26d325e2e82ccf0",
+      "relative_links": 183,
+      "sha256": "sha256:144386188f3922cd8336ebb49b4641df129e5478091408c1c21f314c68daab4f",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -409,7 +409,7 @@
       "path": "docs/architecture/COBOL-RUNTIME-SEMANTICS.md",
       "relative_links": 0,
       "scope": "COBOL runtime semantic contracts",
-      "sha256": "sha256:ac91f6e4eec46a346d252ac43e670b59e9f784bf48aff24d10bdf038145ec59a",
+      "sha256": "sha256:dabd2b256305fd7b7f73411af6d711fddc7eb782783c42dbf2e3ce84c3225b0b",
       "status": "Frozen for mainframe-env cobol.execution implementation",
       "title": "COBOL runtime semantic contracts",
       "xtask_commands": 0
@@ -1455,10 +1455,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env issue #160",
+      "normative": true,
+      "owner": "COBOL compiler and interpreter maintainers",
+      "path": "docs/decisions/0053-cobol-hex-float-storage.md",
+      "relative_links": 1,
+      "scope": "COMP-1/COMP-2 layout attributes and reference-machine checkpoint profiles",
+      "sha256": "sha256:d0b380015196afe3b7db8cb0c3a4266447770ccdda1f36c99a402886eb080f1b",
+      "status": "Accepted for the authorized #160 implementation; licensed differential pending",
+      "title": "ADR-0053: Declare COBOL floating storage profiles and checkpoint interpretation",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 53,
-      "sha256": "sha256:43f9927331159d83f380ef579a56c577b54c4fcdc6aae56121dc8a9ebb8b086b",
+      "relative_links": 54,
+      "sha256": "sha256:bce42063f1300ecf8a877796f1bf181879bd69156dd625bb913ae992448dbdc4",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -2782,6 +2794,10 @@
         {
           "label": "ADR-0050: Boxed shared host-effect payloads",
           "path": "docs/decisions/0050-host-effect-envelope-layout.md"
+        },
+        {
+          "label": "ADR-0053: COBOL HFP storage and checkpoint profiles",
+          "path": "docs/decisions/0053-cobol-hex-float-storage.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -3008,7 +3024,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:11657d5b50a3394d2cf58c698e5ce07f83d5dc6bbd8574fe67c2da15b43c86ae",
+  "registry_sha256": "sha256:7f32fc57126ddcf651c68720113393d52f297def2a0f7e34f2d3e29f08f69fa5",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

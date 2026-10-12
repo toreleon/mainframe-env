@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Generate all 17 COBOL data-runtime fixture digest bindings without altering their independent expectations, and verify COMP-1 USAGE bytes with an exact hand-derived regression."

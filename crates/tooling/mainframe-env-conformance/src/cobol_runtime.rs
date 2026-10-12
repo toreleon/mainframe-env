@@ -468,6 +468,25 @@ mod tests {
     }
 
     #[test]
+    fn hex_floats_move_compute_display_and_redefines_share_storage() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. HFP-RUNTIME. DATA DIVISION. WORKING-STORAGE SECTION. 01 SHORT-X COMP-1. 01 SHORT-BYTES REDEFINES SHORT-X PIC X(4). 01 LONG-X COMP-2. 01 LONG-BYTES REDEFINES LONG-X PIC X(8). 01 OUT-X PIC S9(3)V9(3) SIGN IS TRAILING SEPARATE. PROCEDURE DIVISION. MOVE 0.5 TO SHORT-X. COMPUTE LONG-X = SHORT-X + 0.5. DISPLAY SHORT-X LONG-X. MOVE -118.625 TO LONG-X. MOVE LONG-X TO SHORT-X. MOVE SHORT-X TO OUT-X. DISPLAY OUT-X. STOP RUN.";
+        let (output, machine) = execute_without_effects(source).expect("HFP runtime");
+        assert_eq!(output, b"0.51\n118625-\n");
+        // -.76a * 16^2: sign|E=c2, short fraction=76a000, long=76a00000000000.
+        assert_eq!(
+            machine.variable("SHORT-BYTES").unwrap().bytes(),
+            &[0xc2, 0x76, 0xa0, 0]
+        );
+        assert_eq!(
+            machine.variable("LONG-BYTES").unwrap().bytes(),
+            &[0xc2, 0x76, 0xa0, 0, 0, 0, 0, 0]
+        );
+        let alias_source = "IDENTIFICATION DIVISION. PROGRAM-ID. HFP-ALIAS. DATA DIVISION. WORKING-STORAGE SECTION. 01 SHORT-X COMP-1. 01 SHORT-BYTES REDEFINES SHORT-X PIC X(4). 01 LONG-X COMP-2. 01 LONG-BYTES REDEFINES LONG-X PIC X(8). PROCEDURE DIVISION. MOVE FUNCTION HEX-TO-CHAR('41100000') TO SHORT-BYTES. MOVE FUNCTION HEX-TO-CHAR('C276A00000000000') TO LONG-BYTES. DISPLAY SHORT-X. DISPLAY LONG-X. STOP RUN.";
+        let (output, _) = execute_without_effects(alias_source).expect("HFP raw aliases");
+        assert_eq!(output, b"1\n-118.625\n");
+    }
+
+    #[test]
     fn arith_compat_changes_intermediate_precision_through_the_artifact_contract() {
         let body = "IDENTIFICATION DIVISION. PROGRAM-ID. ARITH-RUNTIME. DATA DIVISION. WORKING-STORAGE SECTION. 01 A-X PIC 9(20) VALUE 99999999999999999999. 01 B-X PIC 9(20) VALUE 1. 01 RESULT-X PIC 9(21). PROCEDURE DIVISION. COMPUTE RESULT-X = A-X + B-X. DISPLAY RESULT-X. STOP RUN.";
         let (extended, _) = execute_without_effects(body).expect("ARITH(EXTEND) runtime");
