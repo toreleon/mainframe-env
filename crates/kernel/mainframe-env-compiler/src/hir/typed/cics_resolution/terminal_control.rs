@@ -2,7 +2,10 @@ use super::super::{
     HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsValue, Resolution,
     ResolutionFailure,
 };
-use super::{Clauses, cics_value, complete_data_reference, numeric_value::cics_integer_value};
+use super::{
+    Clauses, cics_value, complete_data_reference, numeric_value::cics_integer_value,
+    terminal_display,
+};
 use crate::{CobolUsage, DataCategory, SemanticModel};
 
 pub(super) const SEND_CONTROL_OPTIONS: &[&str] = &[
@@ -45,14 +48,7 @@ pub(super) fn validate_constraints(
     options: &[String],
     operation: HirCicsOperation,
 ) -> Resolution<()> {
-    if operation == HirCicsOperation::SendText
-        && options.iter().any(|option| option == "CURSOR")
-        && !clauses.contains_key("CURSOR")
-    {
-        return Err(ResolutionFailure::Invalid(
-            "CICS SEND TEXT CURSOR requires a halfword value".into(),
-        ));
-    }
+    terminal_display::validate_cursor(clauses, options, operation)?;
     if operation == HirCicsOperation::SendControl {
         let present = |name: &str| options.iter().any(|option| option == name);
         if present("CURSOR") && !clauses.contains_key("CURSOR")
