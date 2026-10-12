@@ -15,6 +15,91 @@ fn git(dir: &std::path::Path, args: &[&str]) -> String {
     String::from_utf8(output.stdout).unwrap().trim().to_string()
 }
 
+fn intake_sqlca_through_copy(
+    application_sqlca: bool,
+) -> mainframe_env_conformance::profile_intake::Member {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let dir = std::env::temp_dir().join(format!(
+        "profile-intake-sqlca-copy-{}-{application_sqlca}",
+        std::process::id()
+    ));
+    fs::create_dir_all(dir.join("src")).unwrap();
+    git(&dir, &["init", "-q"]);
+    git(&dir, &["config", "user.email", "test@example.invalid"]);
+    git(&dir, &["config", "user.name", "Fixture"]);
+    git(
+        &dir,
+        &[
+            "remote",
+            "add",
+            "origin",
+            "https://example.invalid/fixture.git",
+        ],
+    );
+    fs::write(dir.join("LICENSE"), "self-authored fixture license\n").unwrap();
+    let statements = if application_sqlca {
+        fs::write(
+            dir.join("src/SQLCA.cpy"),
+            "       01 SQLCA.\n          05 APP-SQLCA PIC X.\n",
+        )
+        .unwrap();
+        "           MOVE 'A' TO APP-SQLCA.\n"
+    } else {
+        "           MOVE 0 TO SQLCODE.\n           MOVE '00000' TO SQLSTATE.\n"
+    };
+    let primary = format!(
+        "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. SQLCOPY.\n       DATA DIVISION.\n       WORKING-STORAGE SECTION.\n           COPY SQLCAWR.\n       PROCEDURE DIVISION.\n{statements}           GOBACK.\n"
+    );
+    assert!(!primary.contains("EXEC SQL"));
+    fs::write(dir.join("src/SQLCOPY.cbl"), primary).unwrap();
+    fs::write(
+        dir.join("src/SQLCAWR.cpy"),
+        "           EXEC SQL INCLUDE SQLCA END-EXEC.\n",
+    )
+    .unwrap();
+    git(&dir, &["add", "."]);
+    git(&dir, &["commit", "-qm", "fixture"]);
+    let commit = git(&dir, &["rev-parse", "HEAD"]);
+    let manifest = dir.with_extension("json");
+    let value = serde_json::json!({
+        "schema_version": "mainframe-env.profile-corpus@1",
+        "origin": "https://example.invalid/fixture.git",
+        "commit": commit,
+        "license_id": "EPL-2.0",
+        "license_file": "LICENSE",
+        "layout": [
+            {"glob": "src/*.cbl", "kind": "cobol"},
+            {"glob": "src/*.cpy", "kind": "copybook"},
+            {"glob": "LICENSE", "kind": "other"}
+        ]
+    });
+    fs::write(&manifest, serde_json::to_vec(&value).unwrap()).unwrap();
+    let report = run(&manifest, &dir, &root).unwrap();
+    fs::remove_dir_all(&dir).unwrap();
+    fs::remove_file(&manifest).unwrap();
+    report
+        .members
+        .into_iter()
+        .find(|member| member.path == "src/SQLCOPY.cbl")
+        .unwrap()
+}
+
+#[test]
+fn profile_intake_supplies_sqlca_for_include_introduced_through_copy() {
+    let member = intake_sqlca_through_copy(false);
+    assert_eq!(member.status, "complete", "{member:?}");
+    assert_eq!(member.stages["hir"], "complete");
+    assert!(member.diagnostics.is_empty(), "{member:?}");
+}
+
+#[test]
+fn profile_intake_application_sqlca_precedes_product_for_copy_include() {
+    let member = intake_sqlca_through_copy(true);
+    assert_eq!(member.status, "complete", "{member:?}");
+    assert_eq!(member.stages["hir"], "complete");
+    assert!(member.diagnostics.is_empty(), "{member:?}");
+}
+
 #[test]
 fn profile_intake_maps_gaps_and_verifies_pin() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
@@ -41,7 +126,8 @@ fn profile_intake_maps_gaps_and_verifies_pin() {
         "       05 ROW-KEY PIC X(2).\n",
     )
     .unwrap();
-    fs::write(dir.join("base/src/SQLCA.cbl"), "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. SQLCA.\n       DATA DIVISION.\n       WORKING-STORAGE SECTION.\n           EXEC SQL INCLUDE SQLCA END-EXEC.\n       PROCEDURE DIVISION.\n           GOBACK.\n").unwrap();
+    fs::write(dir.join("base/src/SQLCA.cbl"), "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. SQLCA.\n       DATA DIVISION.\n       WORKING-STORAGE SECTION.\n           EXEC SQL INCLUDE SQLCA END-EXEC.\n       PROCEDURE DIVISION.\n           MOVE 0 TO SQLCODE.\n           MOVE '00000' TO SQLSTATE.\n           GOBACK.\n").unwrap();
+    fs::write(dir.join("base/src/SQLDA.cbl"), "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. SQLDA.\n       DATA DIVISION.\n       WORKING-STORAGE SECTION.\n           EXEC SQL INCLUDE SQLDA END-EXEC.\n       PROCEDURE DIVISION.\n           GOBACK.\n").unwrap();
     fs::write(dir.join("base/src/TEST.jcl"), "//TEST JOB 1\n//STEP EXEC PGM=IDCAMS\n//SYSIN DD *\n DEFINE CLUSTER (NAME(TEST))\n/*\n//OTHER EXEC PGM=UNKNOWN\n//COPY EXEC PGM=IEBGENER\n//OUT DD DSNAME=<HLQ>.X,DISP=SHR\n//LIB JCLLIB ORDER=(<HLQ>.PROC)\n//PROC EXEC EXTERNAL\n").unwrap();
     fs::write(
         dir.join("base/src/TEST.bms"),
@@ -174,18 +260,27 @@ fn profile_intake_maps_gaps_and_verifies_pin() {
         "SQL include under group",
         &mut missing,
     );
+    let sqlca = members
+        .iter()
+        .find(|m| m["path"] == "base/src/SQLCA.cbl")
+        .unwrap();
+    assert_eq!(
+        sqlca["status"], "complete",
+        "product-supplied SQLCA: {sqlca}"
+    );
+    assert!(sqlca["diagnostics"].as_array().unwrap().is_empty());
     check(
         members
             .iter()
-            .find(|m| m["path"] == "base/src/SQLCA.cbl")
+            .find(|m| m["path"] == "base/src/SQLDA.cbl")
             .is_some_and(|m| {
                 m["diagnostics"]
                     .as_array()
                     .unwrap()
                     .iter()
-                    .any(|d| d["message"].as_str().unwrap_or("").contains("SQLCA"))
+                    .any(|d| d["message"].as_str().unwrap_or("").contains("SQLDA"))
             }),
-        "missing SQLCA explicit",
+        "missing SQLDA explicit",
         &mut missing,
     );
     check(
