@@ -140,7 +140,10 @@ impl BatchService {
         } else {
             None
         };
-        let mut attributes = base.unwrap_or(dataset_attributes_for_dd(dd)?);
+        let mut attributes = match base {
+            Some(attributes) => attributes,
+            None => dataset_attributes_for_dd(dd)?,
+        };
         if let Some(organization) = dd.organization.as_deref() {
             attributes.organization = dd_organization(organization)?;
         }
@@ -152,6 +155,11 @@ impl BatchService {
         }
         if let Some(ccsid) = dd.ccsid {
             attributes.ccsid = Some(ccsid);
+        }
+        if dd.disposition.first() == Some(&crate::Disposition::New)
+            && attributes.logical_record_length == 0
+        {
+            return Err(unavailable_dcb(dd));
         }
         invocation.check()?;
         Ok(attributes)
@@ -208,6 +216,12 @@ fn dcb_reference(dd: &crate::DdPlan) -> Option<&str> {
 }
 
 fn dataset_attributes_for_dd(dd: &crate::DdPlan) -> Result<DatasetAttributes, HostProblem> {
+    // Allocation precedes execution, so no program-FD DCB is available here.
+    if dd.disposition.first() == Some(&crate::Disposition::New)
+        && (dd.record_format.is_none() || dd.logical_record_length.is_none_or(|length| length == 0))
+    {
+        return Err(unavailable_dcb(dd));
+    }
     let organization = dd_organization(dd.organization.as_deref().unwrap_or("PS"))?;
     let record_format = dd_record_format(dd.record_format.as_deref().unwrap_or("V"))?;
     let logical_record_length = dd.logical_record_length.unwrap_or({
@@ -230,6 +244,16 @@ fn dataset_attributes_for_dd(dd: &crate::DdPlan) -> Result<DatasetAttributes, Ho
     })
 }
 
+fn unavailable_dcb(dd: &crate::DdPlan) -> HostProblem {
+    HostProblem::UnsupportedCapability {
+        capability: "batch.new-dataset-dcb".into(),
+        detail: format!(
+            "NEW DD {} requires RECFM and positive LRECL or a usable DCB referback; program-FD DCB merge is unavailable",
+            dd.name
+        ),
+    }
+}
+
 fn dd_organization(value: &str) -> Result<DatasetOrganization, HostProblem> {
     Ok(match value {
         "PS" => DatasetOrganization::Sequential,
@@ -247,4 +271,78 @@ fn dd_record_format(value: &str) -> Result<RecordFormat, HostProblem> {
         "U" => RecordFormat::Undefined,
         _ => return Err(HostProblem::Unsupported),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_dd_without_dcb_does_not_invent_variable_32760_attributes() {
+        let plan = crate::parse_jcl(
+            &JclBundle {
+                primary: "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DSN=USER.NEW,DISP=NEW\n".into(),
+                ..Default::default()
+            },
+            Default::default(),
+        )
+        .unwrap();
+        let result = dataset_attributes_for_dd(&plan.steps[0].dds[0]);
+        assert!(
+            matches!(result, Err(HostProblem::UnsupportedCapability { ref capability, ref detail })
+                if capability == "batch.new-dataset-dcb" && detail.contains("NEW DD D")),
+            "a NEW DD without a usable DCB must fail closed rather than invent attributes: {result:?}"
+        );
+    }
+
+    #[test]
+    fn new_dd_with_unusable_dcb_does_not_invent_record_attributes() {
+        for dcb in [
+            "DCB=(DSORG=PS)",
+            "DCB=(RECFM=VB)",
+            "DCB=(LRECL=256)",
+            "RECFM=VB",
+            "LRECL=256",
+            "DCB=(RECFM=VB,LRECL=0)",
+        ] {
+            let plan = crate::parse_jcl(
+                &JclBundle {
+                    primary: format!(
+                        "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DSN=USER.NEW,DISP=NEW,{dcb}\n"
+                    ),
+                    ..Default::default()
+                },
+                Default::default(),
+            )
+            .unwrap();
+            let result = dataset_attributes_for_dd(&plan.steps[0].dds[0]);
+            assert!(
+                matches!(result, Err(HostProblem::UnsupportedCapability { ref capability, ref detail })
+                    if capability == "batch.new-dataset-dcb" && detail.contains("NEW DD D")),
+                "NEW DD with {dcb} must fail closed without a usable record layout: {result:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn new_dd_with_explicit_dcb_retains_record_attributes() {
+        for (dcb, format, length) in [
+            ("DCB=(RECFM=FB,LRECL=350)", RecordFormat::FixedBlocked, 350),
+            ("RECFM=VB,LRECL=256", RecordFormat::VariableBlocked, 256),
+        ] {
+            let plan = crate::parse_jcl(
+                &JclBundle {
+                    primary: format!(
+                        "//J JOB\n//S EXEC PGM=IEFBR14\n//D DD DSN=USER.NEW,DISP=NEW,{dcb}\n"
+                    ),
+                    ..Default::default()
+                },
+                Default::default(),
+            )
+            .unwrap();
+            let attributes = dataset_attributes_for_dd(&plan.steps[0].dds[0]).unwrap();
+            assert_eq!(attributes.record_format, format);
+            assert_eq!(attributes.logical_record_length, length);
+        }
+    }
 }
