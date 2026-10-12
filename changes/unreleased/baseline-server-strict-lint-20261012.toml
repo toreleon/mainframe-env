@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Restore strict server lint checks with private retained-claim indirection and equivalent fixture aliases, preserving native admission and durable identities."

@@ -69,7 +69,7 @@ fn compiled_native_root_connection_normal_and_known_abend_publish_both_terminal_
                 "{outcome:?}"
             );
             assert_eq!(original, before);
-            assert!(original.bindings.get("mq.host-context").is_none());
+            assert!(!original.bindings.contains_key("mq.host-context"));
             let execution = f
                 .store
                 .get_execution(&original.execution_id)
@@ -150,9 +150,18 @@ fn compiled_native_root_connection_normal_and_known_abend_publish_both_terminal_
                 match map.roots.get(&original.execution_id).unwrap() {
                     RootEntry::Retained {
                         root,
-                        native: Some(_),
+                        native: Some(claim),
                         ..
-                    } => root.clone(),
+                    } => {
+                        assert_eq!(
+                            claim.admission().execution.execution_id,
+                            original.execution_id
+                        );
+                        assert_eq!(claim.admission().invocation_key, original.idempotency_key);
+                        assert_eq!(claim.admission().deadline_tick, original.deadline_tick);
+                        assert_eq!(claim.admission().event, events[0]);
+                        root.clone()
+                    }
                     _ => panic!("native root"),
                 }
             };

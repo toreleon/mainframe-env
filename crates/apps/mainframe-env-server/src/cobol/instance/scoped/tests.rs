@@ -122,7 +122,7 @@ fn exact_busy_member_versions_payloads_and_charges_agree() {
     );
     ScopedRun::decode(&root_row(&root, &key))
         .unwrap()
-        .validate_members(&key, &[row.clone()])
+        .validate_members(&key, std::slice::from_ref(&row))
         .unwrap();
     assert!(root.validate_members(&key, &[]).is_err());
     assert!(
@@ -217,7 +217,8 @@ fn idle_members_charge_actual_retained_bytes_and_cannot_claim_busy() {
     root.active = 0;
     root.charged_bytes = root.root_charge + 2;
     root.refresh(&key).unwrap();
-    root.validate_members(&key, &[row.clone()]).unwrap();
+    root.validate_members(&key, std::slice::from_ref(&row))
+        .unwrap();
     root.members.get_mut(&row.key).unwrap().charged_bytes = 3;
     root.charged_bytes += 1;
     root.refresh(&key).unwrap();
