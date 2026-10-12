@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Honor IDCAMS KSDS RECORDSIZE(avg max) on the server DEFINE route (default 4089 4089, oversized WRITE/REWRITE returns LENGERR 22/0) and reject batch NEW DDs without DCB/RECFM/LRECL or usable referback with a typed diagnostic instead of inventing Variable/32760 (#273). IBM DCB and IDCAMS RECORDSIZE topics were unavailable offline."
