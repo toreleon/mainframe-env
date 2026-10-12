@@ -66,13 +66,13 @@ impl CheckedReplayAuditCapture {
         {
             return Err(StoreError::CapacityExceeded);
         }
-        if let Some(receipt) = &observations.receipt {
-            if !observations.dependencies.iter().any(|d| {
+        if let Some(receipt) = &observations.receipt
+            && !observations.dependencies.iter().any(|d| {
                 matches!(d,TerminalRowDependency::Exact(r)
                 if r.namespace==receipt.namespace && r.key==receipt.key)
-            }) {
-                return Err(StoreError::InvalidTransition);
-            }
+            })
+        {
+            return Err(StoreError::InvalidTransition);
         }
         let mut mailbox = self.mailbox.lock().map_err(|_| StoreError::Conflict)?;
         if mailbox.closed || mailbox.observations.is_some() {
@@ -223,58 +223,6 @@ fn invocation_bound(i: &Invocation) -> Result<usize, StoreError> {
         add(cancellation.reason.len(), limits.max_binding_bytes)?;
     }
     Ok(bytes)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use mainframe_env_execution_api::*;
-    use std::collections::{BTreeMap, BTreeSet};
-
-    #[test]
-    fn checked_replay_capture_bounds_public_invocation_fields_before_clone() {
-        let l = InvocationLimits::default();
-        let mut i = Invocation::new(
-            RequestId::new("request", l).unwrap(),
-            ExecutionId::new("execution", l).unwrap(),
-            RunUnitId::new("run", l).unwrap(),
-            None,
-            Selector::new("fixture", l).unwrap(),
-            ArtifactRef::new("artifact", l).unwrap(),
-            Principal::new(PrincipalId::new("USER", l).unwrap(), BTreeSet::new(), l).unwrap(),
-            ServiceClass::Batch,
-            0,
-            100,
-            TraceId::new("trace", l).unwrap(),
-            IdempotencyKey::new("invocation", l).unwrap(),
-            1,
-            ResourceLimits::default(),
-            BTreeMap::new(),
-            l,
-        )
-        .unwrap();
-        assert!(invocation_bound(&i).is_ok());
-        i.audit_correlation = "x".repeat(l.max_binding_bytes + 1);
-        assert_eq!(invocation_bound(&i), Err(StoreError::CapacityExceeded));
-        i.audit_correlation.clear();
-        let payload = BoundedPayload::new("fixture@1", vec![0; l.max_payload_bytes], l).unwrap();
-        for n in 0..17 {
-            i.bindings.insert(format!("b{n}"), payload.clone());
-        }
-        assert_eq!(invocation_bound(&i), Err(StoreError::CapacityExceeded));
-        i.bindings.clear();
-        i.bindings
-            .insert("x".repeat(l.max_binding_bytes + 1), payload);
-        assert_eq!(invocation_bound(&i), Err(StoreError::CapacityExceeded));
-        i.bindings.clear();
-        for n in 0..=l.max_bindings {
-            i.bindings.insert(
-                format!("b{n}"),
-                BoundedPayload::new("fixture@1", vec![], l).unwrap(),
-            );
-        }
-        assert_eq!(invocation_bound(&i), Err(StoreError::CapacityExceeded));
-    }
 }
 
 pub(super) fn eligible(effect: &EffectRequest) -> bool {
@@ -435,4 +383,56 @@ pub(super) fn dispatch(
     }
     *slot = None;
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mainframe_env_execution_api::*;
+    use std::collections::{BTreeMap, BTreeSet};
+
+    #[test]
+    fn checked_replay_capture_bounds_public_invocation_fields_before_clone() {
+        let l = InvocationLimits::default();
+        let mut i = Invocation::new(
+            RequestId::new("request", l).unwrap(),
+            ExecutionId::new("execution", l).unwrap(),
+            RunUnitId::new("run", l).unwrap(),
+            None,
+            Selector::new("fixture", l).unwrap(),
+            ArtifactRef::new("artifact", l).unwrap(),
+            Principal::new(PrincipalId::new("USER", l).unwrap(), BTreeSet::new(), l).unwrap(),
+            ServiceClass::Batch,
+            0,
+            100,
+            TraceId::new("trace", l).unwrap(),
+            IdempotencyKey::new("invocation", l).unwrap(),
+            1,
+            ResourceLimits::default(),
+            BTreeMap::new(),
+            l,
+        )
+        .unwrap();
+        assert!(invocation_bound(&i).is_ok());
+        i.audit_correlation = "x".repeat(l.max_binding_bytes + 1);
+        assert_eq!(invocation_bound(&i), Err(StoreError::CapacityExceeded));
+        i.audit_correlation.clear();
+        let payload = BoundedPayload::new("fixture@1", vec![0; l.max_payload_bytes], l).unwrap();
+        for n in 0..17 {
+            i.bindings.insert(format!("b{n}"), payload.clone());
+        }
+        assert_eq!(invocation_bound(&i), Err(StoreError::CapacityExceeded));
+        i.bindings.clear();
+        i.bindings
+            .insert("x".repeat(l.max_binding_bytes + 1), payload);
+        assert_eq!(invocation_bound(&i), Err(StoreError::CapacityExceeded));
+        i.bindings.clear();
+        for n in 0..=l.max_bindings {
+            i.bindings.insert(
+                format!("b{n}"),
+                BoundedPayload::new("fixture@1", vec![], l).unwrap(),
+            );
+        }
+        assert_eq!(invocation_bound(&i), Err(StoreError::CapacityExceeded));
+    }
 }

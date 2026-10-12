@@ -348,6 +348,12 @@ fn typed_frame_cannot_rebind_or_silently_restore_legacy_checkpoint() {
     let (mut machine, frame) = fixture();
     assert!(machine.bind_mqi_program_frame(frame).is_err());
     assert!(machine.checkpoint().is_none());
+    let _effect = connect(&mut machine);
+    assert!(matches!(
+        &machine.pending.as_ref().unwrap().kind,
+        PendingKind::MqMqi(_)
+    ));
+    assert!(machine.checkpoint().is_none());
     assert_eq!(
         machine.restore(machine.snapshot()),
         Err(MachineProblem::IncompatibleSnapshot)
@@ -422,6 +428,17 @@ fn legacy_cross_instance_snapshot_and_checkpoint_restore_keep_exact_bytes() {
     let snapshot = source.snapshot();
     assert_eq!(snapshot.schema_version, 12);
     let checkpoint = source.checkpoint().unwrap();
+    // Captured from main 6a3cb877 before boxing private PendingKind::MqMqi.
+    // Typed MQ/pending machines cannot checkpoint; eligible legacy bytes stay unchanged.
+    use sha2::{Digest, Sha256};
+    assert_eq!(checkpoint.bytes().len(), 1785);
+    assert_eq!(
+        Sha256::digest(checkpoint.bytes()).as_slice(),
+        &[
+            197, 82, 4, 187, 99, 89, 61, 53, 135, 229, 3, 228, 3, 90, 155, 160, 68, 232, 15, 181,
+            4, 63, 176, 75, 175, 186, 155, 251, 82, 15, 37, 173
+        ]
+    );
     let mut destination = unbound_fixture();
     destination.restore(snapshot.clone()).unwrap();
     assert_eq!(destination.snapshot(), snapshot);

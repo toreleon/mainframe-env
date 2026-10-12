@@ -131,7 +131,7 @@ fn wait_external_arguments(
     let mut events = Vec::with_capacity(length);
     let mut selected = None;
     let mut seen = BTreeSet::new();
-    for (index, address) in list.chunks_exact(4).enumerate() {
+    for (index, address) in list.as_chunks::<4>().0.iter().enumerate() {
         if is_null_pointer(address) {
             continue;
         }

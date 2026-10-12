@@ -54,6 +54,13 @@ parallel full Cargo invocations just to seek reassurance. Cleanup is for measure
 pressure; cache and parallelism changes need elapsed-time and peak-storage
 measurements first.
 
+For compiler/interpreter lint-only refactors, check all targets and features with
+`cargo clippy -p mainframe-env-compiler -p mainframe-env-interpreter --all-targets --all-features --locked -- -D warnings`
+and select regressions from the changed consumers. Private pending-state layout
+changes must retain checkpoint eligibility and serialized bytes. The legacy MQ
+checkpoint regression binds schema-12 bytes to the pre-refactor main fixture;
+typed MQ and pending machines continue to refuse checkpoint encoding.
+
 See the [IBM cache guide](IBM-DOCS-CACHE.md).
 
 ## Effective Conformance IR inspection

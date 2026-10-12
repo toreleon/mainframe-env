@@ -1,18 +1,6 @@
 use super::*;
 
 impl ReferenceMachine {
-    pub(super) fn commit_arithmetic(
-        &mut self,
-        assignments: Vec<(Vec<String>, Decimal, bool)>,
-        preserve_failed_receiver: bool,
-    ) -> Result<bool, MachineProblem> {
-        if preserve_failed_receiver {
-            self.commit_decimal_assignments_receiver_local(assignments, true)
-        } else {
-            self.commit_decimal_assignments(assignments).map(|()| false)
-        }
-    }
-
     pub(super) fn commit_decimal_assignments(
         &mut self,
         assignments: Vec<(Vec<String>, Decimal, bool)>,

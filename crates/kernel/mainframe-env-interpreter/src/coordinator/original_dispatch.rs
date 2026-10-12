@@ -105,16 +105,13 @@ where
                         "durable effect requires reconciliation before resume",
                     )));
                 }
-                control = match observe_checked(
+                control = observe_checked(
                     observe,
                     control,
                     invocation,
                     invocation.deadline_tick.min(effect.deadline_tick),
                     journal,
-                ) {
-                    Ok(control) => control,
-                    Err(outcome) => return Err(outcome),
-                };
+                )?;
                 let effect_sequence = effect.sequence;
                 if coordinator.checked_inquiry_replay && super::checked_replay::eligible(&effect) {
                     let cursor = journal
@@ -215,16 +212,13 @@ where
         {
             return Err(infrastructure_failure("effect intent persistence failed"));
         }
-        control = match observe_checked(
+        control = observe_checked(
             observe,
             control,
             invocation,
             invocation.deadline_tick.min(effect.deadline_tick),
             journal,
-        ) {
-            Ok(control) => control,
-            Err(outcome) => return Err(outcome),
-        };
+        )?;
         let dispatch_deadline = invocation.deadline_tick.min(effect.deadline_tick);
         let audited = host.invoke(
             invocation,
@@ -317,15 +311,13 @@ where
         };
         let previous_control = control;
         control = observed;
-        if let Err(outcome) = check_control(
+        check_control(
             control,
             Some(previous_control),
             invocation,
             dispatch_deadline,
             journal,
-        ) {
-            return Err(outcome);
-        }
+        )?;
         *control_slot = control;
         Ok(result)
     }

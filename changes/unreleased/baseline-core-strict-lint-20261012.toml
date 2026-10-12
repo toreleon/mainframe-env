@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Restore strict all-target/all-feature compiler and interpreter lint checks without changing language semantics or checkpoint bytes."
