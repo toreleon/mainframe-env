@@ -1981,6 +1981,22 @@ class PublicClientParentRootTests(unittest.TestCase):
         self.refuse_hidden_root('--r')
 
 
+from contextlib import contextmanager
+
+
+@contextmanager
+def _mock_linux_stat_descriptor(stream):
+    descriptor = 71
+    def read(actual_descriptor, count):
+        if actual_descriptor != descriptor:
+            raise AssertionError('Stat reader used a different descriptor')
+        return stream.read(count)
+    with patch.object(ci.os, 'open', return_value=descriptor) as opened, \
+            patch.object(ci.os, 'read', side_effect=read), \
+            patch.object(ci.os, 'close', stream.__exit__):
+        yield opened
+
+
 class LinuxStatReaderTests(unittest.TestCase):
     def test_reads_complete_metadata_without_a_prefix_cap(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -1994,7 +2010,7 @@ class LinuxStatReaderTests(unittest.TestCase):
         stream.__enter__ = Mock(return_value=stream)
         stream.__exit__ = Mock(return_value=False)
         stream.read.side_effect = OSError(5, 'metadata read failed')
-        with patch('builtins.open', return_value=stream), \
+        with _mock_linux_stat_descriptor(stream), \
                 self.assertRaisesRegex(OSError, 'metadata read failed'):
             ci._linux_stat_bytes('/proc/42/stat')
         stream.__exit__.assert_called_once()
@@ -2004,7 +2020,7 @@ class LinuxStatReaderTests(unittest.TestCase):
         stream.__enter__ = Mock(return_value=stream)
         stream.__exit__ = Mock(side_effect=OSError(5, 'metadata close failed'))
         stream.read.side_effect = [b'42 (other) S 1 1 0', b'']
-        with patch('builtins.open', return_value=stream), \
+        with _mock_linux_stat_descriptor(stream), \
                 self.assertRaisesRegex(OSError, 'metadata close failed'):
             ci._linux_stat_bytes('/proc/42/stat')
 
@@ -2015,7 +2031,7 @@ class LinuxStatReaderTests(unittest.TestCase):
         stream.__exit__ = Mock(return_value=False)
         offered = [b'42 (a )', b'\xff name) Z ', b'1 987654321 0\n', b'']
         stream.read.side_effect = offered
-        with patch('builtins.open', return_value=stream):
+        with _mock_linux_stat_descriptor(stream):
             self.assertEqual(ci._linux_stat_bytes('/proc/42/stat'),
                              b'42 (a )\xff name) Z 1 987654321 0\n')
         self.assertEqual(stream.read.call_count, 4)
@@ -2035,14 +2051,14 @@ class LinuxStatReaderTests(unittest.TestCase):
                 stream.__enter__ = Mock(return_value=stream)
                 stream.__exit__ = Mock(return_value=False)
                 stream.read.side_effect = chunks
-                with patch('builtins.open', return_value=stream) as opened:
+                with _mock_linux_stat_descriptor(stream) as opened:
                     actual = ci._linux_stat_bytes('/proc/42/stat')
                 self.assertEqual(actual, b''.join(chunks[:-1]))
                 self.assertIs(type(actual), bytes)
                 self.assertEqual(stream.read.call_count, len(chunks))
                 self.assertTrue(all(call.args == (4096,) and not call.kwargs
                                     for call in stream.read.call_args_list))
-                opened.assert_called_once_with('/proc/42/stat', 'rb', buffering=0)
+                opened.assert_called_once_with('/proc/42/stat', os.O_RDONLY | os.O_CLOEXEC)
                 stream.__exit__.assert_called_once()
 
         # A fast-path prefix cannot hide a later failure or invalid read type.
@@ -2055,7 +2071,7 @@ class LinuxStatReaderTests(unittest.TestCase):
                 stream.__enter__ = Mock(return_value=stream)
                 stream.__exit__ = Mock(return_value=False)
                 stream.read.side_effect = offered
-                with patch('builtins.open', return_value=stream), \
+                with _mock_linux_stat_descriptor(stream), \
                         self.assertRaises(expected) as caught:
                     ci._linux_stat_bytes('/proc/42/stat')
                 if expected is OSError:
@@ -2075,7 +2091,7 @@ class LinuxStatReaderTests(unittest.TestCase):
         stream.__exit__ = Mock(return_value=False)
         problem = OSError(5, 'metadata failed after short read')
         stream.read.side_effect = [b'42 (other) S 1 1 0', problem]
-        with patch('builtins.open', return_value=stream), self.assertRaises(OSError) as caught:
+        with _mock_linux_stat_descriptor(stream), self.assertRaises(OSError) as caught:
             ci._linux_stat_bytes('/proc/42/stat')
         self.assertIs(caught.exception, problem)
         self.assertEqual(stream.read.call_count, 2)
@@ -2083,7 +2099,7 @@ class LinuxStatReaderTests(unittest.TestCase):
 
     def test_open_error_is_not_converted_to_empty_metadata(self):
         problem = PermissionError(13, 'metadata open unavailable')
-        with patch('builtins.open', side_effect=problem), self.assertRaises(OSError) as caught:
+        with patch.object(ci.os, 'open', side_effect=problem), self.assertRaises(OSError) as caught:
             ci._linux_stat_bytes('/proc/42/stat')
         self.assertIs(caught.exception, problem)
 
@@ -2093,7 +2109,7 @@ class LinuxStatReaderTests(unittest.TestCase):
         stream.__exit__ = Mock(return_value=False)
         problem = InterruptedError(4, 'metadata read interrupted')
         stream.read.side_effect = problem
-        with patch('builtins.open', return_value=stream), self.assertRaises(OSError) as caught:
+        with _mock_linux_stat_descriptor(stream), self.assertRaises(OSError) as caught:
             ci._linux_stat_bytes('/proc/42/stat')
         self.assertIs(caught.exception, problem)
         self.assertEqual(stream.read.call_count, 1)
@@ -2114,7 +2130,7 @@ class LinuxStatReaderTests(unittest.TestCase):
                 trace = {'stage': None}
                 token = ci._LINUX_CENSUS_TRACE.set(trace)
                 try:
-                    with patch('builtins.open', return_value=stream), self.assertRaises(OSError) as caught:
+                    with _mock_linux_stat_descriptor(stream), self.assertRaises(OSError) as caught:
                         ci._linux_stat_bytes('/proc/42/stat')
                     self.assertIs(caught.exception, problem)
                     self.assertEqual(trace['stage'], failing_stage)
@@ -2524,7 +2540,7 @@ class CensusFailureDiagnosticTests(unittest.TestCase):
         with self.trace_context() as collector, \
                 patch.object(ci.time, 'monotonic', return_value=0), \
                 patch.object(ci.time, 'thread_time', side_effect=OSError('CPU clock unavailable')), \
-                patch.object(ci.os, 'scandir', scan), patch('builtins.open', return_value=stream):
+                patch.object(ci.os, 'scandir', scan), _mock_linux_stat_descriptor(stream):
             with self.assertRaises(OSError) as stopped:
                 ci._linux_group_observation(987654321, 1)
         self.assertIs(stopped.exception, original)
@@ -2650,6 +2666,124 @@ class CensusFailureDiagnosticTests(unittest.TestCase):
             receipt = json.loads((output/'diagnostic.json').read_text())
             self.assertEqual(receipt['error'], 'CI candidate must be clean before execution, including untracked source')
 
+
+
+class RawDescriptorStatReaderTests(unittest.TestCase):
+    def test_real_descriptor_reads_full_eof_is_noninheritable_and_closes(self):
+        raw = bytes(range(256)) * 35 + b'complete-tail\x00\xff'
+        original_open, original_read, original_close = os.open, os.read, os.close
+        seen = []
+        def read(descriptor, count):
+            self.assertEqual(count, 4096)
+            self.assertFalse(os.get_inheritable(descriptor))
+            result = original_read(descriptor, count)
+            seen.append(result)
+            return result
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'stat'
+            path.write_bytes(raw)
+            with patch.object(ci.os, 'open', wraps=original_open) as opened, \
+                    patch.object(ci.os, 'read', side_effect=read), \
+                    patch.object(ci.os, 'close', wraps=original_close) as closed, \
+                    patch('builtins.open', side_effect=AssertionError('FileIO must not be used')):
+                self.assertEqual(ci._linux_stat_bytes(str(path)), raw)
+            opened.assert_called_once_with(str(path), os.O_RDONLY | os.O_CLOEXEC)
+            closed.assert_called_once()
+            descriptor = closed.call_args.args[0]
+            self.assertEqual(b''.join(seen), raw)
+            self.assertEqual(seen[-1], b'')
+            self.assertGreater(len(seen), 2)
+            with self.assertRaises(OSError) as caught:
+                os.fstat(descriptor)
+            self.assertEqual(caught.exception.errno, ci.errno.EBADF)
+
+    def test_real_descriptor_closes_after_read_failure_without_retry(self):
+        problem = OSError(5, 'actual descriptor read failed')
+        original_open, original_close = os.open, os.close
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'stat'
+            path.write_bytes(b'42 (metadata) S 1 1 0')
+            with patch.object(ci.os, 'open', wraps=original_open) as opened, \
+                    patch.object(ci.os, 'read', side_effect=problem) as read, \
+                    patch.object(ci.os, 'close', wraps=original_close) as closed, \
+                    self.assertRaises(OSError) as caught:
+                ci._linux_stat_bytes(str(path))
+            self.assertIs(caught.exception, problem)
+            opened.assert_called_once()
+            closed.assert_called_once()
+            descriptor = closed.call_args.args[0]
+            read.assert_called_once_with(descriptor, 4096)
+            with self.assertRaises(OSError) as stopped:
+                os.fstat(descriptor)
+            self.assertEqual(stopped.exception.errno, ci.errno.EBADF)
+
+    def test_read_and_close_errors_keep_close_precedence_context_and_stage(self):
+        for close_problem in (OSError(5, 'descriptor close failed'),
+                              InterruptedError(ci.errno.EINTR, 'descriptor close interrupted')):
+            with self.subTest(close_errno=close_problem.errno):
+                read_problem = OSError(5, 'descriptor read failed first')
+                trace = {'stage': None}
+                token = ci._LINUX_CENSUS_TRACE.set(trace)
+                try:
+                    with patch.object(ci.os, 'open', return_value=71) as opened, \
+                            patch.object(ci.os, 'read', side_effect=read_problem) as read, \
+                            patch.object(ci.os, 'close', side_effect=close_problem) as closed, \
+                            self.assertRaises(OSError) as caught:
+                        ci._linux_stat_bytes('/proc/42/stat')
+                    self.assertIs(caught.exception, close_problem)
+                    self.assertIs(caught.exception.__context__, read_problem)
+                    self.assertEqual(trace['stage'], 'stat_read')
+                    opened.assert_called_once_with('/proc/42/stat', os.O_RDONLY | os.O_CLOEXEC)
+                    read.assert_called_once_with(71, 4096)
+                    closed.assert_called_once_with(71)
+                finally:
+                    ci._LINUX_CENSUS_TRACE.reset(token)
+
+    def test_directory_metadata_refuses_and_closes_actual_descriptor(self):
+        original_open, original_close = os.open, os.close
+        trace = {'stage': None}
+        token = ci._LINUX_CENSUS_TRACE.set(trace)
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                with patch.object(ci.os, 'open', wraps=original_open) as opened, \
+                        patch.object(ci.os, 'close', wraps=original_close) as closed, \
+                        self.assertRaises(IsADirectoryError) as caught:
+                    ci._linux_stat_bytes(directory)
+                self.assertEqual(caught.exception.errno, ci.errno.EISDIR)
+                self.assertIsNone(caught.exception.filename)
+                self.assertEqual(trace['stage'], 'stat_read')
+                opened.assert_called_once()
+                closed.assert_called_once()
+                with self.assertRaises(OSError) as stopped:
+                    os.fstat(closed.call_args.args[0])
+                self.assertEqual(stopped.exception.errno, ci.errno.EBADF)
+        finally:
+            ci._LINUX_CENSUS_TRACE.reset(token)
+
+    def test_missing_path_preserves_errno_filename_and_does_not_close(self):
+        trace = {'stage': None}
+        token = ci._LINUX_CENSUS_TRACE.set(trace)
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                path = str(Path(directory) / 'missing-stat')
+                with patch.object(ci.os, 'close') as closed, self.assertRaises(FileNotFoundError) as caught:
+                    ci._linux_stat_bytes(path)
+                self.assertEqual(caught.exception.errno, ci.errno.ENOENT)
+                self.assertEqual(caught.exception.filename, path)
+                self.assertEqual(trace['stage'], 'stat_open')
+                closed.assert_not_called()
+        finally:
+            ci._LINUX_CENSUS_TRACE.reset(token)
+
+    def test_would_block_read_is_unavailable_not_eof_and_closes(self):
+        problem = BlockingIOError(ci.errno.EAGAIN, 'metadata temporarily unavailable')
+        with patch.object(ci.os, 'open', return_value=71), \
+                patch.object(ci.os, 'read', side_effect=problem) as read, \
+                patch.object(ci.os, 'close') as closed, self.assertRaises(OSError) as caught:
+            ci._linux_stat_bytes('/proc/42/stat')
+        self.assertIs(caught.exception, problem)
+        read.assert_called_once_with(71, 4096)
+        closed.assert_called_once_with(71)
 
 
 if __name__=='__main__':unittest.main()

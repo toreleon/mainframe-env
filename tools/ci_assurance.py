@@ -254,14 +254,16 @@ def _linux_stat_bytes(path: str) -> bytes:
     trace = _LINUX_CENSUS_TRACE.get()
     if trace is not None:
         trace['stage'] = 'stat_open'
-    with open(path, 'rb', buffering=0) as stream:
+    # Avoid a per-PID FileIO object; every descriptor is closed exactly once.
+    descriptor = os.open(path, os.O_RDONLY | os.O_CLOEXEC)
+    try:
         if trace is not None:
             trace['stage'] = 'stat_read'
         # Keep the first complete bytes chunk without allocating a list. The
         # next read still establishes EOF; short reads never establish EOF.
         raw = b''
         chunks = None
-        while chunk := stream.read(4096):
+        while chunk := os.read(descriptor, 4096):
             if chunks is None:
                 if not raw and type(chunk) is bytes:
                     raw = chunk
@@ -272,6 +274,8 @@ def _linux_stat_bytes(path: str) -> bytes:
             raw = b''.join(chunks)
         if trace is not None:
             trace['stage'] = 'stat_close'
+    finally:
+        os.close(descriptor)
     return raw
 
 
