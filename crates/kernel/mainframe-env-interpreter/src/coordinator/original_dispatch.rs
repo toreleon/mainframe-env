@@ -238,7 +238,9 @@ where
             };
             cursor.storage = Some(progress);
             result?
-        } else if let Some(hook) = dispatch_hook.as_deref_mut() {
+        } else if intent.is_some()
+            && let Some(hook) = dispatch_hook.as_deref_mut()
+        {
             let cursor = journal.as_ref().ok_or_else(|| {
                 infrastructure_failure("borrowed dispatch requires actual durable journal")
             })?;

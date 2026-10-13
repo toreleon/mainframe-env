@@ -662,3 +662,235 @@ fn process_private_files_and_cleanup_refuse_unowned_inputs() {
     cleanup(&root, &owner, owned_root).unwrap();
     assert!(protocol::is_absent(&root).unwrap());
 }
+
+#[test]
+fn plain_read_dispatch_hook_preserves_unkeyed_assign_and_guards_keyed_calls() {
+    use mainframe_env_execution_api::{
+        AuditDecision, BoundedPayload, CapabilityId, ExecutionOutcome, IdempotencyKey, Invocation,
+        InvocationLimits, LifecycleEventKind, Principal, PrincipalId,
+    };
+    use mainframe_env_host_api::{
+        CapabilityDescriptor, CicsDisposition, CicsOperation, CicsResponse, EffectRequest,
+        EffectResult, HostLimits, HostProblem, HostProvider, HostRequest, HostResult,
+        ProgramRequest, RegistrySnapshot, ScopedHostService,
+    };
+    use mainframe_env_interpreter::{
+        CoordinatorLimits, DurableEffectDispatch, DurableEffectDispatchHook, ExecutionControl,
+        ExecutionCoordinator, ReferenceMachine,
+    };
+    use mainframe_env_store::MemoryStore;
+    use mainframe_env_store_api::{AuditSink, EffectState, EventStore, IdempotencyStore};
+    use std::collections::{BTreeMap, BTreeSet};
+    use std::sync::{Arc, Mutex};
+
+    struct Port {
+        descriptor: CapabilityDescriptor,
+        store: Arc<MemoryStore>,
+        calls: Arc<Mutex<Vec<EffectRequest>>>,
+    }
+    impl HostProvider for Port {
+        fn descriptor(&self) -> &CapabilityDescriptor {
+            &self.descriptor
+        }
+        fn invoke(&self, actor: &Invocation, effect: EffectRequest) -> EffectResult {
+            assert_eq!(effect.run_unit, actor.run_unit_id);
+            let outcome = match &effect.request {
+                HostRequest::Cics(request) => {
+                    assert_eq!(request.operation, CicsOperation::Assign);
+                    assert_eq!(effect.sequence, 1);
+                    assert_eq!(effect.idempotency_key, None);
+                    assert_eq!(request.mutation, None);
+                    assert!(!effect.request.requires_dispatch_record());
+                    Ok(HostResult::Cics(CicsResponse {
+                        disposition: CicsDisposition::Complete,
+                        condition: "NORMAL".into(),
+                        response: 0,
+                        response2: 0,
+                        applid: "TESTAPPL".into(),
+                        sysid: "TEST".into(),
+                        transaction: "TEST".into(),
+                        aid: 0,
+                        target: None,
+                        next_transaction: None,
+                        payload: BoundedPayload::new(
+                            "mainframe-env.cics.payload@1",
+                            Vec::new(),
+                            InvocationLimits::default(),
+                        )
+                        .unwrap(),
+                        outputs: BTreeMap::from([(
+                            "APPLID".into(),
+                            BoundedPayload::new(
+                                "mainframe-env.cics.text@1",
+                                b"TESTAPPL".to_vec(),
+                                InvocationLimits::default(),
+                            )
+                            .unwrap(),
+                        )]),
+                        unit_of_work: None,
+                    }))
+                }
+                HostRequest::Program(ProgramRequest::Call { program, .. }) => {
+                    assert_eq!(program.as_str(), "KEYED");
+                    assert_eq!(effect.sequence, 2);
+                    let intent = self
+                        .store
+                        .effect(effect.idempotency_key.as_ref().unwrap())
+                        .unwrap()
+                        .unwrap();
+                    assert_eq!(intent.state, EffectState::Intent);
+                    assert_eq!(intent.execution_id, actor.execution_id);
+                    assert_eq!(intent.sequence, 2);
+                    Ok(HostResult::Program(
+                        BoundedPayload::new(
+                            "mainframe-env.cobol.call-result@1",
+                            vec![0, 0, 0, 0],
+                            InvocationLimits::default(),
+                        )
+                        .unwrap(),
+                    ))
+                }
+                _ => panic!("only the actual compiled ASSIGN and CALL are selected"),
+            };
+            let sequence = effect.sequence;
+            self.calls.lock().unwrap().push(effect);
+            EffectResult { sequence, outcome }
+        }
+    }
+    struct Hook {
+        mode: &'static str,
+        calls: usize,
+    }
+    impl DurableEffectDispatchHook for Hook {
+        fn with_dispatch(
+            &mut self,
+            actual: &DurableEffectDispatch<'_>,
+            dispatch: &mut dyn FnMut() -> Result<(), HostProblem>,
+        ) -> Result<(), HostProblem> {
+            self.calls += 1;
+            actual.require_current(actual.original())?;
+            assert_eq!(actual.effect().sequence, 2);
+            assert_eq!(actual.intent().state, EffectState::Intent);
+            if self.mode == "refuse" {
+                return Err(HostProblem::UnknownOutcome);
+            }
+            dispatch()?;
+            if self.mode == "twice" {
+                dispatch()?;
+            }
+            Ok(())
+        }
+    }
+
+    let artifact = crate::compile(
+        "IDENTIFICATION DIVISION. PROGRAM-ID. HOOKROUT. \
+         DATA DIVISION. WORKING-STORAGE SECTION. 01 APPL PIC X(8). \
+         PROCEDURE DIVISION. EXEC CICS ASSIGN APPLID(APPL) END-EXEC. \
+         DISPLAY APPL. CALL 'KEYED'. STOP RUN.",
+    )
+    .unwrap();
+    for mode in ["once", "refuse", "twice"] {
+        let mut actor = crate::invocation(&artifact, 4096);
+        actor.principal = Principal::new(
+            PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap(),
+            BTreeSet::from([
+                CapabilityId::new("host.cics.execute", InvocationLimits::default()).unwrap(),
+                CapabilityId::new("host.program.invoke", InvocationLimits::default()).unwrap(),
+            ]),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let calls: Arc<Mutex<Vec<EffectRequest>>> = Arc::default();
+        let providers: Vec<Arc<dyn HostProvider>> = ["host.cics.execute", "host.program.invoke"]
+            .into_iter()
+            .map(|capability| {
+                Arc::new(Port {
+                    descriptor: CapabilityDescriptor {
+                        capability: CapabilityId::new(capability, InvocationLimits::default())
+                            .unwrap(),
+                        provider_id: capability.into(),
+                        generation: "1".into(),
+                        request_schema: "dispatch-routing-request@1".into(),
+                        result_schema: "dispatch-routing-result@1".into(),
+                        max_request_bytes: 4096,
+                        max_result_bytes: 4096,
+                        ready: true,
+                    },
+                    store: store.clone(),
+                    calls: calls.clone(),
+                }) as Arc<dyn HostProvider>
+            })
+            .collect();
+        let host = Arc::new(ScopedHostService::new(
+            Arc::new(RegistrySnapshot::new(1, providers, InvocationLimits::default()).unwrap()),
+            HostLimits::default(),
+        ));
+        let coordinator =
+            ExecutionCoordinator::durable(host, store.clone(), CoordinatorLimits::default());
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            actor.clone(),
+            mainframe_env_ir::CodecLimits::default(),
+        )
+        .unwrap();
+        let mut hook = Hook { mode, calls: 0 };
+        let outcome = coordinator.execute_resumable_with_dispatch_control(
+            &mut machine,
+            &actor,
+            || {
+                Ok(ExecutionControl {
+                    now_tick: 1,
+                    cancellation_requested: false,
+                })
+            },
+            &mut hook,
+        );
+        assert_eq!(hook.calls, 1, "{mode}");
+        assert_eq!(machine.snapshot().output, b"TESTAPPL\n");
+        let unkeyed = IdempotencyKey::new(
+            format!("{}:1", actor.idempotency_key),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(store.effect(&unkeyed).unwrap(), None);
+        let keyed = IdempotencyKey::new(
+            format!("{}:2", actor.idempotency_key),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let retained = store.effect(&keyed).unwrap().unwrap();
+        let expected_calls = if mode == "refuse" { 1 } else { 2 };
+        assert_eq!(calls.lock().unwrap().len(), expected_calls);
+        let audits = store.audit_records(&actor.execution_id, 0, 8).unwrap();
+        assert_eq!(audits.len(), expected_calls);
+        assert_eq!(audits[0].effect_sequence, 1);
+        assert_eq!(audits[0].decision, AuditDecision::Success);
+        let events = store.events(&actor.execution_id, 0, 32).unwrap();
+        assert_eq!(
+            events
+                .iter()
+                .filter(|event| {
+                    matches!(event.kind, LifecycleEventKind::EffectResult { sequence: 1 })
+                })
+                .count(),
+            1
+        );
+        if mode == "once" {
+            assert!(matches!(outcome, ExecutionOutcome::Completed(_)));
+            assert_eq!(retained.state, EffectState::Completed);
+            assert_eq!(audits[1].decision, AuditDecision::Success);
+        } else {
+            assert!(matches!(outcome,
+                ExecutionOutcome::ProviderFailure(problem) if problem.has_unknown_outcome()));
+            assert_eq!(
+                retained.state,
+                if mode == "refuse" {
+                    EffectState::Intent
+                } else {
+                    EffectState::UnknownOutcome
+                }
+            );
+        }
+    }
+}
