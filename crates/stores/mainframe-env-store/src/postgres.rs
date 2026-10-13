@@ -11,7 +11,9 @@ use sqlx::{Postgres, Row, Transaction};
 use std::future::Future;
 use tokio::runtime::Builder;
 
+mod audited_publication;
 mod bounded_provider_read;
+mod checked_read;
 mod container_retention;
 mod provider_retention;
 use provider_retention::validate_postgres_provider_dependency;
@@ -144,10 +146,6 @@ impl PostgresStateStore {
         block_on(&self.runtime, future)?.map_err(infrastructure)
     }
 
-    pub(crate) const fn max_rows(&self) -> usize {
-        self.max_rows
-    }
-
     pub(crate) fn retention_writable_probe(&self) -> Result<(), StoreError> {
         block_on(&self.runtime, async {
             let mut transaction = self.pool.begin().await.map_err(infrastructure)?;
@@ -164,10 +162,6 @@ impl PostgresStateStore {
                 .fetch_one(&self.pool),
         )?;
         usize::try_from(used).map_err(|_| StoreError::IncompatibleVersion)
-    }
-
-    pub(crate) const fn max_payload_bytes(&self) -> usize {
-        self.max_payload_bytes
     }
 
     pub(crate) const fn max_archive_rows(&self) -> usize {
@@ -885,6 +879,7 @@ async fn prove_provider_state_writable(
 }
 
 impl ProviderStateStore for PostgresStateStore {
+    crate::checked_read::checked_read_methods!();
     fn advance_logical_clock(&self, observed_floor: u64) -> Result<u64, StoreError> {
         let observed_floor =
             i64::try_from(observed_floor.max(1)).map_err(|_| StoreError::CapacityExceeded)?;
