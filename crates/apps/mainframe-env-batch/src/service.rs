@@ -2778,7 +2778,7 @@ impl BatchService {
         } else {
             let dataset =
                 dataset_name(&operand(statement, &["INDATASET"]).ok_or(HostProblem::Malformed)?)?;
-            self.read_dataset_records(invocation, None, &dataset, None, effect_sequence)?
+            self.read_repro_dataset_records(invocation, &dataset, effect_sequence, statement)?
                 .into_records()?
         };
         let skip = operand(statement, &["SKIP"])

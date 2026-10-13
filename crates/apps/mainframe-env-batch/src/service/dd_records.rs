@@ -3,6 +3,36 @@
 use super::*;
 
 impl BatchService {
+    pub(super) fn read_repro_dataset_records(
+        &self,
+        invocation: &(impl RunInput + ?Sized),
+        dataset: &DatasetName,
+        effect_sequence: &mut u64,
+        statement: &str,
+    ) -> Result<crate::dd_hydration::CompleteDatasetRead, HostProblem> {
+        if operand(statement, &["COUNT"]).is_some() {
+            // Explicit COUNT retains the original single-read selection. It
+            // does not claim that this unlocked page is the complete dataset.
+            let DatasetResult::Records { records, .. } = self.ams_dataset_read(
+                invocation,
+                effect_sequence,
+                DatasetRequest::Read {
+                    dataset: dataset.clone(),
+                    member: None,
+                    key: None,
+                    max_records: 4_096,
+                    control: Default::default(),
+                },
+            )?
+            else {
+                return Err(HostProblem::ProviderFailure);
+            };
+            Ok(crate::dd_hydration::CompleteDatasetRead::Records(records))
+        } else {
+            self.read_dataset_records(invocation, None, dataset, None, effect_sequence)
+        }
+    }
+
     pub(super) fn read_dataset_records(
         &self,
         invocation: &(impl RunInput + ?Sized),

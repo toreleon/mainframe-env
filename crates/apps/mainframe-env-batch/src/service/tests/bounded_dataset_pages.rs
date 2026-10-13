@@ -528,3 +528,74 @@ fn confirmed_missing_member_is_distinct_from_missing_or_changed_dataset() {
         Err(HostProblem::NotFound)
     );
 }
+
+#[test]
+fn real_provider_direct_repro_count_selects_from_a_full_page_without_claiming_eof() {
+    for (input_count, operands, expected_code, selection) in [
+        (4096, "COUNT(1)", 0, Some(0..1)),
+        (4097, "COUNT(1)", 0, Some(0..1)),
+        (4096, "SKIP(1) COUNT(1)", 0, Some(1..2)),
+        (4096, "COUNT(4096)", 0, Some(0..4096)),
+        (4096, "COUNT(4097)", 16, None),
+        (4096, "SKIP(4097) COUNT(1)", 16, None),
+        (4096, "", 16, None),
+    ] {
+        let (service, dataset) = service_with_real_datasets();
+        let expected_input = fixture_records(input_count);
+        seed_real_dataset(&dataset, "IBMUSER.INPUT", expected_input.clone(), 83000);
+        let unchanged = vec![b"UNCHANGED".to_vec()];
+        seed_real_dataset(&dataset, "IBMUSER.TARGET", unchanged.clone(), 83002);
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: format!(
+                        "//COUNTED JOB CLASS=A\n//S EXEC PGM=IDCAMS\n\
+                         //OUTPUT DD DSN=IBMUSER.TARGET,DISP=OLD\n//SYSIN DD *\n\
+                          REPRO INDATASET(IBMUSER.INPUT) OUTFILE(OUTPUT) {operands}\n/*\n"
+                    ),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("direct-repro-selection", InvocationLimits::default())
+                    .unwrap(),
+                false,
+            )
+            .unwrap();
+        let completed = service.run_next(&invocation, false).unwrap().unwrap();
+        assert_eq!(completed.return_code, Some(expected_code), "{operands}");
+        if expected_code == 0 {
+            assert_eq!(completed.state, JobState::Completed);
+        }
+        let DatasetResult::Records { records, .. } = dataset
+            .invoke(DatasetRequest::Read {
+                dataset: DatasetName::new("IBMUSER.TARGET", 128).unwrap(),
+                member: None,
+                key: None,
+                max_records: 4096,
+                control: Default::default(),
+            })
+            .unwrap()
+        else {
+            panic!("wrong target read result")
+        };
+        let wanted = selection.map_or(unchanged, |range| expected_input[range].to_vec());
+        assert_eq!(records, wanted, "{operands}");
+        let DatasetResult::Records {
+            records, version, ..
+        } = dataset
+            .invoke(DatasetRequest::Read {
+                dataset: DatasetName::new("IBMUSER.INPUT", 128).unwrap(),
+                member: None,
+                key: None,
+                max_records: 4097,
+                control: Default::default(),
+            })
+            .unwrap()
+        else {
+            panic!("wrong source read result")
+        };
+        assert_eq!(records, expected_input);
+        assert_eq!(version, 2);
+    }
+}
