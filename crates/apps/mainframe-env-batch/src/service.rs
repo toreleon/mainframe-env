@@ -1,5 +1,6 @@
 mod controller_preparation;
 mod dd_allocation;
+mod dd_records;
 mod effect_loan;
 mod hex_encoding;
 mod host_dispatch;
@@ -2777,21 +2778,8 @@ impl BatchService {
         } else {
             let dataset =
                 dataset_name(&operand(statement, &["INDATASET"]).ok_or(HostProblem::Malformed)?)?;
-            let DatasetResult::Records { records, .. } = self.ams_dataset_read(
-                invocation,
-                effect_sequence,
-                DatasetRequest::Read {
-                    dataset,
-                    member: None,
-                    key: None,
-                    max_records: 4_096,
-                    control: Default::default(),
-                },
-            )?
-            else {
-                return Err(HostProblem::ProviderFailure);
-            };
-            records
+            self.read_dataset_records(invocation, None, &dataset, None, effect_sequence)?
+                .into_records()?
         };
         let skip = operand(statement, &["SKIP"])
             .map(|value| value.parse::<usize>().map_err(|_| HostProblem::Malformed))
@@ -2804,6 +2792,12 @@ impl BatchService {
         if skip > 4_096 || count > 4_096 {
             return Err(HostProblem::ResourceExhausted);
         }
+        crate::dd_hydration::refuse_implicit_repro_prefix(
+            records.len(),
+            skip,
+            count,
+            operand(statement, &["COUNT"]).is_some(),
+        )?;
         let records = records
             .into_iter()
             .skip(skip)
@@ -3978,38 +3972,6 @@ impl BatchService {
         Ok(allocations)
     }
 
-    fn read_dataset_records(
-        &self,
-        invocation: &(impl RunInput + ?Sized),
-        allocation: &DdRuntimeAllocation,
-        effect_sequence: &mut u64,
-    ) -> Result<Vec<Vec<u8>>, HostProblem> {
-        invocation.check()?;
-        let sequence = next_effect_sequence(invocation, effect_sequence)?;
-        let result = self.invoke_host(
-            invocation,
-            invocation.original().deadline_tick.saturating_sub(1),
-            false,
-            EffectRequest {
-                run_unit: invocation.original().run_unit_id.clone(),
-                sequence,
-                deadline_tick: invocation.original().deadline_tick,
-                idempotency_key: None,
-                request: HostRequest::Dataset(DatasetRequest::Read {
-                    dataset: allocation.dataset.clone(),
-                    member: allocation.member.clone(),
-                    key: None,
-                    max_records: 4_096,
-                    control: Default::default(),
-                }),
-            },
-        );
-        let HostResult::Dataset(DatasetResult::Records { records, .. }) = result.outcome? else {
-            return Err(HostProblem::ProviderFailure);
-        };
-        Ok(records)
-    }
-
     fn hydrate_dds(
         &self,
         invocation: &(impl RunInput + ?Sized),
@@ -4057,37 +4019,49 @@ impl BatchService {
                 ccsid = attributes.ccsid;
             }
             if can_read_as_concatenation {
-                let sequence = next_effect_sequence(invocation, effect_sequence)?;
-                let result = self.invoke_host(
-                    invocation,
-                    invocation.original().deadline_tick.saturating_sub(1),
-                    false,
-                    EffectRequest {
-                        run_unit: invocation.original().run_unit_id.clone(),
-                        sequence,
-                        deadline_tick: invocation.original().deadline_tick,
-                        idempotency_key: None,
-                        request: HostRequest::Dataset(DatasetRequest::ReadConcatenation {
-                            datasets: group_allocations
-                                .iter()
-                                .map(|allocation| allocation.dataset.clone())
-                                .collect(),
-                            member: group_allocations[0].member.clone(),
-                            max_records: 4_096,
-                        }),
-                    },
-                );
-                let HostResult::Dataset(DatasetResult::Records {
-                    records: dataset_records,
-                    ..
-                }) = result.outcome?
-                else {
-                    return Err(HostProblem::ProviderFailure);
-                };
-                if retains_flattened_dataset_bytes(&name) {
-                    append_inline_records(&mut payload, &dataset_records);
+                let member = group_allocations[0].member.as_ref();
+                for allocation in &group_allocations {
+                    let dataset_records = match self.read_dataset_records(
+                        invocation,
+                        Some(allocation),
+                        &allocation.dataset,
+                        member,
+                        effect_sequence,
+                    ) {
+                        // Only confirmed absent members select the next library.
+                        Ok(crate::dd_hydration::CompleteDatasetRead::MissingMember)
+                            if member.is_some() =>
+                        {
+                            continue;
+                        }
+                        Ok(crate::dd_hydration::CompleteDatasetRead::Records(records)) => records,
+                        Ok(crate::dd_hydration::CompleteDatasetRead::MissingMember) => {
+                            return Err(HostProblem::ProviderFailure);
+                        }
+                        Err(problem) => return Err(problem),
+                    };
+                    if member.is_some() && dataset_records.is_empty() {
+                        return Err(HostProblem::Condition {
+                            name: "NOTFND".into(),
+                            response: 13,
+                            response2: 0,
+                        });
+                    }
+                    if retains_flattened_dataset_bytes(&name) {
+                        append_inline_records(&mut payload, &dataset_records);
+                    }
+                    records.extend(dataset_records);
+                    if member.is_some() {
+                        break;
+                    }
                 }
-                records.extend(dataset_records);
+                if member.is_some() && records.is_empty() {
+                    return Err(HostProblem::Condition {
+                        name: "NOTFND".into(),
+                        response: 13,
+                        response2: 0,
+                    });
+                }
             } else {
                 for (ordinal, dd) in dds.iter().enumerate().take(end).skip(start) {
                     if let Some(allocation) = allocations
@@ -4095,8 +4069,15 @@ impl BatchService {
                         .find(|allocation| allocation.ordinal == ordinal)
                     {
                         if allocation.disposition.status != DdStatusDisposition::New {
-                            let dataset_records =
-                                self.read_dataset_records(invocation, allocation, effect_sequence)?;
+                            let dataset_records = self
+                                .read_dataset_records(
+                                    invocation,
+                                    Some(allocation),
+                                    &allocation.dataset,
+                                    allocation.member.as_ref(),
+                                    effect_sequence,
+                                )?
+                                .into_records()?;
                             if retains_flattened_dataset_bytes(&name) {
                                 append_inline_records(&mut payload, &dataset_records);
                             }
@@ -4120,6 +4101,11 @@ impl BatchService {
             }
             start = end;
         }
+        crate::dd_hydration::check_hydration_storage(
+            dds,
+            &hydrated,
+            invocation.original().limits.max_storage_bytes,
+        )?;
         Ok(hydrated)
     }
 
@@ -6769,6 +6755,7 @@ fn dcollect_catalog_names(
 
 #[cfg(test)]
 mod tests {
+    mod bounded_dataset_pages;
     mod ims_completion;
     mod run_stop;
     mod running_step;
@@ -7032,6 +7019,11 @@ mod tests {
                             }))
                             .ok_or(HostProblem::NotFound)
                     }),
+                HostRequest::Dataset(DatasetRequest::ReadSequential {
+                    dataset, member, start, reverse, max_records,
+                }) => bounded_dataset_pages::test_provider_page(
+                    &self.records, &dataset, member.as_ref(), start, reverse, max_records,
+                ).map(HostResult::Dataset),
                 HostRequest::Dataset(DatasetRequest::Read { dataset, .. }) => self
                     .records
                     .lock()
