@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Implement byte-bounded PostgreSQL provider-state pages in one read-only snapshot before finite dataset seed selection."

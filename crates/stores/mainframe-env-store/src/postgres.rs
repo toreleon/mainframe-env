@@ -11,6 +11,7 @@ use sqlx::{Postgres, Row, Transaction};
 use std::future::Future;
 use tokio::runtime::Builder;
 
+mod bounded_provider_read;
 mod container_retention;
 mod provider_retention;
 use provider_retention::validate_postgres_provider_dependency;
@@ -927,28 +928,16 @@ impl ProviderStateStore for PostgresStateStore {
         namespace: &str,
         max: usize,
     ) -> Result<Vec<ProviderStateRecord>, StoreError> {
-        if max == 0 || max > mainframe_env_store_api::MAX_PROVIDER_STATE_SCAN {
-            return Err(StoreError::CapacityExceeded);
-        }
-        let rows = self.run(
-            sqlx::query(
-                "SELECT key,version,payload FROM provider_state WHERE namespace=$1 ORDER BY key LIMIT $2",
-            )
-            .bind(namespace)
-            .bind(i64::try_from(max).map_err(|_| StoreError::CapacityExceeded)?)
-            .fetch_all(&self.pool),
-        )?;
-        rows.into_iter()
-            .map(|row| {
-                Ok(ProviderStateRecord {
-                    namespace: namespace.into(),
-                    key: row.try_get(0).map_err(infrastructure)?,
-                    version: u64::try_from(row.try_get::<i64, _>(1).map_err(infrastructure)?)
-                        .map_err(|_| StoreError::IncompatibleVersion)?,
-                    payload: row.try_get(2).map_err(infrastructure)?,
-                })
-            })
-            .collect()
+        self.legacy_provider_page(namespace, max)
+    }
+
+    fn list_provider_state_bounded(
+        &self,
+        namespace: &str,
+        max: usize,
+        max_bytes: usize,
+    ) -> Result<Vec<ProviderStateRecord>, StoreError> {
+        self.bounded_provider_page(namespace, max, max_bytes)
     }
 
     fn list_provider_state_prefix(
