@@ -243,36 +243,8 @@ fn anchors() -> Vec<Program> {
     ]
 }
 
-fn minimize<F>(mut program: Program, mut divergent: F) -> Program
-where
-    F: FnMut(&Program) -> bool,
-{
-    for index_kind in 0..2 {
-        let mut index = 0;
-        loop {
-            let len = if index_kind == 0 {
-                program.statements.len()
-            } else {
-                program.data.len()
-            };
-            if index >= len {
-                break;
-            }
-            let mut candidate = program.clone();
-            if index_kind == 0 {
-                candidate.statements.remove(index);
-            } else {
-                candidate.data.remove(index);
-            }
-            if divergent(&candidate) {
-                program = candidate;
-            } else {
-                index += 1;
-            }
-        }
-    }
-    program
-}
+mod minimizer;
+use minimizer::minimize;
 
 fn displays_initialized(program: &Program) -> bool {
     program
@@ -286,11 +258,19 @@ fn displays_initialized(program: &Program) -> bool {
             else {
                 return true;
             };
-            let Some(previous) = index.checked_sub(1).and_then(|i| program.statements.get(i))
-            else {
-                return false;
-            };
-            previous.starts_with("MOVE ") && previous.ends_with(&format!(" TO {target}."))
+            program.statements[..index].iter().any(|previous| {
+                (previous.starts_with("MOVE ") && previous.ends_with(&format!(" TO {target}.")))
+                    || previous.starts_with(&format!("COMPUTE {target} "))
+                    || [" TO ", " FROM ", " BY ", " INTO ", " GIVING "]
+                        .iter()
+                        .any(|separator| {
+                            !previous.starts_with("MOVE ")
+                                && previous.contains(&format!("{separator}{target}"))
+                                && previous
+                                    .split(|c: char| !(c.is_ascii_alphanumeric() || c == '-'))
+                                    .any(|word| word == target)
+                        })
+            })
         })
 }
 
@@ -319,8 +299,8 @@ impl Drop for WorkDir {
 }
 
 enum Trial {
-    RejectedReference,
-    RejectedProduct,
+    RejectedReference(CobolObservation),
+    RejectedProduct(CobolObservation, CobolObservation),
     Observed(CobolObservation, CobolObservation),
 }
 
@@ -337,27 +317,37 @@ fn trial(program: &Program, cobc: &Path, work: &Path) -> Result<Trial, String> {
         .collect();
     let compiled = run_bounded(cobc, &arguments, work, &[])?;
     if !compiled.status.success() {
-        return Ok(Trial::RejectedReference);
+        return Ok(Trial::RejectedReference(CobolObservation {
+            stdout_records: records(&compiled.stdout)?,
+            return_code: compiled.status.code(),
+            abend_code: Some("COMPILE-ERROR".into()),
+            abend_reason: Some(String::from_utf8_lossy(&compiled.stderr).into_owned()),
+        }));
     }
-    let artifact = match crate::compile(&source) {
-        Ok(artifact) => artifact,
-        Err(_) => return Ok(Trial::RejectedProduct),
-    };
-    // Use the same source helper for the observation. Compilation above is the
-    // eligibility test; execution remains a single in-process product run.
-    drop(artifact);
-    let product = observe_cobol_source(&source)?;
     let output = run_bounded(&work.join("reference"), &[], work, &[])?;
-    let status = output
-        .status
-        .code()
-        .ok_or("GnuCOBOL process ended without exit code")?;
     let reference = CobolObservation {
         stdout_records: records(&output.stdout)?,
-        return_code: Some(status),
+        return_code: Some(
+            output
+                .status
+                .code()
+                .ok_or("GnuCOBOL process ended without exit code")?,
+        ),
         abend_code: None,
         abend_reason: None,
     };
+    if let Err(error) = crate::compile(&source) {
+        return Ok(Trial::RejectedProduct(
+            CobolObservation {
+                stdout_records: Vec::new(),
+                return_code: None,
+                abend_code: Some("COMPILE-ERROR".into()),
+                abend_reason: Some(error),
+            },
+            reference,
+        ));
+    }
+    let product = observe_cobol_source(&source)?;
     Ok(Trial::Observed(product, reference))
 }
 
@@ -366,16 +356,45 @@ fn allowlisted(signature: &str) -> Result<Option<String>, String> {
         "../../../../conformance/spec/cobol-differential-allowlist.json"
     ))
     .map_err(|e| e.to_string())?;
-    Ok(value
+    allowlisted_value(&value, signature)
+}
+
+fn allowlisted_value(value: &serde_json::Value, signature: &str) -> Result<Option<String>, String> {
+    let entries = value
         .get("entries")
         .and_then(|v| v.as_array())
-        .and_then(|entries| {
-            entries
-                .iter()
-                .find(|entry| entry.get("signature").and_then(|v| v.as_str()) == Some(signature))
-        })
-        .and_then(|entry| entry.get("reason").and_then(|v| v.as_str()))
-        .map(str::to_owned))
+        .ok_or("allowlist requires an entries array")?;
+    let mut matched = None;
+    let mut seen = BTreeSet::new();
+    for entry in entries {
+        let required = |field| {
+            entry
+                .get(field)
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.trim().is_empty())
+                .ok_or_else(|| format!("allowlist entry requires nonempty {field}"))
+        };
+        let entry_signature = required("signature")?;
+        let reason = required("reason")?;
+        let citation = required("citation")?;
+        let topic = citation.strip_prefix("https://www.ibm.com/docs/en/")
+            .filter(|s| s.starts_with("SS6SG3_6.5/lr/") && s.ends_with(".html"))
+            .ok_or("allowlist citation must identify an IBM Enterprise COBOL 6.5 Language Reference topic")?;
+        let catalog =
+            include_str!("../../../../conformance/subsystems/cobol/structure/cobol/language.json");
+        if !catalog.contains(&format!("topic:{topic};")) {
+            return Err(format!(
+                "allowlist citation is not in the pinned language catalog: {topic}"
+            ));
+        }
+        if !seen.insert(entry_signature) {
+            return Err("duplicate allowlist signature".into());
+        }
+        if entry_signature == signature {
+            matched = Some(format!("{reason}; IBM citation: {citation}"));
+        }
+    }
+    Ok(matched)
 }
 
 fn signature(program: &Program, product: &CobolObservation) -> String {
@@ -600,6 +619,8 @@ pub fn run_cobol_differential(
     start: u64,
     end: u64,
 ) -> Result<CobolDifferentialReceipt, String> {
+    // Validate every entry before launching a compiler, including unmatched entries.
+    allowlisted("")?;
     if start > end || end - start >= 300 {
         return Err("seed range must contain 1..300 seeds".into());
     }
@@ -692,17 +713,32 @@ fn run_one(
     seen: &mut BTreeSet<String>,
 ) -> Result<bool, String> {
     let (product, reference) = match trial(program, cobc, work)? {
-        Trial::RejectedReference => {
+        Trial::RejectedReference(reference) => {
             if seed.is_some() {
                 receipt.rejected_reference += 1;
             }
-            return Ok(false);
+            let product = CobolObservation {
+                stdout_records: Vec::new(),
+                return_code: None,
+                abend_code: Some("NOT-RUN".into()),
+                abend_reason: None,
+            };
+            record_rejection(program, seed, "generator-bug", product, reference, receipt);
+            return Ok(true);
         }
-        Trial::RejectedProduct => {
+        Trial::RejectedProduct(product, reference) => {
             if seed.is_some() {
                 receipt.rejected_product += 1;
             }
-            return Ok(false);
+            record_rejection(
+                program,
+                seed,
+                "product-defect-candidate",
+                product,
+                reference,
+                receipt,
+            );
+            return Ok(true);
         }
         Trial::Observed(product, reference) => (product, reference),
     };
@@ -714,22 +750,32 @@ fn run_one(
             && candidate
                 .statements
                 .iter()
+                .any(|statement| statement.starts_with("DISPLAY "))
+            && candidate
+                .statements
+                .iter()
                 .any(|statement| !statement.starts_with("DISPLAY"))
             && matches!(trial(candidate, cobc, work), Ok(Trial::Observed(a, b))
                 if a != b
                     && a.abend_code == product.abend_code
                     && b.abend_code == reference.abend_code)
     });
+    let (product, reference) = match trial(&reduced, cobc, work)? {
+        Trial::Observed(a, b) => (a, b),
+        _ => return Err("minimizer lost the observed divergence".into()),
+    };
     let sig = signature(&reduced, &product);
     let issue = classify(&reduced, &sig, &product, &reference);
-    if let (Some(_), Some(issue)) = (seed, issue) {
+    let allowed = allowlisted(&sig)?;
+    if allowed.is_none()
+        && let (Some(_), Some(issue)) = (seed, issue)
+    {
         receipt.generated_reached.insert(issue.into(), true);
     }
-    let allowed = allowlisted(&sig)?;
-    let classification = if issue.is_some() {
-        "known-defect"
-    } else if allowed.is_some() {
+    let classification = if allowed.is_some() {
         "allowed-difference"
+    } else if issue.is_some() {
+        "known-defect"
     } else {
         "product-defect-candidate"
     };
@@ -742,11 +788,12 @@ fn run_one(
         },
         issue.unwrap_or(classification)
     );
+    if let Some(seed) = seed {
+        println!(
+            "cobol-differential: failing seed={seed} classification={classification} issue={issue:?}"
+        );
+    }
     if seen.insert(class.clone()) {
-        let (product, reference) = match trial(&reduced, cobc, work)? {
-            Trial::Observed(a, b) => (a, b),
-            _ => (product, reference),
-        };
         receipt.divergences.push(DifferentialCase {
             origin: if seed.is_some() {
                 "generated"
@@ -759,14 +806,14 @@ fn run_one(
             signature: sig,
             count: 1,
             classification: classification.into(),
-            reason: issue
-                .map(|issue| {
+            reason: allowed.or_else(|| {
+                issue.map(|issue| {
                     format!(
                         "https://github.com/toreleon/mainframe-env/issues/{}",
                         &issue[1..]
                     )
                 })
-                .or(allowed),
+            }),
             minimized_program: reduced.source(),
             product,
             reference,
@@ -781,9 +828,209 @@ fn run_one(
     Ok(true)
 }
 
+fn record_rejection(
+    program: &Program,
+    seed: Option<u64>,
+    classification: &str,
+    product: CobolObservation,
+    reference: CobolObservation,
+    receipt: &mut CobolDifferentialReceipt,
+) {
+    println!("cobol-differential: failing seed={seed:?} classification={classification}");
+    let sig = signature(program, &product);
+    receipt.divergences.push(DifferentialCase {
+        origin: if seed.is_some() {
+            "generated"
+        } else {
+            "anchor"
+        }
+        .into(),
+        seed,
+        class: format!("compile-rejection:{sig}"),
+        signature: sig,
+        count: 1,
+        classification: classification.into(),
+        reason: Some(
+            if classification == "generator-bug" {
+                "GnuCOBOL rejected the grammar output; product was not run"
+            } else {
+                "GnuCOBOL accepted the grammar output; product compilation failed"
+            }
+            .into(),
+        ),
+        minimized_program: program.source(),
+        product,
+        reference,
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cobol_differential_generates_size_error_handlers() {
+        assert!(
+            (1..=50).any(|seed| generated(seed).source().contains("ON SIZE ERROR")),
+            "bounded grammar never generates ON SIZE ERROR"
+        );
+    }
+
+    #[test]
+    fn cobol_differential_allowlist_rejects_missing_ibm_citation() {
+        let value = serde_json::json!({"entries":[{
+            "signature":"other", "reason":"known difference"
+        }]});
+        assert!(
+            allowlisted_value(&value, "unmatched").is_err(),
+            "uncited allowlist entry accepted even when unmatched"
+        );
+    }
+
+    #[test]
+    fn cobol_differential_minimizer_shrinks_pictures() {
+        let program = Program {
+            class: String::new(),
+            data: vec!["01 N PIC 9(8).".into()],
+            statements: vec!["DISPLAY N.".into()],
+        };
+        let reduced = minimize(program, |candidate| {
+            candidate.data.len() == 1 && candidate.statements.len() == 1
+        });
+        assert_eq!(
+            reduced.data,
+            ["01 N PIC 9(1)."],
+            "minimizer never reduces numeric PICTURE widths"
+        );
+    }
+
+    #[test]
+    fn cobol_differential_allowlist_validates_all_entries() {
+        let valid = serde_json::json!({"entries":[{
+            "signature":"sample", "reason":"documented difference",
+            "citation":"https://www.ibm.com/docs/en/SS6SG3_6.5/lr/ref/rlddepic.html"
+        }]});
+        assert!(
+            allowlisted_value(&valid, "sample")
+                .unwrap()
+                .unwrap()
+                .contains("IBM citation")
+        );
+        assert_eq!(allowlisted_value(&valid, "unmatched").unwrap(), None);
+        for citation in [
+            "",
+            "https://example.com/topic",
+            "https://www.ibm.com/docs/en/SS6SG3_6.5/pg/topic.html",
+            "https://www.ibm.com/docs/en/SS6SG3_6.5/lr/ref/nonexistent.html",
+        ] {
+            let mut invalid = valid.clone();
+            invalid["entries"][0]["citation"] = citation.into();
+            assert!(
+                allowlisted_value(&invalid, "unmatched").is_err(),
+                "{citation}"
+            );
+        }
+        assert!(allowlisted_value(&serde_json::json!({}), "sample").is_err());
+        let mut duplicate = valid.clone();
+        duplicate["entries"]
+            .as_array_mut()
+            .unwrap()
+            .push(valid["entries"][0].clone());
+        assert!(allowlisted_value(&duplicate, "unmatched").is_err());
+    }
+
+    #[test]
+    fn cobol_differential_grammar_covers_numeric_editing_and_arithmetic() {
+        let programs: Vec<_> = (1..=1000).map(generated).collect();
+        let sources = programs
+            .iter()
+            .map(Program::source)
+            .collect::<Vec<_>>()
+            .join("\n");
+        for usage in ["DISPLAY", "COMP", "COMP-3", "COMP-5"] {
+            assert!(sources.contains(&format!("USAGE {usage} ")));
+        }
+        for verb in ["ADD", "SUBTRACT", "MULTIPLY", "DIVIDE", "COMPUTE"] {
+            let arithmetic: Vec<_> = programs
+                .iter()
+                .flat_map(|p| &p.statements)
+                .filter(|s| s.starts_with(&format!("{verb} ")))
+                .collect();
+            assert!(arithmetic.iter().any(|s| s.contains("ROUNDED")), "{verb}");
+            assert!(
+                arithmetic
+                    .iter()
+                    .any(|s| s.contains("ON SIZE ERROR") && s.ends_with(&format!("END-{verb}."))),
+                "{verb}"
+            );
+        }
+        for feature in ["Z", "*", "$$", "++", "--", ",", "B", "/", "CR", "DB"] {
+            assert!(
+                programs
+                    .iter()
+                    .any(|program| program.data.iter().any(|item| {
+                        let name = item.split_whitespace().nth(1).unwrap();
+                        let pic = item
+                            .split("PIC ")
+                            .nth(1)
+                            .unwrap()
+                            .split_whitespace()
+                            .next()
+                            .unwrap();
+                        pic.contains(feature)
+                            && program.statements.iter().any(|s| {
+                                s.starts_with("MOVE ") && s.ends_with(&format!(" TO {name}."))
+                            })
+                            && program.statements.contains(&format!("DISPLAY {name}."))
+                    })),
+                "{feature}"
+            );
+        }
+        assert!(sources.contains("PIC S9("));
+        assert!(sources.contains("PIC 9("));
+        assert!(sources.contains("V9("));
+    }
+
+    #[test]
+    fn cobol_differential_minimizer_preserves_valid_values_and_companions() {
+        let program = Program {
+            class: String::new(),
+            data: vec![
+                "01 N PIC S9(8)V9(4) USAGE COMP-3 VALUE -12.34.".into(),
+                "01 N-O PIC S9(8)V9(4) USAGE DISPLAY SIGN IS TRAILING SEPARATE.".into(),
+            ],
+            statements: vec!["MOVE N TO N-O.".into(), "DISPLAY N-O.".into()],
+        };
+        let reduced = minimize(program, |candidate| {
+            candidate.data.len() == 2 && candidate.statements.len() == 2
+        });
+        assert_eq!(
+            reduced.data,
+            [
+                "01 N PIC S9(2)V9(2) USAGE COMP-3 VALUE -12.34.",
+                "01 N-O PIC S9(2)V9(2) USAGE DISPLAY SIGN IS TRAILING SEPARATE."
+            ]
+        );
+    }
+
+    #[test]
+    fn cobol_differential_minimizer_shrinks_edited_pictures() {
+        let program = Program {
+            class: String::new(),
+            data: vec!["01 E PIC 9999.99CR.".into()],
+            statements: vec!["DISPLAY E.".into()],
+        };
+        let reduced = minimize(program, |candidate| {
+            candidate.data.len() == 1 && candidate.statements.len() == 1
+        });
+        let pic = reduced.data[0]
+            .strip_prefix("01 E PIC ")
+            .unwrap()
+            .trim_end_matches('.');
+        assert!(pic.len() < "9999.99CR".len());
+        assert!(generator::well_formed_picture(pic));
+        assert!(pic.ends_with("CR"));
+    }
 
     #[test]
     fn cobol_differential_observes_product_records_and_return_code() {

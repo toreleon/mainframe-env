@@ -3,7 +3,7 @@
     "markdown_documents": 244,
     "navigation_groups": 8,
     "normative_documents": 100,
-    "xtask_commands": 163
+    "xtask_commands": 164
   },
   "documents": [
     {
@@ -2290,9 +2290,9 @@
       "normative": false,
       "path": "docs/runbooks/COBOL-DIFFERENTIAL.md",
       "relative_links": 0,
-      "sha256": "sha256:ccffa273c310b031cc96a96f59a5e2e15d1464f7346d2d1e08ec0e74d2e2d945",
-      "title": "COBOL semantic differential pilot",
-      "xtask_commands": 1
+      "sha256": "sha256:df3e0e91635c2b22090bd6ca09d912dd1c6a9f5783825c7704debc53ba9033e1",
+      "title": "Randomized COBOL differential testing v1",
+      "xtask_commands": 2
     },
     {
       "normative": false,
