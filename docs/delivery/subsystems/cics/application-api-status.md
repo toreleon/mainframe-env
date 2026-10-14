@@ -5245,8 +5245,11 @@ typed `FormatTime` plan. Append-only tag 16 identifies the operation; operands
 carry exact packed ABSTIME plus optional one-byte DATESEP/TIMESEP values, and
 named output tags bind YYYYMMDD, YYMMDD, MMDDYY, MMDDYYYY, YYDDD, TIME, and
 MILLISECONDS to pre-resolved receiving storage. Compiler and defensive
-interpreter admission enforce each IBM field width and category. The provider
-returns character fields under the bounded CICS payload schema, returns
+interpreter admission enforce character categories and the documented receiving
+widths (8/10/6), also accepting exact compact widths (6/8/5) as local compatibility
+when the corresponding DATESEP or TIMESEP is absent. Bare and valued separators
+require the documented width; compact writes preserve a wider field's suffix.
+The provider returns character fields under the bounded CICS payload schema, returns
 MILLISECONDS as a typed decimal for fullword encoding, maps invalid absolute
 time to INVREQ 16/1, and rejects unknown or malformed request fields.
 
@@ -5260,10 +5263,9 @@ milliseconds at task suspension.
 DATE, FULLDATE, DATEFORM, DATESTRING, STRINGZONE, DAYCOUNT, DAYOFMONTH,
 DAYOFWEEK, DDMMYY, DDMMYYYY, MONTHOFYEAR, STRINGFORMAT, YEAR, YYDDMM,
 YYYYDDD, and YYYYDDMM remain explicit typed-lowering rejections. Bare
-DATESEP/TIMESEP defaults also remain deferred because the frozen generated
-option shape records a required value. Retained raw FORMATTIME artifacts can
-still use their historical separator flags. Those options and the
-candidate-bound licensed differential remain pending, so row `0080` receives
+DATESEP/TIMESEP defaults lower as typed plan options. Retained raw FORMATTIME
+artifacts can still use their historical separator flags. The candidate-bound
+licensed differential remains pending, so row `0080` receives
 no whole-row credit.
 
 #### `CIC-902.time-convert` progress

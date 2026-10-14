@@ -185,6 +185,9 @@ pub fn execute(
 }
 
 #[cfg(test)]
+mod formattime_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use mainframe_env_diagnostics::Completeness;

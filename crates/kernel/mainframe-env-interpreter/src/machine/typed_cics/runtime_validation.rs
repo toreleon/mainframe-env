@@ -73,7 +73,7 @@ pub(super) fn validate_runtime_plan(
             machine,
             operation,
             &output.target,
-            names::output_slot_use(output.name),
+            format_time::plan_output_slot_use(plan, output.name),
         )?;
     }
     Ok(())
@@ -125,7 +125,7 @@ pub(super) fn validate_machine_slot(
             | SlotUse::BtsExactOutput(_)
             | SlotUse::CounterNumber
             | SlotUse::AbstimeOutput
-            | SlotUse::FormatTextOutput(_)
+            | SlotUse::FormatTextOutput(..)
             | SlotUse::MillisecondsOutput
             | SlotUse::NumericOutput
             | SlotUse::HalfwordOutput
@@ -276,8 +276,8 @@ pub(super) fn validate_machine_slot(
         ));
     }
     convert_time::validate_date_string_slot(layout, slot_use)?;
-    if let SlotUse::FormatTextOutput(expected) = slot_use
-        && (layout.length != expected
+    if let SlotUse::FormatTextOutput(field, compact) = slot_use
+        && ((layout.length != field && Some(layout.length) != compact)
             || !matches!(
                 layout.category,
                 LayoutCategory::Alphabetic | LayoutCategory::Alphanumeric
