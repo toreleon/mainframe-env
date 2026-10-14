@@ -3526,7 +3526,7 @@ are removed from this status record.
 |---|---|---|
 | CIC-901 | **Complete at the non-release implementation boundary.** Sources A/B/C accepted 88/88/87; 263-row contract and registry generated; readiness is 3 typed, 20 legacy compatibility, 240 unready; aggregate gates pass | Begin CIC-902 family vertical slices |
 | CIC-902 | **In progress.** Twelve bounded parent slices, twenty-eight implemented interval children, and the START/RETRIEVE metadata, FMH, SET, WAIT-data, and task-local GETMAIN/FREEMAIN children are described below. The local-data cycle connects strict START records to the shared fenced work queue and typed RETRIEVE consumption, now including automatic facility-less target-task launch under the retained principal with one durable execution identity across worker retries and SQLite reopen before launch or after target completion; local TERMID validation, durable terminal association, facility-matched RETRIEVE, busy-terminal deferral and automatic launch on availability; packed plus literal/dynamic `AFTER`/`AT` unit scheduling; no-data START with replay-safe RETRIEVE ENDDATA; bounded RTRANSID/RTERMID/QUEUE propagation; pre-consumption ENVDEFERR; FMH-to-EIBFMH state; either INTO or checkpointed virtual-pointer SET delivery; durable WAIT suspension/reissue until a promoted record appears; generated REQID/EIBREQID identity with local NOCHECK suppression; RACF-backed USERID validity, surrogate admission and durable target-principal binding; PROTECT admission after explicit or implicit committing syncpoint with rollback cleanup on known execution failure, disconnect, or idle timeout, disposition-bound crash-gap recovery after durable execution terminalization, explicit ABEND cancellation of still-protected rows, and source-defined CANCEL refusal before PROTECT commit followed by ordinary cancellation after commit; bounded local CANCEL tombstones unhonored committed START records and cancels their work; bare/default and literal-zero DELAY complete immediately; positive literal or storage-backed packed INTERVAL, packed TIME, and literal/dynamic FOR/UNTIL unit DELAY including MILLISECS persist one task/statement cycle, suspend, promote under the shared worker fence, automatically resume the matching durable exchange in-process or after SQLite reopen, and complete on reissue; elapsed absolute and sub-50 ms targets return source-defined EXPIRED; and local application-named delays support other-task early-expiration cancellation plus bounded terminal cleanup. The local/default and unambiguous installed-ENQMODEL portions of `task-enqueue`, both ASKTIME forms, the source-checked FORMATTIME and local LINK subsets, typed ABEND/HANDLE ABEND, the 92-output ASSIGN subset, ADDRESS SET virtual-pointer transfer, bounded GETMAIN SET/FLENGTH/LENGTH allocation and FREEMAIN DATAPOINTER/DATA release, CHANGE TASK priority, SET ASSOCIATION USERCORRDATA, one-shot SUSPEND, nested PUSH/POP HANDLE stack, and IGNORE CONDITION are executable, but no whole row is credited yet | Continue source-available storage, interval, and START/RETRIEVE obligations; POST remains blocked on its missing pinned body |
-| CIC-903 | **In progress.** The default-cursor STARTBR/READNEXT/READPREV/ENDBR browse subset, including STARTBR EQUAL/GTEQ and GENERIC/KEYLENGTH positioning plus READNEXT/READPREV LENGTH in/out behavior, keyed READ including GTEQ/GENERIC plus WRITE/DELETE with LENGTH/KEYLENGTH where applicable, held-record REWRITE LENGTH, current-record DELETE after READ UPDATE, local WRITEQ/READQ/DELETEQ TD with durable local TDQUEUE definitions and DELETEQ TS QUEUE/QNAME plus READQ/WRITEQ TS, bounded local RECEIVE MAP/SEND MAP/SEND TEXT including RECEIVE FROM/LENGTH/TERMINAL, send lengths and SEND MAP MAPONLY/DATAONLY, empty-state PURGE MESSAGE, and durable SPOOLCLOSE and SPOOLOPEN INPUT/OUTPUT, SPOOLREAD, and SPOOLWRITE are typed; named/remote cursors, alternate key forms, RLS token locking, TSQ definition state, broader BMS controls, and JES-backed spool integration remain pending | Continue file update/browse, terminal/BMS, TSQ/TDQ, journal, and spool slices |
+| CIC-903 | **In progress.** The default-cursor STARTBR/READNEXT/READPREV/ENDBR browse subset, including STARTBR EQUAL/GTEQ and GENERIC/KEYLENGTH positioning plus READNEXT/READPREV LENGTH in/out behavior, keyed READ including GTEQ/GENERIC plus WRITE/DELETE with LENGTH/KEYLENGTH where applicable, held-record REWRITE LENGTH, current-record DELETE after READ UPDATE, local WRITEQ/READQ/DELETEQ TD with durable local TDQUEUE definitions and DELETEQ TS QUEUE/QNAME plus READQ/WRITEQ TS, bounded local RECEIVE MAP/SEND MAP/SEND TEXT including RECEIVE FROM/LENGTH/TERMINAL, send lengths and SEND MAP MAPONLY/DATAONLY, durable pending-control PURGE MESSAGE, and durable SPOOLCLOSE and SPOOLOPEN INPUT/OUTPUT, SPOOLREAD, and SPOOLWRITE are typed; named/remote cursors, alternate key forms, RLS token locking, TSQ definition state, broader BMS controls, and JES-backed spool integration remain pending | Continue file update/browse, terminal/BMS, TSQ/TDQ, journal, and spool slices |
 | CIC-904 | **In progress.** Typed transform, document, all thirteen assigned event-control rows, eight web-service-control rows, and twelve named-counter rows are implemented; broader BTS controls remain pending | Continue separately assigned CIC-904 families |
 | CIC-905 | **In progress.** Nine conversation-open and eight EXTRACT/POINT rows are typed over one ledger; broader APPC/MRO and distributed program link remain pending | Continue sibling commands and licensed differential review |
 | CIC-906 | **In progress: bounded R-24, PostgreSQL durable-profile, and representative SAF/audit/uncertainty validation.** No integrated campaign or release gate completed | Cross-family security, concurrency, recovery, scale, and licensed campaigns |
@@ -3756,7 +3756,7 @@ CIC-903. The first bounded child is declared before broader CIC-903 work:
 | `CIC-903.file-update` | `0040 DELETE`: `FILE`, `RIDFLD`, `TOKEN`, `KEYLENGTH`, `GENERIC`, `NUMREC`, `SYSID`, `RBA`, `RRN`, `NOSUSPEND`, and common response options; `0156 READ`: its generated read/update/key/consistency options; `0181 REWRITE`: `FILE`, `FROM`, `LENGTH`, `TOKEN`, `SYSID`, `NOSUSPEND`, and common response options; `0253 WRITE FILE`: `FILE`, `FROM`, `RIDFLD`, `KEYLENGTH`, `LENGTH`, `SYSID`, `RBA`, `RRN`, `XRBA`, `MASSINSERT`, `NOSUSPEND`, and common response options | Local explicit-key WRITE/DELETE and existing bounded READ UPDATE/REWRITE subsets first; prior-update identity, remote routing, alternate identifiers, and RLS concurrency remain separate. Typed CICS plans over `handlers/file.rs` and durable UOW participants | Exact record/key identity, direct versus prior-update delete, lock/token lifecycle, length/key validation, EIBFN/conditions, SAF/audit, mutation replay/unknown outcome, memory/SQLite/PostgreSQL restart, selected route, and licensed differential |
 | `CIC-903.tdq` | `0048 DELETEQ TD`: `QUEUE`, `SYSID`, and common response options; `0257 WRITEQ TD`: `QUEUE`, `FROM`, `LENGTH`, `SYSID`, and common response options; remaining transient-data rows retain their full generated option contracts | Local WRITEQ/DELETEQ TD first; remote routing and definition-driven intrapartition/extrapartition behavior remain separate. Typed CICS queue plans over `handlers/queue_control.rs` and durable provider state | Exact queue/record/length identity, QIDERR/open/disabled/space/lock conditions, SAF/audit, mutation replay/unknown outcome, memory/SQLite/PostgreSQL restart, selected route, and licensed differential |
 | `CIC-903.tsq` | `0049 DELETEQ TS`: `QUEUE`, `QNAME`, `SYSID`, and common response options; `0160 READQ TS`: its full generated QUEUE/QNAME, INTO/SET, LENGTH, NUMITEMS, NEXT/ITEM, SYSID and common response contract; `0258 WRITEQ TS` retains its full generated item/rewrite/placement/nosuspend contract | Local DELETEQ, READQ and WRITEQ over a dedicated durable namespace first; remote/shared pools, TSMODEL placement, recoverable-UOW coupling and broader lock ownership remain separate. Typed CICS queue plans over `handlers/queue_control.rs` and provider state | Exact queue/item identity, sequential cursor and deletion, QIDERR/INVREQ/ITEMERR/LENGERR/LOCKED/NOTAUTH conditions, SAF/audit, mutation replay/unknown outcome, memory/SQLite/PostgreSQL restart, selected route, and licensed differential |
-| `CIC-903.terminal-bms` | `0148 PURGE MESSAGE`: common response options; `0163 RECEIVE MAP`: `MAP`, `MAPSET`, `INTO`, `SET`, `LENGTH`, terminal controls and common response options; `0189 SEND MAP`: `MAP`, `MAPSET`, `FROM`, `LENGTH`, terminal controls and common response options; `0192 SEND TEXT`: `FROM`, `LENGTH`, terminal controls and common response options | Local empty-logical-message PURGE plus explicit-MAP and storage-backed map/text subsets first; nonempty accumulated pages, omitted-map/AID-only receive, implicit symbolic storage, SET pointers, paging, device and broader terminal controls remain separate. Typed CICS terminal plans over `handlers/terminal_control.rs` and durable session/map definitions | Exact logical-message lifecycle, map identity/default, input/output bindings, field normalization, terminal fit, EIBFN/conditions, bounds, SAF/audit, state recovery disposition, selected route, and licensed differential |
+| `CIC-903.terminal-bms` | `0148 PURGE MESSAGE`: common response options; `0163 RECEIVE MAP`: `MAP`, `MAPSET`, `INTO`, `SET`, `LENGTH`, terminal controls and common response options; `0189 SEND MAP`: `MAP`, `MAPSET`, `FROM`, `LENGTH`, terminal controls and common response options; `0192 SEND TEXT`: `FROM`, `LENGTH`, terminal controls and common response options | Local empty/pending-control PURGE plus explicit-MAP and storage-backed map/text subsets; nonempty accumulated pages, omitted-map/AID-only receive, implicit symbolic storage, SET pointers, paging, device and broader terminal controls remain separate. Typed CICS terminal plans over `handlers/terminal_control.rs` and durable session/map definitions | Exact logical-message lifecycle, map identity/default, input/output bindings, field normalization, terminal fit, EIBFN/conditions, bounds, SAF/audit, state recovery disposition, selected route, and licensed differential |
 
 ### CIC-904 event-control implementation
 
@@ -8271,7 +8271,7 @@ cursor positioning, paging, DPL behavior, broader restart, and licensed
 differential remain pending. This is partial `CIC-903.terminal-bms` progress
 and grants no whole-row credit.
 
-### `CIC-903.terminal-bms` empty-message purge progress
+### `CIC-903.terminal-bms` empty-message purge progress (historical)
 
 Sources B row `0148` PURGE MESSAGE pins topic
 `SSJL4D_6.x/reference-applications/commands-api/dfhp4_purgemessage.html` at
@@ -8286,8 +8286,8 @@ retained in Git, and no host publication cache is available.
 The source defines a no-operand command, apart from common NOHANDLE/RESP/RESP2
 controls, that deletes the full-BMS logical message currently being built and
 its accumulated pages. It also defines `INVREQ` 16/200 for a DPL server and
-`TSIOERR` 35 for irrecoverable temporary-storage I/O. This runtime exposes no
-ACCUM or page-building route, so its reachable pending logical-message state is
+`TSIOERR` 35 for irrecoverable temporary-storage I/O. At that implementation stage, the runtime exposed no
+ACCUM or page-building route, so its reachable pending logical-message state was
 exactly empty. Local PURGE therefore succeeds idempotently without erasing the
 already displayed screen or current map. DPL execution returns the exact
 source-defined `INVREQ` response.
@@ -8306,10 +8306,49 @@ The regenerated live contract has identity
 `sha256:86349d7ffddd945f1366bf978cd3317bfdde5fe7a69ea852bd649d2ae9cea979`
 and registry identity
 `sha256:07f4e7f4b1fb8a400be555eb1ea2060bfc14115c09814fdd86e3b880d91a235f`,
-with 34 typed, 1 legacy compatibility, and 228 unready rows. A nonempty
-accumulated logical-message authority, page deletion, `TSIOERR`, restart
-coverage for that future state, and licensed differential remain pending. This
+with 34 typed, 1 legacy compatibility, and 228 unready rows at that stage.
+Nonempty accumulated-message authority and its restart coverage were pending
+then; the later SEND CONTROL/SEND PAGE slice supplies durable control state.
+Multi-page construction, `TSIOERR`, and licensed differential remain pending. This
 is partial `CIC-903.terminal-bms` progress and grants no whole-row credit.
+
+### `CIC-903.terminal-bms` PURGE selected-route matrix (#198)
+
+Review base: `a688045a`; bounded owner branch: `codex/purge-message-matrix-198`.
+The tests in `product/tests/purge_message_matrix.rs` use compiled artifacts,
+the reference runtime, and the CICS provider with memory and SQLite stores.
+They distinguish zero, one, and several ACCUM control frames; discard deferred
+ERASE/ALARM controls without changing the display; check a subsequent SEND and
+RETURN; and restore a runtime checkpoint and reopen the provider after PURGE.
+Replaying the original purge leaves a later display, new pending message,
+BMS state version, and receipt set unchanged. PostgreSQL variants are written
+but require an isolated PostgreSQL environment and are not local evidence.
+Provider tests additionally pin completed-message page preservation,
+authorization denial, and corrupt-storage failure without fabricated TSIOERR.
+
+This is **partial selected-route evidence**, not a true multi-page accumulated
+message matrix. The current typed route has no SEND MAP/TEXT ACCUM or overflow
+page construction. SEND PAGE completes each logical message; calling it twice
+creates two completed messages, not two pages of the same incomplete message.
+The source requires deleting pages owned by the current incomplete message;
+it does not justify deleting the session's previously completed paging output.
+The existing durable state does not associate such completed output with a
+pending message. Extending construction/ownership would expand this repair's
+scope; true one/multi-page incomplete-message evidence remains pending.
+
+Source review used the retained external cache without refresh: IBM CICS TS
+6.x, baselines `ibm-cics-ts-6x-application-api-sources-b-2026-09-10` (row `0148`,
+`dfhp4_purgemessage.html`) and
+`ibm-cics-ts-6x-application-api-sources-c-2026-09-10` (rows `0188`/`0190`,
+`dfhp4_sendcontrol.html` / `dfhp4_sendpage.html`), with the full topic paths
+and hashes recorded in [CICS terminal control](../../../architecture/CICS-TERMINAL-CONTROL.md).
+The C sources also pin `SSJL4D_6.x/applications/designing/dfhp37j.html`
+at `5f14bc6c80edee0ac85b43c3d667ca6075e46a27be216746c8558840e1126245`.
+The default cache was missing these topics, but offline search/read verified
+the retained cache bodies and TOC. TSIOERR 35 refers to irrecoverable temporary
+storage I/O, not an arbitrary terminal or platform-storage error. No deterministic
+BMS I/O injection exists; that condition remains unverified and fail-closed.
+No catalog promotion, whole-command credit, or licensed equivalence is claimed.
 
 ### `CIC-902.task-retrieve` source boundary
 
