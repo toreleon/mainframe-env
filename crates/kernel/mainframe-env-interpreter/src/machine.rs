@@ -7075,7 +7075,7 @@ impl ReferenceMachine {
         }
         if tokens.len() == 1
             && self.layout(&tokens[0]).is_none()
-            && let Some(value) = self.implicit.get(&normalize(&tokens[0]))
+            && let Some(value) = eib::implicit_value(&self.implicit, &normalize(&tokens[0]))
         {
             return Ok(value.clone());
         }
@@ -7955,7 +7955,7 @@ impl ReferenceMachine {
         rounded: bool,
     ) -> Result<(), MachineProblem> {
         let implicit = normalize(target);
-        if let Some(slot) = self.implicit.get_mut(&implicit) {
+        if let Some(slot) = eib::implicit_slot(&mut self.implicit, &implicit) {
             *slot = CobolValue::Decimal(value);
             if self.layout(target).is_none() {
                 return Ok(());
@@ -8221,7 +8221,7 @@ impl ReferenceMachine {
     }
     fn write(&mut self, name: &str, value: &[u8]) -> Result<(), MachineProblem> {
         let implicit = normalize(name);
-        if let Some(current) = self.implicit.get(&implicit) {
+        if let Some(current) = eib::implicit_value(&self.implicit, &implicit) {
             let next = match current {
                 CobolValue::Decimal(_) => CobolValue::Decimal(
                     decimal_text(&String::from_utf8_lossy(value))

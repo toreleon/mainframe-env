@@ -2781,6 +2781,27 @@ mod tests {
     }
 
     #[test]
+    fn cics_eib_operands_and_intrinsic_arguments_publish_executable_programs() {
+        for statement in [
+            "MOVE EIBTASKN TO N",
+            "COMPUTE X = FUNCTION RANDOM(EIBTASKN)",
+            "COMPUTE N = FUNCTION INTEGER(EIBTASKN)",
+            "COMPUTE N = FUNCTION INTEGER(EIBTIME)",
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. EIBARGS. DATA DIVISION. WORKING-STORAGE SECTION. 01 N PIC 9(7). 01 X PIC 9V9(9). PROCEDURE DIVISION. {statement}. EXEC CICS RETURN END-EXEC."
+            );
+            let result = CobolCompiler::default()
+                .compile(request(&source, CompilationMode::Executable))
+                .unwrap();
+            assert!(
+                matches!(result, CompilerResult::Published { .. }),
+                "{statement}: {result:?}"
+            );
+        }
+    }
+
+    #[test]
     fn unresolved_function_arithmetic_keeps_the_version_one_executable_route() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. LEGACY. DATA DIVISION. WORKING-STORAGE SECTION. 01 TEXT-X PIC X VALUE '1'. PROCEDURE DIVISION. COMPUTE RETURN-CODE = FUNCTION NUMVAL(TEXT-X). STOP RUN.";
         let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
