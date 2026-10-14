@@ -715,6 +715,100 @@ mod tests {
     }
 
     #[test]
+    fn program_without_sql_include_preserves_base_artifact_bytes() {
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(request(HELLO, CompilationMode::Executable))
+            .unwrap()
+        else {
+            panic!("program without SQL INCLUDE must publish");
+        };
+        // Captured on a688045a before enabling automatic SQL INCLUDE expansion.
+        assert_eq!(
+            artifact.content_id().to_reference(),
+            "sha256:fd5ecebf2868a944a20342bc26a3dd1efc37a34e52a2b9874507e180029ea7f5"
+        );
+    }
+
+    #[test]
+    fn sql_include_expands_available_dcl_members_without_an_option() {
+        let limits = SourceLimits::default();
+        let primary = bundle(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. DCLTEST. DATA DIVISION. \
+             WORKING-STORAGE SECTION. EXEC SQL INCLUDE DCLROW END-EXEC. \
+             PROCEDURE DIVISION. ADD 1 TO DCL-TR-DESCRIPTION-LEN. STOP RUN.",
+        );
+        let member = SourceFile::input(
+            "DCLROW.dcl",
+            b"01 DCL-TR-DESCRIPTION-LEN PIC 9(4) VALUE 0.".to_vec(),
+            SourceFormat::Free,
+            SourceEncoding::Utf8,
+            limits,
+        )
+        .unwrap();
+        let library = SourceLibrary::new("dcl", vec![member.path().clone()], limits).unwrap();
+        let source = SourceBundle::with_libraries(
+            primary.files()[0].path(),
+            vec![primary.files()[0].clone(), member],
+            vec![library],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let compile = |source| {
+            CobolCompiler::default()
+                .compile(CompilerRequest {
+                    source,
+                    mode: CompilationMode::Executable,
+                    target: CompileTarget::new("reference").unwrap(),
+                    options: CompileOptions::new(BTreeMap::new()).unwrap(),
+                })
+                .unwrap()
+        };
+        let result = compile(source);
+        assert!(
+            matches!(result, CompilerResult::Published { .. }),
+            "{result:?}"
+        );
+        let CompilerResult::Failed { diagnostics, .. } = compile(primary) else {
+            panic!("missing SQL INCLUDE member must fail compilation");
+        };
+        assert!(
+            diagnostics.iter().any(|diagnostic| {
+                diagnostic
+                    .public_message()
+                    .contains("SQL INCLUDE member DCLROW was not found")
+            }),
+            "{diagnostics:?}"
+        );
+    }
+
+    #[test]
+    fn sql_include_missing_precompiler_definitions_are_explicit() {
+        for member in ["SQLCA", "SQLDA"] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BUILTIN. DATA DIVISION. \
+                 WORKING-STORAGE SECTION. EXEC SQL INCLUDE {member} END-EXEC. \
+                 PROCEDURE DIVISION. STOP RUN."
+            );
+            let CompilerResult::Failed { diagnostics, .. } = CobolCompiler::default()
+                .compile(request(&source, CompilationMode::Executable))
+                .unwrap()
+            else {
+                panic!("missing precompiler definitions must not publish");
+            };
+            assert!(
+                diagnostics.iter().any(|diagnostic| {
+                    let message = diagnostic.public_message();
+                    message.contains(&format!("SQL INCLUDE member {member} was not found"))
+                        && message.contains("automatic precompiler definitions")
+                }),
+                "{diagnostics:?}"
+            );
+        }
+    }
+
+    #[test]
     fn sql_include_precompile_resolves_data_and_procedure_members() {
         let limits = SourceLimits::default();
         let primary_path = LogicalPath::new("SQLMAIN.cbl", limits.max_path_bytes).unwrap();
