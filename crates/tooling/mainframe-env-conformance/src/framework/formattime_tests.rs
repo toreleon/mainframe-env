@@ -8,7 +8,15 @@ use mainframe_env_ir::{
     encode_binary, encode_cics_effect_plan,
 };
 
-const FORMATS: [(&str, usize, &[u8], &[u8], &[u8]); 6] = [
+type FormatCase = (
+    &'static str,
+    usize,
+    &'static [u8],
+    &'static [u8],
+    &'static [u8],
+);
+
+const FORMATS: [FormatCase; 6] = [
     ("MMDDYY", 8, b"083026", b"08/30/26", b"08-30-26"),
     ("YYMMDD", 8, b"260830", b"26/08/30", b"26-08-30"),
     ("TIME", 8, b"123456", b"12:34:56", b"12.34.56"),
