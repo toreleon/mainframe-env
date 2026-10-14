@@ -6,6 +6,39 @@ Phase: **foundation**
 
 Status: **ACTIVE — integrated acceptance pending; local comparison work continues**
 
+## Current review candidate — published `b0eca1e7`, Foundation ACTIVE
+
+The review baseline contains READ `aca02905`, the normal `origin/main` merge
+`35c8bf9c`, and scanner Group30 `c44b2e41`. Append Group31 is published as primary `b0eca1e7` (normal side commit
+`96f56ac6`): all 3,390 source files (`9f49b5a7`) and Git blobs match the tested
+snapshot; side and primary trees match, and the non-force push is verified.
+Earlier results retain their actual producing source, environment and receipts;
+qualified unchanged owning inputs do not create a new native run.
+
+| Acceptance requirement | Achieved | Unrun | Failed | Blocked | Evidence | Next step |
+|---|---|---|---|---|---|---|
+| READ: default-feature authenticated HTTP/two-process SQLite owner, all 24 byte-exact fields and original limits | Original owner passed with strict source-bound stdout qualification; eight original tail checks passed; full custody and exact cleanup completed; READ commit `aca02905` published | Integrated Foundation/application duties | Original `91428` producer/parser refusal and earlier failed attempts remain failed | No missing input for the scoped published result | Exact owner qualification `1448ebe9`; actual owner/tail custody and READ publication receipts | Qualify only unchanged owning inputs when composing later evidence |
+| Main integration and complete tooling discovery | Seven scoped integration methods passed on the actual merge source. Clean `35c8bf9c` passed **1,100 executed including one skip, 1,099 non-skipped**; 61 Python files, zero shell test files and eight syntax checks | Rust workspace floor and original whole command | Earlier failed receipts remain unchanged | None for these producing scopes | Main90976/fullPython21023; independent fullPython audit `077eef13` | Retain separate producers; skip earns zero credit |
+| Scanner Group30: affected discovery and five original policies, unchanged resource limits | Actual **197 + 5 + 9 = 211 Python tests**, zero skips, plus five policies passed at HEAD `35c8bf9c` with the exact three-file overlay `fbe325c2`; normal side `084e88a8`/primary `c44b2e41` published by full tested-byte equivalence. All 48 raw files, TMP directory, metadata and three changed source files retained; full 3,387-file reconstruction verified | Full workspace/application/licensed acceptance | Prebirth environment refusal `ba7c16` offered zero gates; older monitor failures retained | None for this published scope | Native54613/48713; Group30 publication `856b8ea0` and actual audit `8905b74e` | Use immutable tested proofs after normal index staging; metadata target never born, historical 9fb tool kept |
+| Dataset Append: owned publication preserves encoded records, quotas, versions, atomic rollback/replay and physical reopen | Three new Append regressions and five existing borrowed-publication Rust controls passed in their prior owning scopes. Twelve prior passing rows were qualified; Native52056 then passed all eight remaining gates: module/typed boundaries, current tool build, deny, docs, changelog, API and licenses. Full 54-file raw/TMP/source and executable/dependency custody84681 completed; exact target Gone; normal Group31 commit/cherry-pick/push published the identical verified five-path source | Integrated workspace/application acceptance; no further scoped five-path gate is inferred | `39731` compile failure, `35868` quota-fixture failure, `5759` ownership refusal and `26228` module/census failures remain retained. They are not replaced by continuation passes | None for the verified five-path scope | Tested source `9f49b5a7`; actual52056 terminal `817bdb20`; custody `838a46d8`, cleanup `45999545`, independent actual audit `2d1cf7d5`; Group31 publication `787288a0` | Regenerate and verify the owning documentation, then continue the original feasible gates. Only existing non-growing inventory entry changes **9,195→9,087**; default1,200, every other row, allowlist, selectors and limits remain unchanged. This is twelve qualified plus eight actual rows, not twenty fresh native passes or a measured speedup |
+| CREASTMT runtime workflow and its eleven original policies | Eleven previously unrun policies passed on isolated `7c088ff8`/`56cc2a0b`; full custody7491 and exact cleanup completed | Successful original runtime workflow | Native57274 runtime remains failed | None for source-grounded runtime investigation | Original eleven-policy terminal and custody `10e48156`; independent audit `5ccc3777` | Investigate/continue the runtime owner; policy passes do not repair it or become a primary-source producer |
+| Current tooling/effective inputs, workspace and whole455/min260 complete-command acceptance | At `35c8bf9c`/`e19aff59`, genuine tool build/export8941 passed and custody92513 completed; Append continuation has retained actual compiled tooling | Original workspace duties, whole command, current registered backend profiles and authenticated SDK/live-client closure | Earlier owning failures remain failed | Only actions depending on genuinely missing inputs are blocked | Original four source-start/results/spec/admission refs retain their old binding; compiled artifact/dependency custody supports owning-input qualification | Produce a genuine new export for the final source with qualified retained tooling; do not relabel old exports. Run feasible original workspace/backend/SDK gates with unchanged selectors and limits |
+| Installed-data CardDemo, performance/distribution and licensed semantics | Scoped published READ/controls above retain their exact boundaries | Full **20/20 journeys, 114/114 observations; 26/26 selected issue rows, 105/105 acceptances**; declared performance/distribution owners and remaining architecture/licensed duties | Original application/performance failures stay visible | Exact missing reference inputs, semantic pins/TOC, licensed runner and captures block only their dependent actions | Original plans, catalogs, producing receipts and input provenance remain authoritative | Obtain missing inputs and execute their original owners; continue independent feasible work |
+
+Foundation remains **ACTIVE**. Preserve all six coverage gates, 1,506 identities,
+exact-zero H1/application string dispatch, original source constraints and caps.
+A ready sandbox or review candidate does not complete integrated acceptance.
+
+For later candidates, qualify prior passes only through unchanged
+transitive owning code, fixtures, inputs and environment. Regenerate documentation
+normally from the intended checkout, retain every actual generated diff and check
+docs/changelog. The generated manifest is
+`docs/generated/documentation-manifest.json`. This status-only update requires no
+new changelog fragment or Rust rebuild when compiler inputs remain unchanged;
+qualified retained tooling may produce the genuine later full-source export.
+Do not rerun unchanged successful tests merely to refresh prose or hashes, and
+do not relabel earlier receipts as later-source runs.
+
 ## Scope and acceptance boundary
 
 Foundation owns pinned catalogs, six independent coverage gates, semantic
