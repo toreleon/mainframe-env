@@ -78,7 +78,7 @@
     },
     {
       "path": "crates/kernel/mainframe-env-compiler/src/syntax.rs",
-      "max_production_lines": 2265,
+      "max_production_lines": 2227,
       "responsibility": "The syntax stage combines token traversal, division parsing, statement collection, and syntax diagnostics.",
       "split_boundary": "Separate token cursor and program-structure parsing from statement-family dispatch and diagnostic recovery."
     },

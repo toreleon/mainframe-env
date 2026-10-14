@@ -41,6 +41,25 @@ Host ABI copybooks are ordinary explicit source-library inputs. Their CICS,
 Db2, or MQ provider owns exact bytes, version, license, and provenance; the
 compiler neither embeds those assets nor chooses a subsystem generation.
 
+BMS symbolic maps can be generated with the compiler's `BmsMapset::parse` and
+`symbolic_copybook` API. If an ordinary COPY member is absent, the compiler
+searches `.bms` members of the declared libraries for the DFHMSD mapset name and
+generates that COBOL copybook. Library qualification and search order apply;
+duplicate mapsets within one library are ambiguous. Generated descriptions
+retain the BMS source as their expansion origin. Multi-map sets require
+`STORAGE=AUTO`; input/output groups overlay for `MODE=INOUT`.
+
+The option rules use pinned CICS TS 6.x DFHMSD/DFHMDI topics
+(`dfhp47j.html`/`dfhp47g.html`, baseline
+`ibm-cics-ts-6x-application-api-sources-b-2026-09-10`). DFHMDF/ADS topic bodies
+were unavailable offline; the layout is checked structurally against shipped
+CardDemo BMS/copybook pairs instead. Only the corroborated COLOR/PS/HILIGHT/VALIDN
+extensions and COACTVW picture patterns are admitted. Other editing pictures,
+extension fields, and unsupported layout options produce a diagnostic naming
+the unverified feature. The compiler tests use `CARDDEMO_CORPUS_DIR` for all
+shipped pairs and `GENAPP_CORPUS_DIR` for executable `COPY SSMAP` publication.
+An unset corpus variable prints a skip message and earns no conformance credit.
+
 Decoding does not discard byte provenance. Mainframe sources may originate in
 EBCDIC or fixed-column formats, so diagnostics retain a mapping between logical
 characters, original byte ranges, and expansion origins.
