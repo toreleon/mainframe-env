@@ -101,6 +101,7 @@
     "docs/decisions/0049-executable-agent-sandbox.md",
     "docs/decisions/0050-host-effect-envelope-layout.md",
     "docs/decisions/0051-dataset-read-completeness.md",
+    "docs/decisions/0052-cobol-fixed-point-intermediate-precision.md",
     "docs/decisions/0100-cics-borrowed-input-bundles.md",
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
     "docs/delivery/IMPLEMENTATION-ROADMAP.md",
@@ -560,6 +561,10 @@
         {
           "label": "ADR-0051: Explicit dataset read completeness",
           "path": "docs/decisions/0051-dataset-read-completeness.md"
+        },
+        {
+          "label": "ADR-0052: COBOL fixed-point intermediate precision",
+          "path": "docs/decisions/0052-cobol-fixed-point-intermediate-precision.md"
         },
         {
           "label": "ADR-0100: Borrowed CICS input bundles",

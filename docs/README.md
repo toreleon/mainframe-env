@@ -191,6 +191,7 @@ explicitly names that authority as superseded.
 - [ADR-0030: Common CICS source condition authority](decisions/0030-cics-source-condition-authority.md)
 - [ADR-0050: Boxed shared host-effect payloads](decisions/0050-host-effect-envelope-layout.md)
 - [ADR-0051: Explicit dataset read completeness](decisions/0051-dataset-read-completeness.md)
+- [ADR-0052: COBOL fixed-point intermediate precision](decisions/0052-cobol-fixed-point-intermediate-precision.md)
 - [ADR-0100: Borrowed CICS input bundles](decisions/0100-cics-borrowed-input-bundles.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.

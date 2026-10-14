@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 245,
+    "markdown_documents": 246,
     "navigation_groups": 8,
-    "normative_documents": 101,
+    "normative_documents": 102,
     "xtask_commands": 164
   },
   "documents": [
@@ -349,8 +349,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 184,
-      "sha256": "sha256:b91431225eb954c49c899e6e9bf7a6fe5115b0c360fa7bb7dfc0b0befe1ebdc7",
+      "relative_links": 185,
+      "sha256": "sha256:c5bcff7a5b73f7414fceb8a8af4a5341ca2e1544041332a1a50aa66eb9fe2448",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -407,9 +407,9 @@
       "normative": true,
       "owner": "compiler and interpreter maintainers",
       "path": "docs/architecture/COBOL-RUNTIME-SEMANTICS.md",
-      "relative_links": 0,
+      "relative_links": 1,
       "scope": "COBOL runtime semantic contracts",
-      "sha256": "sha256:a16ab9a7c761608f4afa52de4481309f26853961e42320bd41e1b16a8afc029a",
+      "sha256": "sha256:834164c1ab72e2d0b8a737b3802b4ae2122437c14751f0cf54f87938cc1fa356",
       "status": "Frozen for mainframe-env cobol.execution implementation",
       "title": "COBOL runtime semantic contracts",
       "xtask_commands": 0
@@ -1467,6 +1467,18 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env newly compiled COBOL decimal plans",
+      "normative": true,
+      "owner": "COBOL compiler and decimal runtime maintainers",
+      "path": "docs/decisions/0052-cobol-fixed-point-intermediate-precision.md",
+      "relative_links": 1,
+      "scope": "Typed ADD/COMPUTE plans and compile-time numeric admission",
+      "sha256": "sha256:7330331303fda1b1836df881fb365ed73ba46a1e74b5b15c4ffe6fd4f70d5850",
+      "status": "Accepted for the bounded #158/#159 repair with documented source assumptions",
+      "title": "ADR-0052: Separate COBOL data and intermediate precision",
+      "xtask_commands": 0
+    },
+    {
       "applies_from": "mainframe-env unreleased CICS baseline lint integration (pending merge)",
       "normative": true,
       "owner": "CICS provider maintainers",
@@ -1481,8 +1493,8 @@
     {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 54,
-      "sha256": "sha256:1ca343f16c93f6224d05971258783cf8289f0f1a7099456760dbf6a4129d4437",
+      "relative_links": 55,
+      "sha256": "sha256:46b3731646d03303919a10c25c3fa812e7c80e1345ca193f82e909820c28d245",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -2828,6 +2840,10 @@
           "path": "docs/decisions/0051-dataset-read-completeness.md"
         },
         {
+          "label": "ADR-0052: COBOL fixed-point intermediate precision",
+          "path": "docs/decisions/0052-cobol-fixed-point-intermediate-precision.md"
+        },
+        {
           "label": "ADR-0100: Borrowed CICS input bundles",
           "path": "docs/decisions/0100-cics-borrowed-input-bundles.md"
         }
@@ -3056,7 +3072,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:4fd696abbcf77de541191fd163bc202c701fbcccc4093d1049082b80e65d5b95",
+  "registry_sha256": "sha256:6573a93b2f79dcf0acf2401b3858dc688a72d48947230f0a4401d0a9b4f4748e",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

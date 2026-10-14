@@ -105,6 +105,44 @@ impl CobolCompiler {
                 };
             }
         };
+        let mode = syntax.effective_compiler_options().arithmetic_mode();
+        let max_digits = match mode {
+            crate::EffectiveArithmeticMode::Compatible => 18,
+            crate::EffectiveArithmeticMode::Extended => 31,
+        };
+        let over_limit = semantic
+            .layouts
+            .iter()
+            .find(|layout| layout.digits > max_digits)
+            .map(|layout| {
+                format!(
+                    "{} PICTURE has {} digits",
+                    layout.qualified_name, layout.digits
+                )
+            })
+            .or_else(|| {
+                syntax
+                    .oversized_numeric_literal(max_digits)
+                    .map(|text| format!("numeric literal {text} exceeds the digit limit"))
+            });
+        if let Some(detail) = over_limit {
+            return CobolAnalysis {
+                syntax: Some(syntax),
+                semantic: Some(semantic),
+                hir: None,
+                hir_text: None,
+                diagnostics: vec![diagnostic(
+                    "MECOB0101",
+                    Phase::Parse,
+                    FailureCategory::MalformedInput,
+                    format!(
+                        "{detail}; ARITH({}) allows at most {max_digits} data/literal digits",
+                        mode.as_str()
+                    ),
+                )],
+                completeness: Completeness::Failed,
+            };
+        }
         let hir = match CobolHir::build(source, &syntax, &semantic, self.limits.ir) {
             Ok(hir) => hir,
             Err(problem) => {
@@ -740,7 +778,104 @@ mod tests {
             panic!("typed decimal plan bytes")
         };
         let plan = decode_decimal_assignment_plan(bytes, DecimalPlanLimits::default()).unwrap();
-        assert_eq!(plan.policy, DecimalExecutionPolicy::decimal18_v1());
+        assert_eq!(plan.policy, DecimalExecutionPolicy::cobol_compat_v2());
+    }
+
+    #[test]
+    fn compat_rejects_decimal_declarations_over_eighteen_digits() {
+        let source = "PROCESS ARITH(COMPAT)\nIDENTIFICATION DIVISION. PROGRAM-ID. TOOWIDE. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9(19) VALUE 1. 01 B PIC 99. PROCEDURE DIVISION. COMPUTE B = A - A. STOP RUN.";
+        let result = CobolCompiler::default().compile(request(source, CompilationMode::Executable));
+        let Ok(CompilerResult::Failed {
+            diagnostics,
+            completeness,
+        }) = result
+        else {
+            panic!("ARITH(COMPAT) must reject its 19-digit declaration: {result:?}");
+        };
+        assert_eq!(completeness, Completeness::Failed);
+        assert!(diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("at most 18 data/literal digits")
+        }));
+    }
+
+    #[test]
+    fn arithmetic_profiles_enforce_data_and_literal_limits_before_publication() {
+        for (mode, digits, published) in [
+            ("COMPAT", 18, true),
+            ("COMPAT", 19, false),
+            ("EXTEND", 31, true),
+            ("EXTEND", 32, false),
+        ] {
+            for source in [
+                format!(
+                    "PROCESS ARITH({mode})\nIDENTIFICATION DIVISION. PROGRAM-ID. LIMITS. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9({digits}). PROCEDURE DIVISION. STOP RUN."
+                ),
+                format!(
+                    "PROCESS ARITH({mode})\nIDENTIFICATION DIVISION. PROGRAM-ID. LIMITS. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9. PROCEDURE DIVISION. COMPUTE A = {} - {}. STOP RUN.",
+                    "9".repeat(digits),
+                    "9".repeat(digits)
+                ),
+                format!(
+                    "PROCESS ARITH({mode})\nIDENTIFICATION DIVISION. PROGRAM-ID. LIMITS. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9 VALUE {}. PROCEDURE DIVISION. STOP RUN.",
+                    "9".repeat(digits)
+                ),
+            ] {
+                let result =
+                    CobolCompiler::default().compile(request(&source, CompilationMode::Executable));
+                assert_eq!(
+                    matches!(result, Ok(CompilerResult::Published { .. })),
+                    published,
+                    "{mode}/{digits}: {result:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn compat_rejects_complete_period_literals_before_publication() {
+        assert_complete_literal_rejected("", "1234567890.123456789");
+    }
+
+    #[test]
+    fn compat_rejects_complete_comma_literals_before_publication() {
+        assert_complete_literal_rejected(
+            "ENVIRONMENT DIVISION. CONFIGURATION SECTION. SPECIAL-NAMES. DECIMAL-POINT IS COMMA.",
+            "1234567890,123456789",
+        );
+    }
+
+    fn assert_complete_literal_rejected(configuration: &str, literal: &str) {
+        let source = format!(
+            "PROCESS ARITH(COMPAT)\nIDENTIFICATION DIVISION. PROGRAM-ID. LIMITS. {configuration} DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9. PROCEDURE DIVISION. COMPUTE A = {literal} - {literal}. STOP RUN."
+        );
+        let result = CobolCompiler::default()
+            .compile(request(&source, CompilationMode::Executable))
+            .unwrap();
+        let CompilerResult::Failed {
+            diagnostics,
+            completeness,
+        } = result
+        else {
+            panic!("19-digit literal must fail before publication");
+        };
+        assert_eq!(completeness, Completeness::Failed);
+        assert!(diagnostics.iter().any(|diagnostic| {
+            diagnostic.public_message().contains(literal)
+                && diagnostic
+                    .public_message()
+                    .contains("at most 18 data/literal digits")
+        }));
+    }
+
+    #[test]
+    fn compat_publishes_eighteen_digit_fractional_literals() {
+        let source = "PROCESS ARITH(COMPAT)\nIDENTIFICATION DIVISION. PROGRAM-ID. LIMITS. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9. PROCEDURE DIVISION. COMPUTE A = 1234567890.12345678 - 1234567890.12345678. STOP RUN.";
+        let result = CobolCompiler::default()
+            .compile(request(source, CompilationMode::Executable))
+            .unwrap();
+        assert!(matches!(result, CompilerResult::Published { .. }));
     }
 
     #[test]
@@ -1608,7 +1743,7 @@ mod tests {
                     "cobol.add@1"
                 }
             );
-            assert_eq!(plan.policy, DecimalExecutionPolicy::decimal34_v1());
+            assert_eq!(plan.policy, DecimalExecutionPolicy::cobol_extend_v2());
             assert_eq!(
                 plan.assignments.len(),
                 if operation.identity.name() == "compute" {
@@ -1672,7 +1807,7 @@ mod tests {
                 plan.semantic_origin.as_str(),
                 "cobol.add@1" | "cobol.compute@1"
             ));
-            assert_eq!(plan.policy, DecimalExecutionPolicy::decimal34_v1());
+            assert_eq!(plan.policy, DecimalExecutionPolicy::cobol_extend_v2());
             assert_eq!(
                 plan.assignments.len(),
                 if plan.semantic_origin == "cobol.compute@1" {

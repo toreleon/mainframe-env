@@ -11,6 +11,7 @@ mod carddemo_readacct;
 mod carddemo_serve;
 mod changelog;
 mod cics_system_families;
+mod cobol_arithmetic_contract;
 mod cobol_differential;
 mod conformance_catalog;
 mod conformance_spec_export;
@@ -1476,58 +1477,9 @@ fn check_cobol_arithmetic_pilot_inputs(root: &Path, spec: &CompiledSpec) -> Task
         "COBOL arithmetic decisions and fixture cases are not closed",
     )?;
 
-    let expected_contracts = BTreeMap::from([
-        (
-            "receiver-local-size-error",
-            json!(["3639310a", [2], [2], ["GOOD-X", "SMALL-X"]]),
-        ),
-        (
-            "receiver-overflow-without-handler",
-            json!(["36310a", [2], [2], ["GOOD-X", "SMALL-X"]]),
-        ),
-        (
-            "corresponding-relative-qualifiers",
-            json!(["31310a32300a", [2], [1], ["DST-G.MATCH-X"]]),
-        ),
-        (
-            "corresponding-no-pair-no-op",
-            json!(["33340a", [2], [0], []]),
-        ),
-        (
-            "corresponding-numeric-edited-eligible",
-            json!(["31310a2b32320a", [2], [2], ["DST-G.GOOD-X", "DST-G.EDIT-X"]]),
-        ),
-    ]);
+    cobol_arithmetic_contract::check(&fixture)?;
     require(
-        fixture["schema_version"] == "mainframe-env.cobol-arithmetic-pilot-fixtures@1"
-            && fixture["fixture_id"] == "cobol.typed-arithmetic.issue-140-141-v1"
-            && fixture["row_id"] == row_id
-            && cases.iter().all(|case| {
-                case["program_source"]
-                    .as_str()
-                    .is_some_and(|source| source.contains("ADD"))
-                    && expected_contracts
-                        .get(case["case_id"].as_str().unwrap_or_default())
-                        .is_some_and(|expected| {
-                            *expected
-                                == json!([
-                                    case["expected_output_hex"],
-                                    case["expected_typed_plan"]["operation_majors"],
-                                    case["expected_typed_plan"]["assignment_counts"],
-                                    case["expected_typed_plan"]["assignment_targets"],
-                                ])
-                        })
-                    && case["expected_typed_plan"]["semantic_origins"] == json!(["cobol.add@1"])
-                    && case["expected_typed_plan"]["execution_policies"]
-                        == json!(["decimal34-v1/cobol-numeric-v1/captured-operands-receiver-local-v1/cobol-size-error-v1"])
-            })
-            && fixture["expectation_authority"]["external_control"]["status"] == "not-run"
-            && fixture["expectation_authority"]["external_control"]["coverage_credit"] == 0
-            && fixture["expectation_authority"]["external_control"]["licensed_credit"] == 0
-            && fixture["comparison_policy"]["normalizable_fields"]
-                .as_array()
-                .is_some_and(Vec::is_empty)
-            && review["evidence_boundary"]["licensed_ibm_differential_run"] == false
+        review["evidence_boundary"]["licensed_ibm_differential_run"] == false
             && review["evidence_boundary"]["licensed_credit"] == 0
             && review["evidence_boundary"]["differential_credit"] == 0
             && review["evidence_boundary"]["candidate_outputs_are_source_authority"] == false,

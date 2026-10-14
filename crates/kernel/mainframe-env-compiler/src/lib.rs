@@ -5,6 +5,7 @@
 mod generated;
 mod hir;
 mod lower;
+mod numeric_literals;
 mod semantic;
 mod service;
 mod syntax;

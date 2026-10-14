@@ -268,7 +268,10 @@ fn validate_execution_policy(
         DecimalPlanWireVersion::PolicyV2 => {
             matches!(
                 plan.policy.arithmetic_context,
-                DecimalArithmeticContext::Decimal18V1 | DecimalArithmeticContext::Decimal34V1
+                DecimalArithmeticContext::Decimal18V1
+                    | DecimalArithmeticContext::Decimal34V1
+                    | DecimalArithmeticContext::CobolCompatV2
+                    | DecimalArithmeticContext::CobolExtendV2
             ) && plan.policy.storage_abi == DecimalStorageAbi::CobolNumericV1
                 && plan.policy.receiver_update
                     == DecimalReceiverUpdatePolicy::CapturedOperandsReceiverLocalV1
@@ -630,24 +633,33 @@ fn evaluate(
                 scale: value.scale,
             })
         }
-        DecimalExpression::Add { left, right } => decimal_add(
-            arithmetic_mode(machine, plan)?,
+        DecimalExpression::Add { left, right } => expression_binary(
+            machine,
+            plan,
+            CobolArithmetic::add,
             evaluate(machine, operation, plan, left)?,
             evaluate(machine, operation, plan, right)?,
         ),
-        DecimalExpression::Subtract { left, right } => decimal_subtract(
-            arithmetic_mode(machine, plan)?,
+        DecimalExpression::Subtract { left, right } => expression_binary(
+            machine,
+            plan,
+            CobolArithmetic::subtract,
             evaluate(machine, operation, plan, left)?,
             evaluate(machine, operation, plan, right)?,
         ),
-        DecimalExpression::Multiply { left, right } => decimal_multiply(
-            arithmetic_mode(machine, plan)?,
+        DecimalExpression::Multiply { left, right } => expression_binary(
+            machine,
+            plan,
+            CobolArithmetic::multiply,
             evaluate(machine, operation, plan, left)?,
             evaluate(machine, operation, plan, right)?,
         ),
         DecimalExpression::Divide { left, right } => {
             let left = evaluate(machine, operation, plan, left)?;
             let right = evaluate(machine, operation, plan, right)?;
+            if fixed_precision(plan).is_some() {
+                return expression_binary(machine, plan, CobolArithmetic::divide, left, right);
+            }
             let scale = left
                 .scale
                 .max(right.scale)
@@ -665,8 +677,53 @@ fn arithmetic_mode(
     match plan.policy.arithmetic_context {
         DecimalArithmeticContext::LegacyCobolModuleV1 => Ok(machine.arithmetic_mode),
         DecimalArithmeticContext::Decimal18V1 => Ok(CobolArithmeticMode::Compatible),
-        DecimalArithmeticContext::Decimal34V1 => Ok(CobolArithmeticMode::Extended),
+        DecimalArithmeticContext::Decimal34V1
+        | DecimalArithmeticContext::CobolCompatV2
+        | DecimalArithmeticContext::CobolExtendV2 => Ok(CobolArithmeticMode::Extended),
     }
+}
+
+fn fixed_precision(plan: &DecimalAssignmentPlan) -> Option<usize> {
+    match plan.policy.arithmetic_context {
+        DecimalArithmeticContext::CobolCompatV2 => Some(30),
+        DecimalArithmeticContext::CobolExtendV2 => Some(31),
+        _ => None,
+    }
+}
+
+fn expression_binary(
+    machine: &ReferenceMachine,
+    plan: &DecimalAssignmentPlan,
+    operation: DecimalBinaryOperation,
+    left: Decimal,
+    right: Decimal,
+) -> Result<Decimal, MachineProblem> {
+    let Some(precision) = fixed_precision(plan) else {
+        return decimal_primitive_binary(arithmetic_mode(machine, plan)?, left, right, operation);
+    };
+    // The context retains exact finite intermediates within the digit cap and
+    // truncates excess fractional digits toward zero. Division spends the full
+    // significant-digit budget; receiver conversion happens only after evaluation.
+    let mut arithmetic = CobolArithmetic::with_precision(precision, CobolRounding::Truncation)
+        .map_err(runtime_decimal_problem)?;
+    let (left, left_flags) = arithmetic
+        .parse(&decimal_string(left))
+        .map_err(runtime_decimal_problem)?;
+    let (right, right_flags) = arithmetic
+        .parse(&decimal_string(right))
+        .map_err(runtime_decimal_problem)?;
+    if left_flags.size_error() || right_flags.size_error() {
+        return Err(MachineProblem::SizeError);
+    }
+    let (value, flags) =
+        operation(&mut arithmetic, left, right).map_err(runtime_decimal_problem)?;
+    // Integer overflow cannot be repaired by discarding fractional places.
+    if flags.size_error()
+        || i64::from(value.digits()) + i64::from(value.exponent()) > precision as i64
+    {
+        return Err(MachineProblem::SizeError);
+    }
+    decimal_text(&value.to_standard_string()).ok_or(MachineProblem::SizeError)
 }
 
 fn runtime_layout(
@@ -772,9 +829,9 @@ fn round_to_scale(
     if value.scale <= scale {
         return decimal_rescale(value, scale);
     }
-    let factor = ten_power(value.scale - scale)?;
-    let quotient = value.coefficient / factor;
-    let remainder = value.coefficient % factor;
+    let factor = ten_power(value.scale - scale).ok();
+    let quotient = factor.map_or(0, |factor| value.coefficient / factor);
+    let remainder = factor.map_or(value.coefficient, |factor| value.coefficient % factor);
     let sign = value.coefficient.signum();
     let twice = remainder
         .unsigned_abs()
@@ -783,10 +840,16 @@ fn round_to_scale(
     let increment = match policy {
         DecimalRoundingPolicy::Truncation => 0,
         DecimalRoundingPolicy::AwayFromZero if remainder != 0 => sign,
-        DecimalRoundingPolicy::NearestAwayFromZero if twice >= factor as u128 => sign,
+        DecimalRoundingPolicy::NearestAwayFromZero
+            if factor.is_some_and(|factor| twice >= factor as u128) =>
+        {
+            sign
+        }
         DecimalRoundingPolicy::NearestEven
-            if twice > factor as u128
-                || twice == factor as u128 && quotient.unsigned_abs() % 2 == 1 =>
+            if factor.is_some_and(|factor| {
+                twice > factor as u128
+                    || twice == factor as u128 && quotient.unsigned_abs() % 2 == 1
+            }) =>
         {
             sign
         }
@@ -910,6 +973,14 @@ mod tests {
     }
 
     const LAYOUTS: &[TestLayout] = &[
+        TestLayout {
+            name: "QUOTIENT-X",
+            category: "numeric_display",
+            digits: 13,
+            scale: 12,
+            length: 13,
+            initial: b"0000000000000",
+        },
         TestLayout {
             name: "A",
             category: "numeric_display",
@@ -1084,7 +1155,15 @@ mod tests {
                         (
                             "picture".into(),
                             Attribute::Text(if layout.category == "numeric_display" {
-                                format!("9({})", layout.digits)
+                                if layout.scale == 0 {
+                                    format!("9({})", layout.digits)
+                                } else {
+                                    format!(
+                                        "9({})V9({})",
+                                        layout.digits - layout.scale as usize,
+                                        layout.scale
+                                    )
+                                }
                             } else {
                                 format!("X({})", layout.length)
                             }),
@@ -1289,7 +1368,7 @@ mod tests {
     fn plan(assignments: Vec<DecimalAssignment>) -> DecimalAssignmentPlan {
         DecimalAssignmentPlan {
             semantic_origin: "cobol.compute@1".into(),
-            policy: mainframe_env_ir::DecimalExecutionPolicy::decimal34_v1(),
+            policy: mainframe_env_ir::DecimalExecutionPolicy::cobol_extend_v2(),
             assignments,
         }
     }
@@ -2003,6 +2082,143 @@ mod tests {
             run(mainframe_env_ir::DecimalExecutionPolicy::decimal34_v1()),
             b"1000000000000000001"
         );
+    }
+
+    #[test]
+    fn compat_intermediate_addition_preserves_cancellation() {
+        let mut machine = machine(|slots| {
+            let operand = DecimalExpression::Literal {
+                coefficient: 999_999_999_999_999_999,
+                scale: 0,
+            };
+            let mut value = plan(vec![assignment(
+                DecimalExpression::Subtract {
+                    left: Box::new(DecimalExpression::Add {
+                        left: Box::new(operand.clone()),
+                        right: Box::new(DecimalExpression::Literal {
+                            coefficient: 2,
+                            scale: 0,
+                        }),
+                    }),
+                    right: Box::new(operand),
+                },
+                slot(slots, "RESULT-X"),
+            )]);
+            value.policy = mainframe_env_ir::DecimalExecutionPolicy::cobol_compat_v2();
+            value
+        });
+        assert!(matches!(drive(&mut machine), MachineDrive::Completed(_)));
+        assert_eq!(machine.variable("RESULT-X").unwrap().bytes(), b"002");
+    }
+
+    #[test]
+    fn division_preserves_twelve_receiver_fractional_places() {
+        let mut machine = machine(|slots| {
+            plan(vec![assignment(
+                DecimalExpression::Divide {
+                    left: Box::new(DecimalExpression::Literal {
+                        coefficient: 1,
+                        scale: 0,
+                    }),
+                    right: Box::new(DecimalExpression::Literal {
+                        coefficient: 3,
+                        scale: 0,
+                    }),
+                },
+                slot(slots, "QUOTIENT-X"),
+            )])
+        });
+        assert!(matches!(drive(&mut machine), MachineDrive::Completed(_)));
+        assert_eq!(
+            machine.variable("QUOTIENT-X").unwrap().bytes(),
+            b"0333333333333"
+        );
+    }
+
+    #[test]
+    fn fixed_point_caps_truncate_only_excess_fractional_digits_toward_zero() {
+        let machine = machine(|slots| {
+            plan(vec![assignment(
+                DecimalExpression::Literal {
+                    coefficient: 0,
+                    scale: 0,
+                },
+                slot(slots, "RESULT-X"),
+            )])
+        });
+        for (policy, digits) in [
+            (
+                mainframe_env_ir::DecimalExecutionPolicy::cobol_compat_v2(),
+                30u32,
+            ),
+            (
+                mainframe_env_ir::DecimalExecutionPolicy::cobol_extend_v2(),
+                31u32,
+            ),
+        ] {
+            let mut plan = plan(Vec::new());
+            plan.policy = policy;
+            for sign in [-1, 1] {
+                let quotient = expression_binary(
+                    &machine,
+                    &plan,
+                    CobolArithmetic::divide,
+                    Decimal {
+                        coefficient: sign,
+                        scale: 18,
+                    },
+                    Decimal {
+                        coefficient: 3,
+                        scale: 0,
+                    },
+                )
+                .unwrap();
+                assert_eq!(
+                    quotient.coefficient,
+                    sign * (ten_power(digits).unwrap() - 1) / 3
+                );
+                assert_eq!(quotient.scale, digits + 18);
+                assert_eq!(
+                    round_to_scale(quotient, 3, DecimalRoundingPolicy::NearestAwayFromZero)
+                        .unwrap()
+                        .coefficient,
+                    0
+                );
+                let product = expression_binary(
+                    &machine,
+                    &plan,
+                    CobolArithmetic::multiply,
+                    Decimal {
+                        coefficient: sign * 999_999_999_999_999_999,
+                        scale: 18,
+                    },
+                    Decimal {
+                        coefficient: 999_999_999_999_999_999,
+                        scale: 18,
+                    },
+                )
+                .unwrap();
+                let exact = sign * 999_999_999_999_999_999i128.pow(2);
+                assert_eq!(product.coefficient, exact / ten_power(36 - digits).unwrap());
+                assert_eq!(product.scale, digits);
+            }
+            assert_eq!(
+                expression_binary(
+                    &machine,
+                    &plan,
+                    CobolArithmetic::multiply,
+                    Decimal {
+                        coefficient: 1_000_000_000_000_000_000,
+                        scale: 0
+                    },
+                    Decimal {
+                        coefficient: 1_000_000_000_000_000_000,
+                        scale: 0
+                    }
+                ),
+                Err(MachineProblem::SizeError)
+            );
+        }
     }
 
     #[test]
