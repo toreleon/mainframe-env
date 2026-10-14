@@ -3,7 +3,7 @@
 Subsystem: **certification**
 Phase: **licensed**
 
-Status: **Proposed**
+Status: **Planning specification; implementation tracked in the progress record**
 Start gate: full z/OSMF profile and cross-resource semantics accepted
 Completion dependencies: zosmf.rest, integration.transactions
 Estimate: 12–20 engineer-months

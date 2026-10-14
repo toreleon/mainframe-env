@@ -3,7 +3,7 @@
 Subsystem: **mq**
 Phase: **programming**
 
-Status: **Proposed**
+Status: **Planning specification; implementation tracked in the progress record**
 Start gate: cobol.execution host-extension ABI and racf.security SAF/principal contracts frozen
 Completion dependencies: cobol.execution, racf.security
 Estimate: 16–26 engineer-months

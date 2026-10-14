@@ -50,9 +50,70 @@ SHA-256 57539dc40fa06aa78da3b435a22c1955fa750d30a47f865341d9bc6e78417c8d,
 PROGRAM rows 306–310. Deployment classes/access/prefix policy remain configured.
 
 Three row/body joins remain unresolved: SPI0201 PERFORM SECURITY, SPI0203
-PERFORM SSL and SPI0204 PERFORM STATISTICS. Bodies exist, but reviewed exact
-label/form association is incomplete. No prefix or EIBFN shortcut resolves them.
+PERFORM SSL and SPI0204 PERFORM STATISTICS. Their manifests and candidate
+locators exist, but the required retained bodies are unavailable in the current
+offline cache; reviewed exact label/form association remains incomplete.
+No prefix or EIBFN shortcut resolves them.
 Source review and generated case candidates are not licensed execution evidence.
+
+### SPI-1001 PERFORM source/form joins (#413)
+
+Status: **Blocked on three retained command bodies; negative controls implemented**.
+The authorized source-only slice uses branch `codex/spi-perform-source-joins-413`
+and base `a688045a` (origin/main). The base still marks all three joins
+`candidate-unresolved`; none is already fixed. GitHub issue retrieval was
+unavailable, so scope follows the supplied #413 contract. PR #393 overlap review
+excludes `system-api-plan.md` and shared registries from this slice. The
+documentation manifest is regenerated normally for this status update; its
+shared path is routine generated overlap, with no reserved Foundation claim.
+
+Offline searches and exact SHA-selected reads against
+`MAINFRAME_ENV_IBM_DOCS_CACHE=$HOME/.cache/mainframe-env/ibm-docs` found no matching
+body for any join. No retained HTML root is configured. Each join is blocked
+independently under the missing-body rule; no source equivalence is assumed.
+The product is IBM CICS TS 6.x, command-body baseline
+`ibm-cics-ts-6x-spi-command-bodies-2026-09-12`, with official identities from
+`ibm-cics-ts-6x-2026-08-31:spi-commands-unique`.
+
+| Identity | Official label | Candidate source label/form | Disposition |
+|---|---|---|---|
+| SPI0201 / row 0201 | PERFORM SECURITY | PERFORM SECURITY REBUILD | Blocked: pinned body missing |
+| SPI0203 / row 0203 | PERFORM SSL | PERFORM SSL REBUILD | Blocked: pinned body missing |
+| SPI0204 / row 0204 | PERFORM STATISTICS | PERFORM STATISTICS RECORD | Blocked: pinned body missing |
+
+Exact missing topics under
+`SSJL4D_6.x/reference-system-programming/commands-spi/` and retained SHA-256 pins:
+
+- SPI0201: `dfha8_performsecurity.html`,
+  `830d0abe3e41d8ded0a29d9692afa52c2466dc4a70f2dccdb5af8b62aabf86f2`.
+- SPI0203: `dfha8_performssl.html`,
+  `5179c5ec352f12fd973f0e702bfd8cafa4c70b2b73ac9f69b4182638805daff9`.
+- SPI0204: `dfha8_performstatistics.html`,
+  `3732a301a401c5720c300be074876fe7f1b1392de3efb0011f6c19259b6b6130`.
+
+Provision authorized matching bytes through the
+[cache runbook](../../../runbooks/IBM-DOCS-CACHE.md), then review the exact
+official cell, command heading and syntax form before promoting each join.
+The mapper's focused tests now cover ambiguous/missing exact source labels,
+wrong reviewed rows/hashes and missing retained bodies for all three identities.
+These rejection controls preserve the unresolved state; they do not verify the
+candidate equivalences. No join fix or generated authority change is claimed.
+
+Focused checks use `python3 -B -m unittest discover -s tools/tests -p test_cics_system_source_map.py`
+and `python3 -B -m unittest discover -s conformance/subsystems/cics/system/tools/tests`.
+Canonical generator checks use
+`python3 -B tools/generate_cics_source_map.py --family spi --check`, its FEPI
+equivalent, and
+`python3 -B conformance/subsystems/cics/system/tools/generate_spi1001_catalog.py --check`.
+Without retained input bytes these validate committed authorities only.
+
+SPI-1001 still requires these three exact joins and complete source-reviewed
+grammar, option, condition, lifecycle/context and registry obligations. The
+private projection remains 266 SPI/39 FEPI identities; the official denominator
+remains 269 SPI/39 FEPI. Public admission is unchanged, with no SPI/FEPI runtime
+and zero licensed credit. Integration regenerates the shared documentation
+manifest after combining source changes, following the existing coordination
+workflow.
 
 ## Checks and remaining obligations
 

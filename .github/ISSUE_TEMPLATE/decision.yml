@@ -1,0 +1,26 @@
+name: Scope or architecture decision
+description: Resolve one decision before implementation or public admission.
+title: "[decision / phase] "
+labels: ["question", "status:triage"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Decision, authority and alternatives
+      description: State the decision, owning plan/ADR, evidence and concrete alternatives with tradeoffs.
+    validations:
+      required: true
+  - type: textarea
+    id: coordination
+    attributes:
+      label: Dependencies, owner and affected work
+      description: Link existing issues/PRs, identify who can decide and what is blocked. Do not recreate implementation tracked elsewhere.
+    validations:
+      required: true
+  - type: textarea
+    id: completion
+    attributes:
+      label: Completion and next action
+      description: Specify the recorded decision/ADR update and dependent work to resume. A decision alone does not complete its implementation.
+    validations:
+      required: true

@@ -3,7 +3,7 @@
 Subsystem: **cics**
 Phase: **system-api**
 
-Status: **Proposed**
+Status: **Planning specification; implementation tracked in the progress record**
 Start gate: cics.application-api resource, condition, handler, and CICS state contracts frozen
 Completion dependencies: cics.application-api
 Estimate: 18–30 engineer-months

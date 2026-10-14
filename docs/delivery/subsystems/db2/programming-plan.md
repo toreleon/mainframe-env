@@ -3,7 +3,7 @@
 Subsystem: **db2**
 Phase: **programming**
 
-Status: **Proposed**
+Status: **Planning specification; implementation tracked in the progress record**
 Start gate: db2.core parser, binder, catalog, relational IR, and transaction contracts frozen
 Completion dependencies: db2.core
 Estimate: 24–36 engineer-months

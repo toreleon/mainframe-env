@@ -3,14 +3,14 @@
 Subsystem: **cics**
 Phase: **application-api**
 
-Status: **Proposed**
+Status: **Planning specification; implementation tracked in the progress record**
 Start gate: cobol.execution COBOL host ABI, racf.security SAF, and dataset.data data authorities frozen;
 R-01–R-28 integrated and post-review entry gate accepted
 Completion dependencies: cobol.execution, racf.security, dataset.data
 Estimate: 18–28 engineer-months
 
 Current readiness: **CIC-901 complete at its non-release implementation
-boundary**. The full cics.application-api milestone remains **Proposed**: CIC-902 through
+boundary**. Full cics.application-api acceptance remains **incomplete**: CIC-902 through
 CIC-906, release work, and licensed differentials are not complete. PR
 [#131](https://github.com/toreleon/mainframe-env/pull/131) merged the hardening
 changes as `8b7459ab9d9c23e3b872314323d3e30020e13f31`. The integrated acceptance
@@ -46,6 +46,10 @@ entry result. A passing entry gate permits implementation; it does not grant
 new CICS coverage, version promotion, or licensed-equivalence credit.
 
 ## CIC-901 non-release implementation boundary
+
+This section describes historical candidate `49ae7c9d`, not current admission.
+Use the [owning progress record](application-api-status.md) for the current
+260 typed / zero legacy / three unready boundary.
 
 CIC-901 seals the source-derived contract and registry shape for all 263
 application-command rows without implementing the 240 unready handlers. The

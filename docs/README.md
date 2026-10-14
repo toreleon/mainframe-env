@@ -90,6 +90,8 @@ explicitly names that authority as superseded.
 - [Operations and verification runbooks](runbooks/README.md)
 - [Research and source investigations](research/README.md)
 - [Implementation prompts](prompts/README.md)
+- [Contribution ownership and parallel work](delivery/WORK-COORDINATION.md)
+- [Roadmap tracking audit (2026-10-11)](delivery/WORK-AUDIT-2026-10-11.md)
 
 ## Architecture and contracts
 
@@ -223,6 +225,7 @@ ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immuta
 - [Implementation roadmap](delivery/IMPLEMENTATION-ROADMAP.md)
 - [Implementation status](delivery/IMPLEMENTATION-STATUS.md)
 - [Unreleased changes and remaining work](delivery/UNRELEASED-STATUS.md)
+- [Remaining roadmap work and legacy milestone mapping](delivery/subsystems/REMAINING-WORK.md)
 - [Verification strategy](delivery/VERIFICATION-STRATEGY.md)
 - [Compatibility and cutover](delivery/COMPATIBILITY-AND-CUTOVER.md)
 - [z/OSMF compatibility API](delivery/ZOSMF-API.md)

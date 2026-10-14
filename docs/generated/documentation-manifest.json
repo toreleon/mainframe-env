@@ -1,16 +1,24 @@
 {
   "counts": {
-    "markdown_documents": 264,
+    "markdown_documents": 268,
     "navigation_groups": 8,
-    "normative_documents": 125,
+    "normative_documents": 126,
     "xtask_commands": 162
   },
   "documents": [
     {
       "normative": false,
+      "path": ".github/pull_request_template.md",
+      "relative_links": 0,
+      "sha256": "sha256:9c071a01e218100bb9dead8908f6e693337a55b0adfe6db526f9cabe6aaa4eb1",
+      "title": "Pull request review record",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
       "path": "AGENTS.md",
-      "relative_links": 5,
-      "sha256": "sha256:d4bee014a70bdf8af0137329b6cd4ca73e07144ba2aef05dfa1edad87bd9035a",
+      "relative_links": 6,
+      "sha256": "sha256:a2d29bb2daeb373660d15641620fc348c7ce0944852f230c69e4dc33b616b9ec",
       "title": "Repository Guidelines",
       "xtask_commands": 3
     },
@@ -25,8 +33,8 @@
     {
       "normative": false,
       "path": "CONTRIBUTING.md",
-      "relative_links": 13,
-      "sha256": "sha256:792147a8afc75d7fb7a2d2fe8b7467b0a7de83be346c796dc24ae9118a183914",
+      "relative_links": 16,
+      "sha256": "sha256:8b67a698d0b8d1bbf40250b171140557fdcd9221ddbf25bb6fb1203c0808cfe0",
       "title": "Contributing to Mainframe Sandbox",
       "xtask_commands": 11
     },
@@ -341,8 +349,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 206,
-      "sha256": "sha256:d143e5b2a4ffaadf0fea2dde1f42062129fab081b1f841ef0146e7f4b353571f",
+      "relative_links": 209,
+      "sha256": "sha256:cd0c45af7225c50d0149dbc91d071bdc99a7b9d67fdb80c45b42d4c0a87243c4",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -1795,9 +1803,9 @@
       "normative": true,
       "owner": "maintainers",
       "path": "docs/delivery/IMPLEMENTATION-ROADMAP.md",
-      "relative_links": 4,
+      "relative_links": 6,
       "scope": "subsystem progress, dependency sequencing, and acceptance boundaries",
-      "sha256": "sha256:0010aae1177e4a77be3a4fbb0b648af4026431cbde532d3af086d3485da612e0",
+      "sha256": "sha256:a00c1e6506aeea26ae7ef2f7c654d6256bd903a3d9576104b9e1b94081f1df0d",
       "status": "Accepted delivery organization",
       "title": "Subsystem implementation roadmap",
       "xtask_commands": 0
@@ -1813,16 +1821,16 @@
     {
       "normative": false,
       "path": "docs/delivery/README.md",
-      "relative_links": 9,
-      "sha256": "sha256:994cf7a2adcf0021eb5fda366d4fe1ae1572808a38d5385eab2ec59d3c2a0b4b",
+      "relative_links": 11,
+      "sha256": "sha256:1fbf4d499edcb2653829f93acf2d9af2c9b8efe109bd83088869cc2f130bb237",
       "title": "Delivery and verification",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/UNRELEASED-STATUS.md",
-      "relative_links": 19,
-      "sha256": "sha256:c88d8ba3782d6674c6d578968d3a9248c1583abc05356004a3e67e74290fbe36",
+      "relative_links": 20,
+      "sha256": "sha256:d447f163e0d7ca0f760c010ec43790d032c0ac2042f613db7e58ec4e6a398c5e",
       "title": "Unreleased changes and remaining work",
       "xtask_commands": 1
     },
@@ -1836,6 +1844,26 @@
       "sha256": "sha256:45e645b4929dee3498ecab0092a8b27226f6efa4c3a55198e60c3e1705cba75b",
       "status": "Accepted by repository owner",
       "title": "Verification strategy",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "docs/delivery/WORK-AUDIT-2026-10-11.md",
+      "relative_links": 81,
+      "sha256": "sha256:3520c46266fc97af3d51ca60da7cbe46e0e603d79d24c296aa10abc58485122c",
+      "title": "Roadmap and contribution audit — 2026-10-11",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env integration of this workflow",
+      "normative": true,
+      "owner": "maintainers",
+      "path": "docs/delivery/WORK-COORDINATION.md",
+      "relative_links": 8,
+      "scope": "issue intake, ownership, parallel changes, integration and closure",
+      "sha256": "sha256:f4338c1be752c8f94e1c0f67b0aa0b576e9fa794dd9832bd0bac0acaa10d15b0",
+      "status": "Proposed contribution workflow",
+      "title": "Coordinate contributions and parallel work",
       "xtask_commands": 0
     },
     {
@@ -1861,8 +1889,8 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/GITHUB-PROJECT.md",
-      "relative_links": 1,
-      "sha256": "sha256:6f1815c37f2d0c177e4540ab3ac6ea8889accce89c2a95f588285eef7f308415",
+      "relative_links": 4,
+      "sha256": "sha256:f208f97ce99d783dcffdb4edf3295a04fd6cc65a2d7e95cbd8341d8865e70c3f",
       "title": "Track subsystem work on GitHub",
       "xtask_commands": 0
     },
@@ -1877,16 +1905,24 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/README.md",
-      "relative_links": 37,
-      "sha256": "sha256:9a95dc42e69a07f190555250b8415d98c1927a662be227995f421a404dac9d69",
+      "relative_links": 38,
+      "sha256": "sha256:ff9fc44874d5c66377aa9742ca72f6bd1da9adda7d8e46a54e4999fd52adda13",
       "title": "Subsystem delivery plans",
       "xtask_commands": 2
     },
     {
       "normative": false,
+      "path": "docs/delivery/subsystems/REMAINING-WORK.md",
+      "relative_links": 44,
+      "sha256": "sha256:1e654b62f309ac1912305c8c1a54bce42e9d09be14e9f46d22fd35d83a50ec21",
+      "title": "Remaining roadmap work",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
       "path": "docs/delivery/subsystems/certification/licensed-plan.md",
       "relative_links": 2,
-      "sha256": "sha256:53c9b56d6258df065e74941f06ae9af7e207233b25a21bb9bc7e9d11e307cecd",
+      "sha256": "sha256:5127ef8d9a09709ecc05cb7d7cf810d7b3235564ed8ae379862e015c44f6bf45",
       "title": "Licensed certification — Differential certification",
       "xtask_commands": 0
     },
@@ -1917,8 +1953,8 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/cics/application-api-plan.md",
-      "relative_links": 10,
-      "sha256": "sha256:9e00704a189706be416672bf9f0b1c8efa3cdc21865e06a5784f5610d36870cb",
+      "relative_links": 11,
+      "sha256": "sha256:ab72938fb3a3b12d8003e73a57be0cc0152c1d8a8846a0a9cbf5c1a640f5e149",
       "title": "CICS — Application API",
       "xtask_commands": 0
     },
@@ -1942,15 +1978,15 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cics/system-api-plan.md",
       "relative_links": 2,
-      "sha256": "sha256:26685eb319592e36c1d0e74eef3de42a2f6ecb392f96ace25ac3af5eb8cdb219",
+      "sha256": "sha256:8543e26a82a2e5d893f6c0a8f1bd6d47c20c3e8fa8528c44b95a55a55a401b14",
       "title": "CICS — SPI and FEPI",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/cics/system-api-status.md",
-      "relative_links": 2,
-      "sha256": "sha256:5591b9e69676718fe02ba5021351cb302cab3e4937b3a14ec77bdb97fbb5cf69",
+      "relative_links": 3,
+      "sha256": "sha256:ff2618af91544a1db9177ad90da4c3173e40b19c328254d95e1874bd39c09229",
       "title": "CICS — SPI and FEPI progress",
       "xtask_commands": 0
     },
@@ -2046,7 +2082,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/db2/core-plan.md",
       "relative_links": 3,
-      "sha256": "sha256:5d42b8bf135abbf5b3a817665b971c070d54498b61fe11ddf813a4ef36ad232e",
+      "sha256": "sha256:226b5c5ff2084ff55f310069934d7ca46c44582d79e2970ae13643b3c44f882d",
       "title": "Db2 — Engine and common SQL",
       "xtask_commands": 0
     },
@@ -2070,7 +2106,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/db2/programming-plan.md",
       "relative_links": 2,
-      "sha256": "sha256:f6d32a2b9de7c342a3fcb563e91a75a2368709bd4734b9dc728b7c2487ae3586",
+      "sha256": "sha256:f114b9090475f2ebb09908b076bbe3771f2fed2b26cf195666313a01197c3281",
       "title": "Db2 — Complete programming surface",
       "xtask_commands": 0
     },
@@ -2102,7 +2138,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-plan.md",
       "relative_links": 2,
-      "sha256": "sha256:c3891679e72cf7e1515613e33a51d1c600ce774419d467e8acef3c01ea647307",
+      "sha256": "sha256:eb79c2324d8246ea7af5463f829a0d92dfdc015a22cfab5d856eeec8e486bc7a",
       "title": "IMS — DB / TM programming surface",
       "xtask_commands": 0
     },
@@ -2126,7 +2162,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/integration/transactions-plan.md",
       "relative_links": 2,
-      "sha256": "sha256:7f210981668c08b6fa811204895a6a30170550b41e359388937b05f86665faf3",
+      "sha256": "sha256:09ebef361f42bce570d302f89e670b9509a67b2e4178bce493e5c2b517a8fbfc",
       "title": "Cross-resource integration — Transactions and recovery",
       "xtask_commands": 0
     },
@@ -2194,7 +2230,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-plan.md",
       "relative_links": 3,
-      "sha256": "sha256:47712306706b3a784e2b4e16830cf00e9e37716cd5c5c5fd659f0ecc2623b68c",
+      "sha256": "sha256:abd0098b4e2892f988cfebcff0b36ec73d60008cf904e5dc1df4269ea82e90da",
       "title": "IBM MQ — MQI programming surface",
       "xtask_commands": 0
     },
@@ -2226,7 +2262,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/zosmf/rest-plan.md",
       "relative_links": 2,
-      "sha256": "sha256:36f0555ebbc4c0057b312b6483392ac527a2ca6f4df14af63bbb74c3fadb03d8",
+      "sha256": "sha256:2cec38008f33b053c1ee5cd06b984eb2b8c9c7c49106a626819ccc6f013ff120",
       "title": "z/OSMF — REST portfolio",
       "xtask_commands": 0
     },
@@ -2453,8 +2489,8 @@
     {
       "normative": false,
       "path": "docs/research/IBM-OFFICIAL-COVERAGE-ROADMAP.md",
-      "relative_links": 13,
-      "sha256": "sha256:54b3641562da8126ff2bec6f49a394fbb3c364a0cb937a15702408ef8e51bbdc",
+      "relative_links": 14,
+      "sha256": "sha256:b26091e29aaa6b2a215ce97214e6f914e725bcd8c86d3377e116a943047375a5",
       "title": "IBM official coverage and de-hardcoding roadmap",
       "xtask_commands": 0
     },
@@ -2684,6 +2720,14 @@
         {
           "label": "Implementation prompts",
           "path": "docs/prompts/README.md"
+        },
+        {
+          "label": "Contribution ownership and parallel work",
+          "path": "docs/delivery/WORK-COORDINATION.md"
+        },
+        {
+          "label": "Roadmap tracking audit (2026-10-11)",
+          "path": "docs/delivery/WORK-AUDIT-2026-10-11.md"
         }
       ],
       "heading": "Documentation collections"
@@ -3190,6 +3234,10 @@
           "path": "docs/delivery/UNRELEASED-STATUS.md"
         },
         {
+          "label": "Remaining roadmap work and legacy milestone mapping",
+          "path": "docs/delivery/subsystems/REMAINING-WORK.md"
+        },
+        {
           "label": "Verification strategy",
           "path": "docs/delivery/VERIFICATION-STRATEGY.md"
         },
@@ -3392,7 +3440,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:0dae356e28ef3f90c1bb2a05d99cb22e3afef63362421baba29c361da88ce002",
+  "registry_sha256": "sha256:753e968acda3c4a4e42bfae65de8ca1a1079356eba8d9f5d287df332d4809944",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

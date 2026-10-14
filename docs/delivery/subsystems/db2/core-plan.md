@@ -3,7 +3,7 @@
 Subsystem: **db2**
 Phase: **core**
 
-Status: **Proposed**
+Status: **Planning specification; implementation tracked in the progress record**
 Start gate: coverage.foundation catalog/handler contracts, cobol.execution COBOL host ABI, and racf.security SAF frozen
 Completion dependencies: coverage.foundation, cobol.execution, racf.security
 Estimate: 24–36 engineer-months

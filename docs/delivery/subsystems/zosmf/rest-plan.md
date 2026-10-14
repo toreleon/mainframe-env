@@ -3,7 +3,7 @@
 Subsystem: **zosmf**
 Phase: **rest**
 
-Status: **Proposed**
+Status: **Planning specification; implementation tracked in the progress record**
 Start gate: normalized operation catalog and backend ownership frozen; each adapter waits for its accepted backend
 Completion dependencies: racf.security, dataset.data, jes.execution, cics.system-api
 Estimate: 12–20 engineer-months
