@@ -5655,6 +5655,8 @@ fn install_publication_state(
 
 #[cfg(test)]
 mod tests {
+    #[path = "online_transfer_task_state.rs"]
+    mod online_transfer_task_state;
     include!("product/bts_browse.rs");
     use super::*;
     #[path = "ims_package_tests.rs"]
