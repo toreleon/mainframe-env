@@ -246,6 +246,7 @@ pub(super) fn invalid_shape(
                 plan.operation,
                 CicsPlanOperation::SendMap | CicsPlanOperation::SendText
             ),
+            CicsPlanOption::Wait => plan.operation != CicsPlanOperation::SendText,
             CicsPlanOption::MapOnly => {
                 plan.operation != CicsPlanOperation::SendMap
                     || inputs.contains(&CicsOperandName::From)

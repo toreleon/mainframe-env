@@ -6,6 +6,13 @@ pub(super) fn validate_output(
     output: CicsAssignOutput,
 ) -> Result<(), MachineProblem> {
     let name = output.name();
+    if name == "STARTCODE"
+        && (layout.category != LayoutCategory::Alphanumeric || layout.length != 2)
+    {
+        return Err(invalid_plan(
+            "ASSIGN STARTCODE has the wrong character layout",
+        ));
+    }
     if matches!(
         name,
         "ABOFFSET" | "LOCALCCSID" | "MAJORVERSION" | "MICROVERSION" | "MINORVERSION"

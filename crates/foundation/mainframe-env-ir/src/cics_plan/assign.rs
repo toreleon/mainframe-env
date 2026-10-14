@@ -96,6 +96,7 @@ pub const CICS_ASSIGN_OUTPUT_NAMES: &[&str] = &[
     "FACILITY",
     "NETNAME",
     "TNADDR",
+    "STARTCODE",
 ];
 
 impl CicsAssignOutput {
