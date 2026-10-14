@@ -1,3 +1,4 @@
+mod ams_recordsize;
 mod dataset_helpers;
 use dataset_helpers::{
     dataset_attributes, dataset_mutation, join_records, member_name, records_for_write,
@@ -4892,8 +4893,7 @@ impl ProductServer {
                 ))
             }
             "DEFINE" => {
-                let name = control_name(&text, "NAME")
-                    .ok_or_else(|| gateway_problem(HostProblem::Malformed))?;
+                let (name, maximum) = ams_recordsize::define_layout(&text, &words)?;
                 self.dataset_call(
                     principal,
                     DatasetRequest::Create {
@@ -4901,7 +4901,7 @@ impl ProductServer {
                         attributes: DatasetAttributes {
                             organization: DatasetOrganization::KeySequenced,
                             record_format: RecordFormat::Variable,
-                            logical_record_length: 32760,
+                            logical_record_length: maximum,
                             key_offset: Some(0),
                             key_length: Some(8),
                             ccsid: Some(37),
@@ -6447,6 +6447,9 @@ mod tests {
 
     #[path = "bts_set_lifetime.rs"]
     mod bts_set_lifetime;
+
+    #[path = "ams_recordsize.rs"]
+    mod ams_recordsize;
 
     #[path = "program_default_abend.rs"]
     mod program_default_abend;
@@ -9070,7 +9073,7 @@ mod tests {
             &server,
             "ALICE",
             b"ALICEPASS",
-            "//PARENT JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILD JOB CLASS=A\n//RUN EXEC PGM=IKJEFT01\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n//WORK DD DSN=&&WORK,DISP=(NEW,DELETE,DELETE)\n"
+            "//PARENT JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILD JOB CLASS=A\n//RUN EXEC PGM=IKJEFT01\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n//WORK DD DSN=&&WORK,DISP=(NEW,DELETE,DELETE),\n//         DCB=(RECFM=VB,LRECL=32760)\n"
                 .into(),
         );
         let parent_id = parent["jobid"].as_str().unwrap();
@@ -9609,7 +9612,7 @@ mod tests {
             &server,
             "ALICE",
             b"ALICEPASS",
-            "//PARENT JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILD JOB CLASS=A\n//RUN EXEC PGM=IEFBR14\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n//WORK DD DSN=&&WORK,DISP=(NEW,DELETE,DELETE)\n"
+            "//PARENT JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILD JOB CLASS=A\n//RUN EXEC PGM=IEFBR14\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n//WORK DD DSN=&&WORK,DISP=(NEW,DELETE,DELETE),\n//         DCB=(RECFM=VB,LRECL=32760)\n"
                 .into(),
         );
         let parent_id = parent["jobid"].as_str().unwrap();
