@@ -11,6 +11,7 @@ mod protocol {
     struct Proof {
         _root: TestRoot,
         invocation: Invocation,
+        binary: Vec<u8>,
         machine: ReferenceMachine,
         row: ProviderStateRecord,
         execution: ExecutionRecord,
@@ -84,6 +85,10 @@ mod protocol {
 
     impl Proof {
         fn new() -> Self {
+            Self::with_floats(false)
+        }
+
+        fn with_floats(floating: bool) -> Self {
             let root = TestRoot::new();
             let fixture = Fixture::new(
                 &root,
@@ -91,7 +96,12 @@ mod protocol {
                 HostProblem::NotFound,
                 false,
             );
-            fixture.install("MID", "IDENTIFICATION DIVISION. PROGRAM-ID. MID. PROCEDURE DIVISION. EXEC CICS XCTL PROGRAM('EXIT') END-EXEC. GOBACK.");
+            let data = if floating {
+                "DATA DIVISION. WORKING-STORAGE SECTION. 01 F COMP-1. 01 D COMP-2."
+            } else {
+                ""
+            };
+            fixture.install("MID", &format!("IDENTIFICATION DIVISION. PROGRAM-ID. MID. {data} PROCEDURE DIVISION. EXEC CICS XCTL PROGRAM('EXIT') END-EXEC. GOBACK."));
             let admitted = fixture
                 .router
                 .cobol
@@ -220,6 +230,7 @@ mod protocol {
             Self {
                 _root: root,
                 invocation,
+                binary: admitted.executable.payload().to_vec(),
                 machine,
                 row,
                 execution,
@@ -240,6 +251,119 @@ mod protocol {
                 &self.observed,
             )
         }
+    }
+
+    #[test]
+    fn float_checkpoint_source_intent_accepts_schema13() {
+        let proof = Proof::with_floats(true);
+        assert_eq!(
+            proof.machine.checkpoint().unwrap().schema(),
+            "mainframe-env.reference-machine-checkpoint@13"
+        );
+        let staged = proof.prepare().unwrap();
+        assert!(decode_receipt(&staged).is_ok());
+    }
+
+    #[test]
+    fn float_checkpoint_cold_source_recovery_attests_restored_schema13() {
+        let proof = Proof::with_floats(true);
+        let staged = proof.prepare().unwrap();
+        let DecodedReceipt::Current(receipt) = decode_receipt(&staged).unwrap() else {
+            panic!("current intent required");
+        };
+        let mut cold = ReferenceMachine::from_binary(
+            &proof.binary,
+            proof.invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let checkpoint = BoundedPayload::new(
+            "mainframe-env.reference-machine-checkpoint@13",
+            proof.checkpoint.payload.clone(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        cold.restore_checkpoint(&checkpoint).unwrap();
+        assert_eq!(cold.checkpoint().unwrap(), checkpoint);
+        receipt
+            .transfer
+            .unwrap()
+            .attest_source(
+                &proof.invocation,
+                &proof.execution,
+                &proof.checkpoint,
+                &proof.event,
+                &cold,
+                &proof.observed,
+            )
+            .unwrap();
+    }
+
+    #[test]
+    fn float_checkpoint_legacy12_source_intent_remains_readable() {
+        let proof = Proof::new();
+        assert_eq!(
+            proof.machine.checkpoint().unwrap().schema(),
+            "mainframe-env.reference-machine-checkpoint@12"
+        );
+        assert!(decode_receipt(&proof.prepare().unwrap()).is_ok());
+    }
+
+    #[test]
+    fn float_checkpoint_legacy12_floating_source_attests_after_cold_migration() {
+        let mut proof = Proof::with_floats(true);
+        let staged = proof.prepare().unwrap();
+        let mut receipt: Receipt = serde_json::from_slice(&staged.payload).unwrap();
+        // Schema 12 has no representation trailer. Its zero-valued floats are IEEE.
+        let profiles = proof.machine.snapshot().float_profiles;
+        let trailer = 4 + profiles
+            .keys()
+            .map(|name| 8 + name.len() + 1)
+            .sum::<usize>();
+        let bytes = &mut proof.checkpoint.payload;
+        bytes.truncate(bytes.len() - trailer);
+        bytes[..8].copy_from_slice(b"MECP0012");
+        bytes[8..12].copy_from_slice(&12u32.to_be_bytes());
+        proof.checkpoint.payload_size = bytes.len() as u64;
+        proof.checkpoint.payload_digest = Sha256::digest(&*bytes).into();
+        let legacy = BoundedPayload::new(
+            "mainframe-env.reference-machine-checkpoint@12",
+            bytes.clone(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let mut cold = ReferenceMachine::from_binary(
+            &proof.binary,
+            proof.invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        cold.restore_checkpoint(&legacy).unwrap();
+        assert_eq!(
+            cold.checkpoint().unwrap().schema(),
+            "mainframe-env.reference-machine-checkpoint@13"
+        );
+        let intent = receipt.transfer.as_mut().unwrap();
+        intent.checkpoint_schema = legacy.schema().into();
+        intent.checkpoint_digest = format!("{:x}", Sha256::digest(legacy.bytes()));
+        receipt.metadata_digest = receipt_metadata_digest(&receipt);
+        let retained = ProviderStateRecord {
+            payload: serde_json::to_vec(&receipt).unwrap(),
+            ..staged
+        };
+        assert!(decode_receipt(&retained).is_ok());
+        receipt
+            .transfer
+            .unwrap()
+            .attest_source(
+                &proof.invocation,
+                &proof.execution,
+                &proof.checkpoint,
+                &proof.event,
+                &cold,
+                &proof.observed,
+            )
+            .unwrap();
     }
 
     #[test]

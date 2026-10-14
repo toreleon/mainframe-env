@@ -74,6 +74,7 @@ fn field(machine: &mut ReferenceMachine, name: &str, bytes: Vec<u8>, numeric: bo
             digits: if numeric { 9 } else { 0 },
             scale: 0,
             native_binary: false,
+            float_profile: super::super::float_codec::FloatProfile::Hex,
             signed: numeric,
             sign_leading: false,
             sign_separate: false,

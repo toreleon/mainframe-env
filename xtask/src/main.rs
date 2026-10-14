@@ -12,6 +12,7 @@ mod carddemo_serve;
 mod changelog;
 mod cics_system_families;
 mod cobol_arithmetic_contract;
+mod cobol_data_runtime_bindings;
 mod cobol_differential;
 mod conformance_catalog;
 mod conformance_spec_export;
@@ -223,6 +224,8 @@ enum XtaskCommand {
     JesOracleCandidate,
     LicensedHarness(CheckArgs),
     CobolLanguage(CheckArgs),
+    /// Regenerate only COBOL data-runtime fixture digest bindings in the shared spec.
+    CobolDataRuntimeBindings(CheckArgs),
     CobolExit(CheckArgs),
     CobolReference(CobolReferenceArgs),
     CobolDifferential(cobol_differential::Args),
@@ -531,6 +534,11 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             } else {
                 racf_catalog::generate(root)
             },
+        ),
+        XtaskCommand::CobolDataRuntimeBindings(args) => (
+            "cobol-data-runtime-bindings",
+            args.check,
+            cobol_data_runtime_bindings::run(root, args.check),
         ),
         XtaskCommand::Spec(args) => checked!("spec", args, check_spec(root)),
         XtaskCommand::ConformanceSpecExport => (

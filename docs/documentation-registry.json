@@ -102,6 +102,7 @@
     "docs/decisions/0050-host-effect-envelope-layout.md",
     "docs/decisions/0051-dataset-read-completeness.md",
     "docs/decisions/0052-cobol-fixed-point-intermediate-precision.md",
+    "docs/decisions/0053-cobol-hex-float-storage.md",
     "docs/decisions/0100-cics-borrowed-input-bundles.md",
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
     "docs/delivery/IMPLEMENTATION-ROADMAP.md",
@@ -565,6 +566,10 @@
         {
           "label": "ADR-0052: COBOL fixed-point intermediate precision",
           "path": "docs/decisions/0052-cobol-fixed-point-intermediate-precision.md"
+        },
+        {
+          "label": "ADR-0053: COBOL HFP storage and checkpoint profiles",
+          "path": "docs/decisions/0053-cobol-hex-float-storage.md"
         },
         {
           "label": "ADR-0100: Borrowed CICS input bundles",

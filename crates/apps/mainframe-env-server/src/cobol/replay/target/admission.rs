@@ -41,7 +41,9 @@ impl TargetStage {
             CodecLimits::default(),
         )
         .map_err(|_| HostProblem::UnknownOutcome)?;
-        let constructor = machine.checkpoint().ok_or(HostProblem::UnknownOutcome)?;
+        let constructor = machine
+            .checkpoint_for_schema(&self.checkpoint_schema)
+            .ok_or(HostProblem::UnknownOutcome)?;
         if constructor.schema() != self.checkpoint_schema
             || STANDARD.encode(constructor.bytes()) != self.checkpoint
         {

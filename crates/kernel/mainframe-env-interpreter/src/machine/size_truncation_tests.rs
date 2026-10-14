@@ -49,6 +49,7 @@ fn machine_for(case: Case) -> ReferenceMachine {
         digits: case.digits,
         scale: case.scale,
         native_binary: false,
+        float_profile: super::float_codec::FloatProfile::Hex,
         signed: case.signed,
         sign_leading: false,
         sign_separate: false,

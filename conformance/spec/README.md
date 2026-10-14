@@ -83,3 +83,13 @@ SQLite close/reopen checks MQ rows, not the complete core graph or crash recover
 Full MQ completion and gates lacking executable evidence refuse while required
 profiles remain missing. Source references and Unsupported dispositions earn no
 execution credit; the licensed oracle is separately human-skipped at zero credit.
+
+`cargo xtask cobol-data-runtime-bindings` regenerates only the 17 COBOL
+data-runtime fixture digests in `v1/spec.json` from the committed shared fixture
+file; `--check` refuses stale bindings. It requires the complete unique fixture
+registry and leaves rows, obligations, cases, expected observations and oracle
+requirements unchanged. Fixture expectations remain independently reviewed
+inputs; regeneration grants no execution or licensed credit. The COMP-1 USAGE
+fixture's 1.5 bytes are independently derived as `41 18 00 00` from
+`0x.18 * 16^1`, and the runtime test checks exact encoding and decoding before
+accepting the digest update. All 17 data fixtures must still execute exactly.

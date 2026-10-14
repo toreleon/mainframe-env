@@ -66,8 +66,8 @@ pub use cobol_config::{
 };
 pub use cobol_floating_insertion::cobol_floating_insertion_prefix;
 pub use cobol_layout::{
-    COBOL_MAX_INDEX_NAMES, COBOL_MAX_TABLE_KEY_BYTES, COBOL_MAX_TABLE_KEYS,
-    COBOL_MAX_UNBOUNDED_OCCURRENCES, COBOL_MAX_UNBOUNDED_STORAGE_BYTES,
+    COBOL_FLOAT_HEX, COBOL_FLOAT_IEEE, COBOL_MAX_INDEX_NAMES, COBOL_MAX_TABLE_KEY_BYTES,
+    COBOL_MAX_TABLE_KEYS, COBOL_MAX_UNBOUNDED_OCCURRENCES, COBOL_MAX_UNBOUNDED_STORAGE_BYTES,
     cobol_floating_currency_prefix, cobol_index_name_is_valid, cobol_layout_reference_matches,
     cobol_source_word_is_undefinable, cobol_table_key_category_is_eligible,
     validate_cobol_condition_values, validate_cobol_level78_value,

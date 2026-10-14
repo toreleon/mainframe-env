@@ -170,6 +170,7 @@ fn sort_machine() -> ReferenceMachine {
             digits: 0,
             scale: 0,
             native_binary: false,
+            float_profile: float_codec::FloatProfile::Hex,
             signed: false,
             sign_leading: false,
             sign_separate: false,

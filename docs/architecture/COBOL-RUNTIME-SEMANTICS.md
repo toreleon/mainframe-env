@@ -40,7 +40,7 @@ contract explicitly permits it.
   approved assumptions. The adapter owns COBOL PICTURE, packed/zoned/binary
   encoding and receiver mutation.
 - Decimal floating uses canonical IEEE decimal128 bytes. Binary short/long
-  floating uses explicit big-endian IEEE bit wrappers so negative zero, NaN
+  floating primitive wrappers use explicit big-endian IEEE bits so negative zero, NaN
   payloads, and infinities survive storage and checkpoint round trips.
 - DISPLAY/DBCS values retain an explicit CCSID; NATIONAL is UTF-16BE and UTF-8
   retains validated source bytes. Conversion always normalizes to an owned
@@ -483,3 +483,28 @@ artifact/runtime/host compatibility and all bounds, then upgrades through one
 versioned reader. Writers emit only the current schema. Pending effects are
 reconciled through the existing idempotency record; they are never silently
 reissued from a decoded machine snapshot.
+
+## COMP-1/COMP-2 storage (#160)
+
+New z/OS layouts declare `float_profile = "hex"` and share one IBM HFP codec:
+4-byte short and 8-byte long, sign, excess-64 base-16 exponent and 24/56-bit
+fraction. The explicitly named `"ieee"` profile retains binary32/64 storage;
+absent metadata in old artifacts also selects IEEE. No compiler option is added.
+Pinned Enterprise COBOL for z/OS 6.5 topics `rlddecom` and `rlddeusa` establish
+storage sizes (baseline `ibm-enterprise-cobol-6.5-2026-05-31`, USAGE row 0015).
+The HFP format and default selection follow the authorized #160 decision;
+the pinned FLOAT-option topic is unavailable offline.
+
+UNVERIFIED ASSUMPTIONS pending a licensed differential: encoding truncates
+fraction toward zero; overflow above the largest representable magnitude
+raises SizeError; underflow below 16^-65 becomes true zero. Exact decoding
+retains all fraction bits before adapting to the existing 34-digit decimal
+runtime: longer fractions round magnitude upward by one decimal ulp to keep
+storage round trips, while out-of-range decimal integer values raise SizeError.
+The storage codec covers the full HFP range; this does not enlarge the decimal
+arithmetic range.
+
+Floating checkpoints use append-only schema 13 layout profiles. Schemas 1–12
+restore floating layouts as IEEE, including onto newly compiled HEX layouts,
+without rewriting their bytes. Recheckpointing preserves the IEEE selection in
+schema 13. Nonfloating machines continue producing schema 12.
