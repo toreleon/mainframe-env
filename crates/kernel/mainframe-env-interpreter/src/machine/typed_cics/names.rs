@@ -44,7 +44,7 @@ pub(super) enum SlotUse {
     Output,
     ExactOutput(usize),
     AbstimeOutput,
-    FormatTextOutput(usize),
+    FormatTextOutput(usize, Option<usize>),
     MillisecondsOutput,
     NumericOutput,
     HalfwordOutput,
@@ -356,10 +356,10 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         | CicsOutputName::TypeNamespace => SlotUse::Output,
         CicsOutputName::Milliseconds => SlotUse::MillisecondsOutput,
         CicsOutputName::Mmddyy | CicsOutputName::Time | CicsOutputName::Yymmdd => {
-            SlotUse::FormatTextOutput(8)
+            SlotUse::FormatTextOutput(8, None)
         }
-        CicsOutputName::Mmddyyyy | CicsOutputName::Yyyymmdd => SlotUse::FormatTextOutput(10),
-        CicsOutputName::Yyddd => SlotUse::FormatTextOutput(6),
+        CicsOutputName::Mmddyyyy | CicsOutputName::Yyyymmdd => SlotUse::FormatTextOutput(10, None),
+        CicsOutputName::Yyddd => SlotUse::FormatTextOutput(6, None),
         CicsOutputName::Resp
         | CicsOutputName::SecurityRead
         | CicsOutputName::SecurityUpdate

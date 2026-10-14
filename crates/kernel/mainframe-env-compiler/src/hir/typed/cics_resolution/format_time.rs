@@ -72,7 +72,7 @@ pub(super) fn require_output_shape(
     name: HirCicsOutputName,
     target: &HirDataReference,
     clauses: &Clauses,
-    _options: &[String],
+    options: &[String],
 ) -> Resolution<()> {
     match name {
         HirCicsOutputName::Abstime => require_absolute_time(target),
@@ -104,14 +104,19 @@ pub(super) fn require_output_shape(
                 HirCicsOutputName::Yyddd => 6,
                 _ => unreachable!(),
             };
-            let compact = target.length == 6
-                && match name {
-                    HirCicsOutputName::Time => !clauses.contains_key("TIMESEP"),
-                    HirCicsOutputName::Mmddyy | HirCicsOutputName::Yymmdd => {
-                        !clauses.contains_key("DATESEP")
-                    }
-                    _ => false,
-                };
+            let separator = if name == HirCicsOutputName::Time {
+                "TIMESEP"
+            } else {
+                "DATESEP"
+            };
+            let separator_count = if name == HirCicsOutputName::Yyddd {
+                1
+            } else {
+                2
+            };
+            let compact = target.length == field - separator_count
+                && !clauses.contains_key(separator)
+                && !options.iter().any(|option| option == separator);
             if (target.length == field || compact)
                 && matches!(
                     target.category,
