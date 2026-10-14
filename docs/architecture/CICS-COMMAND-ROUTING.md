@@ -542,9 +542,30 @@ terminal-fit validation and input-field normalization. SET pointers,
 omitted-map AID-only receive, implicit symbolic map storage, RECEIVE length,
 paging, device and other terminal controls remain explicit compiler
 rejections.
-`CURSOR` and `FREEKB` are admitted and forwarded but are not yet modeled by the
-terminal provider (`#210`). `ERASE` coincides with the provider's existing
-full-screen replacement behavior (`#203`).
+`CURSOR(value)` on SEND MAP/TEXT accepts a nonnegative halfword binary offset
+within the terminal screen. `FREEKB` unlocks the keyboard; omission leaves it
+locked. These sends atomically persist screen, cursor, keyboard and replay state
+in the same BMS authority exposed by `terminal_control_snapshot`. Replaying an
+older send returns its receipt without changing a newer display or control state.
+`ERASE` resets the cursor to zero unless an explicit cursor is supplied, alongside
+the provider's existing full-screen replacement behavior (`#203`). Bare SEND MAP
+`CURSOR` continues to succeed and selects the first field in map-definition order
+whose symbolic length is `X'FFFF'` (-1), when the FROM area and symbolic attribute
+layout are available (`#210`). The length halfword immediately precedes that
+field's symbolic attribute byte. Cursor offsets use the field's row/column and
+map origin with the terminal width. If no length is -1, or symbolic data/layout
+is unavailable, the cursor retains its post-ERASE/default or current position
+(zero after ERASE or on a new terminal); the send still succeeds. The pinned
+SEND MAP topic specifies symbolic positioning but provides no no-match fallback.
+The dedicated positioning topic is not pinned (`dfhp326`), and the map contract
+has no IC metadata, so the IC/default-positioning corner remains unmodelled.
+Bridge BMS continues to reject cursor and keyboard controls.
+Source review: IBM CICS TS 6.x, baseline
+`ibm-cics-ts-6x-application-api-sources-c-2026-09-10`, SEND MAP
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_sendmap.html` (catalog row
+`0189`), SEND TEXT `commands-api/dfhp4_sendtext.html` (row `0192`), and DFHMDI
+`SSJL4D_6.x/reference-applications/bms/dfhp47g.html`. The unpinned topic is
+`SSJL4D_6.x/applications/designing/dfhp326.html` (Positioning the cursor).
 `PURGE MESSAGE` is a separate typed terminal mutation. Because this runtime has
 no ACCUM or page-building route, its reachable full-BMS logical-message state
 is empty: local purge succeeds idempotently without changing the already

@@ -37571,6 +37571,358 @@ mod tests {
         );
     }
 
+    fn send_display_map(cics: &CicsService) {
+        cics.register_map(BmsMapDefinition {
+            mapset: "MENU".into(),
+            map: "MENU".into(),
+            line: 1,
+            column: 1,
+            rows: 24,
+            columns: 80,
+            fields: Vec::new(),
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn send_display_freekb_unlocks_and_omission_locks_map_and_text() {
+        let cics = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, session) = registered(&cics);
+        send_display_map(&cics);
+        let mut sequence = 0;
+        for operation in [CicsOperation::SendMap, CicsOperation::SendText] {
+            for unlock in [true, false] {
+                sequence += 1;
+                let mut arguments = if operation == CicsOperation::SendMap {
+                    BTreeMap::from([("MAP".into(), argument(b"MENU"))])
+                } else {
+                    BTreeMap::from([("FROM".into(), argument(b"READY"))])
+                };
+                if unlock {
+                    arguments.insert("OPTION.FREEKB".into(), cics_option());
+                }
+                let send = request(operation, arguments, sequence);
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, send.clone(), sequence),
+                    send,
+                )
+                .unwrap();
+                assert_eq!(
+                    cics.terminal_control_snapshot(&session)
+                        .unwrap()
+                        .keyboard_unlocked,
+                    unlock,
+                    "{operation:?}: FREEKB must determine keyboard state"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn send_display_valued_cursor_is_visible_and_invalid_offsets_do_not_mutate() {
+        let cics = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, session) = registered(&cics);
+        send_display_map(&cics);
+        let mut sequence = 0;
+        for operation in [CicsOperation::SendMap, CicsOperation::SendText] {
+            for offset in [0, 1919, -1, 1920, 32768] {
+                sequence += 1;
+                let mut arguments = if operation == CicsOperation::SendMap {
+                    BTreeMap::from([("MAP".into(), argument(b"MENU"))])
+                } else {
+                    BTreeMap::from([("FROM".into(), argument(b"READY"))])
+                };
+                arguments.insert("CURSOR".into(), cics_decimal(offset));
+                arguments.insert("OPTION.FREEKB".into(), cics_option());
+                let before = cics.terminal_control_snapshot(&session).unwrap();
+                let screen = cics.lock().unwrap().sessions[session.as_str()]
+                    .screen
+                    .clone();
+                let send = request(operation, arguments, sequence);
+                let result = cics.invoke(
+                    &effect(&invocation.run_unit_id, send.clone(), sequence),
+                    send,
+                );
+                if (0..1920).contains(&offset) {
+                    result.unwrap();
+                    let after = cics.terminal_control_snapshot(&session).unwrap();
+                    assert_eq!(after.cursor, offset as u16);
+                    assert!(after.keyboard_unlocked);
+                } else {
+                    assert_eq!(result, Err(HostProblem::Malformed));
+                    assert_eq!(cics.terminal_control_snapshot(&session).unwrap(), before);
+                    assert_eq!(
+                        cics.lock().unwrap().sessions[session.as_str()].screen,
+                        screen
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn send_display_sqlite_restart_and_replay_preserve_cursor_and_keyboard() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-send-display-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let invocation = invocation_for("send-display-sqlite", BTreeMap::new());
+        let session = SessionId::new("send-display-sqlite-session", 64).unwrap();
+        let sends = [
+            request(
+                CicsOperation::SendMap,
+                BTreeMap::from([
+                    ("MAP".into(), argument(b"MENU")),
+                    ("CURSOR".into(), cics_decimal(7)),
+                    ("OPTION.FREEKB".into(), cics_option()),
+                ]),
+                1,
+            ),
+            request(
+                CicsOperation::SendText,
+                BTreeMap::from([
+                    ("FROM".into(), argument(b"READY")),
+                    ("CURSOR".into(), cics_decimal(9)),
+                ]),
+                2,
+            ),
+        ];
+        let originals = {
+            let cics = service(Arc::new(
+                SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap(),
+            ));
+            send_display_map(&cics);
+            cics.launch_terminal(
+                invocation.clone(),
+                &session,
+                "MENU",
+                24,
+                80,
+                "send-display-csrf",
+                1,
+                100,
+            )
+            .unwrap();
+            sends
+                .iter()
+                .enumerate()
+                .map(|(index, send)| {
+                    cics.invoke(
+                        &effect(&invocation.run_unit_id, send.clone(), index as u64 + 1),
+                        send.clone(),
+                    )
+                    .unwrap()
+                })
+                .collect::<Vec<_>>()
+        };
+        let cics = service(Arc::new(
+            SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap(),
+        ));
+        cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let before = cics.terminal_control_snapshot(&session).unwrap();
+        assert_eq!(before.cursor, 9);
+        assert!(!before.keyboard_unlocked);
+        for (index, send) in sends.into_iter().enumerate() {
+            assert_eq!(
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, send.clone(), index as u64 + 1),
+                    send
+                )
+                .unwrap(),
+                originals[index]
+            );
+            assert_eq!(cics.terminal_control_snapshot(&session).unwrap(), before);
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn send_display_cursor_omission_preserves_and_erase_resets_unless_explicit() {
+        let cics = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, session) = registered(&cics);
+        send_display_map(&cics);
+        for (index, (operation, arguments, cursor)) in [
+            (
+                CicsOperation::SendControl,
+                BTreeMap::from([
+                    ("CURSOR".into(), cics_decimal(123)),
+                    ("OPTION.ALARM".into(), cics_option()),
+                ]),
+                123,
+            ),
+            (
+                CicsOperation::SendText,
+                BTreeMap::from([("FROM".into(), argument(b"READY"))]),
+                123,
+            ),
+            (
+                CicsOperation::SendMap,
+                BTreeMap::from([
+                    ("MAP".into(), argument(b"MENU")),
+                    ("OPTION.ERASE".into(), cics_option()),
+                ]),
+                0,
+            ),
+            (
+                CicsOperation::SendText,
+                BTreeMap::from([
+                    ("FROM".into(), argument(b"NEXT")),
+                    ("OPTION.ERASE".into(), cics_option()),
+                    ("CURSOR".into(), cics_decimal(17)),
+                ]),
+                17,
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let sequence = index as u64 + 1;
+            let send = request(operation, arguments, sequence);
+            cics.invoke(
+                &effect(&invocation.run_unit_id, send.clone(), sequence),
+                send,
+            )
+            .unwrap();
+            let snapshot = cics.terminal_control_snapshot(&session).unwrap();
+            assert_eq!(snapshot.cursor, cursor);
+            assert_eq!(snapshot.alarm_count, 1);
+        }
+    }
+
+    #[test]
+    fn send_display_bare_cursor_without_symbolic_data_succeeds() {
+        let cics = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, session) = registered(&cics);
+        send_display_map(&cics);
+        for (sequence, erase, expected) in [(1, false, 17), (2, true, 0)] {
+            let control = request(
+                CicsOperation::SendControl,
+                BTreeMap::from([("CURSOR".into(), cics_decimal(17))]),
+                sequence * 2,
+            );
+            cics.invoke(
+                &effect(&invocation.run_unit_id, control.clone(), sequence * 2),
+                control,
+            )
+            .unwrap();
+            let mut arguments = BTreeMap::from([
+                ("MAP".into(), argument(b"MENU")),
+                ("OPTION.CURSOR".into(), cics_option()),
+                ("OPTION.FREEKB".into(), cics_option()),
+            ]);
+            if erase {
+                arguments.insert("OPTION.ERASE".into(), cics_option());
+            }
+            let send = request(CicsOperation::SendMap, arguments, sequence * 2 + 1);
+            let response = cics
+                .invoke(
+                    &effect(&invocation.run_unit_id, send.clone(), sequence * 2 + 1),
+                    send,
+                )
+                .unwrap();
+            assert_eq!(response.condition, "NORMAL");
+            let snapshot = cics.terminal_control_snapshot(&session).unwrap();
+            assert_eq!(snapshot.cursor, expected);
+            assert!(snapshot.keyboard_unlocked);
+        }
+    }
+
+    #[test]
+    fn send_display_bare_cursor_selects_first_minus_one_length_field() {
+        let cics = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, session) = registered(&cics);
+        cics.register_map(BmsMapDefinition {
+            mapset: "COSGN00".into(),
+            map: "COSGN0A".into(),
+            line: 3,
+            column: 4,
+            rows: 20,
+            columns: 40,
+            fields: (0..3)
+                .map(|index| BmsFieldDefinition {
+                    name: format!("FIELD{index}"),
+                    row: 2 + index,
+                    column: 5,
+                    length: 4,
+                    initial: Vec::new(),
+                    color: None,
+                    highlight: None,
+                    protected: false,
+                    secret: false,
+                    fset: false,
+                    justify_right: false,
+                    fill_zero: false,
+                    output_offset: Some(19 + u32::from(index) * 11),
+                    attribute_offset: Some(14 + u32::from(index) * 11),
+                })
+                .collect(),
+        })
+        .unwrap();
+        // CardDemo-style TIOAPFX and extended symbolic fields: L, A, four attributes, O.
+        let mut symbolic = vec![0; 45];
+        for offset in [19, 30, 41] {
+            symbolic[offset..offset + 4].copy_from_slice(b"DATA");
+        }
+        let mut sends = Vec::new();
+        for (index, (marked, erase, expected)) in [
+            (false, true, 0),
+            (true, true, 4 * 80 + 7),
+            (true, false, 4 * 80 + 7),
+            (false, false, 4 * 80 + 7),
+            (false, true, 0),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            for offset in [23, 34] {
+                symbolic[offset..offset + 2].fill(if marked { 0xff } else { 0 });
+            }
+            let sequence = index as u64 + 1;
+            let mut arguments = BTreeMap::from([
+                ("MAP".into(), argument(b"COSGN0A")),
+                ("MAPSET".into(), argument(b"COSGN00")),
+                ("FROM".into(), argument(&symbolic)),
+                ("OPTION.CURSOR".into(), cics_option()),
+            ]);
+            if erase {
+                arguments.insert("OPTION.ERASE".into(), cics_option());
+            }
+            let send = request(CicsOperation::SendMap, arguments, sequence);
+            let response = cics
+                .invoke(
+                    &effect(&invocation.run_unit_id, send.clone(), sequence),
+                    send.clone(),
+                )
+                .unwrap();
+            assert_eq!(response.condition, "NORMAL");
+            assert_eq!(
+                cics.terminal_control_snapshot(&session).unwrap().cursor,
+                expected
+            );
+            assert_eq!(
+                cics.lock().unwrap().sessions[session.as_str()].field_values["FIELD1"],
+                b"DATA"
+            );
+            sends.push((sequence, send, response));
+        }
+        let before = cics.terminal_control_snapshot(&session).unwrap();
+        for (sequence, send, response) in sends {
+            assert_eq!(
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, send.clone(), sequence),
+                    send
+                )
+                .unwrap(),
+                response
+            );
+            assert_eq!(cics.terminal_control_snapshot(&session).unwrap(), before);
+        }
+    }
+
     #[test]
     fn send_text_wait_completes_display_before_return_issue_312() {
         let directory = std::env::temp_dir().join(format!(
@@ -37630,6 +37982,54 @@ mod tests {
             );
         }
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn send_text_wait_commits_cursor_and_keyboard_and_replays_without_resending() {
+        let cics = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, session) = registered(&cics);
+        let send = request(
+            CicsOperation::SendText,
+            BTreeMap::from([
+                ("FROM".into(), argument(b"READY")),
+                ("CURSOR".into(), cics_decimal(7)),
+                ("OPTION.ERASE".into(), cics_option()),
+                ("OPTION.FREEKB".into(), cics_option()),
+                ("OPTION.WAIT".into(), cics_option()),
+            ]),
+            1,
+        );
+        let send_effect = effect(&invocation.run_unit_id, send.clone(), 1);
+        let response = cics.invoke(&send_effect, send.clone()).unwrap();
+        assert_eq!(response.disposition, CicsDisposition::Complete);
+        assert_eq!(response.payload.bytes(), b"READY");
+        let controls = cics.terminal_control_snapshot(&session).unwrap();
+        assert_eq!(controls.cursor, 7);
+        assert!(controls.keyboard_unlocked);
+        assert_eq!(
+            cics.lock().unwrap().sessions[session.as_str()].screen,
+            b"READY"
+        );
+
+        let newer = request(
+            CicsOperation::SendText,
+            BTreeMap::from([
+                ("FROM".into(), argument(b"NEWER")),
+                ("CURSOR".into(), cics_decimal(19)),
+            ]),
+            2,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, newer.clone(), 2), newer)
+            .unwrap();
+        let controls = cics.terminal_control_snapshot(&session).unwrap();
+        assert_eq!(controls.cursor, 19);
+        assert!(!controls.keyboard_unlocked);
+        let version = cics.lock().unwrap().sessions[session.as_str()].version;
+        assert_eq!(cics.invoke(&send_effect, send).unwrap(), response);
+        assert_eq!(cics.terminal_control_snapshot(&session).unwrap(), controls);
+        let state = cics.lock().unwrap();
+        assert_eq!(state.sessions[session.as_str()].version, version);
+        assert_eq!(state.sessions[session.as_str()].screen, b"NEWER");
     }
 
     #[test]

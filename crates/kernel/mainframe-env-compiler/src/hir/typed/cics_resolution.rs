@@ -13,6 +13,7 @@ use mainframe_env_ir::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 type Clauses = BTreeMap<String, Vec<String>>;
+
 mod abend;
 mod address;
 mod assign_validation;
@@ -57,6 +58,7 @@ mod spool_control;
 mod storage_control;
 mod task_wait;
 mod terminal_control;
+mod terminal_display;
 mod transaction_name;
 mod transform_control;
 mod value;
@@ -460,8 +462,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::ReceiveMap => {
             &["MAP", "MAPSET", "FROM", "INTO", "LENGTH", "RESP", "RESP2"]
         }
-        HirCicsOperation::SendMap => &["MAP", "MAPSET", "FROM", "LENGTH", "RESP", "RESP2"],
-        HirCicsOperation::SendText => &["FROM", "LENGTH", "RESP", "RESP2"],
+        HirCicsOperation::SendMap => terminal_display::SEND_MAP_CLAUSES,
+        HirCicsOperation::SendText => terminal_display::SEND_TEXT_CLAUSES,
         HirCicsOperation::SendPartnset => &["PARTNSET", "RESP", "RESP2"],
         HirCicsOperation::ReceivePartn => &["PARTN", "INTO", "SET", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::SendControl => &[
@@ -626,10 +628,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::BifDeedit => &["NOHANDLE"],
         HirCicsOperation::BifDigest => &["HEX", "BINARY", "BASE64", "NOHANDLE"],
         HirCicsOperation::ReceiveMap => &["TERMINAL", "NOHANDLE"],
-        HirCicsOperation::SendMap => &[
-            "DATAONLY", "ERASE", "CURSOR", "FREEKB", "MAPONLY", "NOHANDLE",
-        ],
-        HirCicsOperation::SendText => &["ERASE", "FREEKB", "WAIT", "NOHANDLE"],
+        HirCicsOperation::SendMap => terminal_display::SEND_MAP_OPTIONS,
+        HirCicsOperation::SendText => terminal_display::SEND_TEXT_OPTIONS,
         HirCicsOperation::SendPartnset => &["NOHANDLE"],
         HirCicsOperation::ReceivePartn => &["ASIS", "NOHANDLE"],
         HirCicsOperation::SendControl => terminal_control::SEND_CONTROL_OPTIONS,

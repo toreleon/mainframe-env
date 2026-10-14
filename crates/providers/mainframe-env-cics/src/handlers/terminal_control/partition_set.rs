@@ -1,7 +1,7 @@
 //! Durable partition-set definitions and task associations for BMS terminals.
 
 use super::super::super::{
-    CicsService, CicsTerminalSnapshot, Run, Session, bounded, decimal_payload, mutation_problem,
+    CicsService, CicsTerminalSnapshot, Run, bounded, decimal_payload, mutation_problem,
     terminal_snapshot,
 };
 use super::super::{field, store_error};
@@ -713,46 +713,6 @@ pub(super) fn require_intervening_send(
         return Err(invreq(0));
     }
     Ok(())
-}
-
-pub(super) fn persist_send(
-    service: &CicsService,
-    run: &Run,
-    current: &Session,
-    next: &Session,
-) -> Result<(), HostProblem> {
-    let owner = run.invocation.run_unit_id.as_str();
-    let Some(mut association) = read_association(service, owner)? else {
-        return service.persist_session(&run.session, next, Some(current.version));
-    };
-    let old_version = association.version;
-    association.version = old_version
-        .checked_add(1)
-        .ok_or(HostProblem::ResourceExhausted)?;
-    association.intervening_send = true;
-    service
-        .store
-        .mutate_provider_states_atomic(vec![
-            ProviderStateMutation::Put(ProviderStateWrite {
-                record: ProviderStateRecord {
-                    namespace: "cics-session".into(),
-                    key: run.session.clone(),
-                    version: next.version,
-                    payload: super::super::encode_session(next)?,
-                },
-                expected_version: Some(current.version),
-            }),
-            ProviderStateMutation::Put(ProviderStateWrite {
-                record: ProviderStateRecord {
-                    namespace: ASSOCIATION_NAMESPACE.into(),
-                    key: owner.into(),
-                    version: association.version,
-                    payload: encode_association(&association)?,
-                },
-                expected_version: Some(old_version),
-            }),
-        ])
-        .map_err(store_error)
 }
 
 pub(super) fn mark_control_send(

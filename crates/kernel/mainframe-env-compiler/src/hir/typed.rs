@@ -4698,6 +4698,39 @@ mod tests {
         assert_eq!(command.options, BTreeSet::from([HirCicsOption::Wait]));
     }
 
+    #[test]
+    fn send_text_wait_and_cursor_controls_lower_together() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. WAITCUR. DATA DIVISION. WORKING-STORAGE SECTION. 01 MSG-X PIC X(8). PROCEDURE DIVISION. EXEC CICS SEND TEXT FROM(MSG-X) CURSOR(7) ERASE FREEKB WAIT END-EXEC.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("SEND TEXT controls: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed SEND TEXT");
+        assert_eq!(command.operation, HirCicsOperation::SendText);
+        assert_eq!(
+            command.options,
+            BTreeSet::from([
+                HirCicsOption::Erase,
+                HirCicsOption::FreeKb,
+                HirCicsOption::Wait
+            ])
+        );
+        assert!(
+            command
+                .operands
+                .iter()
+                .any(|operand| operand.name == HirCicsOperandName::ControlCursor)
+        );
+    }
+
     // IBM CICS TS 6.x, api-commands:0258, dfhp4_writeqts.html FROM/LENGTH.
     #[test]
     fn writeq_ts_rejects_length_beyond_from_area_issue_312() {
@@ -5292,6 +5325,46 @@ mod tests {
                 .public_message()
                 .contains("TERMINAL does not accept FROM")
         }));
+    }
+
+    #[test]
+    fn cics_send_display_valued_cursor_binds_halfword_or_literal() {
+        for command in [
+            "SEND MAP('MENU') CURSOR(CUR-X)",
+            "SEND TEXT FROM(DATA-X) CURSOR(7)",
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. SENDCUR. DATA DIVISION. WORKING-STORAGE SECTION. 01 CUR-X PIC S9(4) COMP. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC."
+            );
+            let analysis = analyze(&source);
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{command}: {:?}", analysis.diagnostics));
+            let command = hir
+                .statements
+                .iter()
+                .find_map(|statement| match statement.resolved.as_ref() {
+                    Some(HirResolvedStatement::Cics(command)) => Some(command),
+                    _ => None,
+                })
+                .unwrap();
+            assert!(
+                command
+                    .operands
+                    .iter()
+                    .any(|operand| operand.name == HirCicsOperandName::ControlCursor)
+            );
+        }
+        for command in [
+            "SEND MAP('MENU') CURSOR(-1)",
+            "SEND TEXT FROM(DATA-X) CURSOR(FULL-X)",
+            "SEND TEXT FROM(DATA-X) CURSOR",
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADCUR. DATA DIVISION. WORKING-STORAGE SECTION. 01 FULL-X PIC S9(9) COMP. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC."
+            );
+            assert!(analyze(&source).hir.is_none(), "{command}");
+        }
     }
 
     /// Issues #203 and #206: CardDemo SEND display controls and bounded lengths stay typed.
