@@ -16,6 +16,9 @@ use handlers::{
     DurableFileStatus, argument_bytes, argument_optional, argument_text, decode_terminal_address,
     encode_terminal_address, terminal_field_address, validate_map,
 };
+pub(crate) use handlers::{
+    cics_effect_replay_binding_digest, decode_cics_effect_replay, encode_cics_effect_replay,
+};
 pub(super) use handlers::{field, store_error};
 use mainframe_env_encoding::CodePage;
 use mainframe_env_execution_api::{
@@ -111,6 +114,7 @@ pub(crate) struct CicsEffectReplay {
     pub(crate) request_digest: [u8; 32],
     pub(crate) result_digest: Option<[u8; 32]>,
     pub(crate) binding_digest: Option<[u8; 32]>,
+    pub(crate) read_alias: Option<ProviderStateRecord>,
     pub(crate) response: CicsResponse,
 }
 
@@ -1724,41 +1728,6 @@ struct Provider {
     descriptor: CapabilityDescriptor,
 }
 
-impl HostProvider for Provider {
-    fn descriptor(&self) -> &CapabilityDescriptor {
-        &self.descriptor
-    }
-
-    fn invoke(&self, invocation: &Invocation, effect: EffectRequest) -> EffectResult {
-        if let Err(problem) = reject_reserved_nested_origin(invocation) {
-            return EffectResult {
-                sequence: effect.sequence,
-                outcome: Err(problem),
-            };
-        }
-        if let Err(problem) = self.service.ensure_run(invocation) {
-            return EffectResult {
-                sequence: effect.sequence,
-                outcome: Err(problem),
-            };
-        }
-        let sequence = effect.sequence;
-        let request = match effect.request.clone() {
-            HostRequest::Cics(request) => request,
-            _ => {
-                return EffectResult {
-                    sequence,
-                    outcome: Err(HostProblem::Malformed),
-                };
-            }
-        };
-        EffectResult {
-            sequence,
-            outcome: self.service.invoke(&effect, request).map(HostResult::Cics),
-        }
-    }
-}
-
 fn reject_reserved_nested_origin(invocation: &Invocation) -> Result<(), HostProblem> {
     if invocation
         .bindings
@@ -2834,360 +2803,6 @@ fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Sess
         handle_state,
         version,
     })
-}
-
-fn encode_cics_effect_replay(replay: &CicsEffectReplay) -> Result<Vec<u8>, HostProblem> {
-    let response = &replay.response;
-    let owner = replay
-        .owner_execution
-        .as_deref()
-        .ok_or(HostProblem::InfrastructureFailure)?;
-    let deadline_tick = replay
-        .deadline_tick
-        .filter(|tick| *tick != 0)
-        .ok_or(HostProblem::InfrastructureFailure)?;
-    let mut out = if let Some(effect_key) = replay.effect_key.as_deref() {
-        let owner_run_unit = replay
-            .owner_run_unit
-            .as_deref()
-            .ok_or(HostProblem::InfrastructureFailure)?;
-        let sequence = replay
-            .sequence
-            .filter(|sequence| *sequence != 0)
-            .ok_or(HostProblem::InfrastructureFailure)?;
-        let result_digest = replay
-            .result_digest
-            .ok_or(HostProblem::InfrastructureFailure)?;
-        let binding_digest = replay
-            .binding_digest
-            .ok_or(HostProblem::InfrastructureFailure)?;
-        if replay.resolution_tick == Some(0)
-            || replay
-                .resolution_tick
-                .is_some_and(|tick| tick < deadline_tick)
-        {
-            return Err(HostProblem::InfrastructureFailure);
-        }
-        let mut out = b"MECER003".to_vec();
-        field(&mut out, effect_key.as_bytes())?;
-        field(&mut out, owner.as_bytes())?;
-        field(&mut out, owner_run_unit.as_bytes())?;
-        out.extend_from_slice(&sequence.to_be_bytes());
-        out.extend_from_slice(&deadline_tick.to_be_bytes());
-        out.extend_from_slice(&replay.resolution_tick.unwrap_or(0).to_be_bytes());
-        out.extend_from_slice(&replay.request_digest);
-        out.extend_from_slice(&result_digest);
-        out.extend_from_slice(&binding_digest);
-        out
-    } else {
-        let mut out = b"MECER002".to_vec();
-        field(&mut out, owner.as_bytes())?;
-        out.extend_from_slice(&deadline_tick.to_be_bytes());
-        out.extend_from_slice(&replay.request_digest);
-        out
-    };
-    out.push(match response.disposition {
-        CicsDisposition::Complete => 1,
-        CicsDisposition::Suspended => 2,
-        CicsDisposition::Transfer => 3,
-        CicsDisposition::Handler => 4,
-        CicsDisposition::Returned => 5,
-        CicsDisposition::Abended => 6,
-        CicsDisposition::Ignored => 7,
-    });
-    field(&mut out, response.condition.as_bytes())?;
-    out.extend_from_slice(&response.response.to_be_bytes());
-    out.extend_from_slice(&response.response2.to_be_bytes());
-    field(&mut out, response.applid.as_bytes())?;
-    field(&mut out, response.sysid.as_bytes())?;
-    field(&mut out, response.transaction.as_bytes())?;
-    out.push(response.aid);
-    for value in [&response.target, &response.next_transaction] {
-        match value {
-            Some(value) => {
-                out.push(1);
-                field(&mut out, value.as_bytes())?;
-            }
-            None => out.push(0),
-        }
-    }
-    field(&mut out, response.payload.schema().as_bytes())?;
-    field(&mut out, response.payload.bytes())?;
-    out.extend_from_slice(
-        &u32::try_from(response.outputs.len())
-            .map_err(|_| HostProblem::ResourceExhausted)?
-            .to_be_bytes(),
-    );
-    for (name, value) in &response.outputs {
-        field(&mut out, name.as_bytes())?;
-        field(&mut out, value.schema().as_bytes())?;
-        field(&mut out, value.bytes())?;
-    }
-    out.push(match response.unit_of_work {
-        None => 0,
-        Some(CicsUnitOfWorkOutcome::Committed) => 1,
-        Some(CicsUnitOfWorkOutcome::RolledBack) => 2,
-    });
-    Ok(out)
-}
-
-pub(crate) fn decode_cics_effect_replay(
-    bytes: &[u8],
-    limits: CicsLimits,
-) -> Result<CicsEffectReplay, HostProblem> {
-    let mut reader = Reader { bytes, at: 0 };
-    let version = match reader.take(8)? {
-        b"MECER001" => 1,
-        b"MECER002" => 2,
-        b"MECER003" => 3,
-        _ => return Err(HostProblem::InfrastructureFailure),
-    };
-    let (effect_key, owner_execution, owner_run_unit, sequence, deadline_tick, resolution_tick) =
-        if version == 3 {
-            let effect_key =
-                String::from_utf8(reader.field(InvocationLimits::default().max_identity_bytes)?)
-                    .map_err(|_| HostProblem::InfrastructureFailure)?;
-            let owner_execution =
-                String::from_utf8(reader.field(InvocationLimits::default().max_identity_bytes)?)
-                    .map_err(|_| HostProblem::InfrastructureFailure)?;
-            let owner_run_unit =
-                String::from_utf8(reader.field(InvocationLimits::default().max_identity_bytes)?)
-                    .map_err(|_| HostProblem::InfrastructureFailure)?;
-            let sequence = u64::from_be_bytes(
-                reader
-                    .take(8)?
-                    .try_into()
-                    .map_err(|_| HostProblem::InfrastructureFailure)?,
-            );
-            let deadline_tick = u64::from_be_bytes(
-                reader
-                    .take(8)?
-                    .try_into()
-                    .map_err(|_| HostProblem::InfrastructureFailure)?,
-            );
-            let resolution_tick = match u64::from_be_bytes(
-                reader
-                    .take(8)?
-                    .try_into()
-                    .map_err(|_| HostProblem::InfrastructureFailure)?,
-            ) {
-                0 => None,
-                tick => Some(tick),
-            };
-            (
-                Some(effect_key),
-                Some(owner_execution),
-                Some(owner_run_unit),
-                Some(sequence),
-                Some(deadline_tick),
-                resolution_tick,
-            )
-        } else if version == 2 {
-            (
-                None,
-                Some(
-                    String::from_utf8(
-                        reader.field(InvocationLimits::default().max_identity_bytes)?,
-                    )
-                    .map_err(|_| HostProblem::InfrastructureFailure)?,
-                ),
-                None,
-                None,
-                Some(u64::from_be_bytes(
-                    reader
-                        .take(8)?
-                        .try_into()
-                        .map_err(|_| HostProblem::InfrastructureFailure)?,
-                )),
-                None,
-            )
-        } else {
-            (None, None, None, None, None, None)
-        };
-    if owner_execution
-        .as_ref()
-        .is_some_and(|owner| ExecutionId::new(owner, InvocationLimits::default()).is_err())
-        || owner_run_unit
-            .as_ref()
-            .is_some_and(|owner| RunUnitId::new(owner, InvocationLimits::default()).is_err())
-        || effect_key
-            .as_ref()
-            .is_some_and(|key| IdempotencyKey::new(key, InvocationLimits::default()).is_err())
-        || sequence == Some(0)
-        || deadline_tick == Some(0)
-        || resolution_tick == Some(0)
-        || resolution_tick
-            .zip(deadline_tick)
-            .is_some_and(|(resolution, deadline)| resolution < deadline)
-    {
-        return Err(HostProblem::InfrastructureFailure);
-    }
-    let request_digest = reader
-        .take(32)?
-        .try_into()
-        .map_err(|_| HostProblem::InfrastructureFailure)?;
-    let (result_digest, binding_digest) = if version == 3 {
-        (
-            Some(
-                reader
-                    .take(32)?
-                    .try_into()
-                    .map_err(|_| HostProblem::InfrastructureFailure)?,
-            ),
-            Some(
-                reader
-                    .take(32)?
-                    .try_into()
-                    .map_err(|_| HostProblem::InfrastructureFailure)?,
-            ),
-        )
-    } else {
-        (None, None)
-    };
-    let disposition = match reader.take(1)?[0] {
-        1 => CicsDisposition::Complete,
-        2 => CicsDisposition::Suspended,
-        3 => CicsDisposition::Transfer,
-        4 => CicsDisposition::Handler,
-        5 => CicsDisposition::Returned,
-        6 => CicsDisposition::Abended,
-        7 => CicsDisposition::Ignored,
-        _ => return Err(HostProblem::InfrastructureFailure),
-    };
-    let condition =
-        String::from_utf8(reader.field(128)?).map_err(|_| HostProblem::InfrastructureFailure)?;
-    let response = i32::from_be_bytes(
-        reader
-            .take(4)?
-            .try_into()
-            .map_err(|_| HostProblem::InfrastructureFailure)?,
-    );
-    let response2 = i32::from_be_bytes(
-        reader
-            .take(4)?
-            .try_into()
-            .map_err(|_| HostProblem::InfrastructureFailure)?,
-    );
-    let applid =
-        String::from_utf8(reader.field(16)?).map_err(|_| HostProblem::InfrastructureFailure)?;
-    let sysid =
-        String::from_utf8(reader.field(16)?).map_err(|_| HostProblem::InfrastructureFailure)?;
-    let transaction =
-        String::from_utf8(reader.field(16)?).map_err(|_| HostProblem::InfrastructureFailure)?;
-    let aid = reader.take(1)?[0];
-    let mut optional = || -> Result<Option<String>, HostProblem> {
-        match reader.take(1)?[0] {
-            0 => Ok(None),
-            1 => String::from_utf8(reader.field(128)?)
-                .map(Some)
-                .map_err(|_| HostProblem::InfrastructureFailure),
-            _ => Err(HostProblem::InfrastructureFailure),
-        }
-    };
-    let target = optional()?;
-    let next_transaction = optional()?;
-    let payload_schema =
-        String::from_utf8(reader.field(128)?).map_err(|_| HostProblem::InfrastructureFailure)?;
-    let payload = BoundedPayload::new(
-        payload_schema,
-        reader.field(limits.max_screen_bytes)?,
-        InvocationLimits {
-            max_payload_bytes: limits.max_screen_bytes,
-            ..InvocationLimits::default()
-        },
-    )
-    .map_err(|_| HostProblem::InfrastructureFailure)?;
-    let output_count = usize::try_from(u32::from_be_bytes(
-        reader
-            .take(4)?
-            .try_into()
-            .map_err(|_| HostProblem::InfrastructureFailure)?,
-    ))
-    .map_err(|_| HostProblem::InfrastructureFailure)?;
-    if output_count > limits.max_fields {
-        return Err(HostProblem::ResourceExhausted);
-    }
-    let mut outputs = BTreeMap::new();
-    for _ in 0..output_count {
-        let name = String::from_utf8(reader.field(128)?)
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let schema = String::from_utf8(reader.field(128)?)
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let value = BoundedPayload::new(
-            schema,
-            reader.field(limits.max_screen_bytes)?,
-            InvocationLimits {
-                max_payload_bytes: limits.max_screen_bytes,
-                ..InvocationLimits::default()
-            },
-        )
-        .map_err(|_| HostProblem::InfrastructureFailure)?;
-        if outputs.insert(name, value).is_some() {
-            return Err(HostProblem::InfrastructureFailure);
-        }
-    }
-    let unit_of_work = match reader.take(1)?[0] {
-        0 => None,
-        1 => Some(CicsUnitOfWorkOutcome::Committed),
-        2 => Some(CicsUnitOfWorkOutcome::RolledBack),
-        _ => return Err(HostProblem::InfrastructureFailure),
-    };
-    if reader.at != bytes.len() {
-        return Err(HostProblem::InfrastructureFailure);
-    }
-    Ok(CicsEffectReplay {
-        effect_key,
-        owner_execution,
-        owner_run_unit,
-        sequence,
-        deadline_tick,
-        resolution_tick,
-        request_digest,
-        result_digest,
-        binding_digest,
-        response: CicsResponse {
-            disposition,
-            condition,
-            response,
-            response2,
-            applid,
-            sysid,
-            transaction,
-            aid,
-            target,
-            next_transaction,
-            payload,
-            outputs,
-            unit_of_work,
-        },
-    })
-}
-
-pub(crate) fn cics_effect_replay_binding_digest(replay: &CicsEffectReplay) -> [u8; 32] {
-    let mut hash = Sha256::new();
-    hash.update(b"mainframe-env.cics-effect-replay-binding@1\0");
-    for field in [
-        replay.effect_key.as_deref().unwrap_or_default().as_bytes(),
-        replay
-            .owner_execution
-            .as_deref()
-            .unwrap_or_default()
-            .as_bytes(),
-        replay
-            .owner_run_unit
-            .as_deref()
-            .unwrap_or_default()
-            .as_bytes(),
-    ] {
-        hash.update((field.len() as u64).to_be_bytes());
-        hash.update(field);
-    }
-    hash.update(replay.sequence.unwrap_or(0).to_be_bytes());
-    hash.update(replay.deadline_tick.unwrap_or(0).to_be_bytes());
-    hash.update(replay.resolution_tick.unwrap_or(0).to_be_bytes());
-    hash.update(replay.request_digest);
-    hash.update(replay.result_digest.unwrap_or([0; 32]));
-    hash.finalize().into()
 }
 
 struct Reader<'a> {
@@ -7448,6 +7063,7 @@ mod tests {
                     result_digest: current
                         .then(|| handlers::cics_result_digest(&response).unwrap()),
                     binding_digest: None,
+                    read_alias: None,
                     response,
                 };
                 if current {
@@ -55158,5 +54774,327 @@ mod tests {
         ));
         cic906_appc_send_receipt_gap(store);
         std::fs::remove_dir_all(directory).unwrap();
+    }
+    #[test]
+    fn completed_plain_read_replays_writer_aid_zero_with_enter_and_keeps_current_fences() {
+        use mainframe_env_store_api::{
+            ExecutionRecord, ExecutionState, ExecutionStore, IdempotencyStore, PlatformStore,
+        };
+
+        struct CurrentAuthority {
+            descriptor: CapabilityDescriptor,
+            deny: Arc<AtomicBool>,
+        }
+        impl HostProvider for CurrentAuthority {
+            fn descriptor(&self) -> &CapabilityDescriptor {
+                &self.descriptor
+            }
+            fn invoke(&self, actor: &Invocation, effect: EffectRequest) -> EffectResult {
+                if self.deny.load(Ordering::SeqCst) {
+                    EffectResult {
+                        sequence: effect.sequence,
+                        outcome: Ok(HostResult::Security(SecurityDecision::Deny)),
+                    }
+                } else {
+                    Authority {
+                        descriptor: descriptor("host.security.authorize"),
+                    }
+                    .invoke(actor, effect)
+                }
+            }
+        }
+
+        for scenario in [
+            "valid-enter",
+            "wrong-reply-aid",
+            "current-auth-denied",
+            "current-alias-changed",
+            "session-disconnected",
+            "core-snapshot-changed",
+        ] {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let trace = Arc::new(DatasetTrace::default());
+            let deny = Arc::new(AtomicBool::new(false));
+            let mut ports: Vec<Arc<dyn HostProvider>> = ["host.program.invoke", "host.clock"]
+                .into_iter()
+                .map(|name| {
+                    Arc::new(Authority {
+                        descriptor: descriptor(name),
+                    }) as Arc<dyn HostProvider>
+                })
+                .collect();
+            ports.push(Arc::new(CurrentAuthority {
+                descriptor: descriptor("host.security.authorize"),
+                deny: deny.clone(),
+            }));
+            for name in ["host.dataset.read", "host.dataset.write"] {
+                ports.push(Arc::new(TracedDataset {
+                    descriptor: descriptor(name),
+                    trace: trace.clone(),
+                }));
+            }
+            let host = Arc::new(ScopedHostService::new(
+                Arc::new(RegistrySnapshot::new(1, ports, InvocationLimits::default()).unwrap()),
+                HostLimits::default(),
+            ));
+            let replay_clock = Arc::new(TestCicsClock::fixed(3));
+            let cics = CicsService::open_with_replay_clock(
+                host,
+                store.clone(),
+                CicsLimits::default(),
+                replay_clock.clone(),
+            )
+            .unwrap();
+            let (actor, session_id) = registered(&cics);
+            cics.register_file_aliases(&BTreeMap::from([(
+                "ACCTDAT".into(),
+                DatasetName::new("CARDDEMO.ACCTDAT", 128).unwrap(),
+            )]))
+            .unwrap();
+            // Current input metadata is distinct from the file READ reply envelope.
+            // Persist it through the same owning Session codec/CAS as terminal input.
+            {
+                let mut state = cics.lock().unwrap();
+                let session = state.sessions.get_mut(session_id.as_str()).unwrap();
+                let previous = session.version;
+                session.aid = 0x7d;
+                session.version += 1;
+                store
+                    .put_provider_state(
+                        ProviderStateRecord {
+                            namespace: "cics-session".into(),
+                            key: session_id.as_str().into(),
+                            version: session.version,
+                            payload: handlers::encode_session(session).unwrap(),
+                        },
+                        Some(previous),
+                    )
+                    .unwrap();
+            }
+            store
+                .create_execution(ExecutionRecord {
+                    execution_id: actor.execution_id.clone(),
+                    run_unit_id: actor.run_unit_id.clone(),
+                    selector: actor.selector.clone(),
+                    artifact: actor.artifact.clone(),
+                    principal: actor.principal.id().clone(),
+                    state: ExecutionState::Admitted,
+                    attempt: actor.attempt,
+                    version: 1,
+                    owner_lease: None,
+                    lease_expiry_tick: None,
+                    terminal_tick: None,
+                })
+                .unwrap();
+            let queued = store
+                .transition_execution(&actor.execution_id, 1, ExecutionState::Queued, 1)
+                .unwrap();
+            let running = store
+                .transition_execution(
+                    &actor.execution_id,
+                    queued.version,
+                    ExecutionState::Running,
+                    2,
+                )
+                .unwrap();
+            let read = request(
+                CicsOperation::Read,
+                BTreeMap::from([
+                    ("DATASET".into(), argument(b"ACCTDAT")),
+                    ("RIDFLD".into(), argument(b"AA")),
+                ]),
+                1,
+            );
+            let mut offered = effect(&actor.run_unit_id, read, 1);
+            let key =
+                IdempotencyKey::new("completed-plain-read:1", InvocationLimits::default()).unwrap();
+            offered.idempotency_key = Some(key.clone());
+            let mut core = EffectRecord {
+                execution_id: actor.execution_id.clone(),
+                run_unit_id: actor.run_unit_id.clone(),
+                sequence: offered.sequence,
+                key: key.clone(),
+                digest_format: EffectDigestFormat::CanonicalHostV1,
+                request_digest: canonical_request_digest(&offered.request).unwrap(),
+                intent: EffectIntentMetadata {
+                    owner: actor.execution_id.clone(),
+                    attempt: actor.attempt,
+                    capability: Some(
+                        offered
+                            .request
+                            .required_capability(InvocationLimits::default()),
+                    ),
+                    audit_resource: Some(mainframe_env_host_api::canonical_audit_resource_digest(
+                        &offered.request,
+                    )),
+                    audit_invocation_key: Some(actor.idempotency_key.clone()),
+                    created_tick: 3,
+                    recovery_after_tick: offered.deadline_tick,
+                    epoch: running.version + 1,
+                    recovery_lease: None,
+                },
+                state: EffectState::Intent,
+                result_digest: None,
+                resolved_tick: None,
+            };
+            store.record_intent(core.clone()).unwrap();
+            let provider = cics_provider(cics.clone(), InvocationLimits::default());
+            let first = provider.invoke(&actor, offered.clone());
+            let Ok(HostResult::Cics(first_reply)) = &first.outcome else {
+                panic!("real ordinary READ writer failed")
+            };
+            assert_eq!(first_reply.aid, 0);
+            assert_eq!(first_reply.payload.bytes(), b"AA11");
+            let saved = store
+                .get_provider_state("cics-effect-replay-v1", key.as_str())
+                .unwrap()
+                .unwrap();
+            assert_eq!(saved.version, 2);
+            assert_eq!(saved.payload.get(..8), Some(b"MECER004".as_slice()));
+            let decoded = decode_cics_effect_replay(&saved.payload, CicsLimits::default()).unwrap();
+            assert_eq!(decoded.response, *first_reply);
+            assert!(decoded.read_alias.is_some());
+            assert_eq!(
+                trace
+                    .requests
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .filter(|r| matches!(r, DatasetRequest::Read { .. }))
+                    .count(),
+                1
+            );
+            core.state = EffectState::Completed;
+            core.result_digest =
+                Some(mainframe_env_host_api::canonical_result_digest(&first.outcome).unwrap());
+            core.resolved_tick = Some(4);
+            if scenario == "wrong-reply-aid" {
+                // A self-consistent but noncanonical retained envelope cannot be
+                // blessed merely by matching result and binding hashes.
+                let mut corrupt = decoded;
+                corrupt.response.aid = 0x7d;
+                corrupt.result_digest = Some(
+                    mainframe_env_host_api::canonical_result_digest(&Ok(HostResult::Cics(
+                        corrupt.response.clone(),
+                    )))
+                    .unwrap(),
+                );
+                corrupt.binding_digest = Some(cics_effect_replay_binding_digest(&corrupt));
+                core.result_digest = corrupt.result_digest;
+                let payload = encode_cics_effect_replay(&corrupt).unwrap();
+                store
+                    .delete_provider_state("cics-effect-replay-v1", key.as_str(), 2)
+                    .unwrap();
+                store
+                    .put_provider_state(
+                        ProviderStateRecord {
+                            version: 1,
+                            payload: payload.clone(),
+                            ..saved.clone()
+                        },
+                        None,
+                    )
+                    .unwrap();
+                store
+                    .put_provider_state(
+                        ProviderStateRecord {
+                            version: 2,
+                            payload,
+                            ..saved.clone()
+                        },
+                        Some(1),
+                    )
+                    .unwrap();
+            }
+            store.record_result(&key, core.clone()).unwrap();
+            replay_clock.tick.store(80, Ordering::SeqCst);
+            let platform: Arc<dyn PlatformStore> = store.clone();
+            let prepared = cics
+                .prepare_completed_plain_read(
+                    platform.clone(),
+                    actor.clone(),
+                    offered.clone(),
+                    core.clone(),
+                    running.clone(),
+                    80,
+                )
+                .unwrap();
+            match scenario {
+                "current-auth-denied" => deny.store(true, Ordering::SeqCst),
+                "current-alias-changed" => {
+                    let row = store
+                        .get_provider_state("cics-file-alias", "ACCTDAT")
+                        .unwrap()
+                        .unwrap();
+                    store
+                        .put_provider_state(
+                            ProviderStateRecord {
+                                version: row.version + 1,
+                                ..row.clone()
+                            },
+                            Some(row.version),
+                        )
+                        .unwrap();
+                }
+                "session-disconnected" => {
+                    let mut state = cics.lock().unwrap();
+                    let session = state.sessions.get_mut(session_id.as_str()).unwrap();
+                    let previous = session.version;
+                    session.connected = false;
+                    session.version += 1;
+                    store
+                        .put_provider_state(
+                            ProviderStateRecord {
+                                namespace: "cics-session".into(),
+                                key: session_id.as_str().into(),
+                                version: session.version,
+                                payload: handlers::encode_session(session).unwrap(),
+                            },
+                            Some(previous),
+                        )
+                        .unwrap();
+                }
+                "core-snapshot-changed" => {
+                    store
+                        .transition_execution(
+                            &actor.execution_id,
+                            running.version,
+                            ExecutionState::Failed,
+                            70,
+                        )
+                        .unwrap();
+                }
+                _ => {}
+            }
+            let replayed = provider.replay_completed_plain_read(
+                &actor,
+                offered,
+                core.result_digest.unwrap(),
+                80,
+                &prepared,
+            );
+            if scenario == "valid-enter" {
+                assert_eq!(replayed, first);
+                assert_eq!(store.effect(&key).unwrap(), Some(core));
+                assert_eq!(
+                    store.get_execution(&actor.execution_id).unwrap(),
+                    Some(running)
+                );
+            } else if scenario == "current-auth-denied" {
+                assert_eq!(replayed.outcome, Err(HostProblem::Unauthorized));
+            } else {
+                assert!(replayed.outcome.is_err(), "{scenario}");
+            }
+            assert_eq!(
+                trace
+                    .requests
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .filter(|r| matches!(r, DatasetRequest::Read { .. }))
+                    .count(),
+                1
+            );
+        }
     }
 }

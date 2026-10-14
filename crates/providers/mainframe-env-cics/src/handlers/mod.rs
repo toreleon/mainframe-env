@@ -26,11 +26,15 @@ mod file_tokens;
 mod file_unlock;
 mod handle_state;
 mod host_boundary;
+pub use host_boundary::PreparedCicsPlainRead;
 pub use host_boundary::{
     CicsCurrentProgramLoan, CicsLocalLinkCallAttestation, CicsLocalLinkEntryAttestation,
 };
 pub(in crate::service) use host_boundary::{
     SessionCleanupLease, TaskDispatch, invocation_with_nested_origin,
+};
+pub(crate) use host_boundary::{
+    cics_effect_replay_binding_digest, decode_cics_effect_replay, encode_cics_effect_replay,
 };
 mod interval;
 mod interval_control;

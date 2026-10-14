@@ -10,11 +10,11 @@ pub mod storage64;
 mod value;
 
 pub use coordinator::{
-    CheckedReplayAuditCapture, CheckedReplayObservations, CoordinatorLimits, DurableEffectDispatch,
-    DurableEffectDispatchHook, ExecutionControl, ExecutionControlError, ExecutionCoordinator,
-    NativeChildEnrollment, NativeRootAdmission, NativeRootConfiguration, NativeRootHooks,
-    NativeRootTermination, ProtectedStorageAdmission, ProtectedStorageConfiguration,
-    ProtectedStorageDispatchHooks, WinningRootTerminal,
+    CheckedReplayAuditCapture, CheckedReplayObservations, CoordinatorLimits,
+    DurableCompletedPlainRead, DurableEffectDispatch, DurableEffectDispatchHook, ExecutionControl,
+    ExecutionControlError, ExecutionCoordinator, NativeChildEnrollment, NativeRootAdmission,
+    NativeRootConfiguration, NativeRootHooks, NativeRootTermination, ProtectedStorageAdmission,
+    ProtectedStorageConfiguration, ProtectedStorageDispatchHooks, WinningRootTerminal,
 };
 pub use machine::typed_mq::{MqMqiNativePoint, MqMqiNativePointTarget, MqMqiNativeStructure};
 #[cfg(feature = "assurance-observers")]

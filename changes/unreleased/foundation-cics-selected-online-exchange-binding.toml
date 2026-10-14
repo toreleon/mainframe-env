@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Persist online exchange selector and artifact from the selected installed program after a returned transaction changes target, preserving exact artifact and provider-generation recovery fences."

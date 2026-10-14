@@ -132,12 +132,32 @@ where
                     }
                     return result;
                 }
-                let audited = host.invoke(
-                    invocation,
-                    control.now_tick,
-                    control.cancellation_requested,
-                    effect,
-                );
+                let audited = if let Some(hook) = dispatch_hook.as_deref_mut()
+                    && matches!(&effect.request, mainframe_env_host_api::HostRequest::Cics(request)
+                        if request.is_completed_plain_read_replay())
+                {
+                    super::completed_plain_read::invoke(
+                        hook,
+                        host,
+                        invocation,
+                        &journal
+                            .as_ref()
+                            .ok_or_else(|| {
+                                infrastructure_failure("completed READ requires journal")
+                            })?
+                            .store,
+                        &existing,
+                        control,
+                        effect,
+                    )?
+                } else {
+                    host.invoke(
+                        invocation,
+                        control.now_tick,
+                        control.cancellation_requested,
+                        effect,
+                    )
+                };
                 let (result, audit) = audited.into_transaction_parts();
                 let replay_digest = match canonical_result_digest(&result.outcome) {
                     Ok(digest) => digest,

@@ -36,7 +36,7 @@
     },
     {
       "path": "crates/apps/mainframe-env-server/src/product.rs",
-      "max_production_lines": 4750,
+      "max_production_lines": 4693,
       "responsibility": "Product construction, dependency assembly, application publication, JES control, and HTTP route behavior converge here.",
       "split_boundary": "Extract bootstrap/construction, publication, JES operations, and route-family adapters around the Product state owner."
     },
@@ -96,7 +96,7 @@
     },
     {
       "path": "crates/providers/mainframe-env-cics/src/service.rs",
-      "max_production_lines": 3225,
+      "max_production_lines": 2840,
       "responsibility": "The CICS pilot service owns session, BMS, file, queue, program, and unit-of-work semantics and persistence.",
       "split_boundary": "Freeze this pilot and route future catalog descriptors through generated modules and semantics through handler-family modules."
     },
@@ -492,7 +492,9 @@
       "crates/providers/mainframe-env-cics/src/handlers/host_boundary/current_program_loan.rs",
       "crates/providers/mainframe-env-cics/src/handlers/host_boundary/current_program_loan/initial_entry.rs",
       "crates/providers/mainframe-env-cics/src/handlers/host_boundary/current_program_loan/initial_entry/tests.rs",
-      "crates/providers/mainframe-env-cics/src/handlers/host_boundary/current_program_loan/tests.rs"
+      "crates/providers/mainframe-env-cics/src/handlers/host_boundary/current_program_loan/tests.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/host_boundary/completed_plain_read.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/host_boundary/completed_plain_read_codec_tests.rs"
     ]
   }
 }

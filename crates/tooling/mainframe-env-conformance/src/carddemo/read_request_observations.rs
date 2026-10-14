@@ -8,7 +8,9 @@ use mainframe_env_cics::{
 use mainframe_env_execution_api::{
     AuditDecision, AuditRecord, AuditResourceDigestFormat, LifecycleEvent, LifecycleEventKind,
 };
-use mainframe_env_host_api::{HostRequest, SecurityRequest, canonical_audit_resource_digest};
+use mainframe_env_host_api::{
+    HostRequest, SecurityRequest, canonical_audit_resource_digest, canonical_request_digest,
+};
 use mainframe_env_store_api::{
     ExecutionRecord, ExecutionState, PlatformStore, ProviderStateRecord,
 };
@@ -103,6 +105,99 @@ fn refuse() -> CorpusProblem {
         "carddemo.online.read_request_binding",
         "selected compiled READ request or its persisted owner evidence differs",
     )
+}
+
+/// Exact current first-party request generation, never a union of accepted codecs.
+/// These independent frozen request and audit digests cover only the supplied
+/// canonical DATASET reads. All other receipt checks retain their exact V3 rule.
+pub(super) fn expected_current_plain_read_codec(
+    effect: &mainframe_env_store_api::EffectRecord,
+) -> Result<CicsReplayCodecVersion, CorpusProblem> {
+    for read in oracles::SIGNON_READ.iter().chain(&oracles::ACCOUNT_READS) {
+        let request = read.cics_request();
+        let HostRequest::Cics(plain) = &request else {
+            return Err(refuse());
+        };
+        if plain.is_completed_plain_read_replay()
+            && effect.request_digest == canonical_request_digest(&request).map_err(|_| refuse())?
+        {
+            if effect.intent.audit_resource != Some(read.cics_digest()?) {
+                return Err(refuse());
+            }
+            return Ok(CicsReplayCodecVersion::PlainReadV4);
+        }
+    }
+    Ok(CicsReplayCodecVersion::RetentionV3)
+}
+
+#[cfg(test)]
+pub(super) fn current_plain_read_generation_controls() {
+    use mainframe_env_store_api::{
+        EffectDigestFormat, EffectIntentMetadata, EffectRecord, EffectState,
+    };
+    for read in oracles::SIGNON_READ.iter().chain(&oracles::ACCOUNT_READS) {
+        let limits = InvocationLimits::default();
+        let request = read.cics_request();
+        let mut effect = EffectRecord {
+            execution_id: ExecutionId::new("generation-control", limits).unwrap(),
+            run_unit_id: RunUnitId::new("generation-run", limits).unwrap(),
+            sequence: 1,
+            key: IdempotencyKey::new("generation-key", limits).unwrap(),
+            digest_format: EffectDigestFormat::CanonicalHostV1,
+            request_digest: canonical_request_digest(&request).unwrap(),
+            state: EffectState::Completed,
+            result_digest: Some([1; 32]),
+            resolved_tick: Some(1),
+            intent: EffectIntentMetadata {
+                owner: ExecutionId::new("generation-control", limits).unwrap(),
+                attempt: 1,
+                capability: Some(CapabilityId::new("host.cics.execute", limits).unwrap()),
+                audit_resource: Some(read.cics_digest().unwrap()),
+                audit_invocation_key: None,
+                created_tick: 1,
+                recovery_after_tick: 100,
+                epoch: 1,
+                recovery_lease: None,
+            },
+        };
+        assert_eq!(
+            expected_current_plain_read_codec(&effect).unwrap(),
+            CicsReplayCodecVersion::PlainReadV4
+        );
+        let prior = effect.intent.audit_resource;
+        effect.intent.audit_resource.as_mut().unwrap().value[0] ^= 1;
+        assert!(expected_current_plain_read_codec(&effect).is_err());
+        effect.intent.audit_resource = prior;
+        // Original FILE/update/browse forms are not these independently pinned
+        // current DATASET requests; the old exact V3 generation remains selected.
+        let HostRequest::Cics(original) = request else {
+            unreachable!()
+        };
+        for which in 0..3 {
+            let mut offered = original.clone();
+            match which {
+                0 => {
+                    let value = offered.arguments.remove("DATASET").unwrap();
+                    offered.arguments.insert("FILE".into(), value);
+                }
+                1 => {
+                    offered.operation = CicsOperation::ReadNext;
+                }
+                _ => {
+                    offered.arguments.insert(
+                        "OPTION.UPDATE".into(),
+                        BoundedPayload::new("mainframe-env.cics.option@1", b"1".to_vec(), limits)
+                            .unwrap(),
+                    );
+                }
+            }
+            effect.request_digest = canonical_request_digest(&HostRequest::Cics(offered)).unwrap();
+            assert_eq!(
+                expected_current_plain_read_codec(&effect).unwrap(),
+                CicsReplayCodecVersion::RetentionV3
+            );
+        }
+    }
 }
 
 // Closed metadata only: no provider row, request, key, actor or HTTP value is formatted.
@@ -463,7 +558,9 @@ pub(super) fn compare_stage(
             .ok_or_else(|| refuse_at(RefusalStage::CoreEffect, Some(route), Some(ordinal)))?;
         let descriptor = describe_cics_replay_row(row, Some(&effect), CicsLimits::default())
             .map_err(|_| refuse_at(RefusalStage::ReplayDescriptor, Some(route), Some(ordinal)))?;
-        if descriptor.codec != CicsReplayCodecVersion::RetentionV3
+        if descriptor.codec
+            != expected_current_plain_read_codec(&effect)
+                .map_err(|_| refuse_at(RefusalStage::ReplayTerminal, Some(route), Some(ordinal)))?
             || descriptor.retention != CicsReplayRetentionState::Terminal
             || descriptor.owner_run_unit.as_deref() != Some(run.as_str())
         {

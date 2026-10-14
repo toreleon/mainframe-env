@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 263,
+    "markdown_documents": 264,
     "navigation_groups": 8,
-    "normative_documents": 124,
+    "normative_documents": 125,
     "xtask_commands": 162
   },
   "documents": [
@@ -341,8 +341,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 205,
-      "sha256": "sha256:14aeacec0dba241ea6df7886a414861c42cb6a9c8a2f64444d0b96c0a033c6f8",
+      "relative_links": 206,
+      "sha256": "sha256:d143e5b2a4ffaadf0fea2dde1f42062129fab081b1f841ef0146e7f4b353571f",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -1759,10 +1759,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env unreleased proposal; adoption and owning verification remain pending.",
+      "normative": true,
+      "owner": "Execution runtime and CICS provider maintainers.",
+      "path": "docs/decisions/0077-local-completed-plain-read-consumption.md",
+      "relative_links": 0,
+      "scope": "Local delivery of already completed configured-file plain CICS READ results under original core, task, store and SAF fences; no browse, UPDATE or global acceptance.",
+      "sha256": "sha256:4ab09c83318215654b18f16accd2a20fb8fb20aa2e5435d849e33eadd4a4a901",
+      "status": "Proposed; implementation and owning verification pending.",
+      "title": "ADR 0077: Local consumption of completed plain CICS READ results",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 67,
-      "sha256": "sha256:776b4b4410e7cec33f4bf0b7ad89a5516daf0ae3d9144903657f753df0e90782",
+      "relative_links": 68,
+      "sha256": "sha256:48c150468e2d2854b25f65e175853307519d27f426ff3580a62cb589c103c1e7",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -3154,6 +3166,10 @@
         {
           "label": "ADR 0076: Explicit local committed MQ controller occurrence",
           "path": "docs/decisions/0076-local-committed-mq-controller-occurrence.md"
+        },
+        {
+          "label": "ADR 0077: Local completed plain READ result consumption",
+          "path": "docs/decisions/0077-local-completed-plain-read-consumption.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -3376,7 +3392,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:cb2f3478d16a4c7c74ea44603a4c94850958a5fa9c23df4bf497ad009231dfeb",
+  "registry_sha256": "sha256:0dae356e28ef3f90c1bb2a05d99cb22e3afef63362421baba29c361da88ce002",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

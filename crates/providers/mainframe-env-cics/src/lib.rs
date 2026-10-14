@@ -61,7 +61,7 @@ pub use service::{
     CicsTransientDataQueueDefinition, CicsTransientDataQueueKind, CicsTransientDataQueueOpen,
     CicsWebEndpoint, CicsWebInboundRequest, CicsWebRequest, CicsWebResponse, CicsWebServerResponse,
     CicsWebServiceDefinition, CicsWebTransport, CicsWebUriMapDefinition, CicsWebVersion,
-    CicsXmlTransformMetadata, PreparedCicsRegistration, cics_provider,
+    CicsXmlTransformMetadata, PreparedCicsPlainRead, PreparedCicsRegistration, cics_provider,
 };
 pub use service::{
     BrxaBindFrame, BrxaBindReply, BrxaEndFrame, BrxaInitFrame, BrxaInitReply,

@@ -101,6 +101,16 @@ pub trait DurableEffectDispatchHook {
     ) -> Result<(), HostProblem> {
         Err(HostProblem::Unsupported)
     }
+
+    /// Wrap one completed plain READ replay transport under its actual original owner.
+    /// Default refusal never dispatches, returns a substitute result or restores a cursor.
+    fn with_completed_plain_read(
+        &mut self,
+        _actual: &DurableCompletedPlainRead<'_>,
+        _dispatch: &mut dyn FnMut(&(dyn std::any::Any + Send + Sync)) -> Result<(), HostProblem>,
+    ) -> Result<(), HostProblem> {
+        Err(HostProblem::Unsupported)
+    }
 }
 
 pub(super) fn invoke(

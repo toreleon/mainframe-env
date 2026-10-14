@@ -200,9 +200,16 @@ impl ProductServer {
                     ..CoordinatorLimits::default()
                 },
             );
-            match coordinator.execute_resumable_with_control(&mut machine, &invocation, || {
-                self.program.observe_execution_control(&invocation)
-            }) {
+            let mut replay = OnlinePlainReadReplay {
+                cics: &self.cics,
+                store: &self.store,
+            };
+            match coordinator.execute_resumable_with_dispatch_control(
+                &mut machine,
+                &invocation,
+                || self.program.observe_execution_control(&invocation),
+                &mut replay,
+            ) {
                 ExecutionOutcome::Completed(_) => {
                     self.program.finish_run_unit(&invocation)?;
                     self.clear_online_machine_continuation(session, saved_version)?;
@@ -439,5 +446,41 @@ impl ProductServer {
             }
         }
         Err(HostProblem::ResourceExhausted)
+    }
+}
+
+// This embedding owns actual installed binary admission and the restored CICS Run.
+// It grants no native-root/source/oracle credit and never substitutes a host result.
+struct OnlinePlainReadReplay<'a> {
+    cics: &'a Arc<CicsService>,
+    store: &'a Arc<dyn PlatformStore>,
+}
+impl mainframe_env_interpreter::DurableEffectDispatchHook for OnlinePlainReadReplay<'_> {
+    fn with_dispatch(
+        &mut self,
+        _actual: &mainframe_env_interpreter::DurableEffectDispatch<'_>,
+        dispatch: &mut dyn FnMut() -> Result<(), HostProblem>,
+    ) -> Result<(), HostProblem> {
+        dispatch()
+    }
+
+    fn with_completed_plain_read(
+        &mut self,
+        actual: &mainframe_env_interpreter::DurableCompletedPlainRead<'_>,
+        dispatch: &mut dyn FnMut(&(dyn std::any::Any + Send + Sync)) -> Result<(), HostProblem>,
+    ) -> Result<(), HostProblem> {
+        actual.require_current()?;
+        if !Arc::ptr_eq(self.store, actual.store()) {
+            return Err(HostProblem::UnknownOutcome);
+        }
+        let prepared = self.cics.prepare_completed_plain_read(
+            self.store.clone(),
+            actual.original().clone(),
+            actual.effect().clone(),
+            actual.completed().clone(),
+            actual.execution().clone(),
+            actual.control().now_tick,
+        )?;
+        dispatch(&prepared)
     }
 }

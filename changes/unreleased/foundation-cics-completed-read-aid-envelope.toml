@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Preserve canonical zero-AID envelopes when replaying completed non-update CICS READ records while keeping live terminal-session, authorization, alias and durable-core fences."

@@ -185,6 +185,7 @@ pub use artifact::{BatchProgramDefinition, OnlineProgramDefinition};
 mod bootstrap;
 #[cfg(feature = "assurance-observers")]
 mod cics_read_copyback;
+mod cics_resume;
 #[cfg(feature = "assurance-observers")]
 pub use cics_read_copyback::{
     ArmedReadCopybackObservation, CicsReadObservationProblem, CicsReadObserverManager,
@@ -3161,65 +3162,7 @@ impl ProductServer {
             GatewayRequest::CicsResume {
                 session,
                 csrf_token,
-            } => {
-                let session = terminal_session_id(&session)?;
-                let principal_id = terminal_principal(&principal)?;
-                self.preflight_online_continuation(&session, None)
-                    .map_err(gateway_problem)?;
-                let snapshot = self.online_exchange(&session).map_err(gateway_problem)?;
-                let mut start_fresh_task = snapshot.is_none();
-                if let Some(exchange) = snapshot {
-                    self.preflight_online_exchange_state(&exchange)
-                        .map_err(gateway_problem)?;
-                    let tick = current_tick()?;
-                    self.cics
-                        .validate_terminal_resume(&session, &principal_id, &csrf_token, tick)
-                        .map_err(gateway_problem)?;
-                    match self
-                        .recover_terminal_online_exchange(&session, &principal_id, &exchange, tick)
-                        .map_err(gateway_problem)?
-                    {
-                        Some(TerminalExchangeRecovery::HandoffCompleted) => {
-                            start_fresh_task = true;
-                        }
-                        Some(TerminalExchangeRecovery::Completed) => {}
-                        Some(TerminalExchangeRecovery::Cancelled) => {
-                            return Err(gateway_problem(HostProblem::Cancelled));
-                        }
-                        Some(TerminalExchangeRecovery::TimedOut) => {
-                            return Err(gateway_problem(HostProblem::TimedOut));
-                        }
-                        Some(TerminalExchangeRecovery::Failed) => {
-                            return Err(gateway_problem(HostProblem::ProviderFailure));
-                        }
-                        None => {
-                            self.run_online_exchange(
-                                &session,
-                                &principal_id,
-                                &exchange.program,
-                                tick,
-                            )
-                            .map_err(gateway_problem)?;
-                        }
-                    }
-                }
-                if start_fresh_task {
-                    self.resume_fresh_online_task(
-                        &session,
-                        &principal,
-                        &principal_id,
-                        &csrf_token,
-                    )?;
-                }
-                let snapshot = self
-                    .cics
-                    .terminal_snapshot(&session, &principal_id, current_tick()?)
-                    .map_err(gateway_problem)?;
-                Ok(GatewayResponse::json(
-                    StatusCode::OK,
-                    terminal_json(&snapshot),
-                ))
-            }
+            } => self.resume_cics_session(&session, &principal, &csrf_token),
             GatewayRequest::CicsDisconnect {
                 session,
                 csrf_token,

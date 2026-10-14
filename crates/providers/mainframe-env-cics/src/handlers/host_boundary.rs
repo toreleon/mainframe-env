@@ -16,6 +16,11 @@ mod readonly_journal_tests;
 #[path = "host_boundary/frame_tests.rs"]
 mod tests;
 
+mod completed_plain_read;
+pub use completed_plain_read::PreparedCicsPlainRead;
+pub(crate) use completed_plain_read::{
+    cics_effect_replay_binding_digest, decode_cics_effect_replay, encode_cics_effect_replay,
+};
 mod current_program_loan;
 pub use current_program_loan::CicsCurrentProgramLoan;
 mod link_entry;
@@ -789,6 +794,7 @@ impl CicsService {
             )?;
             return Err(HostProblem::UnknownOutcome);
         }
+        let read_alias = completed_plain_read::read_alias(self, &request)?;
         run.outer_effect_key = effect.idempotency_key.as_ref().map(ToString::to_string);
         run.current_program.program_occurrence = 0;
         let operation = request.operation;
@@ -809,6 +815,7 @@ impl CicsService {
             // A waiting CONVERSE has no result to replay until its peer frame arrives.
             (Ok(response), Some(_)) if handlers::deferred_converse(operation, response) => result,
             (Ok(response), Some((key, digest))) => {
+                completed_plain_read::confirm_alias(self, read_alias.as_ref())?;
                 let result_digest = handlers::cics_result_digest(response).map_err(|problem| {
                     if readonly_record {
                         HostProblem::UnknownOutcome
@@ -826,6 +833,7 @@ impl CicsService {
                     request_digest: *digest,
                     result_digest: Some(result_digest),
                     binding_digest: None,
+                    read_alias,
                     response: response.clone(),
                 };
                 replay.binding_digest = Some(cics_effect_replay_binding_digest(&replay));

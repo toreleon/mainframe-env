@@ -22,7 +22,9 @@ use std::sync::Arc;
 type NativePreparation<'a, M> = dyn FnMut(&mut M) -> Result<(), HostProblem> + 'a;
 
 mod checked_replay;
+mod completed_plain_read;
 mod durable_dispatch;
+pub use completed_plain_read::DurableCompletedPlainRead;
 mod original_dispatch;
 pub use checked_replay::{CheckedReplayAuditCapture, CheckedReplayObservations};
 pub use durable_dispatch::{DurableEffectDispatch, DurableEffectDispatchHook};
@@ -250,8 +252,9 @@ impl ExecutionCoordinator {
     /// Opt-in borrowed journal/dispatch boundary for one actual durable drive.
     ///
     /// The hook wraps each first dispatch after its actual Intent and controls.
-    /// It cannot return a substitute host result or invoke twice. Replay remains
-    /// on the original path. This is not a protected native-root admission,
+    /// It cannot return a substitute host result or invoke twice. Completed
+    /// plain READ replay has a separate opt-in wrapping callback; all other replay
+    /// remains on the original path. This is not a protected native-root admission,
     /// compiled-artifact attestation, CICS task loan or MQ/UOW authority.
     pub fn execute_resumable_with_dispatch_control<M, F>(
         &self,

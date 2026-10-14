@@ -466,7 +466,8 @@ pub(super) fn durable_digest(
         let descriptor = describe_cics_replay_row(row, Some(&effect), CicsLimits::default())
             .map_err(|_| problem())?;
         require(
-            descriptor.codec == CicsReplayCodecVersion::RetentionV3
+            descriptor.codec
+                == super::read_request_observations::expected_current_plain_read_codec(&effect)?
                 && descriptor.retention == CicsReplayRetentionState::Terminal,
         )?;
         components.push(debug_hash(&(row, effect))?);

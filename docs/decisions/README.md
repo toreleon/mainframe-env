@@ -73,6 +73,7 @@ CardDemo participant ownership and batch completion boundary.
 | [0074](0074-local-mq-process-trigger-graph.md) | explicit local MQ process/trigger graph admission | Proposed |
 | [0075](0075-local-complete-owned-publication.md) | owned initial local Complete publication | Proposed |
 | [0076](0076-local-committed-mq-controller-occurrence.md) | explicit local committed MQ controller occurrence | Proposed |
+| [0077](0077-local-completed-plain-read-consumption.md) | local same-owner consumption of completed configured-file plain READ results | Proposed; verification pending |
 
 Parallel subsystem work allocated the same 0028 and 0029 numeric prefixes.
 Their distinct full filenames and subsystem-qualified labels identify each

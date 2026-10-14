@@ -199,15 +199,21 @@ impl ProductServer {
         program: &str,
         context: &CicsTerminalExecution,
     ) -> Result<OnlineExchangeState, HostProblem> {
+        // RETURN TRANSID can change the selected program while the terminal
+        // invocation still carries the prior transaction's selector/artifact.
+        // Persist the same installed identity that the online machine will drive.
+        let (program, artifact) = self.preflight_online_program(program)?;
+        let selector = Selector::new(format!("program:{program}"), InvocationLimits::default())
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
         let mut state = OnlineExchangeState {
             schema_version: EXCHANGE_WITH_OWNER.into(),
             run_owner: None,
-            program: normalize_online_name(program, 128)?,
+            program,
             request_id: context.invocation.request_id.as_str().into(),
             execution_id: context.invocation.execution_id.as_str().into(),
             run_unit_id: context.invocation.run_unit_id.as_str().into(),
-            selector: context.invocation.selector.as_str().into(),
-            artifact: context.invocation.artifact.as_str().into(),
+            selector: selector.as_str().into(),
+            artifact: artifact.as_str().into(),
             principal: context.invocation.principal.id().as_str().into(),
             grants: context
                 .invocation
@@ -524,6 +530,112 @@ mod tests {
                     .unwrap();
             }
         }
+    }
+
+    #[test]
+    fn fresh_transfer_exchange_roundtrip_uses_installed_target_identity() {
+        use mainframe_env_compiler::CobolCompiler;
+        use mainframe_env_compiler_api::{
+            CompilationMode, CompileOptions, CompileTarget, CompilerRequest, CompilerResult,
+            CompilerService, PublishedArtifact,
+        };
+        use mainframe_env_source::{
+            LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLimits,
+        };
+
+        fn compile(name: &str, value: u8) -> PublishedArtifact {
+            let limits = SourceLimits::default();
+            let path = LogicalPath::new(format!("{name}.cbl"), limits.max_path_bytes).unwrap();
+            let source = format!(
+                "IDENTIFICATION DIVISION.\nPROGRAM-ID. {name}.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 RESULT-X PIC 9.\nPROCEDURE DIVISION.\nMOVE {value} TO RESULT-X.\nSTOP RUN.\n"
+            );
+            let bundle = SourceBundle::new(
+                &path,
+                vec![
+                    SourceFile::input(
+                        path.as_str(),
+                        source.into_bytes(),
+                        SourceFormat::Free,
+                        SourceEncoding::Utf8,
+                        limits,
+                    )
+                    .unwrap(),
+                ],
+                BTreeMap::new(),
+                Vec::new(),
+                limits,
+            )
+            .unwrap();
+            let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+                .compile(CompilerRequest {
+                    source: bundle,
+                    mode: CompilationMode::Executable,
+                    target: CompileTarget::new("reference").unwrap(),
+                    options: CompileOptions::new(BTreeMap::new()).unwrap(),
+                })
+                .unwrap()
+            else {
+                panic!("target identity fixture did not publish")
+            };
+            artifact
+        }
+
+        let from = OnlineProgramDefinition::current("OLDAPP", &compile("OLDAPP", 1));
+        let target = OnlineProgramDefinition::current("NEWAPP", &compile("NEWAPP", 2));
+        let from_ref = from.artifact.clone();
+        let target_ref = target.artifact.clone();
+        assert_ne!(from_ref, target_ref);
+        let server = server();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![from, target],
+                transactions: BTreeMap::from([
+                    ("O001".into(), "OLDAPP".into()),
+                    ("N001".into(), "NEWAPP".into()),
+                ]),
+                maps: vec![mainframe_env_cics::BmsMapDefinition {
+                    mapset: "EXMAP".into(),
+                    map: "EXMAP".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        // The selected continuation transaction has advanced, but the admitted
+        // context still has the prior transaction's binding, as after RETURN.
+        let context = CicsTerminalExecution {
+            invocation: server
+                .cics_invocation("IBMUSER", "O001", Some(from_ref.clone()))
+                .unwrap(),
+            transaction: "N001".into(),
+            commarea: Vec::new(),
+            aid: 0x7d,
+        };
+        let original_selector = context.invocation.selector.clone();
+        let session = SessionId::new("target-identity-session", 64).unwrap();
+        server
+            .begin_online_exchange(&session, "NEWAPP", &context)
+            .unwrap();
+        let persisted = server.online_exchange(&session).unwrap().unwrap();
+        let recovered = server.online_exchange_invocation(&persisted).unwrap();
+        assert_eq!(recovered.selector.as_str(), "program:NEWAPP");
+        assert_eq!(recovered.artifact, target_ref);
+        assert!(server.preflight_online_exchange_state(&persisted).is_ok());
+        assert_eq!(context.invocation.selector, original_selector);
+        assert_eq!(context.invocation.artifact, from_ref);
+        // A correctly digested row pointing back to the prior artifact must
+        // still be refused by the unchanged installed-artifact equality fence.
+        let mut stale = persisted;
+        stale.artifact = from_ref.as_str().into();
+        let owner = stale.run_owner.as_ref().unwrap().execution.clone();
+        stale.run_owner = Some(new_run_owner(&stale, &owner).unwrap());
+        assert_eq!(
+            server.preflight_online_exchange_state(&stale),
+            Err(HostProblem::InfrastructureFailure)
+        );
     }
 
     #[test]

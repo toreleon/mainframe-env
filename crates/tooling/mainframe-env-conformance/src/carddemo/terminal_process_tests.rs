@@ -4,6 +4,8 @@ use super::*;
 use mainframe_env_store_api::PlatformStore;
 use std::io;
 
+#[path = "terminal_account_read_process_tests.rs"]
+mod account_read;
 #[path = "terminal_process_negative_tests.rs"]
 mod controls;
 #[path = "terminal_process_evidence.rs"]

@@ -45,6 +45,19 @@ impl AuditedEffectResult {
     }
 }
 
+#[derive(Clone, Copy)]
+enum RetainedTransport<'a> {
+    Inquiry([u8; 32], &'a (dyn std::any::Any + Send + Sync)),
+    PlainRead([u8; 32], &'a (dyn std::any::Any + Send + Sync)),
+}
+impl RetainedTransport<'_> {
+    fn digest(self) -> [u8; 32] {
+        match self {
+            Self::Inquiry(digest, _) | Self::PlainRead(digest, _) => digest,
+        }
+    }
+}
+
 /// Invocation-scoped dispatch through an immutable provider snapshot.
 /// Enforces grants, replay metadata, deadlines, exact generations and canonical byte budgets;
 /// returns an effect together with its mandatory audit record.
@@ -158,7 +171,32 @@ impl ScopedHostService {
             cancellation_requested,
             request,
             None,
-            Some((expected_result_digest, context)),
+            Some(RetainedTransport::Inquiry(expected_result_digest, context)),
+        )
+    }
+
+    /// Replay only a completed plain READ; ordinary validation, generation, budgets and
+    /// typed audit remain owned by this scoped host. There is no ordinary dispatch fallback.
+    #[allow(clippy::too_many_arguments)]
+    pub fn replay_completed_plain_read(
+        &self,
+        invocation: &Invocation,
+        now_tick: u64,
+        cancellation_requested: bool,
+        request: EffectRequest,
+        expected_result_digest: [u8; 32],
+        context: &(dyn std::any::Any + Send + Sync),
+    ) -> AuditedEffectResult {
+        self.invoke_inner(
+            invocation,
+            now_tick,
+            cancellation_requested,
+            request,
+            None,
+            Some(RetainedTransport::PlainRead(
+                expected_result_digest,
+                context,
+            )),
         )
     }
 
@@ -169,7 +207,7 @@ impl ScopedHostService {
         cancellation_requested: bool,
         request: EffectRequest,
         context: Option<&(dyn std::any::Any + Send + Sync)>,
-        replay: Option<([u8; 32], &(dyn std::any::Any + Send + Sync))>,
+        replay: Option<RetainedTransport<'_>>,
     ) -> AuditedEffectResult {
         let capability = request
             .request
@@ -178,23 +216,34 @@ impl ScopedHostService {
         let sequence = request.sequence;
         let mut mutation_dispatched = false;
         let checked_limits = match &request.request {
-            crate::HostRequest::MqMqi(host) if replay.is_some() => Some(host.envelope.limits),
+            crate::HostRequest::MqMqi(host)
+                if matches!(replay, Some(RetainedTransport::Inquiry(..))) =>
+            {
+                Some(host.envelope.limits)
+            }
             _ => None,
         };
-        let checked_inquiry = replay.and_then(|_| match &request.request {
-            crate::HostRequest::MqMqi(host) => match &host.envelope.request {
-                crate::mq_mqi::MqMqiRequest::Inquire(inquiry) if inquiry.selectors.len() <= 256 => {
-                    crate::mq_mqi::MqMqiLocalTypeInquiry::from_inquiry(
-                        inquiry.clone(),
-                        host.envelope.limits,
-                    )
-                    .ok()
-                }
+        let checked_inquiry = replay
+            .filter(|value| matches!(value, RetainedTransport::Inquiry(..)))
+            .and_then(|_| match &request.request {
+                crate::HostRequest::MqMqi(host) => match &host.envelope.request {
+                    crate::mq_mqi::MqMqiRequest::Inquire(inquiry)
+                        if inquiry.selectors.len() <= 256 =>
+                    {
+                        crate::mq_mqi::MqMqiLocalTypeInquiry::from_inquiry(
+                            inquiry.clone(),
+                            host.envelope.limits,
+                        )
+                        .ok()
+                    }
+                    _ => None,
+                },
                 _ => None,
-            },
-            _ => None,
-        });
-        let result = if (replay.is_some() && checked_inquiry.is_none())
+            });
+        let plain_read = matches!(replay, Some(RetainedTransport::PlainRead(..)))
+            && matches!(&request.request, crate::HostRequest::Cics(request)
+                if request.is_completed_plain_read_replay());
+        let result = if (replay.is_some() && checked_inquiry.is_none() && !plain_read)
             || (context.is_some() && !matches!(&request.request, crate::HostRequest::Program(_)))
         {
             Err(HostProblem::Unsupported)
@@ -234,9 +283,13 @@ impl ScopedHostService {
                     let mutating = request.request.is_mutating();
                     mutation_dispatched = mutating && replay.is_none();
                     match catch_unwind(AssertUnwindSafe(|| match (context, replay) {
-                        (_, Some((digest, context))) => {
+                        (_, Some(RetainedTransport::Inquiry(digest, context))) => {
                             provider.replay_retained(invocation, request, digest, now_tick, context)
                         }
+                        (_, Some(RetainedTransport::PlainRead(digest, context))) => provider
+                            .replay_completed_plain_read(
+                                invocation, request, digest, now_tick, context,
+                            ),
                         (Some(context), None) => {
                             provider.invoke_program_context(invocation, request, context)
                         }
@@ -270,11 +323,14 @@ impl ScopedHostService {
                                                     .validate_result(&host.result, host.limits)
                                                     .is_ok()
                                         }
+                                        (Ok(crate::HostResult::Cics(_)), None) if plain_read => {
+                                            true
+                                        }
                                         _ => false,
                                     };
                                     if exact
                                         && crate::canonical_result_digest(&effect.outcome).ok()
-                                            == replay.map(|r| r.0)
+                                            == replay.map(RetainedTransport::digest)
                                     {
                                         effect.outcome
                                     } else {
