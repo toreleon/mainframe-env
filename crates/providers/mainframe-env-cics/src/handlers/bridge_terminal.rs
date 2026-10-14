@@ -29,6 +29,7 @@ pub(super) fn invoke(
         matches!(
             name.as_str(),
             "MAPSET"
+                | "CURSOR"
                 | "OPTION.CURSOR"
                 | "OPTION.DATAONLY"
                 | "OPTION.MAPONLY"

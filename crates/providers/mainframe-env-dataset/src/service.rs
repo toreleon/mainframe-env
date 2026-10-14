@@ -26,6 +26,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
 
 mod browse_ops;
+mod record_read;
+use record_read::bounded_records;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct DatasetLimits {
@@ -1941,92 +1943,10 @@ impl DatasetService {
                     generation: generation.generation,
                     program_object: generation.program_object,
                     version: entry.version,
+                    more: generation.records.len() > *max_records as usize,
                 })
             }
-            DatasetRequest::Read {
-                dataset,
-                member,
-                key,
-                max_records,
-                ..
-            } => {
-                if member.is_some() && state.alternate_indexes.contains_key(dataset.as_str()) {
-                    return Err(HostProblem::Unsupported);
-                }
-                let (records, identities, version) = if let Some(index) =
-                    state.alternate_indexes.get(dataset.as_str())
-                {
-                    let base = entry_text(state, &index.base)?;
-                    let ordered = alternate_identities(base, index)?;
-                    let selected = ordered
-                        .into_iter()
-                        .filter(|(alternate, _)| key.as_ref().is_none_or(|key| alternate == key))
-                        .filter(|(_, identity)| keyed_record(base, identity).is_some())
-                        .take(*max_records as usize)
-                        .collect::<Vec<_>>();
-                    if key.is_some() && selected.is_empty() {
-                        return Err(condition("NOTFND", 13));
-                    }
-                    let identities = selected
-                        .iter()
-                        .map(|(_, identity)| identity.clone())
-                        .collect::<Vec<_>>();
-                    let records = identities
-                        .iter()
-                        .map(|identity| keyed_record(base, identity).cloned())
-                        .collect::<Option<Vec<_>>>()
-                        .ok_or(HostProblem::InfrastructureFailure)?;
-                    (records, identities, index.version)
-                } else {
-                    let entry = entry(state, dataset)?;
-                    if relative(entry.attributes.organization) {
-                        if member.is_some() || key.is_some() {
-                            return Err(HostProblem::Unsupported);
-                        }
-                        let selected = entry
-                            .relative_records
-                            .iter()
-                            .take(*max_records as usize)
-                            .map(|(record_number, record)| {
-                                (record.clone(), record_number.to_be_bytes().to_vec())
-                            })
-                            .collect::<Vec<_>>();
-                        return Ok(DatasetResult::Records {
-                            records: selected.iter().map(|(record, _)| record.clone()).collect(),
-                            identities: selected
-                                .into_iter()
-                                .map(|(_, identity)| identity)
-                                .collect(),
-                            version: entry.version,
-                        });
-                    }
-                    let records = if let Some(member) = member {
-                        member_records(entry, member, 0)?.to_vec()
-                    } else if let Some(key) = key {
-                        let record = keyed_record(entry, key)
-                            .cloned()
-                            .ok_or_else(|| condition("NOTFND", 13))?;
-                        vec![record]
-                    } else {
-                        ordered_records(entry)?
-                            .into_iter()
-                            .take(*max_records as usize)
-                            .cloned()
-                            .collect()
-                    };
-                    let identities = records
-                        .iter()
-                        .enumerate()
-                        .map(|(position, record)| record_identity(entry, record, position))
-                        .collect::<Result<Vec<_>, _>>()?;
-                    (records, identities, entry.version)
-                };
-                Ok(DatasetResult::Records {
-                    records,
-                    identities,
-                    version,
-                })
-            }
+            DatasetRequest::Read { .. } => record_read::read(state, request),
             DatasetRequest::ReadGeneric {
                 dataset,
                 key_prefix,
@@ -2041,7 +1961,7 @@ impl DatasetService {
                                 alternate.starts_with(key_prefix)
                                     && keyed_record(base, identity).is_some()
                             })
-                            .take(*max_records as usize)
+                            .take(*max_records as usize + 1)
                             .collect::<Vec<_>>();
                         let identities = selected
                             .iter()
@@ -2064,7 +1984,7 @@ impl DatasetService {
                                     .starts_with(key_prefix)
                                     .then(|| (record.clone(), identity))
                             })
-                            .take(*max_records as usize)
+                            .take(*max_records as usize + 1)
                             .collect::<Vec<_>>();
                         (
                             selected.iter().map(|(record, _)| record.clone()).collect(),
@@ -2075,11 +1995,12 @@ impl DatasetService {
                 if records.is_empty() {
                     return Err(condition("NOTFND", 13));
                 }
-                Ok(DatasetResult::Records {
+                Ok(bounded_records(
                     records,
                     identities,
                     version,
-                })
+                    *max_records as usize,
+                ))
             }
             DatasetRequest::ReadConcatenation {
                 datasets,
@@ -2097,7 +2018,7 @@ impl DatasetService {
                         }
                         version = version.max(entry.version);
                         if let Ok(found) = member_records(entry, member, 0) {
-                            records.extend(found.iter().take(*max_records as usize).cloned());
+                            records.extend(found.iter().take(*max_records as usize + 1).cloned());
                             identities.extend((0..records.len()).map(|position| {
                                 u64::try_from(position)
                                     .unwrap_or(u64::MAX)
@@ -2118,7 +2039,7 @@ impl DatasetService {
                         }
                         version = version.max(entry.version);
                         for record in ordered_records(entry)? {
-                            if records.len() >= *max_records as usize {
+                            if records.len() > *max_records as usize {
                                 break;
                             }
                             identities.push(
@@ -2131,11 +2052,12 @@ impl DatasetService {
                         }
                     }
                 }
-                Ok(DatasetResult::Records {
+                Ok(bounded_records(
                     records,
                     identities,
                     version,
-                })
+                    *max_records as usize,
+                ))
             }
             DatasetRequest::ReadRelative {
                 dataset,
@@ -2154,6 +2076,7 @@ impl DatasetService {
                     records: vec![record],
                     identities: vec![record_number.to_be_bytes().to_vec()],
                     version: entry.version,
+                    more: false,
                 })
             }
             DatasetRequest::ReadRba {
@@ -2209,12 +2132,13 @@ impl DatasetService {
                 let entry = entry(state, dataset)?;
                 let ordered = sequential_records(entry, member.as_ref())?;
                 let selected =
-                    select_sequential(&ordered, *start, *reverse, *max_records as usize)?;
-                Ok(DatasetResult::Records {
-                    records: selected.iter().map(|(_, record)| record.clone()).collect(),
-                    identities: selected.into_iter().map(|(identity, _)| identity).collect(),
-                    version: entry.version,
-                })
+                    select_sequential(&ordered, *start, *reverse, *max_records as usize + 1)?;
+                Ok(bounded_records(
+                    selected.iter().map(|(_, record)| record.clone()).collect(),
+                    selected.into_iter().map(|(identity, _)| identity).collect(),
+                    entry.version,
+                    *max_records as usize,
+                ))
             }
             DatasetRequest::Snapshot {
                 dataset,
@@ -9713,6 +9637,142 @@ mod tests {
             ccsid: Some(37),
         }
     }
+
+    #[test]
+    fn bounded_dataset_reads_never_report_a_truncated_prefix_as_complete() {
+        let dataset = service(Arc::new(MemoryStore::new(Default::default())));
+        let name = DatasetName::new("IBMUSER.LARGE", 44).unwrap();
+        dataset
+            .invoke(DatasetRequest::Create {
+                dataset: name.clone(),
+                attributes: attrs(DatasetOrganization::Sequential),
+                mutation: mutation(1),
+            })
+            .unwrap();
+        dataset
+            .invoke(DatasetRequest::Write {
+                dataset: name.clone(),
+                member: None,
+                records: vec![b"DATA".to_vec(); 4_097],
+                expected_version: Some(1),
+                mutation: mutation(2),
+            })
+            .unwrap();
+        let complete_prefix = DatasetResult::Records {
+            records: vec![b"DATA".to_vec(); 4_096],
+            identities: (0u64..4_096).map(|n| n.to_be_bytes().to_vec()).collect(),
+            version: 2,
+            more: false,
+        };
+        for request in [
+            DatasetRequest::Read {
+                dataset: name.clone(),
+                member: None,
+                key: None,
+                max_records: 4_096,
+                control: Default::default(),
+            },
+            DatasetRequest::ReadConcatenation {
+                datasets: vec![name],
+                member: None,
+                max_records: 4_096,
+            },
+        ] {
+            let result = dataset.invoke(request).unwrap();
+            assert!(
+                result != complete_prefix,
+                "a truncated read must be distinguishable from complete input"
+            );
+            assert!(
+                matches!(result, DatasetResult::Records { records, identities, more: true, .. }
+                if records.len() == 4_096 && identities.len() == records.len())
+            );
+        }
+    }
+    #[test]
+    fn read_completeness_tracks_exact_end_across_members_and_concatenations() {
+        let dataset = service(Arc::new(MemoryStore::new(Default::default())));
+        let member = MemberName::new("MEMBER", 8).unwrap();
+        let mut sequence = 10;
+        for organization in [
+            DatasetOrganization::Sequential,
+            DatasetOrganization::Partitioned,
+            DatasetOrganization::PartitionedExtended,
+        ] {
+            let first = DatasetName::new(format!("IBMUSER.FIRST{sequence}"), 44).unwrap();
+            let second = DatasetName::new(format!("IBMUSER.SECOND{sequence}"), 44).unwrap();
+            for (name, records) in [
+                (&first, vec![b"ONE1".to_vec(), b"TWO2".to_vec()]),
+                (&second, vec![b"LAST".to_vec()]),
+            ] {
+                dataset
+                    .invoke(DatasetRequest::Create {
+                        dataset: name.clone(),
+                        attributes: attrs(organization),
+                        mutation: mutation(sequence),
+                    })
+                    .unwrap();
+                sequence += 1;
+                dataset
+                    .invoke(DatasetRequest::Write {
+                        dataset: name.clone(),
+                        member: partitioned(organization).then(|| member.clone()),
+                        records,
+                        expected_version: Some(1),
+                        mutation: mutation(sequence),
+                    })
+                    .unwrap();
+                sequence += 1;
+            }
+            let selected_member = partitioned(organization).then(|| member.clone());
+            for max_records in [1, 2, 3] {
+                for request in [
+                    DatasetRequest::Read {
+                        dataset: first.clone(),
+                        member: selected_member.clone(),
+                        key: None,
+                        max_records,
+                        control: Default::default(),
+                    },
+                    DatasetRequest::ReadSequential {
+                        dataset: first.clone(),
+                        member: selected_member.clone(),
+                        start: None,
+                        reverse: false,
+                        max_records,
+                    },
+                    DatasetRequest::ReadSequential {
+                        dataset: first.clone(),
+                        member: selected_member.clone(),
+                        start: None,
+                        reverse: true,
+                        max_records,
+                    },
+                ] {
+                    assert!(matches!(dataset.invoke(request),
+                        Ok(DatasetResult::Records { records, identities, more, .. })
+                        if more == (max_records < 2) && records.len() == (max_records as usize).min(2)
+                            && records.len() == identities.len()));
+                }
+                let total = if selected_member.is_some() { 2 } else { 3 };
+                assert!(matches!(dataset.invoke(DatasetRequest::ReadConcatenation {
+                    datasets: vec![first.clone(), second.clone()], member: selected_member.clone(), max_records,
+                }), Ok(DatasetResult::Records { records, identities, more, .. })
+                    if more == (max_records < total) && records.len() == (max_records.min(total) as usize)
+                        && records.len() == identities.len()));
+                if organization == DatasetOrganization::PartitionedExtended {
+                    assert!(
+                        matches!(dataset.invoke(DatasetRequest::ReadMemberGeneration {
+                        dataset: first.clone(), member: member.clone(), relative: 0, max_records,
+                    }), Ok(DatasetResult::MemberGeneration { records, identities, more, .. })
+                        if more == (max_records < 2) && records.len() == (max_records as usize).min(2)
+                            && records.len() == identities.len())
+                    );
+                }
+            }
+        }
+    }
+
     fn seed_object(source: &str, dataset: &str, bytes: &[u8]) -> DatasetSeedObject {
         DatasetSeedObject {
             source_id: source.into(),
@@ -10010,7 +10070,7 @@ mod tests {
                 reverse: false,
                 max_records: 8,
             }),
-            Ok(DatasetResult::Records { records, identities, version: 3 })
+            Ok(DatasetResult::Records { records, identities, version: 3, .. })
                 if records == [b"ONE".to_vec(), b"FOUR".to_vec()]
                     && identities == [1u64.to_be_bytes().to_vec(), 4u64.to_be_bytes().to_vec()]
         ));
@@ -10981,7 +11041,7 @@ mod tests {
                     max_records: 1,
                     control: Default::default(),
                 }),
-                Ok(DatasetResult::Records { records, identities, version: 2 })
+                Ok(DatasetResult::Records { records, identities, version: 2, .. })
                     if records == [b"CC33".to_vec()] && identities == [b"CC".to_vec()]
             ));
         }
@@ -11025,7 +11085,7 @@ mod tests {
                     max_records: 1,
                     control: Default::default(),
                 }),
-                Ok(DatasetResult::Records { records, identities, version: 3 })
+                Ok(DatasetResult::Records { records, identities, version: 3, .. })
                     if records == [b"AA11".to_vec()] && identities == [b"AA".to_vec()]
             ));
         }

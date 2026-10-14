@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Keep nested mutation keys monotonic across same-task online program transfers; retain regression coverage for READ UPDATE holds and browse cursors (#214)."

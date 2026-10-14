@@ -174,6 +174,7 @@ pub(super) fn invalid_shape(
         CicsOperandName::Mapset,
         CicsOperandName::From,
         CicsOperandName::Length,
+        CicsOperandName::ControlCursor,
     ]);
     let required = match plan.operation {
         CicsPlanOperation::ReceiveMap => BTreeSet::from([CicsOperandName::Map]),
@@ -183,6 +184,8 @@ pub(super) fn invalid_shape(
     };
     !inputs.is_subset(&allowed_inputs)
         || !required.is_subset(inputs)
+        || inputs.contains(&CicsOperandName::ControlCursor)
+            && plan.options.contains(&CicsPlanOption::Cursor)
         || (plan.operation == CicsPlanOperation::ReceiveMap
             && inputs.iter().any(|name| {
                 !matches!(
@@ -194,15 +197,24 @@ pub(super) fn invalid_shape(
                 )
             }))
         || (plan.operation == CicsPlanOperation::SendText
-            && inputs
-                .iter()
-                .any(|name| !matches!(name, CicsOperandName::From | CicsOperandName::Length)))
+            && inputs.iter().any(|name| {
+                !matches!(
+                    name,
+                    CicsOperandName::From
+                        | CicsOperandName::Length
+                        | CicsOperandName::ControlCursor
+                )
+            }))
         || plan.operands.iter().any(|operand| match operand.name {
             CicsOperandName::Map | CicsOperandName::Mapset => !matches!(
                 operand.value,
                 CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
             ),
             CicsOperandName::From => !matches!(operand.value, CicsOperandValue::Storage(_)),
+            CicsOperandName::ControlCursor => !matches!(
+                operand.value,
+                CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
+            ),
             CicsOperandName::Length => !matches!(
                 operand.value,
                 CicsOperandValue::Integer(_)
@@ -246,6 +258,7 @@ pub(super) fn invalid_shape(
                 plan.operation,
                 CicsPlanOperation::SendMap | CicsPlanOperation::SendText
             ),
+            CicsPlanOption::Wait => plan.operation != CicsPlanOperation::SendText,
             CicsPlanOption::MapOnly => {
                 plan.operation != CicsPlanOperation::SendMap
                     || inputs.contains(&CicsOperandName::From)
@@ -263,4 +276,59 @@ pub(super) fn invalid_shape(
             }
             _ => true,
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        CicsCondition, CicsNamedOperand, CicsPlanLimits, CicsStorageSlot, StorageId,
+        decode_cics_effect_plan, encode_cics_effect_plan,
+    };
+
+    #[test]
+    fn send_display_valued_cursor_roundtrips_and_rejects_wrong_roles() {
+        for operation in [CicsPlanOperation::SendMap, CicsPlanOperation::SendText] {
+            let required = if operation == CicsPlanOperation::SendMap {
+                CicsNamedOperand {
+                    name: CicsOperandName::Map,
+                    value: CicsOperandValue::Literal(b"MENU".to_vec()),
+                }
+            } else {
+                CicsNamedOperand {
+                    name: CicsOperandName::From,
+                    value: CicsOperandValue::Storage(CicsStorageSlot {
+                        storage: StorageId::from_index(0).unwrap(),
+                        qualified_layout_name: "TEXT-X".into(),
+                    }),
+                }
+            };
+            let plan = CicsEffectPlan {
+                operation,
+                operands: vec![
+                    required,
+                    CicsNamedOperand {
+                        name: CicsOperandName::ControlCursor,
+                        value: CicsOperandValue::Integer(7),
+                    },
+                ],
+                options: BTreeSet::from([CicsPlanOption::FreeKb]),
+                outputs: vec![],
+                condition: CicsCondition::Default,
+            };
+            let limits = CicsPlanLimits::default();
+            let bytes =
+                encode_cics_effect_plan(&plan, limits).expect("SEND cursor must be executable");
+            assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), plan);
+            let mut invalid = plan.clone();
+            invalid.operands[1].value = CicsOperandValue::Literal(b"7".to_vec());
+            assert!(encode_cics_effect_plan(&invalid, limits).is_err());
+            let mut invalid = plan;
+            invalid.options.insert(CicsPlanOption::Cursor);
+            assert!(
+                encode_cics_effect_plan(&invalid, limits).is_err(),
+                "bare and valued cursor conflict"
+            );
+        }
+    }
 }

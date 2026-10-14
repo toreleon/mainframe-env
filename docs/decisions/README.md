@@ -59,6 +59,10 @@ CardDemo participant ownership and batch completion boundary.
 | [0030](0030-gsam-application-record-formats.md) | explicit GSAM application formats, owned U length and checkpoint format identity | Proposed |
 | [0032](0032-selected-secondary-checkpoint-position.md) | selected secondary checkpoint occurrence witnesses composed with existing local backout | Proposed |
 | [0050](0050-host-effect-envelope-layout.md) | exclusive boxed outer MQI host payloads with unchanged canonical encoding | Proposed; compatibility validation pending |
+| [0051](0051-dataset-read-completeness.md) | explicit bounded dataset read completeness with preserved complete-result canonical bytes | Proposed |
+
+| [0052](0052-cobol-fixed-point-intermediate-precision.md) | explicit COBOL 30/31-digit intermediate policies separate from 18/31-digit data limits | Accepted with documented source assumptions |
+| [0053](0053-cobol-hex-float-storage.md) | explicit HFP/IEEE floating layouts and append-only checkpoint profiles | Accepted; licensed differential pending |
 
 Parallel subsystem work allocated the same 0028 and 0029 numeric prefixes.
 Their distinct full filenames and subsystem-qualified labels identify each

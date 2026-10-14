@@ -56,8 +56,18 @@ pub(super) fn analyze(
     user_functions: &BTreeSet<String>,
     pointer_bytes: usize,
 ) -> Result<(Vec<CobolIntrinsicCall>, Vec<CobolSpecialRegisterReference>), SemanticProblem> {
+    let cics_context = super::strip_comments(source)
+        .to_ascii_uppercase()
+        .contains("EXEC CICS");
     Ok((
-        intrinsic_calls(source, origins, layouts, pointer_bytes, user_functions)?,
+        intrinsic_calls(
+            source,
+            origins,
+            layouts,
+            pointer_bytes,
+            user_functions,
+            cics_context,
+        )?,
         special_registers(source, origins, layouts, files, pointer_bytes)?,
     ))
 }
@@ -68,6 +78,7 @@ fn intrinsic_calls(
     layouts: &[CobolLayout],
     pointer_bytes: usize,
     user_functions: &BTreeSet<String>,
+    cics_context: bool,
 ) -> Result<Vec<CobolIntrinsicCall>, SemanticProblem> {
     let mut calls = Vec::new();
     let mut cursor = 0usize;
@@ -105,7 +116,7 @@ fn intrinsic_calls(
                     (Vec::new(), close + 1, selector)
                 } else {
                     (
-                        split_arguments(source, after_name + 1..close),
+                        split_arguments(source, after_name + 1..close, layouts),
                         close + 1,
                         None,
                     )
@@ -117,7 +128,8 @@ fn intrinsic_calls(
             .into_iter()
             .map(|range| {
                 let text = source[range].trim().to_string();
-                let value_type = argument_type(&text, layouts, pointer_bytes, user_functions)?;
+                let value_type =
+                    argument_type(&text, layouts, pointer_bytes, user_functions, cics_context)?;
                 Ok(CobolIntrinsicArgument { text, value_type })
             })
             .collect::<Result<Vec<_>, SemanticProblem>>()?;
@@ -159,11 +171,12 @@ fn argument_type(
     layouts: &[CobolLayout],
     pointer_bytes: usize,
     user_functions: &BTreeSet<String>,
+    cics_context: bool,
 ) -> Result<IntrinsicValueType, SemanticProblem> {
     let text = text.trim();
     let upper = text.to_ascii_uppercase();
     if let Some(value_type) =
-        arithmetic_argument_type(text, layouts, pointer_bytes, user_functions)?
+        arithmetic_argument_type(text, layouts, pointer_bytes, user_functions, cics_context)?
     {
         return Ok(value_type);
     }
@@ -171,7 +184,7 @@ fn argument_type(
         return Ok(IntrinsicValueType::Keyword);
     }
     if upper.starts_with("FUNCTION ") {
-        return infer_nested_function(text, layouts, pointer_bytes, user_functions);
+        return infer_nested_function(text, layouts, pointer_bytes, user_functions, cics_context);
     }
     if quoted_literal(text) {
         return Ok(if upper.starts_with("N'") || upper.starts_with("N\"") {
@@ -210,12 +223,27 @@ fn argument_type(
         .collect::<Vec<_>>();
     match candidates.as_slice() {
         [layout] => Ok(layout_value_type(layout)),
-        [] => Err(SemanticProblem::InvalidIntrinsic(format!(
-            "unresolved intrinsic argument {text}"
-        ))),
+        [] => cics_context
+            .then(|| eib_argument_type(&reference))
+            .flatten()
+            .ok_or_else(|| {
+                SemanticProblem::InvalidIntrinsic(format!("unresolved intrinsic argument {text}"))
+            }),
         _ => Err(SemanticProblem::InvalidIntrinsic(format!(
             "ambiguous intrinsic argument {text}"
         ))),
+    }
+}
+
+// Keep the implicit names aligned with the interpreter's EIB operand values.
+fn eib_argument_type(reference: &str) -> Option<IntrinsicValueType> {
+    match reference {
+        "EIBTASKN" | "EIBDATE" | "EIBTIME" | "EIBCALEN" | "EIBCPOSN" | "EIBRESP" | "EIBRESP2" => {
+            Some(IntrinsicValueType::Integer)
+        }
+        "EIBAID" | "EIBFN" | "EIBRSRCE" | "EIBFMH" | "EIBEOC" | "EIBERR" | "EIBERRCD"
+        | "EIBRCODE" | "EIBSIG" | "EIBREQID" | "EIBTRNID" => Some(IntrinsicValueType::Alphanumeric),
+        _ => None,
     }
 }
 
@@ -224,6 +252,7 @@ fn arithmetic_argument_type(
     layouts: &[CobolLayout],
     pointer_bytes: usize,
     user_functions: &BTreeSet<String>,
+    cics_context: bool,
 ) -> Result<Option<IntrinsicValueType>, SemanticProblem> {
     if text.starts_with('(') && matching_close(text, 0) == Some(text.len() - 1) {
         return argument_type(
@@ -231,6 +260,7 @@ fn arithmetic_argument_type(
             layouts,
             pointer_bytes,
             user_functions,
+            cics_context,
         )
         .map(Some);
     }
@@ -279,8 +309,20 @@ fn arithmetic_argument_type(
     let Some(index) = operator else {
         return Ok(None);
     };
-    let left = argument_type(&text[..index], layouts, pointer_bytes, user_functions)?;
-    let right = argument_type(&text[index + 1..], layouts, pointer_bytes, user_functions)?;
+    let left = argument_type(
+        &text[..index],
+        layouts,
+        pointer_bytes,
+        user_functions,
+        cics_context,
+    )?;
+    let right = argument_type(
+        &text[index + 1..],
+        layouts,
+        pointer_bytes,
+        user_functions,
+        cics_context,
+    )?;
     if !matches!(
         left,
         IntrinsicValueType::Integer | IntrinsicValueType::Numeric
@@ -350,6 +392,7 @@ fn infer_nested_function(
     layouts: &[CobolLayout],
     pointer_bytes: usize,
     user_functions: &BTreeSet<String>,
+    cics_context: bool,
 ) -> Result<IntrinsicValueType, SemanticProblem> {
     let name_start = skip_space(text, "FUNCTION".len());
     let name_end = word_end(text, name_start);
@@ -366,7 +409,7 @@ fn infer_nested_function(
         let close = matching_close(text, open).ok_or_else(|| {
             SemanticProblem::InvalidIntrinsic("unterminated nested function".into())
         })?;
-        split_arguments(text, open + 1..close)
+        split_arguments(text, open + 1..close, layouts)
     } else {
         Vec::new()
     };
@@ -375,7 +418,13 @@ fn infer_nested_function(
         .map(|range| {
             let argument = text[range].trim().to_string();
             Ok(CobolIntrinsicArgument {
-                value_type: argument_type(&argument, layouts, pointer_bytes, user_functions)?,
+                value_type: argument_type(
+                    &argument,
+                    layouts,
+                    pointer_bytes,
+                    user_functions,
+                    cics_context,
+                )?,
                 text: argument,
             })
         })
@@ -688,10 +737,15 @@ const fn layout_value_type(layout: &CobolLayout) -> IntrinsicValueType {
     }
 }
 
-fn split_arguments(source: &str, range: Range<usize>) -> Vec<Range<usize>> {
+fn split_arguments(
+    source: &str,
+    range: Range<usize>,
+    layouts: &[CobolLayout],
+) -> Vec<Range<usize>> {
     let bytes = source.as_bytes();
     let mut result = Vec::new();
     let mut start = range.start;
+    let mut operand_start = start;
     let mut depth = 0usize;
     let mut quote = None;
     for index in range.clone() {
@@ -706,11 +760,28 @@ fn split_arguments(source: &str, range: Range<usize>) -> Vec<Range<usize>> {
             match byte {
                 b'(' => depth += 1,
                 b')' => depth = depth.saturating_sub(1),
-                b',' if depth == 0 => {
+                b',' | b';' if depth == 0 => {
                     if let Some(argument) = trim_range(source, start..index) {
                         result.push(argument);
                     }
                     start = index + 1;
+                    operand_start = start;
+                }
+                byte if depth == 0 && index >= operand_start && byte.is_ascii_whitespace() => {
+                    let next = skip_space(source, index);
+                    if next < range.end
+                        && space_separates_arguments(source, operand_start..index, next, layouts)
+                    {
+                        if let Some(argument) = trim_range(source, start..index) {
+                            result.push(argument);
+                        }
+                        start = next;
+                        operand_start = next;
+                    }
+                }
+                b'+' | b'*' | b'/' if depth == 0 => operand_start = index + 1,
+                b'-' if depth == 0 && index > start && bytes[index - 1].is_ascii_whitespace() => {
+                    operand_start = index + 1;
                 }
                 _ => {}
             }
@@ -720,6 +791,88 @@ fn split_arguments(source: &str, range: Range<usize>) -> Vec<Range<usize>> {
         result.push(argument);
     }
     result
+}
+
+fn space_separates_arguments(
+    source: &str,
+    operand: Range<usize>,
+    next: usize,
+    layouts: &[CobolLayout],
+) -> bool {
+    let prefix = source[operand].trim().to_ascii_uppercase();
+    let following = &source[next..word_end(source, next)];
+    if prefix.is_empty()
+        || prefix.ends_with(['+', '-', '*', '/'])
+        || matches!(
+            source.as_bytes()[next],
+            b'+' | b'-' | b'*' | b'/' | b',' | b';'
+        )
+        || matches!(
+            prefix.split_whitespace().next_back(),
+            Some("FUNCTION" | "OF" | "IN")
+        )
+        || matches!(following.to_ascii_uppercase().as_str(), "OF" | "IN")
+    {
+        return false;
+    }
+    if source.as_bytes()[next] != b'(' {
+        return true;
+    }
+    if (prefix.starts_with("FUNCTION ") && !prefix.contains('('))
+        || has_reference_modifier(source, next)
+    {
+        return false;
+    }
+    // A space before parentheses joins a table selector, but separates a
+    // scalar argument from a parenthesized expression (COBOL 6.5 rlrefsub).
+    let Some(identity) = data_reference_identity(&prefix) else {
+        return true;
+    };
+    !layouts.iter().any(|layout| {
+        if layout.name != identity
+            && layout.qualified_name != identity
+            && !qualified_reference_matches(&identity, &layout.qualified_name)
+        {
+            return false;
+        }
+        let mut current = Some(layout);
+        while let Some(item) = current {
+            if item.occurs_clause {
+                return true;
+            }
+            current = item.parent.as_ref().and_then(|parent| {
+                layouts
+                    .iter()
+                    .find(|candidate| &candidate.qualified_name == parent)
+            });
+        }
+        false
+    })
+}
+
+fn has_reference_modifier(source: &str, open: usize) -> bool {
+    let Some(close) = matching_close(source, open) else {
+        return false;
+    };
+    let mut depth = 0usize;
+    let mut quote = None;
+    for byte in source.as_bytes()[open + 1..close].iter().copied() {
+        if matches!(byte, b'\'' | b'"') {
+            if quote == Some(byte) {
+                quote = None;
+            } else if quote.is_none() {
+                quote = Some(byte);
+            }
+        } else if quote.is_none() {
+            match byte {
+                b'(' => depth += 1,
+                b')' => depth = depth.saturating_sub(1),
+                b':' if depth == 0 => return true,
+                _ => {}
+            }
+        }
+    }
+    false
 }
 
 fn trim_range(source: &str, mut range: Range<usize>) -> Option<Range<usize>> {
@@ -897,6 +1050,34 @@ mod tests {
     use super::*;
     use crate::semantic::SemanticModel;
 
+    #[test]
+    fn intrinsic_arguments_resolve_eib_fields_only_in_cics_programs() {
+        for (expression, value_type) in [
+            ("FUNCTION RANDOM(EIBTASKN)", IntrinsicValueType::Integer),
+            ("FUNCTION INTEGER(EIBTASKN)", IntrinsicValueType::Integer),
+            ("FUNCTION INTEGER(EIBTIME)", IntrinsicValueType::Integer),
+            ("FUNCTION INTEGER(EIBDATE)", IntrinsicValueType::Integer),
+            ("FUNCTION INTEGER(EIBCALEN)", IntrinsicValueType::Integer),
+            (
+                "FUNCTION LENGTH(EIBTRNID)",
+                IntrinsicValueType::Alphanumeric,
+            ),
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. EIBARGS. DATA DIVISION. WORKING-STORAGE SECTION. 01 N PIC 9(7). PROCEDURE DIVISION. COMPUTE N = {expression}. EXEC CICS RETURN END-EXEC."
+            );
+            let model = SemanticModel::analyze(&source, 1024, 32)
+                .unwrap_or_else(|problem| panic!("{expression}: {problem:?}"));
+            assert_eq!(model.intrinsic_calls[0].arguments[0].value_type, value_type);
+            let batch = source.replace("EXEC CICS RETURN END-EXEC", "GOBACK");
+            assert!(matches!(
+                SemanticModel::analyze(&batch, 1024, 32),
+                Err(SemanticProblem::InvalidIntrinsic(problem))
+                    if problem.contains("unresolved intrinsic argument EIB")
+            ));
+        }
+    }
+
     fn program(procedure: &str) -> String {
         format!(
             "IDENTIFICATION DIVISION. PROGRAM-ID. FUNCTIONS. DATA DIVISION. WORKING-STORAGE SECTION. 01 TEXT PIC X(8). 01 INT PIC 9(4) BINARY. 01 NUM PIC 9(4)V99 COMP-3. 01 PTR POINTER. LINKAGE SECTION. 01 LINK-X PIC X. PROCEDURE DIVISION. {procedure}. STOP RUN."
@@ -947,6 +1128,83 @@ mod tests {
 
         let nonnumeric = source.replace("LO * 2", "'ABC' * 2");
         assert!(SemanticModel::analyze(&nonnumeric, 4096, 128).is_err());
+    }
+
+    #[test]
+    fn intrinsic_arguments_accept_space_and_mixed_separators() {
+        let declarations = "01 A PIC S9(4). 01 B PIC S9(4). 01 C PIC S9(4). 01 R PIC S9(4).";
+        for (call, expected) in [
+            ("MAX(A B)", vec!["A", "B"]),
+            ("MAX(A   B\tC)", vec!["A", "B", "C"]),
+            ("MAX(A, B)", vec!["A", "B"]),
+            ("MAX(A B C)", vec!["A", "B", "C"]),
+            ("MAX(A, B C)", vec!["A", "B", "C"]),
+            ("MAX(A B, C)", vec!["A", "B", "C"]),
+            ("MAX(A; B C)", vec!["A", "B", "C"]),
+            ("MAX(A 42 B * 4)", vec!["A", "42", "B * 4"]),
+            ("MAX((A + 1) * 2 B)", vec!["(A + 1) * 2", "B"]),
+            ("MAX(FUNCTION MIN(A B) C)", vec!["FUNCTION MIN(A B)", "C"]),
+            (
+                "MAX(FUNCTION MIN(A B) (C * 2))",
+                vec!["FUNCTION MIN(A B)", "(C * 2)"],
+            ),
+            ("MIN(A (B * 4))", vec!["A", "(B * 4)"]),
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. SPACEARGS. DATA DIVISION. WORKING-STORAGE SECTION. {declarations} PROCEDURE DIVISION. COMPUTE R = FUNCTION {call}. STOP RUN."
+            );
+            let model = SemanticModel::analyze(&source, 4096, 128)
+                .unwrap_or_else(|problem| panic!("{call}: {problem:?}"));
+            assert_eq!(
+                model.intrinsic_calls[0]
+                    .arguments
+                    .iter()
+                    .map(|arg| arg.text.as_str())
+                    .collect::<Vec<_>>(),
+                expected,
+                "{call}"
+            );
+        }
+    }
+
+    #[test]
+    fn intrinsic_space_separators_preserve_table_selectors_and_qualification() {
+        // Enterprise COBOL 6.5 rlrefsub.html: table elements include descendants
+        // of OCCURS entries. Non-table names cannot consume a subscript.
+        let declarations = "01 ROOT. 05 T PIC 9(4) OCCURS 2 TIMES. 05 ROW OCCURS 2 TIMES. 10 ITEM PIC 9(4). 01 I PIC 9 VALUE 1. 01 J PIC 9 VALUE 2. 01 R PIC 9(4). 01 TEXT PIC X(4).";
+        for (call, expected) in [
+            ("MAX(T (I) T (J))", vec!["T (I)", "T (J)"]),
+            ("MAX(ITEM (I) ITEM (J))", vec!["ITEM (I)", "ITEM (J)"]),
+            (
+                "MAX(T OF ROOT (I) T IN ROOT (J))",
+                vec!["T OF ROOT (I)", "T IN ROOT (J)"],
+            ),
+            ("MAX(T (I + 1) I)", vec!["T (I + 1)", "I"]),
+            ("MIN(T (I * 4))", vec!["T (I * 4)"]),
+            ("LENGTH(TEXT (1:2))", vec!["TEXT (1:2)"]),
+            ("MAX(TEXT ('C:D'))", vec!["TEXT", "('C:D')"]),
+            (
+                "MAX(I (FUNCTION LENGTH(TEXT (1:2))))",
+                vec!["I", "(FUNCTION LENGTH(TEXT (1:2)))"],
+            ),
+            ("MAX('A B' 'C,D')", vec!["'A B'", "'C,D'"]),
+            ("MAX('A'' B' 'C;D')", vec!["'A'' B'", "'C;D'"]),
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. TABLEARGS. DATA DIVISION. WORKING-STORAGE SECTION. {declarations} PROCEDURE DIVISION. COMPUTE R = FUNCTION {call}. STOP RUN."
+            );
+            let model = SemanticModel::analyze(&source, 4096, 128)
+                .unwrap_or_else(|problem| panic!("{call}: {problem:?}"));
+            assert_eq!(
+                model.intrinsic_calls[0]
+                    .arguments
+                    .iter()
+                    .map(|arg| arg.text.as_str())
+                    .collect::<Vec<_>>(),
+                expected,
+                "{call}"
+            );
+        }
     }
 
     #[test]

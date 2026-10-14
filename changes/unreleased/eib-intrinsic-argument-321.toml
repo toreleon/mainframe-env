@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Resolve implicit CICS EIB fields as intrinsic-function arguments, defaulting EIBTASKN lazily to zero and persisting it only when written so legacy checkpoint bytes remain unchanged (#321)."

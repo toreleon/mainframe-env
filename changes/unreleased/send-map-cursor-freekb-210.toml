@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "SEND MAP and SEND TEXT now persist valued CURSOR and FREEKB keyboard state with their screen and replay receipt (#210). Bare SEND MAP CURSOR continues to succeed and selects the first symbolic field with length -1 when available; IC/default cursor positioning remains unmodelled."

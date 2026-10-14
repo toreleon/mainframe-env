@@ -30,7 +30,7 @@ use mainframe_env_source::{
     SourceLimits, materialize_host_abi_libraries,
 };
 use mainframe_env_store_api::{
-    ArtifactStore, PlatformStore, ProviderStateRecord, ProviderStateWrite,
+    ArtifactStore, PlatformStore, ProviderStateMutation, ProviderStateRecord, ProviderStateWrite,
 };
 use runtime_calls::*;
 use std::collections::BTreeMap;
@@ -206,35 +206,33 @@ pub fn default_program_router() -> Arc<DefaultProgramRouter> {
     Arc::new(DefaultProgramRouter { router, cobol })
 }
 
-fn persist_batch_file_cursors(
-    store: &dyn PlatformStore,
+fn batch_file_cursor_mutation(
     key: &str,
     cursors: &BTreeMap<String, String>,
     current_version: Option<u64>,
-) -> Result<(), HostProblem> {
+) -> Result<Option<ProviderStateMutation>, HostProblem> {
     if cursors.is_empty() {
-        if let Some(version) = current_version {
-            store
-                .delete_provider_state("batch-file-cursor", key, version)
-                .map_err(|_| HostProblem::InfrastructureFailure)?;
-        }
-        return Ok(());
+        return Ok(
+            current_version.map(|expected_version| ProviderStateMutation::Delete {
+                namespace: "batch-file-cursor".into(),
+                key: key.into(),
+                expected_version,
+            }),
+        );
     }
     let version = current_version
         .unwrap_or(0)
         .checked_add(1)
         .ok_or(HostProblem::ResourceExhausted)?;
-    store
-        .put_provider_state(
-            ProviderStateRecord {
-                namespace: "batch-file-cursor".into(),
-                key: key.into(),
-                version,
-                payload: serde_json::to_vec(cursors).map_err(|_| HostProblem::ProviderFailure)?,
-            },
-            current_version,
-        )
-        .map_err(|_| HostProblem::InfrastructureFailure)
+    Ok(Some(ProviderStateMutation::Put(ProviderStateWrite {
+        record: ProviderStateRecord {
+            namespace: "batch-file-cursor".into(),
+            key: key.into(),
+            version,
+            payload: serde_json::to_vec(cursors).map_err(|_| HostProblem::ProviderFailure)?,
+        },
+        expected_version: current_version,
+    })))
 }
 
 struct CobolProgram {
@@ -577,6 +575,19 @@ impl Program for CobolProgram {
             })
             .map_err(|_| HostProblem::ProviderFailure)?;
         let CompilerResult::Published { artifact, .. } = compiled else {
+            if let CompilerResult::Failed { diagnostics, .. } = compiled
+                && let Some(diagnostic) = diagnostics.iter().find(|diagnostic| {
+                    diagnostic
+                        .public_message()
+                        .starts_with("EXEC SQL INCLUDE member ")
+                })
+            {
+                return Err(HostProblem::Condition {
+                    name: diagnostic.public_message().to_owned(),
+                    response: -2,
+                    response2: 0,
+                });
+            }
             return Err(HostProblem::Malformed);
         };
         let executable = admit_published_artifact(&artifact)?;
@@ -839,6 +850,8 @@ fn source_bundle(input: &ProgramInput) -> Result<SourceBundle, HostProblem> {
 
 #[cfg(test)]
 mod hardening;
+#[cfg(test)]
+mod installed_cursor_authority;
 
 mod replay;
 #[allow(dead_code, reason = "R-11 product integration seam")]
@@ -1238,6 +1251,40 @@ mod tests {
         .unwrap();
         assert_eq!(abend.schema(), "mainframe-env.program.abend@1");
         assert_eq!(abend.bytes(), b"U0999");
+    }
+
+    #[test]
+    fn jes_sql_include_expands_dcl_from_syslib_and_reports_missing_member() {
+        let plan = mainframe_env_batch::parse_jcl(
+            &mainframe_env_batch::JclBundle {
+                primary: "//J JOB\n//S EXEC PGM=COBOL,PARM='FORMAT=FIXED'\n\
+                          //SYSIN DD *\nSOURCE\n/*\n//SYSLIB DD DSN=DCLROW\n"
+                    .into(),
+                ..Default::default()
+            },
+            mainframe_env_batch::JclLimits::default(),
+        )
+        .unwrap();
+        let mut input = ProgramInput {
+            parameter: plan.steps[0].parameter.clone(),
+            dds: plan.steps[0].dds.clone(),
+            dd_records: BTreeMap::new(),
+            execution: None,
+        };
+        input.dds[0].inline_data = b"       IDENTIFICATION DIVISION.\n       PROGRAM-ID. DCLTEST.\n       DATA DIVISION.\n       WORKING-STORAGE SECTION.\n       EXEC SQL INCLUDE DCLROW END-EXEC.\n       PROCEDURE DIVISION.\n       ADD 1 TO DCL-TR-DESCRIPTION-LEN.\n       DISPLAY DCL-TR-DESCRIPTION-LEN.\n       STOP RUN.\n".to_vec();
+        input.dds[1].inline_data = b"       01 DCL-TR-DESCRIPTION-LEN PIC 9(4) VALUE 0.\n".to_vec();
+        let output = CobolProgram::new().execute(&parent(), &input).unwrap();
+        assert_eq!(output.records, vec![b"0001".to_vec()]);
+        input.dds.pop();
+        let Err(HostProblem::Condition { name, .. }) =
+            CobolProgram::new().execute(&parent(), &input)
+        else {
+            panic!("missing SQL INCLUDE member must return a compile diagnostic");
+        };
+        assert!(
+            name.contains("SQL INCLUDE member DCLROW was not found"),
+            "{name}"
+        );
     }
 
     #[test]

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "COMP-1/COMP-2 default to IBM HFP through one storage codec; installed-transfer receipts and cold recovery accept floating checkpoints while preserving explicit and legacy IEEE profiles and schema-12 readers (#160)."

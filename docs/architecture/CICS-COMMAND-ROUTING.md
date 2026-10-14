@@ -205,7 +205,13 @@ request exact-width writable destinations for any corresponding value.
 ENVDEFERR is decided before one-time consumption when the producer omitted a
 requested field. START FMH is persisted with the data record; RETRIEVE emits a
 strict typed EIBFMH byte that the interpreter applies to its implicit EIB
-state. RETRIEVE may alternatively use SET with mandatory LENGTH: the compiler
+state. The provider's empty-argument RETRIEVE compatibility form uses the same
+durable START consumer and returns data in its response payload. Both forms
+require a configured durable clock and mutation identity, consume records by
+compare-and-swap, replay the same consumed record for the same effect, and return
+ENDDATA 29/0 when exhausted. RETURN TRANSID COMMAREA remains separate task-entry
+state for DFHCOMMAREA/EIBCALEN and is never returned by RETRIEVE.
+RETRIEVE may alternatively use SET with mandatory LENGTH: the compiler
 requires a pointer target, and the interpreter returns task-owned bytes through
 its checked virtual-address model. Local START PROTECT writes no worker item
 until an explicit successful SYNCPOINT commits its issuing run's
@@ -251,16 +257,17 @@ RIDFLD without returning a record and admits the default-equivalent `GTEQ` or
 exact-key `EQUAL` relation as an exclusive choice; READNEXT and READPREV require INTO and
 model RIDFLD as the same input/output storage identity so the host-updated key
 feeds the next browse request; ENDBR closes the resource browse. REQID/SYSID,
-KEYLENGTH/LENGTH, SET, alternate RBA/RRN/XRBA and generic key modes, and
+SET, alternate RBA/RRN/XRBA and generic key modes, and
 UPDATE/TOKEN/RLS locking remain explicit compiler rejections.
 The typed keyed-mutation subset admits DELETE with either an explicit RIDFLD or
 the record held by the task's latest `READ UPDATE` on that file. WRITE FILE
 requires explicit FROM and RIDFLD data areas; REWRITE consumes the held record
 identity and an explicit FROM area. Optional WRITE or REWRITE LENGTH is a
 bounded literal, halfword-binary value, or matching `LENGTH OF` and selects the
-exact record prefix before mutation. READ LENGTH is the same writable halfword
-capacity on input and actual-record-length output. Optional READ, WRITE, or
-explicit-key DELETE KEYLENGTH uses the same positive halfword forms against
+exact record prefix before mutation. READ, READNEXT, and READPREV LENGTH accept
+a halfword integer literal capacity (0–32767) or matching `LENGTH OF` without
+write-back; writable halfword storage receives the actual record length. Optional
+READ, WRITE, or explicit-key DELETE KEYLENGTH uses the same positive halfword forms against
 RIDFLD and is validated against the durable definition. All use the same single
 FILE/DATASET resource binding and typed mutation envelope. TOKEN correlation,
 SYSID, generic and alternate record identities, WRITE MASSINSERT, and RLS
@@ -528,6 +535,12 @@ defaults. DATAONLY requires explicit symbolic FROM bytes, ignores map defaults,
 applies supplied field attributes, and preserves an existing attribute for
 `X'00'`. `SEND TEXT` requires FROM and accepts the same three LENGTH forms; an
 out-of-range runtime value returns LENGERR 22/0 without changing the screen.
+`SEND TEXT WAIT` returns only after the virtual screen has been durably replaced;
+this synchronous provider has no pending output queue. Replay returns the retained
+completion without sending again. This follows IBM CICS TS 6.x
+[`SEND TEXT`, WAIT](https://www.ibm.com/docs/en/SSJL4D_6.x/reference-applications/commands-api/dfhp4_sendtext.html),
+catalog row `0192`, pinned in `ibm-cics-ts-6x-application-api-sources-c-2026-09-10`
+(`#312`).
 `RECEIVE MAP` requires MAP, applies the same MAPSET default, and optionally
 writes INTO. The provider validates the canonical request shape and uses the
 requested durable map definition for
@@ -535,16 +548,44 @@ terminal-fit validation and input-field normalization. SET pointers,
 omitted-map AID-only receive, implicit symbolic map storage, RECEIVE length,
 paging, device and other terminal controls remain explicit compiler
 rejections.
-`CURSOR` and `FREEKB` are admitted and forwarded but are not yet modeled by the
-terminal provider (`#210`). `ERASE` coincides with the provider's existing
-full-screen replacement behavior (`#203`).
-`PURGE MESSAGE` is a separate typed terminal mutation. Because this runtime has
-no ACCUM or page-building route, its reachable full-BMS logical-message state
-is empty: local purge succeeds idempotently without changing the already
-displayed screen or current map. DPL use returns `INVREQ` 16/200. Deleting a
-nonempty accumulated message and surfacing temporary-storage `TSIOERR` remain
-unready until that logical-message authority exists.
-The typed ASSIGN subset carries each of its 92 admitted context values as a
+`CURSOR(value)` on SEND MAP/TEXT accepts a nonnegative halfword binary offset
+within the terminal screen. `FREEKB` unlocks the keyboard; omission leaves it
+locked. These sends atomically persist screen, cursor, keyboard and replay state
+in the same BMS authority exposed by `terminal_control_snapshot`. Replaying an
+older send returns its receipt without changing a newer display or control state.
+`ERASE` resets the cursor to zero unless an explicit cursor is supplied, alongside
+the provider's existing full-screen replacement behavior (`#203`). Bare SEND MAP
+`CURSOR` continues to succeed and selects the first field in map-definition order
+whose symbolic length is `X'FFFF'` (-1), when the FROM area and symbolic attribute
+layout are available (`#210`). The length halfword immediately precedes that
+field's symbolic attribute byte. Cursor offsets use the field's row/column and
+map origin with the terminal width. If no length is -1, or symbolic data/layout
+is unavailable, the cursor retains its post-ERASE/default or current position
+(zero after ERASE or on a new terminal); the send still succeeds. The pinned
+SEND MAP topic specifies symbolic positioning but provides no no-match fallback.
+The dedicated positioning topic is not pinned (`dfhp326`), and the map contract
+has no IC metadata, so the IC/default-positioning corner remains unmodelled.
+Bridge BMS continues to reject cursor and keyboard controls.
+Source review: IBM CICS TS 6.x, baseline
+`ibm-cics-ts-6x-application-api-sources-c-2026-09-10`, SEND MAP
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_sendmap.html` (catalog row
+`0189`), SEND TEXT `commands-api/dfhp4_sendtext.html` (row `0192`), and DFHMDI
+`SSJL4D_6.x/reference-applications/bms/dfhp47g.html`. The unpinned topic is
+`SSJL4D_6.x/applications/designing/dfhp326.html` (Positioning the cursor).
+`PURGE MESSAGE` is a separate typed terminal mutation over durable BMS state.
+Local purge discards pending `SEND CONTROL ACCUM` frames and succeeds
+idempotently on empty state, preserving the displayed screen and current map.
+It allows a new logical message in the same task. DPL use returns `INVREQ`
+16/200. Selected compiled-route tests cover zero, one, and several control
+frames, checkpoint/provider restart, and replay while a later message is active.
+These are control frames, not multiple accumulated pages: SEND MAP/TEXT ACCUM
+and overflow page construction remain unready. Pages retained after SEND PAGE
+belong to completed messages and are not evidence of an incomplete multi-page
+message. Temporary-storage `TSIOERR` 35 remains unverified because there is no
+deterministic BMS I/O failure injection; corrupt platform storage fails closed
+as infrastructure failure. This is partial #198 evidence, with no whole-command
+or licensed equivalence claim.
+The typed ASSIGN subset carries each of its 93 admitted context values as a
 pre-resolved output binding under one bounded output-name authority. It retains
 the existing 16-option maximum, exact receiver checks, partial-INVREQ behavior,
 local/DPL matrix, EIBFN and provider semantics without carrying source command
@@ -578,9 +619,35 @@ terminal identity is propagated. Historical sessions without an identifier
 remain readable but do not acquire a fabricated one. Because no client network
 endpoint is retained, local `TNADDR` returns the source-defined 39 blanks for
 an unresolved address; nonterminal use returns 16/5 and DPL fails closed until
-remote endpoint context exists. The other 21 generated
+remote endpoint context exists. The other 20 generated
 ASSIGN semantic options remain compiler rejections until
 their contexts are implemented.
+`STARTCODE` requires a writable two-character alphanumeric receiver (`PIC XX`).
+It returns terminal origin `TD`, retained local START origin `S ` or `SD`,
+bound START ATTACH origin `U `, or DPL origin `D ` or `DS`. Existing start-code
+bindings are validated and padded to two bytes. A facility-less task without
+retained origin, or a DPL context without SYNCONRETURN identity, fails closed.
+The source reference is IBM CICS TS 6.x
+[`ASSIGN`, STARTCODE](https://www.ibm.com/docs/en/SSJL4D_6.x/reference-applications/commands-api/dfhp4_assign.html),
+catalog row `0011`, pinned in `ibm-cics-ts-6x-application-api-sources-a-2026-09-10`
+(`#312`). The pinned body was unavailable locally to the independent PR `#427`
+reviewer, so that review did not verify the STARTCODE value matrix against the
+body. The implemented values above still require verified source/effect evidence
+at acceptance. The output uses append-only tag `110`; existing tags retain their
+meaning.
+
+The GenApp `WRITEQ TS FROM(WRITE-MSG-L) LENGTH(23)` rejection remains when
+`WRITE-MSG-L` is `PIC X(13)`: LENGTH selects the number of bytes supplied by FROM,
+so this requests ten bytes beyond the owned area. The compiler reports
+`CICS WRITEQ TS LENGTH exceeds the FROM data area`; a length of 13 is admitted.
+The FROM/LENGTH source reference is IBM CICS TS 6.x
+[`WRITEQ TS`](https://www.ibm.com/docs/en/SSJL4D_6.x/reference-applications/commands-api/dfhp4_writeqts.html),
+catalog row `0258`, pinned in `ibm-cics-ts-6x-application-api-sources-c-2026-09-10`
+(`#312`). The pinned body was unavailable locally to the independent PR `#427`
+reviewer; the citation does not claim source verification by that review. The
+rejection is a compiler safety check, not a claim that IBM diagnoses the same
+source as a translation error. The caller must supply a sufficiently large area
+or correct the requested length.
 The legacy route admits only the source-valid option subset whose behavior is
 implemented by that raw handler. A catalog-known option outside that subset
 fails explicitly before compatibility lowering instead of being silently

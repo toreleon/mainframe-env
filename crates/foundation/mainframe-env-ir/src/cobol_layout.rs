@@ -7,6 +7,11 @@ mod category;
 
 pub(crate) use category::validate_address_width;
 
+/// Default representation emitted for new z/OS COMP-1/COMP-2 layouts.
+pub const COBOL_FLOAT_HEX: &str = "hex";
+/// Explicit compatibility representation; absent metadata in old artifacts means IEEE.
+pub const COBOL_FLOAT_IEEE: &str = "ieee";
+
 const MAX_PICTURE_SYMBOLS: u64 = 1_000_000;
 /// Maximum admitted backing occurrences for an `OCCURS ... UNBOUNDED` layout.
 pub const COBOL_MAX_UNBOUNDED_OCCURRENCES: usize = 4_096;
@@ -71,6 +76,12 @@ pub(crate) fn validate_definition(
         .ok_or("COBOL layout category is missing or has the wrong type")?;
     if !is_known_layout(category) {
         return Err("COBOL layout category is unsupported");
+    }
+    if let Some(profile) = definition.attributes.get("float_profile")
+        && (!matches!(category, "float_short" | "float_long")
+            || !matches!(profile, Attribute::Text(value) if matches!(value.as_str(), COBOL_FLOAT_HEX | COBOL_FLOAT_IEEE)))
+    {
+        return Err("COBOL floating profile is invalid or incompatible with its category");
     }
     let picture = text_attribute(definition, "picture")
         .ok_or("COBOL layout picture is missing or has the wrong type")?;

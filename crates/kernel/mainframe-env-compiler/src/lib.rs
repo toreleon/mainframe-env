@@ -2,12 +2,16 @@
 
 #![forbid(unsafe_code)]
 
+mod bms;
 mod generated;
 mod hir;
 mod lower;
+mod numeric_literals;
 mod semantic;
 mod service;
 mod syntax;
+
+pub use bms::{BmsMapset, BmsSymbolicProblem};
 
 pub use generated::cobol_language::{
     COMPILER_DIRECTING_STATEMENTS, COMPILER_DIRECTIVE_GROUPS, COMPILER_DIRECTIVES,

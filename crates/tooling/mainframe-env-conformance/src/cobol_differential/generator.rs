@@ -89,12 +89,23 @@ pub(super) fn well_formed_picture(pic: &str) -> bool {
         .enumerate()
         .filter_map(|(i, c)| (*c == '+' || *c == '-').then_some(i))
         .collect();
-    if !signs.is_empty() && !(signs.len() == 1 && (signs[0] == 0 || signs[0] == chars.len() - 1)) {
-        return false;
+    if !signs.is_empty() {
+        let fixed = signs.len() == 1 && (signs[0] == 0 || signs[0] == chars.len() - 1);
+        let floating_sign = signs.len() > 1
+            && signs[0] == 0
+            && signs.iter().all(|i| chars[*i] == chars[0])
+            && !body.contains(['Z', '*', '$'])
+            && suffix.is_empty();
+        if !fixed && !floating_sign {
+            return false;
+        }
     }
-    let main = body
-        .trim_start_matches(['+', '-'])
-        .trim_end_matches(['+', '-']);
+    let main = if signs.len() == 1 {
+        body.trim_start_matches(['+', '-'])
+            .trim_end_matches(['+', '-'])
+    } else {
+        body
+    };
     if main.is_empty() || !main.chars().any(|c| "Z*9$".contains(c)) {
         return false;
     }
@@ -110,11 +121,13 @@ pub(super) fn well_formed_picture(pic: &str) -> bool {
 fn edited_picture(rng: &mut Rng) -> String {
     let width = 3 + rng.range(6);
     let fraction = rng.range(4);
-    let family = rng.range(7);
+    let family = rng.range(9);
     let mut body = match family {
         0 => format!("{}9", "Z".repeat(width - 1)),
         1 => format!("{}9", "*".repeat(width - 1)),
         2 => format!("{}9", "$".repeat(width - 1)),
+        7 => format!("{}9", "+".repeat(width - 1)),
+        8 => format!("{}9", "-".repeat(width - 1)),
         _ => "9".repeat(width),
     };
     if rng.coin() {
@@ -224,7 +237,7 @@ pub(super) fn generated(seed: u64) -> Program {
         };
         let verb = rng.range(7);
         let rounded = if rng.coin() { " ROUNDED" } else { "" };
-        let operation = if edited.contains(&target)
+        let mut operation = if edited.contains(&target)
             || alpha.contains(&source)
             || source.starts_with('\'')
             || verb == 0
@@ -242,13 +255,20 @@ pub(super) fn generated(seed: u64) -> Program {
                 ),
                 _ => {
                     let op = ["+", "-", "*", "/"][rng.range(4)];
-                    format!(
-                        "COMPUTE {target}{rounded} = ({source} {op} {}).",
-                        1 + rng.range(9)
-                    )
+                    let operand = 1 + rng.range(9);
+                    if rng.coin() {
+                        format!("COMPUTE {target}{rounded} = ({source} + {operand}) - {source}.")
+                    } else {
+                        format!("COMPUTE {target}{rounded} = ({source} {op} {operand}).")
+                    }
                 }
             }
         };
+        if !operation.starts_with("MOVE ") && rng.coin() {
+            let verb = operation.split_whitespace().next().unwrap().to_owned();
+            operation.pop();
+            operation.push_str(&format!(" ON SIZE ERROR MOVE 0 TO {target} END-{verb}."));
+        }
         statements.push(operation);
         if numeric.contains(&target) {
             statements.push(format!("MOVE {target} TO {target}-O."));

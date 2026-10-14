@@ -47,6 +47,20 @@ integration; historical generation receipts are removed.
   available; converter recognition/validation and independently reviewed
   golden/property comparison still form part of JCL-706.
 
+Batch NEW DD allocation without DCB, RECFM, LRECL, or a usable DCB referback
+fails closed with `HostProblem::UnsupportedCapability`, capability
+`batch.new-dataset-dcb`. Its detail names the DD and asks for DCB/RECFM/LRECL
+or a referback. Allocation precedes program execution; the service has no
+program-FD/OPEN DCB merge at this boundary. Explicit DCB attributes and the
+existing dataset/step/procedure/GDG referback behavior remain supported.
+Lifecycle fixtures supply explicit `DCB=(RECFM=VB,LRECL=32760)` because their
+programs do not supply a DCB, preserving their original record format and bounds.
+
+For #273, IBM z/OS 3.2 DCB topic `xdddcb.htm` (baseline
+`ibm-zos-3.2-jcl-jes2-2026-06`) was unavailable in the offline cache. This
+allocation policy follows the issue text and authorized continuation decision;
+it carries no licensed or independent IBM verification credit.
+
 Blockers: none.
 
 JCL-701 focused validation passed with 47 batch tests, strict batch and xtask

@@ -2,6 +2,7 @@ mod call_codec;
 pub use call_codec::encode_cobol_call_result;
 use call_codec::*;
 mod dataset_codec;
+mod dataset_reply;
 use dataset_codec::{dataset_file_status, decode_dataset_record, encode_dataset_record};
 
 mod date_helpers;
@@ -50,12 +51,28 @@ mod corresponding;
 mod decimal_capacity;
 mod decimal_commit;
 mod eib;
+mod float_checkpoint;
+mod float_codec;
 #[cfg(test)]
 mod floating_insertion_tests;
+#[cfg(test)]
+mod hexadecimal_float_tests;
+mod host_call_position;
+#[cfg(test)]
+mod indexed_by_tests;
+mod indexes;
+mod inspect;
+#[cfg(test)]
+mod inspect_tests;
+mod intrinsic_arguments;
+use intrinsic_arguments::split_function_arguments;
 mod layout_admission;
 mod layout_resolution;
 mod legacy_mq;
 mod observability;
+mod sign_placement;
+#[cfg(test)]
+mod sign_placement_tests;
 mod snapshot_codec;
 mod typed_cics;
 pub(crate) mod typed_mq;
@@ -136,7 +153,9 @@ struct LayoutMetadata {
     digits: usize,
     scale: u32,
     native_binary: bool,
+    float_profile: float_codec::FloatProfile,
     signed: bool,
+    sign_leading: bool,
     sign_separate: bool,
     justified_right: bool,
     blank_when_zero: bool,
@@ -445,6 +464,8 @@ pub struct MachineSnapshot {
     pub random_state: Option<u64>,
     pub storage64: Storage64Snapshot,
     pub storage64_area_bindings: BTreeMap<String, u64>,
+    /// Schema 13 representation by floating layout name; schemas 1..=12 imply IEEE.
+    pub float_profiles: BTreeMap<String, String>,
 }
 
 pub type MachineSnapshotSortIo = (
@@ -503,6 +524,9 @@ pub struct ReferenceMachine {
     effect_sequence: u64,
     executed_steps: u64,
     pending: Option<Pending>,
+    pending_pc: Option<usize>,
+    // Volatile host-resume failure position; never changes the execution pc or snapshots.
+    host_failure_pc: Option<usize>,
     perform_stack: Vec<usize>,
     deferred_drive: Option<MachineDrive<EffectRequest>>,
     // Volatile live-drive observation; deliberately absent from every snapshot.
@@ -853,6 +877,8 @@ impl ReferenceMachine {
             effect_sequence: 0,
             executed_steps: 0,
             pending: None,
+            pending_pc: None,
+            host_failure_pc: None,
             perform_stack: Vec::new(),
             deferred_drive: None,
             normal_return: None,
@@ -920,10 +946,10 @@ impl ReferenceMachine {
 
     #[must_use]
     /// Typed MQ frames export diagnostic schema zero because their live authority is not
-    /// represented here. This is not a checkpoint version; legacy snapshots remain schema 12.
+    /// represented here. This is not a checkpoint version; nonfloating snapshots remain schema 12.
     pub fn snapshot(&self) -> MachineSnapshot {
         MachineSnapshot {
-            schema_version: if self.mqi.is_some() { 0 } else { 12 },
+            schema_version: self.snapshot_version(),
             program_counter: self.pc,
             effect_sequence: self.effect_sequence,
             executed_steps: self.executed_steps,
@@ -999,6 +1025,7 @@ impl ReferenceMachine {
             random_state: self.random_state.get(),
             storage64: self.storage64.snapshot(),
             storage64_area_bindings: self.storage64_area_bindings.clone(),
+            float_profiles: self.snapshot_float_profiles(),
         }
     }
 
@@ -1009,7 +1036,7 @@ impl ReferenceMachine {
             return Err(MachineProblem::IncompatibleSnapshot);
         }
         self.validate_return_restore(&snapshot)?;
-        if !matches!(snapshot.schema_version, 1..=12)
+        if !matches!(snapshot.schema_version, 1..=13)
             || snapshot.program_counter > self.operations.len()
             || snapshot.base_storage.iter().map(Vec::len).sum::<usize>()
                 > self.invocation.limits.max_storage_bytes as usize
@@ -1024,6 +1051,7 @@ impl ReferenceMachine {
         {
             return Err(MachineProblem::IncompatibleSnapshot);
         }
+        let names = self.validate_profiles(snapshot.schema_version, &snapshot.float_profiles)?;
         let mut restored_storage64 = self.new_storage64_arena();
         self.restore_storage64_snapshot(&mut restored_storage64, &snapshot)?;
         let base_used = snapshot
@@ -1227,8 +1255,15 @@ impl ReferenceMachine {
         } else {
             None
         });
+        self.restore_checkpoint_float_profiles(
+            snapshot.schema_version,
+            &snapshot.float_profiles,
+            names,
+        );
         self.install_storage64_snapshot(restored_storage64, area_bindings);
         self.pending = None;
+        self.pending_pc = None;
+        self.host_failure_pc = None;
         self.deferred_drive = None;
         self.normal_return = None;
         Ok(())
@@ -1249,6 +1284,7 @@ impl ReferenceMachine {
                 | "mainframe-env.reference-machine-checkpoint@10"
                 | "mainframe-env.reference-machine-checkpoint@11"
                 | "mainframe-env.reference-machine-checkpoint@12"
+                | "mainframe-env.reference-machine-checkpoint@13"
         ) {
             return Err(MachineProblem::IncompatibleSnapshot);
         }
@@ -1597,24 +1633,6 @@ impl ReferenceMachine {
             .collect()
     }
 
-    #[must_use]
-    pub fn position_summary(&self) -> String {
-        self.operations.get(self.pc).map_or_else(
-            || format!("pc={} completed", self.pc),
-            |operation| {
-                format!(
-                    "pc={} {} {:?} role={:?} scope={:?} text={:?}",
-                    self.pc,
-                    operation.identity.name(),
-                    arguments(operation),
-                    optional_text_attribute(operation, "control_role"),
-                    optional_text_attribute(operation, "control_scope"),
-                    optional_text_attribute(operation, "control_text")
-                )
-            },
-        )
-    }
-
     fn resume_host(&mut self, result: EffectResult) -> Result<(), MachineProblem> {
         let pending = self
             .pending
@@ -1687,6 +1705,7 @@ impl ReferenceMachine {
                 )),
                 (_, problem) => MachineProblem::Host(problem),
             })?;
+        let outcome = dataset_reply::complete_whole_input(&pending.kind, outcome)?;
         match (pending.kind, outcome) {
             (PendingKind::Accept { target, .. }, HostResult::Terminal(payload)) => {
                 self.condition_status.accept_exception = false;
@@ -2707,8 +2726,9 @@ impl ReferenceMachine {
             .map(control_tokens)
             .map(|tokens| tokens.into_iter().skip(1).collect::<Vec<_>>())
             .collect::<Vec<_>>();
+        let start = self.search_start(args, &index_name)?;
         let mut found = false;
-        for occurrence in 1..=active {
+        for occurrence in start..=active {
             self.implicit.insert(
                 normalize(&index_name),
                 CobolValue::Decimal(Decimal {
@@ -4256,28 +4276,6 @@ impl ReferenceMachine {
         Ok(record)
     }
 
-    fn finish_dataset_read(
-        &mut self,
-        target: &str,
-        into: Option<&str>,
-        depending_on: Option<&str>,
-        record: &[u8],
-    ) -> Result<(), MachineProblem> {
-        self.write(target, record)?;
-        if let Some(depending_on) = depending_on {
-            self.write_decimal(
-                depending_on,
-                Decimal {
-                    coefficient: record.len() as i128,
-                    scale: 0,
-                },
-            )?;
-        }
-        if let Some(into) = into {
-            self.write(into, record)?;
-        }
-        Ok(())
-    }
     fn ims_effect(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
         let opcode = args
             .iter()
@@ -4517,6 +4515,7 @@ impl ReferenceMachine {
         effect
             .validate(HostLimits::default())
             .map_err(MachineProblem::Host)?;
+        self.pending_pc = Some(self.host_call_issuing_pc(&kind));
         self.pending = Some(Pending {
             sequence: self.effect_sequence,
             kind,
@@ -4823,6 +4822,7 @@ impl ReferenceMachine {
                 } else {
                     decimal_subtract(self.arithmetic_mode, current, amount)?
                 };
+                self.validate_index_adjustment(target, amount, value, &args[direction + 2..])?;
                 if self.layout(target).is_some() {
                     layout_assignments.push((vec![target.clone()], value, false));
                 } else if matches!(
@@ -4846,6 +4846,9 @@ impl ReferenceMachine {
         let to = position(args, "TO").ok_or(MachineProblem::InvalidOperation)?;
         if to == 0 || to + 1 >= args.len() {
             return Err(MachineProblem::InvalidOperation);
+        }
+        if self.has_index_target(&args[..to]) {
+            return self.set_indexes(&args[..to], &args[to + 1..]);
         }
         let targets = self
             .arithmetic_items(&args[..to], true)?
@@ -5928,165 +5931,6 @@ impl ReferenceMachine {
         }
         Ok(overflow)
     }
-    fn inspect_op(&mut self, args: &[String]) -> Result<(), MachineProblem> {
-        if args.is_empty() {
-            return Err(MachineProblem::InvalidOperation);
-        }
-        let control = ["CONVERTING", "REPLACING", "TALLYING"]
-            .into_iter()
-            .filter_map(|keyword| position(args, keyword))
-            .min()
-            .unwrap_or(args.len());
-        let reference = self.reference(&args[..control])?;
-        let source = self.read_reference(&reference)?;
-        let range = self.inspect_range(&source, args)?;
-        if let Some(converting) = position(args, "CONVERTING") {
-            if args.get(converting + 2).is_none_or(|token| token != "TO") {
-                return Err(MachineProblem::InvalidOperation);
-            }
-            let from = self.resolve(
-                args.get(converting + 1)
-                    .ok_or(MachineProblem::InvalidOperation)?,
-            )?;
-            let to = self.resolve(
-                args.get(converting + 3)
-                    .ok_or(MachineProblem::InvalidOperation)?,
-            )?;
-            if from.is_empty() || from.len() != to.len() {
-                return Err(MachineProblem::DataException);
-            }
-            let mut converted = source.clone();
-            for byte in &mut converted[range.clone()] {
-                *byte = from
-                    .iter()
-                    .position(|candidate| candidate == byte)
-                    .map_or(*byte, |index| to[index]);
-            }
-            self.write_reference(&reference, &converted)?;
-        } else if let Some(replacing) = position(args, "REPLACING") {
-            let mode = args
-                .get(replacing + 1)
-                .ok_or(MachineProblem::InvalidOperation)?;
-            let by = position(args, "BY").ok_or(MachineProblem::InvalidOperation)?;
-            let to = self.resolve(args.get(by + 1).ok_or(MachineProblem::InvalidOperation)?)?;
-            let mut replaced = source.clone();
-            match mode.as_str() {
-                "CHARACTERS" => {
-                    if to.len() != 1 {
-                        return Err(MachineProblem::DataException);
-                    }
-                    replaced[range.clone()].fill(to[0]);
-                }
-                "ALL" | "LEADING" | "FIRST" => {
-                    let from = self.resolve(
-                        args.get(replacing + 2)
-                            .ok_or(MachineProblem::InvalidOperation)?,
-                    )?;
-                    if from.is_empty() || from.len() != to.len() {
-                        return Err(MachineProblem::DataException);
-                    }
-                    let inspected = &mut replaced[range.clone()];
-                    if mode == "LEADING" {
-                        let mut offset = 0usize;
-                        while inspected
-                            .get(offset..offset.saturating_add(from.len()))
-                            .is_some_and(|candidate| candidate == from)
-                        {
-                            inspected[offset..offset + from.len()].copy_from_slice(&to);
-                            offset += from.len();
-                        }
-                    } else if mode == "FIRST" {
-                        if let Some(at) = find_bytes(inspected, &from) {
-                            inspected[at..at + from.len()].copy_from_slice(&to);
-                        }
-                    } else {
-                        let all = replace_bytes(inspected, &from, &to)?;
-                        inspected.copy_from_slice(&all);
-                    }
-                }
-                _ => return Err(MachineProblem::UnsupportedForm),
-            }
-            self.write_reference(&reference, &replaced)?;
-        } else if let Some(tallying) = position(args, "TALLYING") {
-            let target = args
-                .get(tallying + 1)
-                .ok_or(MachineProblem::InvalidOperation)?;
-            let for_at = position(args, "FOR").ok_or(MachineProblem::InvalidOperation)?;
-            let mode = args
-                .get(for_at + 1)
-                .ok_or(MachineProblem::InvalidOperation)?;
-            let inspected = &source[range];
-            let count = match mode.as_str() {
-                "CHARACTERS" => inspected.len(),
-                "ALL" | "LEADING" => {
-                    let needle = self.resolve(
-                        args.get(for_at + 2)
-                            .ok_or(MachineProblem::InvalidOperation)?,
-                    )?;
-                    if mode == "ALL" {
-                        count_bytes(inspected, &needle)?
-                    } else if needle.is_empty() {
-                        return Err(MachineProblem::InvalidOperation);
-                    } else {
-                        let mut offset = 0usize;
-                        while inspected
-                            .get(offset..offset.saturating_add(needle.len()))
-                            .is_some_and(|candidate| candidate == needle)
-                        {
-                            offset += needle.len();
-                        }
-                        offset / needle.len()
-                    }
-                }
-                _ => return Err(MachineProblem::UnsupportedForm),
-            };
-            let next = decimal_add(
-                self.arithmetic_mode,
-                self.decimal(target)?,
-                Decimal {
-                    coefficient: i128::try_from(count)
-                        .map_err(|_| MachineProblem::ResourceExhausted)?,
-                    scale: 0,
-                },
-            )?;
-            self.write_decimal(target, next)?;
-        }
-        Ok(())
-    }
-
-    fn inspect_range(
-        &self,
-        source: &[u8],
-        args: &[String],
-    ) -> Result<std::ops::Range<usize>, MachineProblem> {
-        let delimiter = |keyword: &str| -> Result<Option<Vec<u8>>, MachineProblem> {
-            position(args, keyword)
-                .map(|at| {
-                    let at = at
-                        + 1
-                        + usize::from(args.get(at + 1).is_some_and(|token| token == "INITIAL"));
-                    self.resolve(args.get(at).ok_or(MachineProblem::InvalidOperation)?)
-                })
-                .transpose()
-        };
-        let after = delimiter("AFTER")?;
-        let before = delimiter("BEFORE")?;
-        let start = if let Some(after) = after {
-            let Some(at) = find_bytes(source, &after) else {
-                return Ok(source.len()..source.len());
-            };
-            at.checked_add(after.len())
-                .ok_or(MachineProblem::ResourceExhausted)?
-        } else {
-            0
-        };
-        let end = before
-            .as_ref()
-            .and_then(|before| find_bytes(&source[start..], before))
-            .map_or(source.len(), |at| start + at);
-        Ok(start..end)
-    }
-
     fn initialize_op(&mut self, args: &[String]) -> Result<(), MachineProblem> {
         let with_filler = args
             .windows(2)
@@ -7075,7 +6919,7 @@ impl ReferenceMachine {
         }
         if tokens.len() == 1
             && self.layout(&tokens[0]).is_none()
-            && let Some(value) = self.implicit.get(&normalize(&tokens[0]))
+            && let Some(value) = eib::implicit_value(&self.implicit, &normalize(&tokens[0]))
         {
             return Ok(value.clone());
         }
@@ -7955,7 +7799,7 @@ impl ReferenceMachine {
         rounded: bool,
     ) -> Result<(), MachineProblem> {
         let implicit = normalize(target);
-        if let Some(slot) = self.implicit.get_mut(&implicit) {
+        if let Some(slot) = eib::implicit_slot(&mut self.implicit, &implicit) {
             *slot = CobolValue::Decimal(value);
             if self.layout(target).is_none() {
                 return Ok(());
@@ -8064,16 +7908,8 @@ impl ReferenceMachine {
                         }
                         _ => return Err(MachineProblem::SubscriptError),
                     };
-                    if index == 0 || index > *occurs {
-                        return Err(MachineProblem::SubscriptError);
-                    }
-                    offset = offset
-                        .checked_add(
-                            (index - 1)
-                                .checked_mul(*stride)
-                                .ok_or(MachineProblem::SubscriptError)?,
-                        )
-                        .ok_or(MachineProblem::SubscriptError)?;
+                    offset =
+                        self.checked_subscript_offset(tokens, index, *occurs, *stride, offset)?;
                 }
                 length = layout.element_length.min(layout.length);
             }
@@ -8221,7 +8057,7 @@ impl ReferenceMachine {
     }
     fn write(&mut self, name: &str, value: &[u8]) -> Result<(), MachineProblem> {
         let implicit = normalize(name);
-        if let Some(current) = self.implicit.get(&implicit) {
+        if let Some(current) = eib::implicit_value(&self.implicit, &implicit) {
             let next = match current {
                 CobolValue::Decimal(_) => CobolValue::Decimal(
                     decimal_text(&String::from_utf8_lossy(value))
@@ -8483,10 +8319,16 @@ impl Machine for ReferenceMachine {
         quantum: Quantum,
     ) -> MachineDrive<Self::Effect> {
         self.normal_return = None;
+        self.host_failure_pc = None;
         let result = (|| -> Result<MachineDrive<Self::Effect>, MachineProblem> {
             match resume {
                 MachineResume::Start if self.pending.is_none() => {}
-                MachineResume::HostResult(result) => self.resume_host(result)?,
+                MachineResume::HostResult(result) => {
+                    let issuing_pc = self.pending_pc.take();
+                    self.resume_host(result).inspect_err(|_| {
+                        self.host_failure_pc = issuing_pc;
+                    })?;
+                }
                 MachineResume::Cancelled => {
                     return Ok(self.interrupted_drive(FailureCategory::Cancelled));
                 }
@@ -8566,7 +8408,7 @@ impl Machine for ReferenceMachine {
     fn checkpoint(&self) -> Option<BoundedPayload> {
         let bytes = self.checkpoint_bytes()?;
         BoundedPayload::new(
-            "mainframe-env.reference-machine-checkpoint@12",
+            self.checkpoint_schema(),
             bytes,
             InvocationLimits {
                 max_payload_bytes: usize::try_from(
@@ -8606,7 +8448,7 @@ fn push_string_list(output: &mut Vec<u8>, values: &[String]) -> Option<()> {
 }
 
 pub(super) fn encode_snapshot_prefix(snapshot: &MachineSnapshot) -> Option<Vec<u8>> {
-    let mut bytes = b"MECP0012".to_vec();
+    let mut bytes = float_checkpoint::snapshot_header(snapshot.schema_version).to_vec();
     bytes.extend_from_slice(&snapshot.schema_version.to_be_bytes());
     bytes.extend_from_slice(&u64::try_from(snapshot.program_counter).ok()?.to_be_bytes());
     bytes.extend_from_slice(&snapshot.effect_sequence.to_be_bytes());
@@ -8661,6 +8503,7 @@ fn decode_snapshot(
         b"MECP0010" => 10,
         b"MECP0011" => 11,
         b"MECP0012" => 12,
+        b"MECP0013" => 13,
         _ => return Err(MachineProblem::IncompatibleSnapshot),
     };
     let schema_version = input.u32()?;
@@ -8991,6 +8834,7 @@ fn decode_snapshot(
         max_frames,
         &mut remaining_storage,
     )?;
+    let float_profiles = float_checkpoint::decode(&mut input, header_version, max_storage)?;
     if !input.finished() {
         return Err(MachineProblem::IncompatibleSnapshot);
     }
@@ -9020,6 +8864,7 @@ fn decode_snapshot(
         random_state,
         storage64,
         storage64_area_bindings,
+        float_profiles,
     })
 }
 
@@ -9324,10 +9169,20 @@ fn layout_metadata(operations: &[Operation]) -> Result<LayoutState, MachineProbl
             digits: usize_attribute(operation, "digits")?,
             scale: u32::try_from(usize_attribute(operation, "scale")?)
                 .map_err(|_| MachineProblem::InvalidOperation)?,
+            float_profile: match optional_text_attribute(operation, "float_profile") {
+                Some(mainframe_env_ir::COBOL_FLOAT_HEX) => float_codec::FloatProfile::Hex,
+                Some(mainframe_env_ir::COBOL_FLOAT_IEEE) | None => float_codec::FloatProfile::Ieee,
+                _ => {
+                    return Err(MachineProblem::InvalidArtifact(
+                        "unknown floating profile".into(),
+                    ));
+                }
+            },
             native_binary: optional_integer_attribute(operation, "native_binary")
                 .unwrap_or_default()
                 != 0,
             signed: integer_attribute(operation, "signed")? != 0,
+            sign_leading: sign_placement::sign_leading(operation)?,
             sign_separate: integer_attribute(operation, "sign_separate")? != 0,
             justified_right: optional_integer_attribute(operation, "justified_right")
                 .unwrap_or_default()
@@ -9858,73 +9713,6 @@ fn integer_value(coefficient: i128) -> CobolValue {
         coefficient,
         scale: 0,
     })
-}
-
-fn split_function_arguments<'a>(
-    machine: &ReferenceMachine,
-    tokens: &'a [String],
-) -> Result<Vec<&'a [String]>, MachineProblem> {
-    if tokens.is_empty() {
-        return Ok(Vec::new());
-    }
-    let mut arguments = Vec::new();
-    let mut start = 0usize;
-    let mut depth = 0usize;
-    for (index, token) in tokens.iter().enumerate() {
-        match token.as_str() {
-            "(" => depth = depth.saturating_add(1),
-            ")" => {
-                depth = depth
-                    .checked_sub(1)
-                    .ok_or(MachineProblem::InvalidOperation)?
-            }
-            "," if depth == 0 => {
-                if start == index {
-                    return Err(MachineProblem::InvalidOperation);
-                }
-                arguments.push(&tokens[start..index]);
-                start = index + 1;
-            }
-            _ => {}
-        }
-    }
-    if depth != 0 || start == tokens.len() {
-        return Err(MachineProblem::InvalidOperation);
-    }
-    arguments.push(&tokens[start..]);
-    if arguments.len() > 1 {
-        return Ok(arguments);
-    }
-    let mut depth = 0usize;
-    let mut arithmetic = false;
-    for token in tokens {
-        match token.as_str() {
-            "(" => depth += 1,
-            ")" => depth = depth.saturating_sub(1),
-            "+" | "-" | "*" | "/" if depth == 0 => arithmetic = true,
-            _ => {}
-        }
-    }
-    if arithmetic && machine.eval_expression(tokens).is_ok() {
-        return Ok(arguments);
-    }
-    let mut inferred = Vec::new();
-    let mut at = 0usize;
-    while at < tokens.len() {
-        let end = (at + 1..=tokens.len())
-            .rev()
-            .find(|end| machine.eval_function_argument(&tokens[at..*end]).is_ok());
-        let Some(end) = end else {
-            return if arithmetic && inferred.is_empty() {
-                Ok(arguments)
-            } else {
-                Err(MachineProblem::InvalidOperation)
-            };
-        };
-        inferred.push(&tokens[at..end]);
-        at = end;
-    }
-    Ok(inferred)
 }
 
 fn decimal_abs(mut value: Decimal) -> Result<Decimal, MachineProblem> {
@@ -10787,44 +10575,15 @@ fn decode_decimal(layout: &LayoutMetadata, bytes: &[u8]) -> Result<Decimal, Mach
                 .ok_or(MachineProblem::DataException)?
                 .coefficient
         }
-        LayoutCategory::FloatShort => {
-            let bytes: [u8; 4] = bytes
-                .try_into()
-                .map_err(|_| MachineProblem::DataException)?;
-            decimal_from_float(f64::from(f32::from_be_bytes(bytes)))?.coefficient
-        }
-        LayoutCategory::FloatLong => {
-            let bytes: [u8; 8] = bytes
-                .try_into()
-                .map_err(|_| MachineProblem::DataException)?;
-            decimal_from_float(f64::from_be_bytes(bytes))?.coefficient
+        LayoutCategory::FloatShort | LayoutCategory::FloatLong => {
+            return float_codec::decode(layout, bytes);
         }
         _ => return Err(MachineProblem::DataException),
     };
-    if matches!(
-        layout.category,
-        LayoutCategory::FloatShort | LayoutCategory::FloatLong
-    ) {
-        let value = match layout.category {
-            LayoutCategory::FloatShort => f64::from(f32::from_be_bytes(
-                bytes
-                    .try_into()
-                    .map_err(|_| MachineProblem::DataException)?,
-            )),
-            LayoutCategory::FloatLong => f64::from_be_bytes(
-                bytes
-                    .try_into()
-                    .map_err(|_| MachineProblem::DataException)?,
-            ),
-            _ => unreachable!(),
-        };
-        decimal_from_float(value)
-    } else {
-        Ok(Decimal {
-            coefficient,
-            scale: layout.scale,
-        })
-    }
+    Ok(Decimal {
+        coefficient,
+        scale: layout.scale,
+    })
 }
 
 fn decode_display(bytes: &[u8], separate: bool) -> Result<i128, MachineProblem> {
@@ -10933,18 +10692,13 @@ fn encode_decimal(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Ma
             let copy = digits.len().min(output.len());
             let start = output.len() - copy;
             output[start..].copy_from_slice(&digits.as_bytes()[digits.len() - copy..]);
-            if layout.signed && !layout.sign_separate {
-                let last = output.last_mut().ok_or(MachineProblem::SizeError)?;
-                let overpunch = if value.coefficient < 0 {
-                    b"}JKLMNOPQR"
-                } else {
-                    b"{ABCDEFGHI"
-                };
-                *last = overpunch[usize::from(*last - b'0')];
-            }
-            if layout.sign_separate {
-                output.push(if value.coefficient < 0 { b'-' } else { b'+' });
-            }
+            sign_placement::encode_sign(
+                &mut output,
+                layout.signed,
+                layout.sign_leading,
+                layout.sign_separate,
+                value.coefficient < 0,
+            )?;
             Ok(output)
         }
         LayoutCategory::PackedDecimal => {
@@ -10980,14 +10734,9 @@ fn encode_decimal(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Ma
             Ok(output)
         }
         LayoutCategory::NumericEdited => encode_edited(layout, value),
-        LayoutCategory::FloatShort => {
-            let value = decimal_to_float(value)?;
-            if !value.is_finite() || value < f64::from(f32::MIN) || value > f64::from(f32::MAX) {
-                return Err(MachineProblem::SizeError);
-            }
-            Ok((value as f32).to_be_bytes().to_vec())
+        LayoutCategory::FloatShort | LayoutCategory::FloatLong => {
+            float_codec::encode(layout, value)
         }
-        LayoutCategory::FloatLong => Ok(decimal_to_float(value)?.to_be_bytes().to_vec()),
         _ => Err(MachineProblem::DataException),
     }
 }
@@ -11619,37 +11368,6 @@ fn json_figurative_bytes(layout: &LayoutMetadata, value: &str, length: usize) ->
     Some(bytes)
 }
 
-fn replace_bytes(source: &[u8], from: &[u8], to: &[u8]) -> Result<Vec<u8>, MachineProblem> {
-    if from.is_empty() || from.len() != to.len() {
-        return Err(MachineProblem::UnsupportedForm);
-    }
-    let mut result = source.to_vec();
-    let mut offset = 0usize;
-    while let Some(position) = find_bytes(&result[offset..], from) {
-        let start = offset + position;
-        result[start..start + from.len()].copy_from_slice(to);
-        offset = start + from.len();
-    }
-    Ok(result)
-}
-
-fn count_bytes(source: &[u8], needle: &[u8]) -> Result<usize, MachineProblem> {
-    if needle.is_empty() {
-        return Err(MachineProblem::InvalidOperation);
-    }
-    let mut count = 0usize;
-    let mut offset = 0usize;
-    while let Some(position) = find_bytes(&source[offset..], needle) {
-        count = count
-            .checked_add(1)
-            .ok_or(MachineProblem::ResourceExhausted)?;
-        offset = offset
-            .checked_add(position + needle.len())
-            .ok_or(MachineProblem::ResourceExhausted)?;
-    }
-    Ok(count)
-}
-
 fn failure_drive(category: FailureCategory, message: &str) -> MachineDrive<EffectRequest> {
     MachineDrive::Failed(
         ExecutionProblem::new(
@@ -11751,7 +11469,12 @@ mod instance;
 mod size_truncation_tests;
 
 #[cfg(test)]
+mod host_call_failure_tests;
+
+#[cfg(test)]
 mod tests {
+    mod dataset_completeness;
+
     use super::*;
     use mainframe_env_execution_api::{
         ArtifactRef, CapabilityId, ExecutionId, IdempotencyKey, Principal, PrincipalId, RequestId,
@@ -11759,7 +11482,7 @@ mod tests {
     };
     use mainframe_env_ir::{Effect, IrLimits, ModuleBuilder};
 
-    fn divide_rounding_machine() -> ReferenceMachine {
+    pub(super) fn divide_rounding_machine() -> ReferenceMachine {
         let mut machine =
             ReferenceMachine::from_binary(&binary(), invocation(), CodecLimits::default()).unwrap();
         for name in ["R", "SRC", "Q", "REM"] {
@@ -11783,7 +11506,9 @@ mod tests {
                     digits: 9,
                     scale: 2,
                     native_binary: false,
+                    float_profile: float_codec::FloatProfile::Hex,
                     signed: true,
+                    sign_leading: false,
                     sign_separate: false,
                     justified_right: false,
                     blank_when_zero: false,
@@ -12036,7 +11761,9 @@ mod tests {
                 digits: 11,
                 scale: 0,
                 native_binary: false,
+                float_profile: float_codec::FloatProfile::Hex,
                 signed: false,
+                sign_leading: false,
                 sign_separate: false,
                 justified_right: false,
                 blank_when_zero: false,
@@ -12362,6 +12089,132 @@ mod tests {
         }
     }
     #[test]
+    fn intrinsic_random_argument_is_evaluated_once() {
+        let machine = display_fixture();
+        let expected = CobolValue::Decimal(Decimal {
+            coefficient: 481999410520547004,
+            scale: 18,
+        });
+        // The standalone RANDOM path is unchanged from origin/main.
+        machine.random_state.set(Some(42));
+        assert_eq!(
+            machine.eval_value(&["FUNCTION".into(), "RANDOM".into()]),
+            Ok(expected.clone())
+        );
+        assert_eq!(machine.random_state.get(), Some(10481999410520546993));
+
+        for expression in [
+            "FUNCTION MAX ( FUNCTION RANDOM , 0 )",
+            "FUNCTION MAX ( FUNCTION RANDOM 0 )",
+            "FUNCTION MAX ( FUNCTION RANDOM ; 0 0 )",
+            "FUNCTION MAX ( FUNCTION RANDOM ( ) + 0 , 0 )",
+            "FUNCTION MAX ( FUNCTION MIN ( FUNCTION RANDOM , 1 ) , 0 )",
+        ] {
+            machine.random_state.set(Some(42));
+            let tokens = expression
+                .split_whitespace()
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            assert_eq!(
+                machine.eval_value(&tokens),
+                Ok(expected.clone()),
+                "{expression}"
+            );
+            assert_eq!(
+                machine.random_state.get(),
+                Some(10481999410520546993),
+                "{expression}"
+            );
+        }
+    }
+
+    #[test]
+    fn intrinsic_argument_boundaries_do_not_evaluate_functions() {
+        let machine = display_fixture();
+        for expression in [
+            "FUNCTION RANDOM , 0",
+            "FUNCTION RANDOM 0",
+            "FUNCTION RANDOM ( ) + 0 , 0",
+            "FUNCTION MIN ( FUNCTION RANDOM , 1 ) , 0",
+        ] {
+            machine.random_state.set(Some(42));
+            let tokens = expression
+                .split_whitespace()
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            let arguments = split_function_arguments(&machine, &tokens).unwrap();
+            assert_eq!(arguments.len(), 2, "{expression}");
+            assert_eq!(arguments[1], ["0"], "{expression}");
+            assert_eq!(machine.random_state.get(), Some(42), "{expression}");
+        }
+    }
+
+    #[test]
+    fn list_intrinsics_evaluate_space_and_mixed_separators() {
+        let mut machine = display_fixture();
+        machine.implicit.insert("A".into(), integer_value(7));
+        machine.implicit.insert("B".into(), integer_value(-3));
+        for (expression, expected) in [
+            ("FUNCTION MAX ( A B )", 7),
+            ("FUNCTION MAX ( A , B )", 7),
+            ("FUNCTION MAX ( A B 42 )", 42),
+            ("FUNCTION MAX ( A , B 42 )", 42),
+            ("FUNCTION MAX ( A B , 42 )", 42),
+            ("FUNCTION MAX ( A ; B 42 )", 42),
+            ("FUNCTION MAX ( A B * 4 42 )", 42),
+            ("FUNCTION MIN ( A ( B * 4 ) )", -12),
+            ("FUNCTION MAX ( TABLE-ITEM ( 1 ) , TABLE-ITEM ( 2 ) 3 )", 3),
+            ("FUNCTION MIN ( OTHER-ID ( B * 4 ) )", -12),
+            ("FUNCTION MAX ( DFHRESP ( NORMAL ) , 1 )", 1),
+        ] {
+            let tokens = expression
+                .split_whitespace()
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            let value = machine.eval_value(&tokens);
+            assert!(
+                matches!(value, Ok(CobolValue::Decimal(Decimal { coefficient, scale: 0 })) if coefficient == expected),
+                "{expression}: {value:?}"
+            );
+        }
+    }
+    #[test]
+    fn space_separated_table_arguments_remain_subscripted() {
+        let machine = display_fixture();
+        let tokens = "FUNCTION MAX ( TABLE-ITEM ( 1 ) TABLE-ITEM ( 2 ) )"
+            .split_whitespace()
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        let arguments = split_function_arguments(&machine, &tokens[3..tokens.len() - 1]).unwrap();
+        assert_eq!(arguments.len(), 2);
+        assert_eq!(arguments[0], ["TABLE-ITEM", "(", "1", ")"]);
+        assert_eq!(arguments[1], ["TABLE-ITEM", "(", "2", ")"]);
+        assert_eq!(
+            machine.eval_value(&tokens),
+            Ok(CobolValue::Bytes(b"00000000002".to_vec()))
+        );
+    }
+
+    #[test]
+    fn intrinsic_separator_inference_preserves_keyword_arguments() {
+        let machine = display_fixture();
+        for separator in [vec![","], vec![";"], vec![]] {
+            let tokens = [
+                vec!["FUNCTION", "TRIM", "(", "' ABC '"],
+                separator,
+                vec!["LEADING", ")"],
+            ]
+            .concat()
+            .into_iter()
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+            assert_eq!(
+                machine.eval_value(&tokens),
+                Ok(CobolValue::Bytes(b"ABC ".to_vec()))
+            );
+        }
+    }
+    #[test]
     fn write_without_from_uses_record_name_and_preserves_fixed_length() {
         let mut builder = ModuleBuilder::new(IrLimits::default());
         for (name, length) in [("REC", 5), ("WS-ITEM", 5), ("FILE-STATUS", 2)] {
@@ -12459,7 +12312,9 @@ mod tests {
             digits: length,
             scale,
             native_binary: false,
+            float_profile: float_codec::FloatProfile::Hex,
             signed,
+            sign_leading: false,
             sign_separate: false,
             justified_right: false,
             blank_when_zero: false,
@@ -12779,7 +12634,9 @@ mod tests {
             digits: 11,
             scale: 2,
             native_binary: false,
+            float_profile: float_codec::FloatProfile::Hex,
             signed: true,
+            sign_leading: false,
             sign_separate: false,
             justified_right: false,
             blank_when_zero: false,
@@ -13067,7 +12924,9 @@ mod tests {
             digits,
             scale,
             native_binary: false,
+            float_profile: float_codec::FloatProfile::Hex,
             signed: true,
+            sign_leading: false,
             sign_separate: false,
             justified_right: false,
             blank_when_zero,
@@ -13101,7 +12960,9 @@ mod tests {
             digits: 5,
             scale: 0,
             native_binary: false,
+            float_profile: float_codec::FloatProfile::Hex,
             signed: true,
+            sign_leading: false,
             sign_separate: false,
             justified_right: false,
             blank_when_zero: false,
@@ -13237,7 +13098,9 @@ mod tests {
                 digits: 4,
                 scale: 0,
                 native_binary: false,
+                float_profile: float_codec::FloatProfile::Hex,
                 signed: false,
+                sign_leading: false,
                 sign_separate: false,
                 justified_right: false,
                 blank_when_zero: false,
@@ -13292,6 +13155,7 @@ mod tests {
                     records: vec![vec![b'A'; 12]],
                     identities: vec![b"1".to_vec()],
                     version: 1,
+                    more: false,
                 },
             )),
         })
@@ -13321,6 +13185,7 @@ mod tests {
                     records: vec![vec![b'B'; 39]],
                     identities: vec![b"2".to_vec()],
                     version: 2,
+                    more: false,
                 },
             )),
         })

@@ -1,9 +1,9 @@
 {
   "counts": {
-    "markdown_documents": 244,
+    "markdown_documents": 247,
     "navigation_groups": 8,
-    "normative_documents": 100,
-    "xtask_commands": 163
+    "normative_documents": 103,
+    "xtask_commands": 165
   },
   "documents": [
     {
@@ -82,9 +82,9 @@
       "normative": false,
       "path": "conformance/spec/README.md",
       "relative_links": 0,
-      "sha256": "sha256:b9c8b2ea1272a51a174b8b54366351ca211ef3caf578576b7e6991d6ca1ea424",
+      "sha256": "sha256:d1546a76e2cf1ee7c9a7a98b7fadc92b184a19a87249e57221eea55f8905c2c6",
       "title": "Shared Conformance IR v1",
-      "xtask_commands": 3
+      "xtask_commands": 4
     },
     {
       "normative": false,
@@ -138,7 +138,7 @@
       "normative": false,
       "path": "crates/apps/mainframe-env-cli/README.md",
       "relative_links": 4,
-      "sha256": "sha256:c5c1aefdd2b4c52d90484f79cf152e7a4243dda1884513de75a17f540e7fc858",
+      "sha256": "sha256:19b9b952d58d31432837027f8131e91452db72deebd2f50e486c63a00e481f78",
       "title": "mainframe-env-cli",
       "xtask_commands": 0
     },
@@ -349,8 +349,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 183,
-      "sha256": "sha256:28158325238278108924706334a670d0324a7ad094f443455e9acbc6f4d43a65",
+      "relative_links": 186,
+      "sha256": "sha256:060c6e7fa8e618b989d99261400f11de612625e347ce00c562bbf1dedbe5a887",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -383,9 +383,9 @@
       "normative": true,
       "owner": "CICS provider maintainers",
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
-      "relative_links": 25,
+      "relative_links": 28,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:b7d66ce43c278928cb3e63488945b8d7bcb9c9731e2b2d01b0634f832cdb4f0d",
+      "sha256": "sha256:c602540e04edcfba2fa0650170a59893dfb6be435a1da27b7d0feef9244ec236",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -407,9 +407,9 @@
       "normative": true,
       "owner": "compiler and interpreter maintainers",
       "path": "docs/architecture/COBOL-RUNTIME-SEMANTICS.md",
-      "relative_links": 0,
+      "relative_links": 1,
       "scope": "COBOL runtime semantic contracts",
-      "sha256": "sha256:ac91f6e4eec46a346d252ac43e670b59e9f784bf48aff24d10bdf038145ec59a",
+      "sha256": "sha256:90e7f0666c13eb12bc6d24f0260d6167f858c7c638b90d83574657ac7e53b425",
       "status": "Frozen for mainframe-env cobol.execution implementation",
       "title": "COBOL runtime semantic contracts",
       "xtask_commands": 0
@@ -421,7 +421,7 @@
       "path": "docs/architecture/COMPILER-AND-IR.md",
       "relative_links": 1,
       "scope": "compiler stages, IR contracts, and publication pipeline",
-      "sha256": "sha256:76d3b6017452017e912750e5688c646b60bc502d37972b4ce309f0dff7244165",
+      "sha256": "sha256:e788d62e803f605f7939d0b0496f744016815e37651c037979e7ca1752967ded",
       "status": "Accepted by repository owner",
       "title": "Compiler and IR Architecture",
       "xtask_commands": 0
@@ -455,9 +455,9 @@
       "normative": true,
       "owner": "dataset provider maintainers",
       "path": "docs/architecture/DATASET-VSAM-AMS.md",
-      "relative_links": 0,
+      "relative_links": 1,
       "scope": "dataset, VSAM, catalog, and AMS authority",
-      "sha256": "sha256:e69beb77f1a971c3f19e8982d1d8136883c76ca96212e66268eee9b0b4ee31c6",
+      "sha256": "sha256:94a54ec04c0f4bb623885f366266deedc0b53ea0aa3529d4229f4764486079bb",
       "status": "Normative from dataset.data",
       "title": "Dataset, VSAM, catalog, and AMS authority",
       "xtask_commands": 2
@@ -505,7 +505,7 @@
       "path": "docs/architecture/JES-EXECUTION.md",
       "relative_links": 1,
       "scope": "JES execution, scheduling, spool, and utility behavior",
-      "sha256": "sha256:36185b99ff17a072338d42faf064bb95c5e34e664b71e4b62da6f76901843df3",
+      "sha256": "sha256:50d4a9072b9ac017f62a85470b09c3748445c3b204316831b2dfbf9c358ebe92",
       "status": "Normative from mainframe-env jes.execution",
       "title": "JES execution, scheduling, spool, and utilities",
       "xtask_commands": 1
@@ -969,7 +969,7 @@
       "path": "docs/decisions/0027-cics-logical-program-frames.md",
       "relative_links": 0,
       "scope": "local LINK and INVOKE APPLICATION on an existing task",
-      "sha256": "sha256:37eff1fed09b50ce3a2e7d211a85df1dd1cde926866b0aba9fc4f51875eff377",
+      "sha256": "sha256:9595e240853f40864c0a8eb38f271b5ac2c4dc6c6af2f3d90224c66b3dc12289",
       "status": "Proposed for CIC-902.program-task.frames; acceptance pending",
       "title": "ADR-0027: CICS task ownership across logical program frames",
       "xtask_commands": 0
@@ -1455,6 +1455,42 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env dataset result contract @3",
+      "normative": true,
+      "owner": "Dataset and shared host-contract maintainers",
+      "path": "docs/decisions/0051-dataset-read-completeness.md",
+      "relative_links": 0,
+      "scope": "Bounded dataset read results and whole-input consumers",
+      "sha256": "sha256:6191c7d6b87abd9c57ea9a214a2933c1bb30d0a9e20c25e25b32f2d9a00027b1",
+      "status": "Proposed implementation for issue #186",
+      "title": "ADR-0051: Explicit dataset read completeness",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env newly compiled COBOL decimal plans",
+      "normative": true,
+      "owner": "COBOL compiler and decimal runtime maintainers",
+      "path": "docs/decisions/0052-cobol-fixed-point-intermediate-precision.md",
+      "relative_links": 1,
+      "scope": "Typed ADD/COMPUTE plans and compile-time numeric admission",
+      "sha256": "sha256:7330331303fda1b1836df881fb365ed73ba46a1e74b5b15c4ffe6fd4f70d5850",
+      "status": "Accepted for the bounded #158/#159 repair with documented source assumptions",
+      "title": "ADR-0052: Separate COBOL data and intermediate precision",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env issue #160",
+      "normative": true,
+      "owner": "COBOL compiler and interpreter maintainers",
+      "path": "docs/decisions/0053-cobol-hex-float-storage.md",
+      "relative_links": 1,
+      "scope": "COMP-1/COMP-2 layout attributes and reference-machine checkpoint profiles",
+      "sha256": "sha256:d0b380015196afe3b7db8cb0c3a4266447770ccdda1f36c99a402886eb080f1b",
+      "status": "Accepted for the authorized #160 implementation; licensed differential pending",
+      "title": "ADR-0053: Declare COBOL floating storage profiles and checkpoint interpretation",
+      "xtask_commands": 0
+    },
+    {
       "applies_from": "mainframe-env unreleased CICS baseline lint integration (pending merge)",
       "normative": true,
       "owner": "CICS provider maintainers",
@@ -1469,8 +1505,8 @@
     {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 53,
-      "sha256": "sha256:43f9927331159d83f380ef579a56c577b54c4fcdc6aae56121dc8a9ebb8b086b",
+      "relative_links": 56,
+      "sha256": "sha256:d7a6025ad20106a46203f2d8dc254e35ecf50e878e7ab0dfd6766d78e8a6824c",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1538,7 +1574,7 @@
       "normative": false,
       "path": "docs/delivery/WORK-AUDIT-2026-10-11.md",
       "relative_links": 81,
-      "sha256": "sha256:3520c46266fc97af3d51ca60da7cbe46e0e603d79d24c296aa10abc58485122c",
+      "sha256": "sha256:ff38febdb768b4a14135d861878bf2ffba25ba8c80579db8a5db8051208fb068",
       "title": "Roadmap and contribution audit — 2026-10-11",
       "xtask_commands": 0
     },
@@ -1649,8 +1685,8 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/cics/application-api-status.md",
-      "relative_links": 34,
-      "sha256": "sha256:e3f3393deb90c99696ea028e276dad937001af74f1bb73c56d0a87b63a8b0fc3",
+      "relative_links": 35,
+      "sha256": "sha256:7d2dca19ec836d516d3b7e97137580f04521724265f3b9235ca43d5a735b3328",
       "title": "CICS — Application API progress",
       "xtask_commands": 5
     },
@@ -1874,7 +1910,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/jcl/planning-status.md",
       "relative_links": 0,
-      "sha256": "sha256:8d0591b812c1c9f583a88f6d5383dc165082d44f4b9dde294c362ff8eb28ae30",
+      "sha256": "sha256:1fdee9dea99984638355c8783c49d747dc711dce4656fbd8c36a36a9b72fa628",
       "title": "JCL — Converter and planner progress",
       "xtask_commands": 0
     },
@@ -2290,9 +2326,9 @@
       "normative": false,
       "path": "docs/runbooks/COBOL-DIFFERENTIAL.md",
       "relative_links": 0,
-      "sha256": "sha256:ccffa273c310b031cc96a96f59a5e2e15d1464f7346d2d1e08ec0e74d2e2d945",
-      "title": "COBOL semantic differential pilot",
-      "xtask_commands": 1
+      "sha256": "sha256:df3e0e91635c2b22090bd6ca09d912dd1c6a9f5783825c7704debc53ba9033e1",
+      "title": "Randomized COBOL differential testing v1",
+      "xtask_commands": 2
     },
     {
       "normative": false,
@@ -2812,6 +2848,18 @@
           "path": "docs/decisions/0050-host-effect-envelope-layout.md"
         },
         {
+          "label": "ADR-0051: Explicit dataset read completeness",
+          "path": "docs/decisions/0051-dataset-read-completeness.md"
+        },
+        {
+          "label": "ADR-0052: COBOL fixed-point intermediate precision",
+          "path": "docs/decisions/0052-cobol-fixed-point-intermediate-precision.md"
+        },
+        {
+          "label": "ADR-0053: COBOL HFP storage and checkpoint profiles",
+          "path": "docs/decisions/0053-cobol-hex-float-storage.md"
+        },
+        {
           "label": "ADR-0100: Borrowed CICS input bundles",
           "path": "docs/decisions/0100-cics-borrowed-input-bundles.md"
         }
@@ -3040,7 +3088,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:80a9e9352c38b0b208779bf252718ced3398de060482dee9e54e5f99b608962b",
+  "registry_sha256": "sha256:ec38a50f1f5d0d67911ae76cbc39fdf1e7ac08bbc98486a622d7d504b4c6e0fd",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

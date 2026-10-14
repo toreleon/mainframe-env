@@ -45,6 +45,8 @@ enum Command {
         format: Format,
         #[arg(long = "library", value_name = "DIRECTORY")]
         libraries: Vec<PathBuf>,
+        #[command(flatten)]
+        sql: SqlPrecompile,
     },
     Run {
         source: PathBuf,
@@ -52,6 +54,8 @@ enum Command {
         format: Format,
         #[arg(long = "library", value_name = "DIRECTORY")]
         libraries: Vec<PathBuf>,
+        #[command(flatten)]
+        sql: SqlPrecompile,
     },
     Inspect {
         source: PathBuf,
@@ -59,7 +63,32 @@ enum Command {
         format: Format,
         #[arg(long = "library", value_name = "DIRECTORY")]
         libraries: Vec<PathBuf>,
+        #[command(flatten)]
+        sql: SqlPrecompile,
     },
+}
+
+#[derive(clap::Args, Clone, Copy, Default)]
+struct SqlPrecompile {
+    /// Expand EXEC SQL INCLUDE members (automatic when INCLUDE is present).
+    #[arg(long, conflicts_with = "no_sql_precompile")]
+    sql_precompile: bool,
+    /// Disable EXEC SQL INCLUDE expansion.
+    #[arg(long, conflicts_with = "sql_precompile")]
+    no_sql_precompile: bool,
+}
+
+impl SqlPrecompile {
+    fn options(self) -> BTreeMap<String, String> {
+        if self.sql_precompile || self.no_sql_precompile {
+            BTreeMap::from([(
+                "cobol.sql-precompile".into(),
+                self.sql_precompile.to_string(),
+            )])
+        } else {
+            BTreeMap::new()
+        }
+    }
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -86,8 +115,15 @@ fn run(cli: Cli) -> Result<(), String> {
             source,
             format,
             libraries,
+            sql,
         } => {
-            let result = compile(&source, format, &libraries, CompilationMode::Executable)?;
+            let result = compile(
+                &source,
+                format,
+                &libraries,
+                sql,
+                CompilationMode::Executable,
+            )?;
             match result {
                 CompilerResult::Published {
                     artifact,
@@ -120,8 +156,9 @@ fn run(cli: Cli) -> Result<(), String> {
             source,
             format,
             libraries,
+            sql,
         } => {
-            let bundle = bundle(&source, format, &libraries)?;
+            let bundle = bundle(&source, format, &libraries, sql)?;
             let analysis = CobolCompiler::default().analyze(&bundle);
             if cli.json {
                 let diagnostics = analysis.diagnostics.iter().map(|d|
@@ -160,8 +197,15 @@ fn run(cli: Cli) -> Result<(), String> {
             source,
             format,
             libraries,
+            sql,
         } => {
-            let result = compile(&source, format, &libraries, CompilationMode::Executable)?;
+            let result = compile(
+                &source,
+                format,
+                &libraries,
+                sql,
+                CompilationMode::Executable,
+            )?;
             let CompilerResult::Published { artifact, .. } = result else {
                 return Err(format!("compilation failed: {result:?}"));
             };
@@ -206,9 +250,10 @@ fn compile(
     path: &PathBuf,
     format: Format,
     libraries: &[PathBuf],
+    sql: SqlPrecompile,
     mode: CompilationMode,
 ) -> Result<CompilerResult, String> {
-    let source = bundle(path, format, libraries)?;
+    let source = bundle(path, format, libraries, sql)?;
     CobolCompiler::new(CobolCompilerLimits::default())
         .compile(CompilerRequest {
             source,
@@ -223,6 +268,7 @@ fn bundle(
     path: &PathBuf,
     format: Format,
     library_roots: &[PathBuf],
+    sql: SqlPrecompile,
 ) -> Result<SourceBundle, String> {
     let bytes = fs::read(path).map_err(|error| format!("{}: {error}", path.display()))?;
     let name = path
@@ -240,10 +286,6 @@ fn bundle(
         limits,
     )
     .map_err(|error| error.to_string())?;
-    if library_roots.is_empty() {
-        return SourceBundle::new(&logical, vec![file], BTreeMap::new(), Vec::new(), limits)
-            .map_err(|error| error.to_string());
-    }
     let mut files = vec![file];
     let mut libraries = Vec::with_capacity(library_roots.len() + 1);
     for (index, root) in library_roots.iter().enumerate() {
@@ -261,18 +303,22 @@ fn bundle(
         );
         files.extend(loaded.into_iter().map(|(_, file)| file));
     }
-    let abi = materialize_host_abi_libraries(
-        &[cics_abi_library(), db2_abi_library(), mq_abi_library()],
-        limits,
-    )
-    .map_err(|error| error.to_string())?;
+    let definitions = [cics_abi_library(), db2_abi_library(), mq_abi_library()];
+    // Db2 supplies SQLCA even when the application has no source libraries.
+    let definitions = if library_roots.is_empty() {
+        &definitions[1..2]
+    } else {
+        &definitions[..]
+    };
+    let abi =
+        materialize_host_abi_libraries(definitions, limits).map_err(|error| error.to_string())?;
     files.extend(abi.files);
     libraries.extend(abi.libraries);
     SourceBundle::with_libraries(
         &logical,
         files,
         libraries,
-        BTreeMap::new(),
+        sql.options(),
         Vec::new(),
         limits,
     )
@@ -401,6 +447,199 @@ mod tests {
         Cli::command().debug_assert();
     }
 
+    #[test]
+    fn sqlca_is_product_supplied_without_application_libraries() {
+        let fixture = Fixture::new();
+        let source = fixture.0.join("LGACDB01.cbl");
+        // GenApp-style fixed-format fragment. Db2 13 SQLCA topic unavailable
+        // offline; the existing Db2-owned host ABI is the layout authority.
+        fs::write(&source, "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. LGACDB01.\n       DATA DIVISION.\n       WORKING-STORAGE SECTION.\n           EXEC SQL INCLUDE SQLCA END-EXEC.\n       PROCEDURE DIVISION.\n           MOVE 0 TO SQLCODE.\n           MOVE '00000' TO SQLSTATE.\n           EXEC SQL SELECT 1 END-EXEC.\n           GOBACK.\n").unwrap();
+        let bundle = bundle(
+            &source,
+            Format::Fixed,
+            &[],
+            SqlPrecompile {
+                sql_precompile: true,
+                no_sql_precompile: false,
+            },
+        )
+        .unwrap();
+        let analysis = CobolCompiler::default().analyze(&bundle);
+        assert!(
+            analysis.diagnostics.is_empty(),
+            "{:?}",
+            analysis.diagnostics
+        );
+        assert_eq!(
+            bundle.resolve_library_member("SQLCA").unwrap().bytes(),
+            db2_abi_library().members[0].source.as_bytes(),
+        );
+        let semantic = analysis.semantic.unwrap();
+        assert_eq!(semantic.layout("SQLCA").unwrap().length, 136);
+        for (name, offset, length) in [
+            ("SQLCAID", 0, 8),
+            ("SQLCABC", 8, 4),
+            ("SQLCODE", 12, 4),
+            ("SQLERRM", 16, 72),
+            ("SQLERRML", 16, 2),
+            ("SQLERRMC", 18, 70),
+            ("SQLERRP", 88, 8),
+            ("SQLERRD", 96, 24),
+            ("SQLWARN", 120, 11),
+            ("SQLSTATE", 131, 5),
+        ] {
+            let layout = semantic.layout(name).unwrap();
+            assert_eq!((layout.offset, layout.length), (offset, length), "{name}");
+        }
+        for (index, suffix) in "0123456789A".chars().enumerate() {
+            let layout = semantic.layout(&format!("SQLWARN{suffix}")).unwrap();
+            assert_eq!((layout.offset, layout.length), (120 + index, 1));
+        }
+        for (name, digits) in [
+            ("SQLCABC", 9),
+            ("SQLCODE", 9),
+            ("SQLERRML", 4),
+            ("SQLERRD", 9),
+        ] {
+            let layout = semantic.layout(name).unwrap();
+            assert_eq!(
+                layout.usage,
+                mainframe_env_compiler::CobolUsage::NativeBinary
+            );
+            assert_eq!(layout.digits, digits);
+            assert!(layout.signed);
+        }
+        let sqlerrd = semantic.layout("SQLERRD").unwrap();
+        assert_eq!((sqlerrd.occurs, sqlerrd.element_length), (6, 4));
+        for flag in [None, Some("--sql-precompile")] {
+            let mut args = vec![
+                "mainframe-env",
+                "compile",
+                source.to_str().unwrap(),
+                "--format",
+                "fixed",
+            ];
+            if let Some(flag) = flag {
+                args.push(flag);
+            }
+            assert!(run(Cli::try_parse_from(args).unwrap()).is_ok());
+        }
+    }
+
+    #[test]
+    fn application_sqlca_precedes_product_sqlca_and_other_missing_includes_fail() {
+        let fixture = Fixture::new();
+        let source = fixture.0.join("SQLTEST.cbl");
+        let library = fixture.0.join("copybooks");
+        fs::create_dir_all(&library).unwrap();
+        fs::write(
+            library.join("SQLCA.cpy"),
+            "01 SQLCA. 05 APP-SQLCA PIC X VALUE 'A'.",
+        )
+        .unwrap();
+        let program = "IDENTIFICATION DIVISION. PROGRAM-ID. SQLTEST. DATA DIVISION. \
+            WORKING-STORAGE SECTION. EXEC SQL INCLUDE SQLCA END-EXEC. \
+            PROCEDURE DIVISION. DISPLAY APP-SQLCA. GOBACK.";
+        fs::write(&source, program).unwrap();
+        let result = compile(
+            &source,
+            Format::Free,
+            std::slice::from_ref(&library),
+            SqlPrecompile::default(),
+            CompilationMode::Executable,
+        )
+        .unwrap();
+        assert!(
+            matches!(result, CompilerResult::Published { .. }),
+            "{result:?}"
+        );
+        for member in ["SQLDA", "MISSING"] {
+            fs::write(
+                &source,
+                program.replace("INCLUDE SQLCA", &format!("INCLUDE {member}")),
+            )
+            .unwrap();
+            let CompilerResult::Failed { diagnostics, .. } = compile(
+                &source,
+                Format::Free,
+                &[],
+                SqlPrecompile::default(),
+                CompilationMode::Executable,
+            )
+            .unwrap() else {
+                panic!("missing {member} must fail");
+            };
+            assert!(
+                diagnostics.iter().any(|d| d
+                    .public_message()
+                    .contains(&format!("EXEC SQL INCLUDE member {member} was not found"))),
+                "{diagnostics:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn cli_sql_precompile_overrides_apply_to_all_product_commands() {
+        let fixture = Fixture::new();
+        let source = fixture.0.join("SQLMAIN.cbl");
+        let library = fixture.0.join("dcl");
+        fs::create_dir_all(&library).unwrap();
+        fs::write(&source, b"IDENTIFICATION DIVISION. PROGRAM-ID. SQLMAIN. DATA DIVISION. WORKING-STORAGE SECTION. EXEC SQL INCLUDE DCLROW END-EXEC. PROCEDURE DIVISION. ADD 1 TO DCL-LEN. STOP RUN.").unwrap();
+        fs::write(library.join("DCLROW.dcl"), b"01 DCL-LEN PIC 9(4) VALUE 0.").unwrap();
+        for command in ["compile", "inspect", "run"] {
+            for flag in [None, Some("--sql-precompile"), Some("--no-sql-precompile")] {
+                let mut args = vec![
+                    "mainframe-env",
+                    command,
+                    source.to_str().unwrap(),
+                    "--library",
+                    library.to_str().unwrap(),
+                ];
+                if let Some(flag) = flag {
+                    args.push(flag);
+                }
+                let cli = Cli::try_parse_from(args).unwrap();
+                let sql = match &cli.command {
+                    Command::Compile { sql, .. }
+                    | Command::Inspect { sql, .. }
+                    | Command::Run { sql, .. } => *sql,
+                };
+                assert_eq!(
+                    run(cli).is_ok(),
+                    command == "inspect" || flag != Some("--no-sql-precompile")
+                );
+                let source =
+                    bundle(&source, Format::Free, std::slice::from_ref(&library), sql).unwrap();
+                let analysis = CobolCompiler::default().analyze(&source);
+                assert_eq!(
+                    analysis.diagnostics.is_empty(),
+                    flag != Some("--no-sql-precompile")
+                );
+                assert_eq!(
+                    source
+                        .options()
+                        .get("cobol.sql-precompile")
+                        .map(String::as_str),
+                    match flag {
+                        Some("--sql-precompile") => Some("true"),
+                        Some("--no-sql-precompile") => Some("false"),
+                        _ => None,
+                    }
+                );
+            }
+            assert!(
+                Cli::try_parse_from([
+                    "mainframe-env",
+                    command,
+                    "SQLMAIN.cbl",
+                    "--sql-precompile",
+                    "--no-sql-precompile",
+                ])
+                .is_err()
+            );
+        }
+    }
+
     /// Level-88 condition-names declared on an alphanumeric group item,
     /// before the group's subordinate items, must compile, evaluate in
     /// `IF`, and write correctly in `SET ... TO TRUE`. Mirrors
@@ -423,7 +662,14 @@ mod tests {
             b"IDENTIFICATION DIVISION.\nPROGRAM-ID. LEVEL88G.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 WS-GROUP.\n 88 WS-GROUP-INVALID VALUE '000'.\n 88 WS-GROUP-VALID VALUE LOW-VALUES.\n 05 WS-FLAG-A PIC X(01) VALUE '0'.\n 05 WS-FLAG-B PIC X(01) VALUE '0'.\n 05 WS-FLAG-C PIC X(01) VALUE '0'.\nPROCEDURE DIVISION.\nIF WS-GROUP-INVALID DISPLAY 'BEFORE-TRUE' ELSE DISPLAY 'BEFORE-FALSE' END-IF.\nSET WS-GROUP-VALID TO TRUE.\nDISPLAY WS-GROUP.\nIF WS-GROUP-INVALID DISPLAY 'AFTER-TRUE' ELSE DISPLAY 'AFTER-FALSE' END-IF.\nIF WS-GROUP-VALID DISPLAY 'VALID-TRUE' ELSE DISPLAY 'VALID-FALSE' END-IF.\nSTOP RUN.\n",
         )
         .unwrap();
-        let result = compile(&source, Format::Free, &[], CompilationMode::Executable).unwrap();
+        let result = compile(
+            &source,
+            Format::Free,
+            &[],
+            SqlPrecompile::default(),
+            CompilationMode::Executable,
+        )
+        .unwrap();
         let CompilerResult::Published { artifact, .. } = result else {
             panic!("group-level condition-name program did not publish: {result:?}");
         };
@@ -471,7 +717,14 @@ mod tests {
             b"IDENTIFICATION DIVISION.\nPROGRAM-ID. LEVEL88H.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 FEEDBACK-CODE.\n 02 FEEDBACK-TOKEN-VALUE.\n 88 FC-INVALID-DATE VALUE X'0000000000000000'.\n 88 FC-INSUFFICIENT-DATA VALUE X'000309CB59C3C5C5'.\n 03 CASE-1-CONDITION-ID.\n 04 SEVERITY PIC S9(4) BINARY VALUE 0.\n 04 MSG-NO PIC S9(4) BINARY VALUE 0.\n 03 CASE-SEV-CTL PIC X VALUE X'00'.\n 03 FACILITY-ID PIC XXX VALUE X'000000'.\nPROCEDURE DIVISION.\nIF FC-INVALID-DATE DISPLAY 'BEFORE-TRUE' ELSE DISPLAY 'BEFORE-FALSE' END-IF.\nSET FC-INSUFFICIENT-DATA TO TRUE.\nDISPLAY FEEDBACK-TOKEN-VALUE.\nIF FC-INVALID-DATE DISPLAY 'AFTER-TRUE' ELSE DISPLAY 'AFTER-FALSE' END-IF.\nIF FC-INSUFFICIENT-DATA DISPLAY 'INSUFFICIENT-TRUE' ELSE DISPLAY 'INSUFFICIENT-FALSE' END-IF.\nSTOP RUN.\n",
         )
         .unwrap();
-        let result = compile(&source, Format::Free, &[], CompilationMode::Executable).unwrap();
+        let result = compile(
+            &source,
+            Format::Free,
+            &[],
+            SqlPrecompile::default(),
+            CompilationMode::Executable,
+        )
+        .unwrap();
         let CompilerResult::Published { artifact, .. } = result else {
             panic!("hexadecimal group-level condition-name program did not publish: {result:?}");
         };
@@ -513,7 +766,14 @@ mod tests {
             b"IDENTIFICATION DIVISION.\nPROGRAM-ID. LEVEL88S.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 WS-TEXT PIC X(3) VALUE 'A  '.\n 88 MATCH-QUOTED VALUE 'A'.\n 88 MATCH-HEX VALUE X'41'.\nPROCEDURE DIVISION.\nIF MATCH-QUOTED DISPLAY 'QUOTED-TRUE' END-IF.\nIF MATCH-HEX DISPLAY 'HEX-TRUE' END-IF.\nMOVE 'ZZZ' TO WS-TEXT.\nSET MATCH-HEX TO TRUE.\nDISPLAY WS-TEXT.\nIF MATCH-HEX DISPLAY 'SET-TRUE' END-IF.\nSTOP RUN.\n",
         )
         .unwrap();
-        let result = compile(&source, Format::Free, &[], CompilationMode::Executable).unwrap();
+        let result = compile(
+            &source,
+            Format::Free,
+            &[],
+            SqlPrecompile::default(),
+            CompilationMode::Executable,
+        )
+        .unwrap();
         let CompilerResult::Published { artifact, .. } = result else {
             panic!("short hexadecimal condition program did not publish: {result:?}");
         };
@@ -544,6 +804,56 @@ mod tests {
     }
 
     #[test]
+    fn cli_sql_include_expands_dcl_from_library_and_reports_missing_member() {
+        let fixture = Fixture::new();
+        let source = fixture.0.join("DCLTEST.cbl");
+        let library = fixture.0.join("dcl");
+        fs::create_dir_all(&library).unwrap();
+        fs::write(
+            &source,
+            b"IDENTIFICATION DIVISION. PROGRAM-ID. DCLTEST. DATA DIVISION. \
+              WORKING-STORAGE SECTION. EXEC SQL INCLUDE DCLROW END-EXEC. \
+              PROCEDURE DIVISION. ADD 1 TO DCL-TR-DESCRIPTION-LEN. STOP RUN.",
+        )
+        .unwrap();
+        fs::write(
+            library.join("DCLROW.dcl"),
+            b"01 DCL-TR-DESCRIPTION-LEN PIC 9(4) VALUE 0.",
+        )
+        .unwrap();
+        let result = compile(
+            &source,
+            Format::Free,
+            std::slice::from_ref(&library),
+            SqlPrecompile::default(),
+            CompilationMode::Executable,
+        )
+        .unwrap();
+        assert!(
+            matches!(result, CompilerResult::Published { .. }),
+            "{result:?}"
+        );
+        let CompilerResult::Failed { diagnostics, .. } = compile(
+            &source,
+            Format::Free,
+            &[],
+            SqlPrecompile::default(),
+            CompilationMode::Executable,
+        )
+        .unwrap() else {
+            panic!("missing SQL INCLUDE member must fail compilation");
+        };
+        assert!(
+            diagnostics.iter().any(|diagnostic| {
+                diagnostic
+                    .public_message()
+                    .contains("SQL INCLUDE member DCLROW was not found")
+            }),
+            "{diagnostics:?}"
+        );
+    }
+
+    #[test]
     fn cli_builds_ordered_fixed_libraries_with_subsystem_abi_sources() {
         let fixture = Fixture::new();
         let source = fixture.0.join("MAIN.cbl");
@@ -554,7 +864,13 @@ mod tests {
         fs::write(&source, b"       COPY REC.\n").unwrap();
         fs::write(first.join("REC.cpy"), b"       01 FIRST-VALUE PIC X.\n").unwrap();
         fs::write(second.join("REC.cpy"), b"       01 SECOND-VALUE PIC X.\n").unwrap();
-        let bundle = bundle(&source, Format::Fixed, &[first, second]).unwrap();
+        let bundle = bundle(
+            &source,
+            Format::Fixed,
+            &[first, second],
+            SqlPrecompile::default(),
+        )
+        .unwrap();
         assert_eq!(bundle.libraries().len(), 5);
         assert!(
             String::from_utf8_lossy(bundle.resolve_library_member("REC").unwrap().bytes())
@@ -572,7 +888,15 @@ mod tests {
         fs::write(&source, b"       COPY REC.\n").unwrap();
         fs::write(library.join("REC.cpy"), b"A").unwrap();
         fs::write(library.join("REC.copy"), b"B").unwrap();
-        assert!(bundle(&source, Format::Fixed, &[library]).is_err());
-        assert!(bundle(&source, Format::Fixed, &[fixture.0.join("missing")]).is_err());
+        assert!(bundle(&source, Format::Fixed, &[library], SqlPrecompile::default()).is_err());
+        assert!(
+            bundle(
+                &source,
+                Format::Fixed,
+                &[fixture.0.join("missing")],
+                SqlPrecompile::default()
+            )
+            .is_err()
+        );
     }
 }

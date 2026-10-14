@@ -348,8 +348,10 @@ pub(super) fn commit(
         writes.push(session_write(&run.session, current, next)?);
     }
     writes.push(state_write(&run.session, state, service)?);
-    if request.operation == CicsOperation::SendControl
-        && let Some(mutation) = super::partition_set::mark_control_send(service, run)?
+    if matches!(
+        request.operation,
+        CicsOperation::SendControl | CicsOperation::SendMap | CicsOperation::SendText
+    ) && let Some(mutation) = super::partition_set::mark_control_send(service, run)?
     {
         writes.push(mutation);
     }

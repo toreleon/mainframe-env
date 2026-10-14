@@ -1,3 +1,4 @@
+mod ams_recordsize;
 mod dataset_helpers;
 use dataset_helpers::{
     dataset_attributes, dataset_mutation, join_records, member_name, records_for_write,
@@ -7,6 +8,7 @@ use batch_controller::decode_application_batch_controller;
 mod system_providers;
 use system_providers::*;
 mod dataset_input;
+mod jcl_input;
 use dataset_input::wildcard;
 mod cics_security;
 mod ims;
@@ -18,8 +20,8 @@ use crate::console_retention::{decode_console_log_rows, encode_console_log};
 use crate::jes_admission::ChildAdmissionResult;
 use crate::jes_worker::{
     DurableJesClock, JES_HEARTBEAT_MILLIS, JES_IDLE_MILLIS, JES_WORK_GENERATION, JES_WORKER_COUNT,
-    JES_WORKER_FRESHNESS_MILLIS, JesClock, JesWorkPayload, claim_durable_work,
-    clear_worker_progress, heartbeat_durable_work,
+    JES_WORKER_FRESHNESS_MILLIS, JesClock, JesWorkPayload, clear_worker_progress,
+    heartbeat_durable_work,
 };
 use crate::retention_maintenance::provider::RetentionPlanner;
 use crate::{
@@ -2631,7 +2633,7 @@ impl ProductServer {
     }
 
     fn claim_jes_work(&self, worker: &str) -> Result<Option<WorkRecord>, HostProblem> {
-        claim_durable_work(self.store.as_ref(), worker, self.jes_tick()?).map_err(store_error)
+        self.claim_jes_work_with_child_recovery(worker, self.jes_tick()?)
     }
 
     fn heartbeat_jes_work(&self, work: &WorkRecord) -> Result<(), HostProblem> {
@@ -2671,7 +2673,7 @@ impl ProductServer {
             if job.priority != work.priority {
                 return Err(HostProblem::Malformed);
             }
-            match job.state {
+            match self.child_admission_recovery_state(&payload, job.state)? {
                 mainframe_env_batch::JobState::Completed
                 | mainframe_env_batch::JobState::Failed => {
                     return match self.admit_internal_reader_children(
@@ -4482,83 +4484,9 @@ impl ProductServer {
             )
             .persist_with(|audit| self.store.record_audit(audit).map_err(store_error));
         match result.outcome.map_err(gateway_problem)? {
-            HostResult::Dataset(result) => Ok(result),
+            HostResult::Dataset(result) => result.require_complete().map_err(gateway_problem),
             _ => Err(gateway_problem(HostProblem::ProviderFailure)),
         }
-    }
-
-    fn jcl_bundle(&self, principal: &str, jcl: Vec<u8>) -> Result<JclBundle, GatewayProblem> {
-        let primary =
-            String::from_utf8(jcl).map_err(|_| gateway_problem(HostProblem::Malformed))?;
-        let mut cataloged_procedures = BTreeMap::new();
-        for library in jcl_library_names(&primary).map_err(gateway_problem)? {
-            self.authorize_resource(principal, "DATASET", &library, AccessIntent::Read)?;
-            let dataset = DatasetName::new(library, 128)
-                .map_err(|_| gateway_problem(HostProblem::Malformed))?;
-            let (ccsid, members) = match (
-                self.dataset
-                    .invoke(DatasetRequest::Attributes {
-                        dataset: dataset.clone(),
-                    })
-                    .map_err(gateway_problem)?,
-                self.dataset
-                    .invoke(DatasetRequest::ListMembers {
-                        dataset: dataset.clone(),
-                        start: None,
-                        max_items: 4_096,
-                    })
-                    .map_err(gateway_problem)?,
-            ) {
-                (
-                    DatasetResult::Attributes { attributes, .. },
-                    DatasetResult::Members { names, more: false },
-                ) => (attributes.ccsid, names),
-                _ => return Err(gateway_problem(HostProblem::ProviderFailure)),
-            };
-            for member in members {
-                let records = match self
-                    .dataset
-                    .invoke(DatasetRequest::Read {
-                        dataset: dataset.clone(),
-                        member: Some(member.clone()),
-                        key: None,
-                        max_records: 4_096,
-                        control: Default::default(),
-                    })
-                    .map_err(gateway_problem)?
-                {
-                    DatasetResult::Records { records, .. } => records,
-                    _ => return Err(gateway_problem(HostProblem::ProviderFailure)),
-                };
-                let mut source = String::new();
-                for record in records {
-                    let mut line = match ccsid {
-                        None | Some(1208) => String::from_utf8(record)
-                            .map_err(|_| gateway_problem(HostProblem::Malformed))?,
-                        Some(37) => CodePage::Cp037
-                            .decode(&record, record.len().saturating_mul(4).max(1))
-                            .map_err(|_| gateway_problem(HostProblem::Malformed))?,
-                        Some(_) => return Err(gateway_problem(HostProblem::Unsupported)),
-                    };
-                    while line.ends_with(' ') {
-                        line.pop();
-                    }
-                    source.push_str(&line);
-                    source.push('\n');
-                }
-                if cataloged_procedures
-                    .insert(member.as_str().to_ascii_uppercase(), source)
-                    .is_some()
-                {
-                    return Err(gateway_problem(HostProblem::IdempotencyConflict));
-                }
-            }
-        }
-        Ok(JclBundle {
-            primary,
-            cataloged_procedures,
-            ..Default::default()
-        })
     }
 
     fn authorize_resource(
@@ -4892,8 +4820,7 @@ impl ProductServer {
                 ))
             }
             "DEFINE" => {
-                let name = control_name(&text, "NAME")
-                    .ok_or_else(|| gateway_problem(HostProblem::Malformed))?;
+                let (name, maximum) = ams_recordsize::define_layout(&text, &words)?;
                 self.dataset_call(
                     principal,
                     DatasetRequest::Create {
@@ -4901,7 +4828,7 @@ impl ProductServer {
                         attributes: DatasetAttributes {
                             organization: DatasetOrganization::KeySequenced,
                             record_format: RecordFormat::Variable,
-                            logical_record_length: 32760,
+                            logical_record_length: maximum,
                             key_offset: Some(0),
                             key_length: Some(8),
                             ccsid: Some(37),
@@ -5655,10 +5582,14 @@ fn install_publication_state(
 
 #[cfg(test)]
 mod tests {
+    #[path = "online_transfer_task_state.rs"]
+    mod online_transfer_task_state;
     include!("product/bts_browse.rs");
     use super::*;
     #[path = "ims_package_tests.rs"]
     mod ims_package_tests;
+    #[path = "jes_child_recovery_tests.rs"]
+    mod jes_child_recovery_tests;
     #[path = "sequential_layout_admission_tests.rs"]
     mod sequential_layout_admission_tests;
     #[path = "shisam_fixed_admission_tests.rs"]
@@ -6444,11 +6375,17 @@ mod tests {
     #[path = "bts_set_lifetime.rs"]
     mod bts_set_lifetime;
 
+    #[path = "ams_recordsize.rs"]
+    mod ams_recordsize;
+
     #[path = "program_default_abend.rs"]
     mod program_default_abend;
 
     #[path = "program_control_pending.rs"]
     mod program_control_pending;
+
+    #[path = "purge_message_matrix.rs"]
+    mod purge_message_matrix;
 
     #[test]
     #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
@@ -9066,7 +9003,7 @@ mod tests {
             &server,
             "ALICE",
             b"ALICEPASS",
-            "//PARENT JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILD JOB CLASS=A\n//RUN EXEC PGM=IKJEFT01\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n//WORK DD DSN=&&WORK,DISP=(NEW,DELETE,DELETE)\n"
+            "//PARENT JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILD JOB CLASS=A\n//RUN EXEC PGM=IKJEFT01\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n//WORK DD DSN=&&WORK,DISP=(NEW,DELETE,DELETE),\n//         DCB=(RECFM=VB,LRECL=32760)\n"
                 .into(),
         );
         let parent_id = parent["jobid"].as_str().unwrap();
@@ -9605,7 +9542,7 @@ mod tests {
             &server,
             "ALICE",
             b"ALICEPASS",
-            "//PARENT JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILD JOB CLASS=A\n//RUN EXEC PGM=IEFBR14\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n//WORK DD DSN=&&WORK,DISP=(NEW,DELETE,DELETE)\n"
+            "//PARENT JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILD JOB CLASS=A\n//RUN EXEC PGM=IEFBR14\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n//WORK DD DSN=&&WORK,DISP=(NEW,DELETE,DELETE),\n//         DCB=(RECFM=VB,LRECL=32760)\n"
                 .into(),
         );
         let parent_id = parent["jobid"].as_str().unwrap();

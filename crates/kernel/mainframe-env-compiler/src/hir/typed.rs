@@ -3127,7 +3127,7 @@ mod tests {
 
         for source in [
             "IDENTIFICATION DIVISION. PROGRAM-ID. BADBLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(2). 01 RECORD-X PIC X(4). PROCEDURE DIVISION. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) LENGTH(KEY-X) END-EXEC.",
-            "IDENTIFICATION DIVISION. PROGRAM-ID. BADBLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(2). 01 RECORD-X PIC X(4). PROCEDURE DIVISION. EXEC CICS READNEXT FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) LENGTH(2) END-EXEC.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADBLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(2). 01 RECORD-X PIC X(4). PROCEDURE DIVISION. EXEC CICS READNEXT FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) LENGTH(-1) END-EXEC.",
         ] {
             assert!(analyze(source).hir.is_none(), "{source}");
         }
@@ -4645,6 +4645,110 @@ mod tests {
         }
     }
 
+    // IBM CICS TS 6.x, api-commands:0011, dfhp4_assign.html STARTCODE.
+    #[test]
+    fn assign_startcode_accepts_two_character_output_issue_312() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. STARTCODE. DATA DIVISION. WORKING-STORAGE SECTION. 01 WS-STARTCODE PIC XX. PROCEDURE DIVISION. EXEC CICS ASSIGN STARTCODE(WS-STARTCODE) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("STARTCODE PIC XX: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed ASSIGN STARTCODE");
+        assert_eq!(command.operation, HirCicsOperation::Assign);
+        assert!(command.outputs.iter().any(|output| {
+            matches!(output.name, HirCicsOutputName::Assign(identity) if identity.name() == "STARTCODE")
+                && output.target.length == 2
+        }));
+        for picture in ["X", "XXX", "99"] {
+            let rejected = analyze(&source.replace("PIC XX", &format!("PIC {picture}")));
+            assert!(rejected.hir.is_none());
+            assert!(rejected.diagnostics.iter().any(|diagnostic| {
+                diagnostic
+                    .public_message()
+                    .contains("STARTCODE requires a two-character alphanumeric data area")
+            }));
+        }
+    }
+
+    // IBM CICS TS 6.x, api-commands:0192, dfhp4_sendtext.html WAIT.
+    #[test]
+    fn send_text_wait_lowers_completion_option_issue_312() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. SENDWAIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 MSG-X PIC X(13). PROCEDURE DIVISION. EXEC CICS SEND TEXT FROM(MSG-X) LENGTH(13) WAIT END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("SEND TEXT WAIT: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed SEND TEXT WAIT");
+        assert_eq!(command.operation, HirCicsOperation::SendText);
+        assert_eq!(command.options, BTreeSet::from([HirCicsOption::Wait]));
+    }
+
+    #[test]
+    fn send_text_wait_and_cursor_controls_lower_together() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. WAITCUR. DATA DIVISION. WORKING-STORAGE SECTION. 01 MSG-X PIC X(8). PROCEDURE DIVISION. EXEC CICS SEND TEXT FROM(MSG-X) CURSOR(7) ERASE FREEKB WAIT END-EXEC.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("SEND TEXT controls: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed SEND TEXT");
+        assert_eq!(command.operation, HirCicsOperation::SendText);
+        assert_eq!(
+            command.options,
+            BTreeSet::from([
+                HirCicsOption::Erase,
+                HirCicsOption::FreeKb,
+                HirCicsOption::Wait
+            ])
+        );
+        assert!(
+            command
+                .operands
+                .iter()
+                .any(|operand| operand.name == HirCicsOperandName::ControlCursor)
+        );
+    }
+
+    // IBM CICS TS 6.x, api-commands:0258, dfhp4_writeqts.html FROM/LENGTH.
+    #[test]
+    fn writeq_ts_rejects_length_beyond_from_area_issue_312() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. WRITEOVER. DATA DIVISION. WORKING-STORAGE SECTION. 01 WRITE-MSG-L PIC X(13). PROCEDURE DIVISION. EXEC CICS WRITEQ TS QUEUE('GENAQ') FROM(WRITE-MSG-L) LENGTH(23) END-EXEC. STOP RUN.";
+        let rejected = analyze(source);
+        assert!(rejected.hir.is_none());
+        assert!(rejected.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("CICS WRITEQ TS LENGTH exceeds the FROM data area")
+        }));
+        assert!(
+            analyze(&source.replace("LENGTH(23)", "LENGTH(13)"))
+                .hir
+                .is_some()
+        );
+    }
+
     #[test]
     fn cics_writeq_ts_local_forms_are_typed() {
         let analysis = analyze(
@@ -5221,6 +5325,46 @@ mod tests {
                 .public_message()
                 .contains("TERMINAL does not accept FROM")
         }));
+    }
+
+    #[test]
+    fn cics_send_display_valued_cursor_binds_halfword_or_literal() {
+        for command in [
+            "SEND MAP('MENU') CURSOR(CUR-X)",
+            "SEND TEXT FROM(DATA-X) CURSOR(7)",
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. SENDCUR. DATA DIVISION. WORKING-STORAGE SECTION. 01 CUR-X PIC S9(4) COMP. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC."
+            );
+            let analysis = analyze(&source);
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{command}: {:?}", analysis.diagnostics));
+            let command = hir
+                .statements
+                .iter()
+                .find_map(|statement| match statement.resolved.as_ref() {
+                    Some(HirResolvedStatement::Cics(command)) => Some(command),
+                    _ => None,
+                })
+                .unwrap();
+            assert!(
+                command
+                    .operands
+                    .iter()
+                    .any(|operand| operand.name == HirCicsOperandName::ControlCursor)
+            );
+        }
+        for command in [
+            "SEND MAP('MENU') CURSOR(-1)",
+            "SEND TEXT FROM(DATA-X) CURSOR(FULL-X)",
+            "SEND TEXT FROM(DATA-X) CURSOR",
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADCUR. DATA DIVISION. WORKING-STORAGE SECTION. 01 FULL-X PIC S9(9) COMP. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC."
+            );
+            assert!(analyze(&source).hir.is_none(), "{command}");
+        }
     }
 
     /// Issues #203 and #206: CardDemo SEND display controls and bounded lengths stay typed.
@@ -5954,6 +6098,31 @@ mod tests {
                 .public_message()
                 .contains("unknown or unreviewed top-level option ERASE")
         }));
+    }
+
+    #[test]
+    fn purge_message_matrix_cannot_claim_unready_map_or_text_accumulation() {
+        // #198: SEND CONTROL ACCUM frames do not establish page overflow.
+        // Pin the current admission boundary, not IBM's full BMS capability.
+        for command in [
+            "SEND MAP('MENU') ACCUM PAGING",
+            "SEND TEXT FROM(TEXT-X) ACCUM PAGING",
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. PURGEPG. DATA DIVISION. \
+                 WORKING-STORAGE SECTION. 01 TEXT-X PIC X(5) VALUE 'HELLO'. \
+                 PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| { diagnostic.public_message().contains("ACCUM") }),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
     }
 
     #[test]
@@ -7371,6 +7540,134 @@ mod tests {
     }
 
     #[test]
+    fn cics_read_and_rewrite_accept_halfword_length_literals() {
+        for length in [0, 8, 32_767] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. LITLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). 01 KEY-X PIC X(16). 01 R PIC S9(9) COMP. 01 R2 PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) LENGTH({length}) KEYLENGTH(16) RESP(R) RESP2(R2) END-EXEC. EXEC CICS REWRITE FILE('ACCTDAT') FROM(REC-X) LENGTH({length}) END-EXEC. STOP RUN."
+            ));
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("literal LENGTH({length}): {:?}", analysis.diagnostics));
+            let commands = hir
+                .statements
+                .iter()
+                .filter_map(|statement| match statement.resolved.as_ref() {
+                    Some(HirResolvedStatement::Cics(command)) => Some(command),
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(commands.len(), 2);
+            for command in &commands {
+                assert!(command.operands.iter().any(|operand| {
+                    operand.name == HirCicsOperandName::Length
+                        && operand.value == HirCicsValue::Integer(length)
+                }));
+                assert!(
+                    !command
+                        .outputs
+                        .iter()
+                        .any(|output| { output.name == HirCicsOutputName::Length })
+                );
+            }
+            assert!(commands[0].operands.iter().any(|operand| {
+                operand.name == HirCicsOperandName::KeyLength
+                    && operand.value == HirCicsValue::Integer(16)
+            }));
+        }
+    }
+
+    #[test]
+    fn cics_file_length_literals_reject_invalid_halfwords_and_missing_names() {
+        for command in [
+            "READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) LENGTH",
+            "READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) KEYLENGTH",
+            "REWRITE FILE('ACCTDAT') FROM(REC-X) LENGTH",
+        ] {
+            let relation = if command.ends_with("KEYLENGTH") {
+                " GTEQ"
+            } else {
+                ""
+            };
+            for invalid in [
+                "-1",
+                "-0",
+                "1.5",
+                "32768",
+                "2147483647",
+                "999999999999999999999",
+            ] {
+                let analysis = analyze(&format!(
+                    "IDENTIFICATION DIVISION. PROGRAM-ID. BADLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). 01 KEY-X PIC X(16). PROCEDURE DIVISION. EXEC CICS {command}({invalid}){relation} END-EXEC. STOP RUN."
+                ));
+                assert!(analysis.hir.is_none(), "{command}({invalid})");
+                assert!(
+                    analysis.diagnostics.iter().any(|diagnostic| {
+                        diagnostic
+                            .public_message()
+                            .contains("literal must be an integer between 0 and 32767")
+                    }),
+                    "{command}({invalid}): {:?}",
+                    analysis.diagnostics
+                );
+            }
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADNAME. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). 01 KEY-X PIC X(16). PROCEDURE DIVISION. EXEC CICS {command}(MISSING-X) END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none());
+            assert!(
+                analysis.diagnostics.iter().any(|diagnostic| {
+                    diagnostic
+                        .public_message()
+                        .contains("cannot resolve MISSING-X: Missing")
+                }),
+                "{:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+
+    #[test]
+    fn cics_sibling_file_commands_accept_halfword_length_literals() {
+        for command in [
+            "READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) LENGTH(8) KEYLENGTH(0) GTEQ",
+            "READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) KEYLENGTH(32767)",
+            "READNEXT FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) LENGTH(8) KEYLENGTH(16)",
+            "READPREV FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) LENGTH(8) KEYLENGTH(16)",
+            "STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) KEYLENGTH(16)",
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. SIBLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). 01 KEY-X PIC X(16). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{command}: {:?}", analysis.diagnostics));
+            let cics = hir
+                .statements
+                .iter()
+                .find_map(|statement| match statement.resolved.as_ref() {
+                    Some(HirResolvedStatement::Cics(command)) => Some(command),
+                    _ => None,
+                })
+                .expect("typed file command");
+            assert!(
+                cics.operands
+                    .iter()
+                    .filter(|operand| {
+                        matches!(
+                            operand.name,
+                            HirCicsOperandName::Length | HirCicsOperandName::KeyLength
+                        )
+                    })
+                    .all(|operand| matches!(operand.value, HirCicsValue::Integer(_)))
+            );
+        }
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADREWR. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). PROCEDURE DIVISION. EXEC CICS REWRITE FILE('ACCTDAT') FROM(REC-X) KEYLENGTH(16) END-EXEC. STOP RUN.",
+        );
+        assert!(analysis.hir.is_none(), "REWRITE has no KEYLENGTH option");
+    }
+
+    #[test]
     fn cics_file_lengths_lower_as_typed_values_and_read_output() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). 01 KEY-X PIC X(3). 01 LEN-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) LENGTH(LEN-X) KEYLENGTH(LENGTH OF KEY-X) END-EXEC. EXEC CICS REWRITE FILE('ACCTDAT') FROM(REC-X) LENGTH(LENGTH OF REC-X) END-EXEC. STOP RUN.";
         let hir = analyze(source).hir.expect("typed CICS length HIR");
@@ -7433,7 +7730,7 @@ mod tests {
                 .any(|output| output.name == HirCicsOutputName::Length)
         );
 
-        for invalid in ["LENGTH(8)", "LENGTH(LENGTH OF KEY-X)"] {
+        for invalid in ["LENGTH(-1)", "LENGTH(LENGTH OF KEY-X)"] {
             let analysis = analyze(&format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. BADRLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). 01 KEY-X PIC X(3). PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) {invalid} END-EXEC. STOP RUN."
             ));

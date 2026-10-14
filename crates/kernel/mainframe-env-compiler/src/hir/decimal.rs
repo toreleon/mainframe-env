@@ -39,8 +39,8 @@ pub(crate) fn execution_policy(
     arithmetic_mode: &str,
 ) -> Result<DecimalExecutionPolicy, DecimalPlanProblem> {
     match arithmetic_mode {
-        "compatible" => Ok(DecimalExecutionPolicy::decimal18_v1()),
-        "extended" => Ok(DecimalExecutionPolicy::decimal34_v1()),
+        "compatible" => Ok(DecimalExecutionPolicy::cobol_compat_v2()),
+        "extended" => Ok(DecimalExecutionPolicy::cobol_extend_v2()),
         _ => Err(DecimalPlanProblem::InvalidArithmeticContext),
     }
 }

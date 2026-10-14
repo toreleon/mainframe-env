@@ -159,6 +159,16 @@ impl HostResult {
                     validate_dataset_snapshot(snapshot, limits)
                 }
             }
+            Self::Dataset(DatasetResult::Records {
+                records,
+                more: true,
+                ..
+            })
+            | Self::Dataset(DatasetResult::MemberGeneration {
+                records,
+                more: true,
+                ..
+            }) if records.is_empty() => Err(HostProblem::Malformed),
             Self::Dataset(DatasetResult::MemberGeneration { generation: 0, .. }) => {
                 Err(HostProblem::Malformed)
             }

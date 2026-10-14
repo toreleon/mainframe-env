@@ -326,6 +326,7 @@ pub(crate) fn effect_result(effect: &EffectRequest) -> Result<EffectResult, Stri
                 records: vec![b"RECORD  ".to_vec(), b"AA01    ".to_vec()],
                 identities: vec![b"RE".to_vec(), b"AA".to_vec()],
                 version: 1,
+                more: false,
             })
         }
         HostRequest::Dataset(DatasetRequest::ReadNext { .. }) => {
@@ -468,13 +469,111 @@ mod tests {
     }
 
     #[test]
+    fn arith_compat_preserves_cancellation_through_the_artifact_contract() {
+        let body = "IDENTIFICATION DIVISION. PROGRAM-ID. ARITH-RUNTIME. DATA DIVISION. WORKING-STORAGE SECTION. 01 A-X PIC 9(18) VALUE 999999999999999999. 01 RESULT-X PIC 9(3). PROCEDURE DIVISION. COMPUTE RESULT-X = (A-X + 2) - A-X. DISPLAY RESULT-X. STOP RUN.";
+        for mode in ["COMPAT", "EXTEND"] {
+            let (output, _) = execute_without_effects(&format!("PROCESS ARITH({mode})\n{body}"))
+                .expect("ARITH cancellation runtime");
+            assert_eq!(output, b"002\n");
+        }
+        let extended = "PROCESS ARITH(EXTEND)\nIDENTIFICATION DIVISION. PROGRAM-ID. WIDE-RUNTIME. DATA DIVISION. WORKING-STORAGE SECTION. 01 A-X PIC 9(20) VALUE 99999999999999999999. 01 RESULT-X PIC 9(21). PROCEDURE DIVISION. COMPUTE RESULT-X = A-X + 1. DISPLAY RESULT-X. STOP RUN.";
+        assert_eq!(
+            execute_without_effects(extended).unwrap().0,
+            b"100000000000000000000\n"
+        );
+    }
+
+    #[test]
+    fn decimal_intermediates_survive_nested_division_and_receiver_conversion() {
+        let cases = [
+            (
+                "01 Q PIC 9V9(12).",
+                "COMPUTE Q = 1 / 3.",
+                "Q",
+                "0333333333333\n",
+            ),
+            (
+                "01 Q PIC 9V9(12).",
+                "COMPUTE Q = (1 / 3) * 2.",
+                "Q",
+                "0666666666666\n",
+            ),
+            (
+                "01 Q PIC 9V9(12).",
+                "COMPUTE Q = (1 / 1000000000000) * 1000000000000.",
+                "Q",
+                "1000000000000\n",
+            ),
+            (
+                "01 Q PIC 9V9(12).",
+                "COMPUTE Q = 1 / 300000000000.",
+                "Q",
+                "0000000000003\n",
+            ),
+            (
+                "01 Q PIC S9V9(12) SIGN IS TRAILING SEPARATE.",
+                "COMPUTE Q = -1 / 3.",
+                "Q",
+                "0333333333333-\n",
+            ),
+            (
+                "01 Q PIC 9V9(12).",
+                "COMPUTE Q ROUNDED = 2 / 3.",
+                "Q",
+                "0666666666667\n",
+            ),
+            (
+                "01 Q PIC 9V9(12) VALUE 0.5. 01 E PIC 9 VALUE 0.",
+                "COMPUTE Q ROUNDED = 99999999999999 / 10000000000000 ON SIZE ERROR MOVE 1 TO E END-COMPUTE.",
+                "Q E",
+                "05000000000001\n",
+            ),
+            (
+                "01 Q PIC 9V9(12). 01 R PIC 9V99.",
+                "COMPUTE Q R ROUNDED = 2 / 3.",
+                "Q R",
+                "0666666666666067\n",
+            ),
+        ];
+        for mode in ["COMPAT", "EXTEND"] {
+            for (data, compute, display, expected) in cases {
+                let source = format!(
+                    "PROCESS ARITH({mode})\nIDENTIFICATION DIVISION. PROGRAM-ID. DECIMAL-EDGE. DATA DIVISION. WORKING-STORAGE SECTION. {data} PROCEDURE DIVISION. {compute} DISPLAY {display}. STOP RUN."
+                );
+                let (output, _) = execute_without_effects(&source).expect("decimal edge runtime");
+                assert_eq!(output, expected.as_bytes(), "{mode}: {compute}");
+            }
+        }
+    }
+
+    #[test]
+    fn hex_floats_move_compute_display_and_redefines_share_storage() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. HFP-RUNTIME. DATA DIVISION. WORKING-STORAGE SECTION. 01 SHORT-X COMP-1. 01 SHORT-BYTES REDEFINES SHORT-X PIC X(4). 01 LONG-X COMP-2. 01 LONG-BYTES REDEFINES LONG-X PIC X(8). 01 OUT-X PIC S9(3)V9(3) SIGN IS TRAILING SEPARATE. PROCEDURE DIVISION. MOVE 0.5 TO SHORT-X. COMPUTE LONG-X = SHORT-X + 0.5. DISPLAY SHORT-X LONG-X. MOVE -118.625 TO LONG-X. MOVE LONG-X TO SHORT-X. MOVE SHORT-X TO OUT-X. DISPLAY OUT-X. STOP RUN.";
+        let (output, machine) = execute_without_effects(source).expect("HFP runtime");
+        assert_eq!(output, b"0.51\n118625-\n");
+        // -.76a * 16^2: sign|E=c2, short fraction=76a000, long=76a00000000000.
+        assert_eq!(
+            machine.variable("SHORT-BYTES").unwrap().bytes(),
+            &[0xc2, 0x76, 0xa0, 0]
+        );
+        assert_eq!(
+            machine.variable("LONG-BYTES").unwrap().bytes(),
+            &[0xc2, 0x76, 0xa0, 0, 0, 0, 0, 0]
+        );
+        let alias_source = "IDENTIFICATION DIVISION. PROGRAM-ID. HFP-ALIAS. DATA DIVISION. WORKING-STORAGE SECTION. 01 SHORT-X COMP-1. 01 SHORT-BYTES REDEFINES SHORT-X PIC X(4). 01 LONG-X COMP-2. 01 LONG-BYTES REDEFINES LONG-X PIC X(8). PROCEDURE DIVISION. MOVE FUNCTION HEX-TO-CHAR('41100000') TO SHORT-BYTES. MOVE FUNCTION HEX-TO-CHAR('C276A00000000000') TO LONG-BYTES. DISPLAY SHORT-X. DISPLAY LONG-X. STOP RUN.";
+        let (output, _) = execute_without_effects(alias_source).expect("HFP raw aliases");
+        assert_eq!(output, b"1\n-118.625\n");
+    }
+
+    #[test]
     fn arith_compat_changes_intermediate_precision_through_the_artifact_contract() {
         let body = "IDENTIFICATION DIVISION. PROGRAM-ID. ARITH-RUNTIME. DATA DIVISION. WORKING-STORAGE SECTION. 01 A-X PIC 9(20) VALUE 99999999999999999999. 01 B-X PIC 9(20) VALUE 1. 01 RESULT-X PIC 9(21). PROCEDURE DIVISION. COMPUTE RESULT-X = A-X + B-X. DISPLAY RESULT-X. STOP RUN.";
         let (extended, _) = execute_without_effects(body).expect("ARITH(EXTEND) runtime");
-        let (compatible, _) = execute_without_effects(&format!("PROCESS ARITH(COMPAT)\n{body}"))
-            .expect("ARITH(COMPAT) runtime");
+        let compatible = execute_without_effects(&format!("PROCESS ARITH(COMPAT)\n{body}"))
+            .err()
+            .expect("COMPAT rejects declarations above its 18-digit data limit");
         assert_eq!(extended, b"100000000000000000000\n");
-        assert_eq!(compatible, b"099999999999999999900\n");
+        assert!(compatible.contains("at most 18 data/literal digits"));
     }
 
     #[test]

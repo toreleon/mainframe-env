@@ -185,6 +185,9 @@ pub fn execute(
 }
 
 #[cfg(test)]
+mod formattime_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use mainframe_env_diagnostics::Completeness;
@@ -738,6 +741,7 @@ mod tests {
                                 records: vec![b"BB02".to_vec(), b"AA03".to_vec(), b"AA01".to_vec()],
                                 identities: vec![b"BB".to_vec(), b"AA".to_vec(), b"AA".to_vec()],
                                 version: 1,
+                                more: false,
                             })
                         }
                         HostRequest::Dataset(DatasetRequest::Write {
@@ -1185,6 +1189,7 @@ mod tests {
                                 identities: records.clone(),
                                 records: records.clone(),
                                 version: 1,
+                                more: false,
                             })),
                         });
                     }
@@ -1315,6 +1320,7 @@ mod tests {
                                     identities: records.clone(),
                                     records: records.clone(),
                                     version: 1,
+                                    more: false,
                                 }))
                             }
                             HostRequest::Program(_) => call.take().unwrap(),
@@ -1659,6 +1665,7 @@ mod tests {
                             identities: records.clone(),
                             records,
                             version: reads as u64,
+                            more: false,
                         })),
                     });
                 }
@@ -2100,6 +2107,7 @@ mod tests {
                         records: vec![b"ABC".to_vec()],
                         identities: vec![b"ABC".to_vec()],
                         version: 1,
+                        more: false,
                     })),
                 }),
                 Quantum::new(64, 1024).unwrap(),

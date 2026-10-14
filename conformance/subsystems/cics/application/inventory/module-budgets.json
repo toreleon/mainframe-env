@@ -24,7 +24,7 @@
     },
     {
       "path": "crates/apps/mainframe-env-batch/src/service.rs",
-      "max_production_lines": 6827,
+      "max_production_lines": 6797,
       "responsibility": "The batch service coordinates submission, DD allocation, program execution, spool state, and recovery transitions.",
       "split_boundary": "Split submission and routing, DD allocation, step execution, and completion/recovery into state-machine command families."
     },
@@ -36,7 +36,7 @@
     },
     {
       "path": "crates/apps/mainframe-env-server/src/product.rs",
-      "max_production_lines": 5655,
+      "max_production_lines": 5582,
       "responsibility": "Product construction, dependency assembly, application publication, JES control, and HTTP route behavior converge here.",
       "split_boundary": "Extract bootstrap/construction, publication, JES operations, and route-family adapters around the Product state owner."
     },
@@ -48,7 +48,7 @@
     },
     {
       "path": "crates/contracts/mainframe-env-host-api/src/canonical/generated.rs",
-      "max_production_lines": 2668,
+      "max_production_lines": 2659,
       "responsibility": "This frozen exhaustive host wire encoder keeps every request and result field explicit for protocol review.",
       "split_boundary": "Partition exhaustive encoders by dataset, CICS, security, Db2, IMS, and MQ families under one canonical codec facade."
     },
@@ -78,7 +78,7 @@
     },
     {
       "path": "crates/kernel/mainframe-env-compiler/src/syntax.rs",
-      "max_production_lines": 2265,
+      "max_production_lines": 2227,
       "responsibility": "The syntax stage combines token traversal, division parsing, statement collection, and syntax diagnostics.",
       "split_boundary": "Separate token cursor and program-structure parsing from statement-family dispatch and diagnostic recovery."
     },
@@ -90,7 +90,7 @@
     },
     {
       "path": "crates/kernel/mainframe-env-interpreter/src/machine.rs",
-      "max_production_lines": 11752,
+      "max_production_lines": 11473,
       "responsibility": "The deterministic COBOL machine executes all operations, control flow, calls, host effects, and conditions.",
       "split_boundary": "Extract operation handlers by control, numeric/data, call, file/host-effect, and condition families around one machine state."
     },
@@ -102,7 +102,7 @@
     },
     {
       "path": "crates/providers/mainframe-env-dataset/src/service.rs",
-      "max_production_lines": 9411,
+      "max_production_lines": 9335,
       "responsibility": "Dataset allocation, catalog state, sequential and VSAM I/O, AMS behavior, transactions, and replay meet here.",
       "split_boundary": "Split catalog/allocation, record I/O, VSAM access, AMS commands, and persistence/recovery command families."
     },
@@ -168,13 +168,13 @@
     },
     {
       "path": "crates/tooling/mainframe-env-conformance/src/carddemo.rs",
-      "max_production_lines": 12796,
+      "max_production_lines": 12772,
       "responsibility": "CardDemo conformance provisions the full fixture, drives online and batch journeys, and checks persistence and failures.",
       "split_boundary": "Separate fixture provisioning, online transactions, batch jobs, authorization, and durability/failure scenario families."
     },
     {
       "path": "crates/tooling/mainframe-env-conformance/src/cics_pilot.rs",
-      "max_production_lines": 1323,
+      "max_production_lines": 1309,
       "responsibility": "The CICS pilot harness decodes fixtures, drives candidate behavior, and compares licensed and local evidence.",
       "split_boundary": "Separate fixture decoding, local scenario execution, licensed capture adaptation, and evidence assertions."
     },

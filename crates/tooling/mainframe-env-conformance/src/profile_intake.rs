@@ -8,10 +8,11 @@ use mainframe_env_batch::{
 use mainframe_env_compiler::{
     CobolCompiler, CobolCompilerLimits, PROCEDURE_STATEMENTS, procedure_statement_descriptor,
 };
+use mainframe_env_db2::db2_abi_library;
 use mainframe_env_diagnostics::Diagnostic;
 use mainframe_env_source::{
     LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLibrary,
-    SourceLimits,
+    SourceLimits, materialize_host_abi_libraries,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -477,13 +478,22 @@ fn analyze_cobol(
             .push(logical);
         files.push(file);
     }
-    let libraries = by_dir
+    let mut libraries: Vec<_> = by_dir
         .into_iter()
         .enumerate()
         .filter_map(|(i, (_, paths))| {
             SourceLibrary::new(format!("copybooks{i}"), paths, limits).ok()
         })
         .collect();
+    // INCLUDE may arrive through COPY; application libraries retain precedence.
+    let Ok(abi) = materialize_host_abi_libraries(&[db2_abi_library()], limits) else {
+        member
+            .diagnostics
+            .push(local_error("MEINTAKE001", "invalid Db2 ABI library"));
+        return member;
+    };
+    files.extend(abi.files);
+    libraries.extend(abi.libraries);
     let options = if fixed_source_area(&bytes).contains("EXEC SQL") {
         BTreeMap::from([("cobol.sql-precompile".into(), "true".into())])
     } else {

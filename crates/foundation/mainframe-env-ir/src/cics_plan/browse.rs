@@ -49,6 +49,7 @@ pub(super) fn invalid_shape(
         }
         || reading != outputs.contains(&CicsOutputName::Into)
         || match length {
+            Some(CicsOperandValue::Integer(0..=32_767)) if reading => length_output.is_some(),
             Some(CicsOperandValue::Storage(slot)) if reading => length_output != Some(slot),
             Some(CicsOperandValue::LengthOf(slot)) if reading => {
                 length_output.is_some()

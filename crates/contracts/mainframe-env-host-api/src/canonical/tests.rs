@@ -444,3 +444,98 @@ fn canonical_encoding_never_invokes_debug() {
     }
     assert_eq!(bytes(&FormattingBomb, b""), bytes("stable", b""));
 }
+
+#[test]
+fn dataset_read_completeness_preserves_complete_canonical_bytes() {
+    let complete = DatasetResult::Records {
+        records: vec![b"A".to_vec()],
+        identities: vec![b"K".to_vec()],
+        version: 7,
+        more: false,
+    };
+    let generation = DatasetResult::MemberGeneration {
+        records: vec![b"A".to_vec()],
+        identities: vec![b"K".to_vec()],
+        generation: 9,
+        program_object: false,
+        version: 7,
+        more: false,
+    };
+    // Independent vectors from the retained v1 field framing, before #186.
+    for (complete, golden) in [
+        (
+            complete,
+            "62319f9cd3a6c4db6fe2c4bd24049beb71b4592e1d1c512c56254b8f1cffe4bf",
+        ),
+        (
+            generation,
+            "51523c55463b507081522921824816a756d4fc49e592cfc249590fa15122a4d9",
+        ),
+    ] {
+        let mut truncated = complete.clone();
+        match &mut truncated {
+            DatasetResult::Records { more, .. } | DatasetResult::MemberGeneration { more, .. } => {
+                *more = true
+            }
+            _ => unreachable!(),
+        }
+        let complete = Ok(HostResult::Dataset(complete));
+        let truncated = Ok(HostResult::Dataset(truncated));
+        assert_eq!(hex(&canonical_result_digest(&complete).unwrap()), golden);
+        assert_ne!(
+            canonical_result_digest(&complete).unwrap(),
+            canonical_result_digest(&truncated).unwrap()
+        );
+    }
+}
+
+#[test]
+fn dataset_read_completeness_rejects_incomplete_and_malformed_input() {
+    for generation in [false, true] {
+        for more in [false, true] {
+            let result = if generation {
+                DatasetResult::MemberGeneration {
+                    records: vec![b"A".to_vec()],
+                    identities: vec![b"K".to_vec()],
+                    generation: 9,
+                    program_object: false,
+                    version: 7,
+                    more,
+                }
+            } else {
+                DatasetResult::Records {
+                    records: vec![b"A".to_vec()],
+                    identities: vec![b"K".to_vec()],
+                    version: 7,
+                    more,
+                }
+            };
+            assert_eq!(
+                HostResult::Dataset(result.clone()).validate(HostLimits::default()),
+                Ok(())
+            );
+            assert_eq!(
+                result.clone().require_complete(),
+                if more {
+                    Err(HostProblem::Condition {
+                        name: "DATASET_READ_TRUNCATED".into(),
+                        response: 16,
+                        response2: 0,
+                    })
+                } else {
+                    Ok(result)
+                }
+            );
+        }
+    }
+    assert_eq!(
+        HostResult::Dataset(DatasetResult::Records {
+            records: Vec::new(),
+            identities: Vec::new(),
+            version: 1,
+            more: true,
+        })
+        .validate(HostLimits::default()),
+        Err(HostProblem::Malformed)
+    );
+}

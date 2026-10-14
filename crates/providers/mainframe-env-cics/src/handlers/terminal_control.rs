@@ -3,7 +3,7 @@ use super::super::{
     bounded, decimal_payload, decode_map_payload, encode_symbolic_map_output, field,
     normalize_bms_input, symbolic_map_modified, symbolic_map_protection, symbolic_map_values,
 };
-use super::bms_map::map_fits_terminal;
+use super::bms_map::{map_fits_terminal, terminal_field_address};
 use mainframe_env_host_api::{
     CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
 };
@@ -154,6 +154,9 @@ pub(super) fn send(
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     validate_send_request(request)?;
+    if let Some(response) = bms::receipt_for_request(service, run, request)? {
+        return Ok(response);
+    }
     let map_names = (request.operation == CicsOperation::SendMap)
         .then(|| map_names(request))
         .transpose()?;
@@ -171,12 +174,27 @@ pub(super) fn send(
         }
         payload.truncate(length);
     }
-    let mut state = service.lock()?;
+    let state = service.lock()?;
     let current = state
         .sessions
         .get(&run.session)
         .cloned()
         .ok_or(HostProblem::NotFound)?;
+    let mut cursor = request
+        .arguments
+        .get("CURSOR")
+        .map(|value| {
+            std::str::from_utf8(value.bytes())
+                .ok()
+                .and_then(|value| value.trim().parse::<u16>().ok())
+                .filter(|value| {
+                    *value <= 32_767
+                        && u32::from(*value) < u32::from(current.rows) * u32::from(current.columns)
+                })
+                .ok_or(HostProblem::Malformed)
+        })
+        .transpose()?;
+    let mut controls = bms::read_state(service, &run.session)?;
     let mut field_protection = None;
     let mut field_modified = None;
     let mut field_values = None;
@@ -186,6 +204,20 @@ pub(super) fn send(
             .maps
             .get(&(mapset.clone(), map.clone()))
             .ok_or(HostProblem::NotFound)?;
+        if request.arguments.contains_key("OPTION.CURSOR") {
+            // The symbolic L halfword precedes A, including extended-attribute maps.
+            let selected = definition.fields.iter().find(|field| {
+                field
+                    .attribute_offset
+                    .and_then(|offset| offset.checked_sub(2))
+                    .and_then(|offset| usize::try_from(offset).ok())
+                    .and_then(|offset| payload.get(offset..offset.checked_add(2)?))
+                    == Some(&[0xff, 0xff][..])
+            });
+            cursor = selected
+                .map(|field| terminal_field_address(&current, definition, field))
+                .transpose()?;
+        }
         if request.arguments.contains_key("OPTION.DATAONLY") {
             let attributes = data_only_attributes(definition, &payload, &current, mapset, map)?;
             field_protection = Some(attributes.protection);
@@ -237,7 +269,10 @@ pub(super) fn send(
             });
         }
     }
-    next.version += 1;
+    next.version = next
+        .version
+        .checked_add(1)
+        .ok_or(HostProblem::ResourceExhausted)?;
     next.screen = payload.clone();
     if request.operation == CicsOperation::SendMap {
         let (mapset, map) = map_names.expect("SEND MAP names");
@@ -247,17 +282,25 @@ pub(super) fn send(
         next.field_modified = field_modified.unwrap_or_default();
         next.field_values = field_values.unwrap_or_default();
     }
-    partition_set::persist_send(service, run, &current, &next)?;
-    state.sessions.insert(run.session.clone(), next);
-    service.response(
+    if let Some(cursor) = cursor {
+        controls.cursor = cursor;
+    } else if request.arguments.contains_key("OPTION.ERASE") {
+        controls.cursor = 0;
+    }
+    controls.keyboard_unlocked = request.arguments.contains_key("OPTION.FREEKB");
+    let mut receipt = bms::base_receipt(run, request)?;
+    receipt.payload = payload;
+    drop(state);
+    // SEND TEXT WAIT completes here: the screen and controls are durably replaced
+    // before returning control. This provider has no asynchronous output queue.
+    bms::commit(
+        service,
         run,
-        CicsDisposition::Complete,
-        "NORMAL",
-        0,
-        0,
-        None,
-        None,
-        payload,
+        request,
+        Some(&current),
+        Some(&next),
+        &controls,
+        &receipt,
     )
 }
 
@@ -319,6 +362,7 @@ pub(super) fn validate_send_request(request: &CicsRequest) -> Result<(), HostPro
     const SEND_MAP_ALLOWED: &[&str] = &[
         "FROM",
         "LENGTH",
+        "CURSOR",
         "MAP",
         "MAPSET",
         "OPTION.CURSOR",
@@ -333,8 +377,10 @@ pub(super) fn validate_send_request(request: &CicsRequest) -> Result<(), HostPro
     const SEND_TEXT_ALLOWED: &[&str] = &[
         "FROM",
         "LENGTH",
+        "CURSOR",
         "OPTION.ERASE",
         "OPTION.FREEKB",
+        "OPTION.WAIT",
         "OPTION.NOHANDLE",
         "RESP",
         "RESP2",
@@ -362,13 +408,15 @@ pub(super) fn validate_send_request(request: &CicsRequest) -> Result<(), HostPro
             && !request.arguments.contains_key("FROM")
         || request.arguments.contains_key("OPTION.DATAONLY")
             && request.arguments.contains_key("OPTION.MAPONLY")
+        || request.arguments.contains_key("CURSOR")
+            && request.arguments.contains_key("OPTION.CURSOR")
         || request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
         || request.arguments.iter().any(|(name, value)| {
             !allowed.contains(&name.as_str())
                 || match name.as_str() {
-                    "LENGTH" => value.schema() != "mainframe-env.cics.decimal@1",
+                    "LENGTH" | "CURSOR" => value.schema() != "mainframe-env.cics.decimal@1",
                     "OPTION.CURSOR" | "OPTION.DATAONLY" | "OPTION.ERASE" | "OPTION.FREEKB"
-                    | "OPTION.MAPONLY" | "OPTION.NOHANDLE" => {
+                    | "OPTION.MAPONLY" | "OPTION.NOHANDLE" | "OPTION.WAIT" => {
                         value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
                     }
                     "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",

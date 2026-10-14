@@ -118,6 +118,11 @@ pub(in crate::service) fn assign(
 ) -> Result<CicsResponse, HostProblem> {
     validate_assign_request(request)?;
     let dpl = assign_dpl_context(run)?;
+    let start_code = request
+        .arguments
+        .contains_key("STARTCODE")
+        .then(|| assign_start_code(service, run))
+        .transpose()?;
     let screen_options = [
         "ALTSCRNHT",
         "ALTSCRNWD",
@@ -301,6 +306,11 @@ pub(in crate::service) fn assign(
                 .outputs
                 .insert(name.into(), bounded(value.to_vec())?);
         }
+    }
+    if let Some(code) = start_code {
+        response
+            .outputs
+            .insert("STARTCODE".into(), bounded(code.to_vec())?);
     }
     if request.arguments.contains_key("TASKPRIORITY") {
         response.outputs.insert(
@@ -707,6 +717,76 @@ fn assign_dpl_context(run: &Run) -> Result<bool, HostProblem> {
     }
 }
 
+// IBM CICS TS 6.x dfhp4_assign.html STARTCODE. Reuse retained task origin;
+// absence of origin on a facility-less task must not fabricate terminal input.
+fn assign_start_code(service: &CicsService, run: &Run) -> Result<[u8; 2], HostProblem> {
+    if let Some(context) = run.invocation.bindings.get("cics.execution-context") {
+        match context.bytes() {
+            b"dpl-synconreturn" => return Ok(*b"DS"),
+            b"dpl-without-synconreturn" => return Ok(*b"D "),
+            b"dpl-executionset-subset" => return Err(HostProblem::Unsupported),
+            _ => {}
+        }
+    }
+    if let Some(code) = run.invocation.bindings.get("cics.start-code") {
+        if code.schema() != "mainframe-env.cics.start-code@1" {
+            return Err(HostProblem::Malformed);
+        }
+        return match code.bytes() {
+            b"S" | b"S " => Ok(*b"S "),
+            b"SD" => Ok(*b"SD"),
+            b"TD" => Ok(*b"TD"),
+            b"U" | b"U " => Ok(*b"U "),
+            _ => Err(HostProblem::Malformed),
+        };
+    }
+    if let Some(request) = run.invocation.bindings.get("cics.start-request") {
+        if request.schema() != "mainframe-env.cics.start-request@1" {
+            return Err(HostProblem::Malformed);
+        }
+        let request_id =
+            std::str::from_utf8(request.bytes()).map_err(|_| HostProblem::Malformed)?;
+        let state = service.lock()?;
+        let record = state
+            .interval_records
+            .get(request_id)
+            .ok_or(HostProblem::NotFound)?;
+        if record.transaction != run.transaction
+            || record.principal != run.invocation.principal.id().as_str()
+        {
+            return Err(HostProblem::Unauthorized);
+        }
+        // The admitted START contract rejects FROM with zero length, so retained
+        // empty data unambiguously means START without FROM.
+        use super::interval_control::IntervalStartState;
+        return match record.state {
+            IntervalStartState::AttachedReady => Ok(*b"U "),
+            IntervalStartState::Ready | IntervalStartState::Consumed => {
+                Ok(if record.data.is_empty() {
+                    *b"S "
+                } else {
+                    *b"SD"
+                })
+            }
+            _ => Err(HostProblem::Unsupported),
+        };
+    }
+    let state = service.lock()?;
+    let session = state
+        .sessions
+        .get(&run.session)
+        .ok_or(HostProblem::NotFound)?;
+    if session.input.terminal_id.is_some()
+        && session.principal == run.invocation.principal.id().as_str()
+        && session.run_unit == run.invocation.run_unit_id.as_str()
+        && session.transaction == run.transaction
+    {
+        Ok(*b"TD")
+    } else {
+        Err(HostProblem::Unsupported)
+    }
+}
+
 fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
     let allowed = [
         "ABCODE",
@@ -781,6 +861,7 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "SCRNHT",
         "SCRNWD",
         "SOSI",
+        "STARTCODE",
         "SYSID",
         "TASKPRIORITY",
         "TCTUALENG",

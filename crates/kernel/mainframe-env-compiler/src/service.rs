@@ -105,6 +105,44 @@ impl CobolCompiler {
                 };
             }
         };
+        let mode = syntax.effective_compiler_options().arithmetic_mode();
+        let max_digits = match mode {
+            crate::EffectiveArithmeticMode::Compatible => 18,
+            crate::EffectiveArithmeticMode::Extended => 31,
+        };
+        let over_limit = semantic
+            .layouts
+            .iter()
+            .find(|layout| layout.digits > max_digits)
+            .map(|layout| {
+                format!(
+                    "{} PICTURE has {} digits",
+                    layout.qualified_name, layout.digits
+                )
+            })
+            .or_else(|| {
+                syntax
+                    .oversized_numeric_literal(max_digits)
+                    .map(|text| format!("numeric literal {text} exceeds the digit limit"))
+            });
+        if let Some(detail) = over_limit {
+            return CobolAnalysis {
+                syntax: Some(syntax),
+                semantic: Some(semantic),
+                hir: None,
+                hir_text: None,
+                diagnostics: vec![diagnostic(
+                    "MECOB0101",
+                    Phase::Parse,
+                    FailureCategory::MalformedInput,
+                    format!(
+                        "{detail}; ARITH({}) allows at most {max_digits} data/literal digits",
+                        mode.as_str()
+                    ),
+                )],
+                completeness: Completeness::Failed,
+            };
+        }
         let hir = match CobolHir::build(source, &syntax, &semantic, self.limits.ir) {
             Ok(hir) => hir,
             Err(problem) => {
@@ -435,6 +473,104 @@ mod tests {
     }
 
     #[test]
+    fn inspect_lowering_preserves_every_phrase_and_rejects_malformed_tail() {
+        let prefix = "IDENTIFICATION DIVISION. PROGRAM-ID. INSPECT-MULTI. \
+            DATA DIVISION. WORKING-STORAGE SECTION. \
+            01 X PIC X(4) VALUE 'SUSU'. 01 I PIC 9(3) VALUE 0. \
+            01 J PIC 9(3) VALUE 0. PROCEDURE DIVISION.";
+        for phrase in [
+            "TALLYING I FOR ALL 'S' ALL 'U'",
+            "TALLYING I FOR LEADING 'S' J FOR ALL 'U' CHARACTERS",
+            "REPLACING FIRST 'S' BY '1' ALL 'U' BY '2' CHARACTERS BY '0'",
+        ] {
+            let source = format!("{prefix} INSPECT X {phrase}. STOP RUN.");
+            let result = CobolCompiler::default()
+                .compile(request(&source, CompilationMode::Executable))
+                .unwrap();
+            let CompilerResult::Published { artifact, .. } = result else {
+                panic!("expected executable: {result:?}");
+            };
+            let module = decode_binary(artifact.payload(), CodecLimits::default()).unwrap();
+            let inspect = module
+                .regions()
+                .iter()
+                .flat_map(|region| &region.blocks)
+                .flat_map(|block| &block.operations)
+                .find(|operation| operation.identity.name() == "inspect")
+                .expect("lowered INSPECT");
+            let expected = std::iter::once("X")
+                .chain(phrase.split_whitespace())
+                .flat_map(|token| {
+                    (token.len() as u64)
+                        .to_be_bytes()
+                        .into_iter()
+                        .chain(token.bytes())
+                })
+                .collect();
+            assert_eq!(
+                inspect.attributes["arguments"],
+                Attribute::Bytes(expected),
+                "{phrase}"
+            );
+        }
+        for phrase in [
+            "TALLYING I FOR ALL 'S' FIRST 'U'",
+            "REPLACING ALL 'S' BY '1' ALL 'U'",
+        ] {
+            let source = format!("{prefix} INSPECT X {phrase}. STOP RUN.");
+            let analysis = CobolCompiler::default().analyze(&bundle(&source));
+            assert!(!analysis.diagnostics.is_empty(), "{phrase}");
+            assert!(analysis.hir.is_none(), "{phrase}");
+        }
+    }
+
+    #[test]
+    fn sign_leading_placement_survives_executable_lowering() {
+        for (clause, leading, separate) in [
+            ("LEADING SEPARATE", 1, 1),
+            ("TRAILING SEPARATE", 0, 1),
+            ("LEADING", 1, 0),
+            ("TRAILING", 0, 0),
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. SIGNTEST. DATA DIVISION.                  WORKING-STORAGE SECTION. 01 R PIC S9(6) SIGN {clause}.                  PROCEDURE DIVISION. MOVE 7 TO R. DISPLAY R. STOP RUN."
+            );
+            let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+                .compile(request(&source, CompilationMode::Executable))
+                .unwrap()
+            else {
+                panic!("SIGN {clause} must publish");
+            };
+            let module = decode_binary(artifact.payload(), CodecLimits::default()).unwrap();
+            let layout = module
+                .regions()
+                .iter()
+                .flat_map(|region| &region.blocks)
+                .flat_map(|block| &block.operations)
+                .find(|op| {
+                    op.identity.name() == "define"
+                        && op.attributes.get("name") == Some(&Attribute::Text("R".into()))
+                })
+                .unwrap();
+            assert_eq!(
+                layout.attributes.get("sign_separate"),
+                Some(&Attribute::Integer(separate)),
+                "{clause}"
+            );
+            assert_eq!(
+                layout.attributes.get("length"),
+                Some(&Attribute::Integer(6 + separate)),
+                "{clause}"
+            );
+            assert_eq!(
+                layout.attributes.get("sign_leading"),
+                (leading == 1).then_some(&Attribute::Integer(1)),
+                "SIGN {clause} lost its placement"
+            );
+        }
+    }
+
+    #[test]
     fn bts_child_link_six_rows_lower_with_reserved_tags_and_reject_conflicting_wait() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. BTSP. DATA DIVISION. WORKING-STORAGE SECTION. 01 CHILD-X PIC X(16). 01 ANY-X PIC X(16). 01 CHANNEL-X PIC X(16). 01 AB-X PIC X(4). 01 STATUS-X PIC S9(9) COMP. 01 TIMEOUT-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS FETCH ANY(ANY-X) COMPSTATUS(STATUS-X) CHANNEL(CHANNEL-X) ABCODE(AB-X) NOSUSPEND END-EXEC. EXEC CICS FETCH CHILD(CHILD-X) COMPSTATUS(STATUS-X) TIMEOUT(TIMEOUT-X) END-EXEC. EXEC CICS FREE CHILD(CHILD-X) END-EXEC. EXEC CICS LINK ACQACTIVITY END-EXEC. EXEC CICS LINK ACQPROCESS END-EXEC. EXEC CICS LINK ACTIVITY('SUBTASK') INPUTEVENT('GO') END-EXEC.";
         let analysis = CobolCompiler::default().analyze(&bundle(source));
@@ -591,6 +727,21 @@ mod tests {
         assert_eq!(completeness, Completeness::Complete);
     }
     #[test]
+    fn hello_artifact_bytes_are_unchanged_without_sign_leading() {
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(request(HELLO, CompilationMode::Executable))
+            .unwrap()
+        else {
+            panic!("program without SQL INCLUDE must publish");
+        };
+        // Exact HELLO source and golden from #419, captured on a688045a.
+        assert_eq!(
+            artifact.content_id().to_reference(),
+            "sha256:fd5ecebf2868a944a20342bc26a3dd1efc37a34e52a2b9874507e180029ea7f5"
+        );
+    }
+
+    #[test]
     fn hello_publishes_legal_mir() {
         let result = CobolCompiler::default()
             .compile(request(HELLO, CompilationMode::Executable))
@@ -642,7 +793,104 @@ mod tests {
             panic!("typed decimal plan bytes")
         };
         let plan = decode_decimal_assignment_plan(bytes, DecimalPlanLimits::default()).unwrap();
-        assert_eq!(plan.policy, DecimalExecutionPolicy::decimal18_v1());
+        assert_eq!(plan.policy, DecimalExecutionPolicy::cobol_compat_v2());
+    }
+
+    #[test]
+    fn compat_rejects_decimal_declarations_over_eighteen_digits() {
+        let source = "PROCESS ARITH(COMPAT)\nIDENTIFICATION DIVISION. PROGRAM-ID. TOOWIDE. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9(19) VALUE 1. 01 B PIC 99. PROCEDURE DIVISION. COMPUTE B = A - A. STOP RUN.";
+        let result = CobolCompiler::default().compile(request(source, CompilationMode::Executable));
+        let Ok(CompilerResult::Failed {
+            diagnostics,
+            completeness,
+        }) = result
+        else {
+            panic!("ARITH(COMPAT) must reject its 19-digit declaration: {result:?}");
+        };
+        assert_eq!(completeness, Completeness::Failed);
+        assert!(diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("at most 18 data/literal digits")
+        }));
+    }
+
+    #[test]
+    fn arithmetic_profiles_enforce_data_and_literal_limits_before_publication() {
+        for (mode, digits, published) in [
+            ("COMPAT", 18, true),
+            ("COMPAT", 19, false),
+            ("EXTEND", 31, true),
+            ("EXTEND", 32, false),
+        ] {
+            for source in [
+                format!(
+                    "PROCESS ARITH({mode})\nIDENTIFICATION DIVISION. PROGRAM-ID. LIMITS. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9({digits}). PROCEDURE DIVISION. STOP RUN."
+                ),
+                format!(
+                    "PROCESS ARITH({mode})\nIDENTIFICATION DIVISION. PROGRAM-ID. LIMITS. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9. PROCEDURE DIVISION. COMPUTE A = {} - {}. STOP RUN.",
+                    "9".repeat(digits),
+                    "9".repeat(digits)
+                ),
+                format!(
+                    "PROCESS ARITH({mode})\nIDENTIFICATION DIVISION. PROGRAM-ID. LIMITS. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9 VALUE {}. PROCEDURE DIVISION. STOP RUN.",
+                    "9".repeat(digits)
+                ),
+            ] {
+                let result =
+                    CobolCompiler::default().compile(request(&source, CompilationMode::Executable));
+                assert_eq!(
+                    matches!(result, Ok(CompilerResult::Published { .. })),
+                    published,
+                    "{mode}/{digits}: {result:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn compat_rejects_complete_period_literals_before_publication() {
+        assert_complete_literal_rejected("", "1234567890.123456789");
+    }
+
+    #[test]
+    fn compat_rejects_complete_comma_literals_before_publication() {
+        assert_complete_literal_rejected(
+            "ENVIRONMENT DIVISION. CONFIGURATION SECTION. SPECIAL-NAMES. DECIMAL-POINT IS COMMA.",
+            "1234567890,123456789",
+        );
+    }
+
+    fn assert_complete_literal_rejected(configuration: &str, literal: &str) {
+        let source = format!(
+            "PROCESS ARITH(COMPAT)\nIDENTIFICATION DIVISION. PROGRAM-ID. LIMITS. {configuration} DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9. PROCEDURE DIVISION. COMPUTE A = {literal} - {literal}. STOP RUN."
+        );
+        let result = CobolCompiler::default()
+            .compile(request(&source, CompilationMode::Executable))
+            .unwrap();
+        let CompilerResult::Failed {
+            diagnostics,
+            completeness,
+        } = result
+        else {
+            panic!("19-digit literal must fail before publication");
+        };
+        assert_eq!(completeness, Completeness::Failed);
+        assert!(diagnostics.iter().any(|diagnostic| {
+            diagnostic.public_message().contains(literal)
+                && diagnostic
+                    .public_message()
+                    .contains("at most 18 data/literal digits")
+        }));
+    }
+
+    #[test]
+    fn compat_publishes_eighteen_digit_fractional_literals() {
+        let source = "PROCESS ARITH(COMPAT)\nIDENTIFICATION DIVISION. PROGRAM-ID. LIMITS. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9. PROCEDURE DIVISION. COMPUTE A = 1234567890.12345678 - 1234567890.12345678. STOP RUN.";
+        let result = CobolCompiler::default()
+            .compile(request(source, CompilationMode::Executable))
+            .unwrap();
+        assert!(matches!(result, CompilerResult::Published { .. }));
     }
 
     #[test]
@@ -712,6 +960,100 @@ mod tests {
                 .unwrap(),
             CompilerResult::Published { .. }
         ));
+    }
+
+    #[test]
+    fn program_without_sql_include_preserves_base_artifact_bytes() {
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(request(HELLO, CompilationMode::Executable))
+            .unwrap()
+        else {
+            panic!("program without SQL INCLUDE must publish");
+        };
+        // Captured on a688045a before enabling automatic SQL INCLUDE expansion.
+        assert_eq!(
+            artifact.content_id().to_reference(),
+            "sha256:fd5ecebf2868a944a20342bc26a3dd1efc37a34e52a2b9874507e180029ea7f5"
+        );
+    }
+
+    #[test]
+    fn sql_include_expands_available_dcl_members_without_an_option() {
+        let limits = SourceLimits::default();
+        let primary = bundle(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. DCLTEST. DATA DIVISION. \
+             WORKING-STORAGE SECTION. EXEC SQL INCLUDE DCLROW END-EXEC. \
+             PROCEDURE DIVISION. ADD 1 TO DCL-TR-DESCRIPTION-LEN. STOP RUN.",
+        );
+        let member = SourceFile::input(
+            "DCLROW.dcl",
+            b"01 DCL-TR-DESCRIPTION-LEN PIC 9(4) VALUE 0.".to_vec(),
+            SourceFormat::Free,
+            SourceEncoding::Utf8,
+            limits,
+        )
+        .unwrap();
+        let library = SourceLibrary::new("dcl", vec![member.path().clone()], limits).unwrap();
+        let source = SourceBundle::with_libraries(
+            primary.files()[0].path(),
+            vec![primary.files()[0].clone(), member],
+            vec![library],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let compile = |source| {
+            CobolCompiler::default()
+                .compile(CompilerRequest {
+                    source,
+                    mode: CompilationMode::Executable,
+                    target: CompileTarget::new("reference").unwrap(),
+                    options: CompileOptions::new(BTreeMap::new()).unwrap(),
+                })
+                .unwrap()
+        };
+        let result = compile(source);
+        assert!(
+            matches!(result, CompilerResult::Published { .. }),
+            "{result:?}"
+        );
+        let CompilerResult::Failed { diagnostics, .. } = compile(primary) else {
+            panic!("missing SQL INCLUDE member must fail compilation");
+        };
+        assert!(
+            diagnostics.iter().any(|diagnostic| {
+                diagnostic
+                    .public_message()
+                    .contains("SQL INCLUDE member DCLROW was not found")
+            }),
+            "{diagnostics:?}"
+        );
+    }
+
+    #[test]
+    fn sql_include_missing_precompiler_definitions_are_explicit() {
+        for member in ["SQLCA", "SQLDA"] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BUILTIN. DATA DIVISION. \
+                 WORKING-STORAGE SECTION. EXEC SQL INCLUDE {member} END-EXEC. \
+                 PROCEDURE DIVISION. STOP RUN."
+            );
+            let CompilerResult::Failed { diagnostics, .. } = CobolCompiler::default()
+                .compile(request(&source, CompilationMode::Executable))
+                .unwrap()
+            else {
+                panic!("missing precompiler definitions must not publish");
+            };
+            assert!(
+                diagnostics.iter().any(|diagnostic| {
+                    let message = diagnostic.public_message();
+                    message.contains(&format!("SQL INCLUDE member {member} was not found"))
+                        && message.contains("automatic precompiler definitions")
+                }),
+                "{diagnostics:?}"
+            );
+        }
     }
 
     #[test]
@@ -1275,6 +1617,45 @@ mod tests {
     }
 
     #[test]
+    fn comp1_and_comp2_publish_explicit_hex_storage_profile() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. FLOATS. DATA DIVISION. WORKING-STORAGE SECTION. 01 SHORT-X COMP-1. 01 LONG-X COMP-2. PROCEDURE DIVISION. DISPLAY SHORT-X LONG-X. STOP RUN.";
+        let compiler = CobolCompiler::default();
+        let analysis = compiler.analyze(&bundle(source));
+        let semantic = analysis.semantic.as_ref().expect("float semantic model");
+        assert_eq!(
+            semantic.layout("SHORT-X").unwrap().category,
+            crate::DataCategory::FloatShort
+        );
+        assert_eq!(
+            semantic.layout("LONG-X").unwrap().category,
+            crate::DataCategory::FloatLong
+        );
+        assert!(analysis.hir.is_some());
+        assert_eq!(analysis.completeness, Completeness::Complete);
+        let CompilerResult::Published { artifact, .. } = compiler
+            .compile(request(source, CompilationMode::Executable))
+            .unwrap()
+        else {
+            panic!("floats did not publish")
+        };
+        let module = decode_binary(artifact.payload(), CodecLimits::default()).unwrap();
+        let definitions = module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .filter(|operation| operation.identity.name() == "define")
+            .collect::<Vec<_>>();
+        assert_eq!(definitions.len(), 2);
+        for definition in definitions {
+            assert_eq!(
+                definition.attributes.get("float_profile"),
+                Some(&Attribute::Text(mainframe_env_ir::COBOL_FLOAT_HEX.into()))
+            );
+        }
+    }
+
+    #[test]
     fn completed_state_survives_zero_and_exhausted_diagnostic_caps() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CAPS. DATA DIVISION. WORKING-STORAGE SECTION. 01 FLOAT-X COMP-1. PROCEDURE DIVISION. DISPLAY WHEN-COMPILED FLOAT-X. STOP RUN.";
         for max_diagnostics in [0, 1] {
@@ -1416,7 +1797,7 @@ mod tests {
                     "cobol.add@1"
                 }
             );
-            assert_eq!(plan.policy, DecimalExecutionPolicy::decimal34_v1());
+            assert_eq!(plan.policy, DecimalExecutionPolicy::cobol_extend_v2());
             assert_eq!(
                 plan.assignments.len(),
                 if operation.identity.name() == "compute" {
@@ -1480,7 +1861,7 @@ mod tests {
                 plan.semantic_origin.as_str(),
                 "cobol.add@1" | "cobol.compute@1"
             ));
-            assert_eq!(plan.policy, DecimalExecutionPolicy::decimal34_v1());
+            assert_eq!(plan.policy, DecimalExecutionPolicy::cobol_extend_v2());
             assert_eq!(
                 plan.assignments.len(),
                 if plan.semantic_origin == "cobol.compute@1" {
@@ -2778,6 +3159,27 @@ mod tests {
             })
             .expect("numeric CICS lexeme remains exact");
         assert!(numeric.windows(3).any(|window| window == b"003"));
+    }
+
+    #[test]
+    fn cics_eib_operands_and_intrinsic_arguments_publish_executable_programs() {
+        for statement in [
+            "MOVE EIBTASKN TO N",
+            "COMPUTE X = FUNCTION RANDOM(EIBTASKN)",
+            "COMPUTE N = FUNCTION INTEGER(EIBTASKN)",
+            "COMPUTE N = FUNCTION INTEGER(EIBTIME)",
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. EIBARGS. DATA DIVISION. WORKING-STORAGE SECTION. 01 N PIC 9(7). 01 X PIC 9V9(9). PROCEDURE DIVISION. {statement}. EXEC CICS RETURN END-EXEC."
+            );
+            let result = CobolCompiler::default()
+                .compile(request(&source, CompilationMode::Executable))
+                .unwrap();
+            assert!(
+                matches!(result, CompilerResult::Published { .. }),
+                "{statement}: {result:?}"
+            );
+        }
     }
 
     #[test]
