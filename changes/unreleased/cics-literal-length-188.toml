@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Accept halfword integer literal LENGTH operands in typed CICS READ and sibling file commands, with consistent LENGTH/KEYLENGTH literal validation (#188)."

@@ -1809,6 +1809,84 @@ STOP RUN.
     }
 
     #[test]
+    fn read_and_rewrite_length_literals_execute_as_decimal_on_memory() {
+        use mainframe_env_execution_api::{Machine, MachineDrive, MachineResume, Quantum};
+
+        let source = r#"IDENTIFICATION DIVISION.
+PROGRAM-ID. LITLEN.
+DATA DIVISION.
+WORKING-STORAGE SECTION.
+01 REC-X PIC X(4).
+01 KEY-X PIC X(2) VALUE 'AA'.
+01 RESP-X PIC 9(3).
+01 RESP2-X PIC 9(3).
+PROCEDURE DIVISION.
+EXEC CICS READ FILE('ACCTDAT') UPDATE INTO(REC-X) RIDFLD(KEY-X)
+    LENGTH(4) KEYLENGTH(2) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
+DISPLAY 'READ:' RESP-X ':' RESP2-X ':' REC-X.
+MOVE 'AA22' TO REC-X.
+EXEC CICS REWRITE FILE('ACCTDAT') FROM(REC-X) LENGTH(4)
+    RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
+DISPLAY 'REWRITE:' RESP-X ':' RESP2-X.
+EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X)
+    LENGTH(4) KEYLENGTH(2) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
+DISPLAY 'READBACK:' RESP-X ':' RESP2-X ':' REC-X.
+STOP RUN.
+"#;
+        let artifact = crate::compile(source).unwrap();
+        let invocation =
+            pilot_invocation(&artifact, "IBMUSER", "literal-lengths", "LITLEN").unwrap();
+        let mut machine = mainframe_env_interpreter::ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            mainframe_env_ir::CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(128, 4096).unwrap())
+        else {
+            panic!("typed READ must emit a host call");
+        };
+        let HostRequest::Cics(request) = effect.request else {
+            panic!("expected CICS READ request");
+        };
+        assert_eq!(request.operation, CicsOperation::Read);
+        for (name, bytes) in [("LENGTH", b"4"), ("KEYLENGTH", b"2")] {
+            assert_eq!(
+                request.arguments[name].schema(),
+                "mainframe-env.cics.decimal@1"
+            );
+            assert_eq!(request.arguments[name].bytes(), bytes);
+        }
+
+        let store = Arc::new(MemoryStore::new(StoreLimits::default()));
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let platform_store: Arc<dyn PlatformStore> = store;
+        let dataset =
+            DatasetService::open(provider_store.clone(), DatasetLimits::default()).unwrap();
+        seed_dataset(&dataset, "literal-lengths").unwrap();
+        let cics = CicsService::open(
+            pilot_inner_host(dataset).unwrap(),
+            provider_store,
+            CicsLimits::default(),
+        )
+        .unwrap();
+        cics.register_file_definitions(&BTreeMap::from([(
+            "ACCTDAT".into(),
+            CicsFileDefinition {
+                dataset: dataset_name().unwrap(),
+                ccsid: Some(37),
+            },
+        )]))
+        .unwrap();
+        let execution = PilotExecution::new(pilot_outer_host(cics).unwrap(), platform_store);
+        assert_eq!(
+            drive_artifact(&artifact, invocation, &execution).unwrap(),
+            "READ:000:000:AA11\nREWRITE:000:000\nREADBACK:000:000:AA22\n",
+        );
+    }
+
+    #[test]
     fn remote_rollback_uses_the_typed_selected_route_without_claiming_credit() {
         let store = Arc::new(MemoryStore::new(StoreLimits::default()));
         let provider_store: Arc<dyn ProviderStateStore> = store.clone();

@@ -256,12 +256,7 @@ pub(super) fn resolve(
             {
                 file_key_length_value(tokens, operation, semantic)?
             } else {
-                if matches!(tokens.as_slice(), [token] if numeric_literal(token).is_some()) {
-                    return Err(ResolutionFailure::Invalid(format!(
-                        "CICS typed lowering is unready for {name} numeric literal"
-                    )));
-                }
-                numeric_length_value(tokens, semantic)?
+                numeric_length_value(tokens, name, semantic)?
             };
             if matches!(
                 operation,
@@ -328,6 +323,8 @@ fn file_record_length_value(
             .is_some_and(|token| token.eq_ignore_ascii_case("OF"))
     {
         HirCicsValue::LengthOf(complete_data_reference(&tokens[2..], semantic)?)
+    } else if let Some(value) = file_halfword_literal(tokens, "LENGTH")? {
+        HirCicsValue::Integer(value)
     } else {
         cics_integer_value(tokens, semantic)?
     };
@@ -362,6 +359,8 @@ fn file_key_length_value(
             .is_some_and(|token| token.eq_ignore_ascii_case("OF"))
     {
         HirCicsValue::LengthOf(complete_data_reference(&tokens[2..], semantic)?)
+    } else if let Some(value) = file_halfword_literal(tokens, "KEYLENGTH")? {
+        HirCicsValue::Integer(value)
     } else {
         cics_integer_value(tokens, semantic)?
     };
@@ -396,7 +395,27 @@ fn file_key_length_value(
     Ok(value)
 }
 
-fn numeric_length_value(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsValue> {
+fn file_halfword_literal(tokens: &[String], name: &str) -> Resolution<Option<i64>> {
+    let [token] = tokens else {
+        return Ok(None);
+    };
+    let Some(literal) = numeric_literal(token) else {
+        return Ok(None);
+    };
+    let value = literal.digits.parse::<i64>().ok();
+    if literal.negative || literal.scale != 0 || !matches!(value, Some(0..=32_767)) {
+        return Err(ResolutionFailure::Invalid(format!(
+            "CICS {name} literal must be an integer between 0 and 32767"
+        )));
+    }
+    Ok(value)
+}
+
+fn numeric_length_value(
+    tokens: &[String],
+    name: &str,
+    semantic: &SemanticModel,
+) -> Resolution<HirCicsValue> {
     if tokens
         .first()
         .is_some_and(|token| token.eq_ignore_ascii_case("LENGTH"))
@@ -405,6 +424,9 @@ fn numeric_length_value(tokens: &[String], semantic: &SemanticModel) -> Resoluti
             .is_some_and(|token| token.eq_ignore_ascii_case("OF"))
     {
         return complete_data_reference(&tokens[2..], semantic).map(HirCicsValue::LengthOf);
+    }
+    if let Some(value) = file_halfword_literal(tokens, name)? {
+        return Ok(HirCicsValue::Integer(value));
     }
     let reference = complete_data_reference(tokens, semantic)?;
     if reference.category != DataCategory::Binary || reference.length != 2 {
