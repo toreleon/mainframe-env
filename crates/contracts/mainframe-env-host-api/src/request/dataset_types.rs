@@ -7,7 +7,7 @@ use crate::dataset::{
     DatasetLockTarget, DatasetProviderCapabilities, DatasetSnapshot, TvsRecordOperation,
     TvsUnitOfWorkReceipt,
 };
-use crate::{DatasetName, MemberName};
+use crate::{DatasetName, HostProblem, MemberName};
 use mainframe_env_execution_api::PrincipalId;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -676,6 +676,9 @@ pub enum DatasetResult {
         identities: Vec<Vec<u8>>,
         /// Observed provider revision, distinct from a schema version or execution sequence.
         version: u64,
+        /// True when matching records remain beyond the requested ceiling.
+        /// Consumers must continue reading or reject the incomplete input.
+        more: bool,
     },
     /// Exact member content and generation classification.
     MemberGeneration {
@@ -689,6 +692,9 @@ pub enum DatasetResult {
         program_object: bool,
         /// Observed provider revision, distinct from a schema version or execution sequence.
         version: u64,
+        /// True when matching records remain beyond the requested ceiling.
+        /// Consumers must continue reading or reject the incomplete input.
+        more: bool,
     },
     /// Logical byte-range/record observation with a checked next address.
     Rba {
@@ -740,4 +746,23 @@ pub enum DatasetResult {
         /// Provider condition status text, not normalized to a generic success.
         status: String,
     },
+}
+
+impl DatasetResult {
+    /// Reject incomplete record input before a consumer uses it as a whole dataset.
+    /// This is a local host budget condition, not an IBM response-code projection.
+    pub fn require_complete(self) -> Result<Self, HostProblem> {
+        if matches!(
+            self,
+            Self::Records { more: true, .. } | Self::MemberGeneration { more: true, .. }
+        ) {
+            Err(HostProblem::Condition {
+                name: "DATASET_READ_TRUNCATED".into(),
+                response: 16,
+                response2: 0,
+            })
+        } else {
+            Ok(self)
+        }
+    }
 }

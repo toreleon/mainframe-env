@@ -10,7 +10,7 @@ pub const DATASET_DEFINITION_CONTRACT: &str = "mainframe-env.dataset-definition@
 /// Stable dataset request identity used by host framing.
 pub const DATASET_REQUEST_CONTRACT: &str = "mainframe-env.host.dataset-request@2";
 /// Stable dataset result identity used by host framing.
-pub const DATASET_RESULT_CONTRACT: &str = "mainframe-env.host.dataset-result@2";
+pub const DATASET_RESULT_CONTRACT: &str = "mainframe-env.host.dataset-result@3";
 /// Stable provider operand-family capability descriptor identity.
 pub const DATASET_PROVIDER_CAPABILITY_CONTRACT: &str =
     "mainframe-env.dataset-provider-capabilities@1";

@@ -4312,6 +4312,7 @@ mod tests {
                         records: vec![b"CARD0001".to_vec()],
                         identities: vec![b"CARD0001".to_vec()],
                         version: 1,
+                        more: false,
                     }))
                 }
                 HostRequest::Dataset(DatasetRequest::Attributes { .. }) => {
@@ -4559,6 +4560,7 @@ mod tests {
                                 records: vec![b"AA11".to_vec()],
                                 identities: vec![identity],
                                 version: 1,
+                                more: false,
                             }))
                         }
                         DatasetRequest::StartBrowse { .. } => {
@@ -4648,6 +4650,7 @@ mod tests {
                         records: vec![record],
                         identities: vec![key.unwrap_or_else(|| b"KEY".to_vec())],
                         version: 2,
+                        more: false,
                     }))
                 }
                 HostRequest::Dataset(_) => Err(HostProblem::Unsupported),

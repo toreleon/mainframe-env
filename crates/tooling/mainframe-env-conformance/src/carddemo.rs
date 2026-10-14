@@ -6,7 +6,9 @@ use source_input::{collect_paths, source_file};
 mod corpus_validation;
 use corpus_validation::*;
 mod bounds;
+mod dataset_reads;
 use bounds::checked_total;
+use dataset_reads::utility_records;
 
 mod authorization_context;
 mod bms;
@@ -8652,6 +8654,7 @@ async fn exercise_base_batch_routes(
                     max_records: 4_096,
                     control: Default::default(),
                 })
+                .and_then(DatasetResult::require_complete)
                 .map_err(terminal_problem)?
             else {
                 return Err(CorpusProblem::new(
@@ -9193,6 +9196,7 @@ fn base_batch_dataset_digests(
                     records,
                     identities,
                     version,
+                    ..
                 } = server
                     .dataset_service()
                     .invoke(DatasetRequest::Read {
@@ -9202,6 +9206,7 @@ fn base_batch_dataset_digests(
                         max_records: 4_096,
                         control: Default::default(),
                     })
+                    .and_then(DatasetResult::require_complete)
                     .map_err(terminal_problem)?
                 else {
                     return Err(CorpusProblem::new(
@@ -9222,6 +9227,7 @@ fn base_batch_dataset_digests(
                 records,
                 identities,
                 version,
+                ..
             } = server
                 .dataset_service()
                 .invoke(DatasetRequest::Read {
@@ -9231,6 +9237,7 @@ fn base_batch_dataset_digests(
                     max_records: 4_096,
                     control: Default::default(),
                 })
+                .and_then(DatasetResult::require_complete)
                 .map_err(terminal_problem)?
             else {
                 return Err(CorpusProblem::new(
@@ -10289,38 +10296,6 @@ fn utility_write_dataset(
         .map_err(terminal_problem)?;
     *sequence += 1;
     Ok(())
-}
-
-fn utility_records(
-    server: &ProductServer,
-    name: &str,
-    member: Option<&str>,
-) -> Result<Vec<Vec<u8>>, CorpusProblem> {
-    match server
-        .dataset_service()
-        .invoke(DatasetRequest::Read {
-            dataset: DatasetName::new(name, 128).map_err(|_| {
-                CorpusProblem::new("carddemo.utility.dataset", "dataset name is invalid")
-            })?,
-            member: member
-                .map(|member| {
-                    MemberName::new(member, 8).map_err(|_| {
-                        CorpusProblem::new("carddemo.utility.dataset", "member name is invalid")
-                    })
-                })
-                .transpose()?,
-            key: None,
-            max_records: 4_096,
-            control: Default::default(),
-        })
-        .map_err(terminal_problem)?
-    {
-        DatasetResult::Records { records, .. } => Ok(records),
-        _ => Err(CorpusProblem::new(
-            "carddemo.utility.dataset",
-            "dataset read returned the wrong result",
-        )),
-    }
 }
 
 async fn submit_utility_job(
@@ -11977,6 +11952,7 @@ fn carddemo_dataset_text_records(
             max_records: 4096,
             control: Default::default(),
         })
+        .and_then(DatasetResult::require_complete)
         .map_err(terminal_problem)?;
     let DatasetResult::Records { records, .. } = result else {
         return Err(CorpusProblem::new(

@@ -219,6 +219,7 @@ fn assert_sort_failure_position(successful_effects: usize) {
                     records: vec![b"AA01".to_vec()],
                     identities: vec![vec![1]],
                     version: 1,
+                    more: false,
                 })
             }
             HostRequest::Dataset(DatasetRequest::Write {
