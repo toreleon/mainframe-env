@@ -2550,6 +2550,47 @@ class CensusFailureDiagnosticTests(unittest.TestCase):
         self.assertEqual((row['stat_reads_started'], row['stat_reads_completed']), (1, 0))
         self.assertNotIn('deadline_detected_monotonic_seconds', row)
 
+    def test_iterator_close_refusal_retains_complete_scan_progress(self):
+        from contextlib import contextmanager
+        from types import SimpleNamespace
+        for close_mode in ('late', 'error'):
+            with self.subTest(close_mode=close_mode):
+                clock = [0.0]
+                close_error = OSError(5, 'process iterator close refused')
+                @contextmanager
+                def scan(root):
+                    self.assertEqual(root, '/proc')
+                    yield iter(SimpleNamespace(name=name, path='/proc/' + name)
+                               for name in ('42', 'self', '987654321', '43'))
+                    if close_mode == 'late':
+                        clock[0] = .051
+                    else:
+                        raise close_error
+                with self.trace_context() as collector, \
+                        patch.object(ci.time, 'monotonic', side_effect=lambda: clock[0]), \
+                        patch.object(ci.time, 'thread_time', return_value=1), \
+                        patch.object(ci.os, 'scandir', scan), \
+                        patch.object(ci, '_linux_stat_bytes',
+                                     return_value=b'42 (other) S 1 1 0') as read:
+                    with self.assertRaises(OSError) as refused:
+                        ci._linux_group_observation(987654321, 1)
+                if close_mode == 'late':
+                    self.assertEqual(str(refused.exception), self.ERROR)
+                else:
+                    self.assertIs(refused.exception, close_error)
+                self.assertEqual(read.call_count, 2)
+                self.assertEqual(len(collector['observations']), 1)
+                row = collector['observations'][0]
+                self.assertEqual(row['stage'], 'scan_complete_deadline'
+                                 if close_mode == 'late' else 'scandir_close')
+                self.assertEqual(row['numeric_entries_per_scan'], [2])
+                self.assertEqual(row['entries_seen'], 4)
+                self.assertEqual((row['stat_reads_started'], row['stat_reads_completed']), (2, 2))
+                self.assertEqual(row['last_numeric_pid'], '43')
+                self.assertEqual(row['deadline_monotonic_seconds'], .05)
+                self.assertEqual((row['retry_count'], row['vanished_scans']), (0, 0))
+                self.assertFalse(row['member_observed'])
+
     def test_diagnostics_bound_rows_and_restore_context_after_failures(self):
         from contextvars import Context
         with self.trace_context() as collector, \

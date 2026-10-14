@@ -248,34 +248,33 @@ def _check_linux_census_deadline(until) -> None:
 
 
 def _linux_stat_bytes(path: str) -> bytes:
-    # scandir already supplies the absolute path. Avoid rebuilding pathlib
-    # objects for every PID within the fixed census allowance; still read the
-    # entire stat and propagate open/read/close failures.
+    # Read all stat bytes and establish EOF; close every opened descriptor once.
+    # Successful IO needs no collector writes. Publish the exact IO failure
+    # stage only when the caller must retain an incomplete census diagnostic.
     trace = _LINUX_CENSUS_TRACE.get()
-    if trace is not None:
-        trace['stage'] = 'stat_open'
-    # Avoid a per-PID FileIO object; every descriptor is closed exactly once.
-    descriptor = os.open(path, os.O_RDONLY | os.O_CLOEXEC)
+    stage = 'stat_open'
     try:
+        descriptor = os.open(path, os.O_RDONLY | os.O_CLOEXEC)
+        try:
+            stage = 'stat_read'
+            raw = b''
+            chunks = None
+            while chunk := os.read(descriptor, 4096):
+                if chunks is None:
+                    if not raw and type(chunk) is bytes:
+                        raw = chunk
+                        continue
+                    chunks = [raw] if raw else []
+                chunks.append(chunk)
+            if chunks is not None:
+                raw = b''.join(chunks)
+            stage = 'stat_close'
+        finally:
+            os.close(descriptor)
+    except OSError:
         if trace is not None:
-            trace['stage'] = 'stat_read'
-        # Keep the first complete bytes chunk without allocating a list. The
-        # next read still establishes EOF; short reads never establish EOF.
-        raw = b''
-        chunks = None
-        while chunk := os.read(descriptor, 4096):
-            if chunks is None:
-                if not raw and type(chunk) is bytes:
-                    raw = chunk
-                    continue
-                chunks = [raw] if raw else []
-            chunks.append(chunk)
-        if chunks is not None:
-            raw = b''.join(chunks)
-        if trace is not None:
-            trace['stage'] = 'stat_close'
-    finally:
-        os.close(descriptor)
+            trace['stage'] = stage
+        raise
     return raw
 
 
@@ -291,62 +290,72 @@ def _linux_group_has_members(pgid: int) -> bool:
     until = _LINUX_CENSUS_UNTIL.get()
     trace = _LINUX_CENSUS_TRACE.get()
     count = 0
-    if trace is not None:
-        trace['stage'] = 'scandir_open'
-    with os.scandir('/proc') as entries:
+    # Keep hot-loop progress local. Publish once at every exit, including a
+    # refused/vanished scan, before the observer records failure or retries.
+    entries_seen = stat_started = stat_completed = 0
+    last_numeric_pid = None
+    stage = 'scandir_open'
+    try:
+        with os.scandir('/proc') as entries:
+            stage = 'scandir_iterate'
+            for entry in entries:
+                if trace is not None:
+                    entries_seen += 1
+                if not entry.name.isdecimal() or int(entry.name) == pgid:
+                    continue
+                stage = 'numeric_entry_deadline'
+                _check_linux_census_deadline(until)
+                count += 1
+                if trace is not None:
+                    last_numeric_pid = entry.name[:20]
+                stage = 'numeric_entry_limit'
+                if count > 65536:
+                    raise OSError('owned group membership census exceeds 65536 processes')
+                # A disappearing parent might have forked an unlisted child.
+                # Unknown membership cannot earn success.
+                stage = 'stat_read_deadline'
+                _check_linux_census_deadline(until)
+                try:
+                    stage = 'stat_read_call'
+                    if trace is not None:
+                        stat_started += 1
+                        # A patched reader that fails before IO still has this
+                        # precise call-stage; actual IO publishes its own stage.
+                        trace['stage'] = stage
+                    raw = _linux_stat_bytes(entry.path + '/stat')
+                    if trace is not None:
+                        stat_completed += 1
+                except OSError as problem:
+                    if trace is not None:
+                        stage = trace['stage']
+                    if problem.errno in (errno.ENOENT, errno.ESRCH):
+                        raise _LinuxCensusVanished(
+                            problem.errno, problem.strerror, problem.filename) from problem
+                    raise
+                try:
+                    stage = 'stat_parse'
+                    group = int(raw.rsplit(b')', 1)[1].split(None, 3)[2])
+                except (IndexError, ValueError) as problem:
+                    raise OSError('invalid Linux process-group metadata') from problem
+                if group == pgid:
+                    if trace is not None:
+                        trace['member_observed'] = True
+                    stage = 'positive_scandir_close'
+                    return True
+                stage = 'scandir_iterate'
+            stage = 'scandir_close'
+        stage = 'scan_complete_deadline'
+        _check_linux_census_deadline(until)
+        return False
+    finally:
         if trace is not None:
-            trace['stage'] = 'scandir_iterate'
-        for entry in entries:
-            if trace is not None:
-                trace['entries_seen'] += 1
-            if not entry.name.isdecimal() or int(entry.name) == pgid:
-                continue
-            if trace is not None:
-                trace['stage'] = 'numeric_entry_deadline'
-            _check_linux_census_deadline(until)
-            count += 1
-            if trace is not None:
-                trace['numeric_entries_per_scan'][-1] = count
-                trace['last_numeric_pid'] = entry.name[:20]
-                trace['stage'] = 'numeric_entry_limit'
-            if count > 65536:
-                raise OSError('owned group membership census exceeds 65536 processes')
-            # Do not ignore vanished entries: a disappearing parent might have
-            # forked an unlisted child. Unknown membership cannot earn success.
-            if trace is not None:
-                trace['stage'] = 'stat_read_deadline'
-            _check_linux_census_deadline(until)
-            try:
-                if trace is not None:
-                    trace['stage'] = 'stat_read_call'
-                    trace['stat_reads_started'] += 1
-                raw = _linux_stat_bytes(entry.path + '/stat')
-                if trace is not None:
-                    trace['stat_reads_completed'] += 1
-            except OSError as problem:
-                if problem.errno in (errno.ENOENT, errno.ESRCH):
-                    raise _LinuxCensusVanished(
-                        problem.errno, problem.strerror, problem.filename) from problem
-                raise
-            try:
-                if trace is not None:
-                    trace['stage'] = 'stat_parse'
-                group = int(raw.rsplit(b')', 1)[1].split(None, 3)[2])
-            except (IndexError, ValueError) as problem:
-                raise OSError('invalid Linux process-group metadata') from problem
-            if group == pgid:
-                if trace is not None:
-                    trace['member_observed'] = True
-                    trace['stage'] = 'positive_scandir_close'
-                return True
-            if trace is not None:
-                trace['stage'] = 'scandir_iterate'
-        if trace is not None:
-            trace['stage'] = 'scandir_close'
-    if trace is not None:
-        trace['stage'] = 'scan_complete_deadline'
-    _check_linux_census_deadline(until)
-    return False
+            trace['stage'] = stage
+            trace['entries_seen'] += entries_seen
+            trace['numeric_entries_per_scan'][-1] = count
+            trace['stat_reads_started'] += stat_started
+            trace['stat_reads_completed'] += stat_completed
+            if last_numeric_pid is not None:
+                trace['last_numeric_pid'] = last_numeric_pid
 
 
 def _linux_group_observation(pgid: int, deadline: float) -> bool:

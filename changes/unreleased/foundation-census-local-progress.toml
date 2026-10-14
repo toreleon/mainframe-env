@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Accumulate Linux process-group census diagnostic progress locally and retain it at scan boundaries, reducing collector writes while preserving complete stat reads, failure diagnostics, and the original membership and deadline rules."
