@@ -3,19 +3,42 @@ use mainframe_env_execution_api::BoundedPayload;
 use mainframe_env_host_api::{CicsOperation, CicsResponse};
 use std::collections::BTreeMap;
 
+static DEFAULT_TASK_NUMBER: CobolValue = CobolValue::Decimal(Decimal {
+    coefficient: 0,
+    scale: 0,
+});
+
+// Missing task numbers read as zero without adding state to legacy checkpoints.
+pub(super) fn implicit_value<'a>(
+    values: &'a BTreeMap<String, CobolValue>,
+    name: &str,
+) -> Option<&'a CobolValue> {
+    values
+        .get(name)
+        .or_else(|| (name == "EIBTASKN").then_some(&DEFAULT_TASK_NUMBER))
+}
+
+pub(super) fn implicit_slot<'a>(
+    values: &'a mut BTreeMap<String, CobolValue>,
+    name: &str,
+) -> Option<&'a mut CobolValue> {
+    if name == "EIBTASKN" {
+        Some(
+            values
+                .entry(name.into())
+                .or_insert_with(|| DEFAULT_TASK_NUMBER.clone()),
+        )
+    } else {
+        values.get_mut(name)
+    }
+}
+
 pub(super) fn implicit_values(
     commarea_len: Option<usize>,
     aid: Option<u8>,
     transaction: Option<&[u8]>,
 ) -> Result<BTreeMap<String, CobolValue>, MachineProblem> {
     Ok(BTreeMap::from([
-        (
-            "EIBTASKN".into(),
-            CobolValue::Decimal(Decimal {
-                coefficient: 0,
-                scale: 0,
-            }),
-        ),
         (
             "EIBRESP".into(),
             CobolValue::Decimal(Decimal {
@@ -337,6 +360,103 @@ mod tests {
     use mainframe_env_execution_api::{InvocationLimits, Machine};
     use mainframe_env_host_api::CicsDisposition;
     use mainframe_env_ir::CodecLimits;
+
+    #[test]
+    fn intrinsic_task_number_checkpoint_restores_legacy_default_and_written_value() {
+        use mainframe_env_ir::{Attribute, Effect, IrLimits, ModuleBuilder, OperationIdentity};
+
+        let mut builder = ModuleBuilder::new(IrLimits::default());
+        let region = builder.add_region().unwrap();
+        let block = builder.add_block(region).unwrap();
+        for (name, tokens, effects) in [
+            (
+                "display",
+                vec!["FUNCTION", "MAX", "(", "EIBTASKN", ",", "0", ")"],
+                vec![Effect::MemoryRead, Effect::TerminalWrite],
+            ),
+            ("exec_cics", vec!["RETURN"], vec![Effect::ProgramControl]),
+            ("halt", Vec::new(), Vec::new()),
+        ] {
+            builder
+                .add_operation(
+                    block,
+                    OperationIdentity::new(super::super::NAMESPACE, name, 1).unwrap(),
+                    Vec::new(),
+                    0,
+                    tokens
+                        .into_iter()
+                        .enumerate()
+                        .map(|(index, token)| {
+                            (format!("arg_{index:03}"), Attribute::Text(token.into()))
+                        })
+                        .collect(),
+                    effects,
+                    Vec::new(),
+                    None,
+                )
+                .unwrap();
+        }
+        let binary =
+            mainframe_env_ir::encode_binary(&builder.finish().unwrap(), CodecLimits::default())
+                .unwrap();
+        let new_machine = || {
+            let mut invocation = super::super::tests::invocation();
+            invocation.bindings.insert(
+                "cics.transaction".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.transaction@1",
+                    b"MENU".to_vec(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            );
+            ReferenceMachine::from_binary(&binary, invocation, CodecLimits::default()).unwrap()
+        };
+        let mut source = new_machine();
+        let tokens = super::super::arguments(&source.operations[0]);
+        let assert_task_number = |machine: &ReferenceMachine, expected| {
+            let integer = ["FUNCTION", "INTEGER", "(", "EIBTASKN", ")"].map(str::to_string);
+            for expression in [&tokens[..], &integer[..]] {
+                assert!(matches!(
+                    machine.eval_value(expression),
+                    Ok(CobolValue::Decimal(Decimal { coefficient, scale: 0 }))
+                        if coefficient == expected
+                ));
+            }
+        };
+        // Pre-PR checkpoints have no implicit EIBTASKN entry.
+        source.implicit.remove("EIBTASKN");
+        let legacy = source.checkpoint().unwrap();
+        let mut restored = new_machine();
+        restored.restore_checkpoint(&legacy).unwrap();
+        assert_task_number(&restored, 0);
+        assert_eq!(restored.checkpoint(), Some(legacy.clone()));
+        assert_task_number(&source, 0);
+        assert_eq!(source.checkpoint(), Some(legacy.clone()));
+
+        // Exercise both decimal and byte writes used by CICS host output paths.
+        for coefficient in [12345, 67890] {
+            source.restore_checkpoint(&legacy).unwrap();
+            if coefficient == 12345 {
+                source
+                    .write_decimal(
+                        "EIBTASKN",
+                        Decimal {
+                            coefficient,
+                            scale: 0,
+                        },
+                    )
+                    .unwrap();
+            } else {
+                source.write("EIBTASKN", b"67890").unwrap();
+            }
+            let checkpoint = source.checkpoint().unwrap();
+            restored.restore_checkpoint(&checkpoint).unwrap();
+            assert_task_number(&restored, coefficient);
+            assert_eq!(restored.snapshot(), source.snapshot());
+            assert_eq!(restored.checkpoint(), Some(checkpoint));
+        }
+    }
 
     #[test]
     fn intrinsic_arguments_evaluate_seeded_eib_fields() {
