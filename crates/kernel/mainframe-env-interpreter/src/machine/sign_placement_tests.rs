@@ -2,41 +2,49 @@ use super::*;
 use mainframe_env_ir::{IrLimits, ModuleBuilder, cobol_layout_definition_identity, encode_binary};
 
 fn sign_machine(leading: bool, separate: bool) -> ReferenceMachine {
+    sign_machine_with_attribute(Some(leading), separate)
+}
+
+fn sign_machine_with_attribute(leading: Option<bool>, separate: bool) -> ReferenceMachine {
     let mut builder = ModuleBuilder::new(IrLimits::default());
     let length = 6 + u64::from(separate);
     builder.add_storage("R", length, None).unwrap();
     let region = builder.add_region().unwrap();
     let block = builder.add_block(region).unwrap();
+    let mut attributes = BTreeMap::from([
+        ("name".into(), Attribute::Text("R".into())),
+        ("simple_name".into(), Attribute::Text("R".into())),
+        ("category".into(), Attribute::Text("numeric_display".into())),
+        ("picture".into(), Attribute::Text("S9(6)".into())),
+        ("digits".into(), Attribute::Integer(6)),
+        ("scale".into(), Attribute::Integer(0)),
+        ("signed".into(), Attribute::Integer(1)),
+        (
+            "sign_leading".into(),
+            Attribute::Integer(i64::from(leading.unwrap_or(false))),
+        ),
+        (
+            "sign_separate".into(),
+            Attribute::Integer(i64::from(separate)),
+        ),
+        ("section".into(), Attribute::Text("working".into())),
+        ("offset".into(), Attribute::Integer(0)),
+        ("length".into(), Attribute::Integer(length as i64)),
+        ("element_length".into(), Attribute::Integer(length as i64)),
+        ("occurs".into(), Attribute::Integer(1)),
+        ("parent".into(), Attribute::Text(String::new())),
+        ("condition_values".into(), Attribute::Text(String::new())),
+    ]);
+    if leading.is_none() {
+        attributes.remove("sign_leading");
+    }
     builder
         .add_operation(
             block,
             cobol_layout_definition_identity(),
             Vec::new(),
             0,
-            BTreeMap::from([
-                ("name".into(), Attribute::Text("R".into())),
-                ("simple_name".into(), Attribute::Text("R".into())),
-                ("category".into(), Attribute::Text("numeric_display".into())),
-                ("picture".into(), Attribute::Text("S9(6)".into())),
-                ("digits".into(), Attribute::Integer(6)),
-                ("scale".into(), Attribute::Integer(0)),
-                ("signed".into(), Attribute::Integer(1)),
-                (
-                    "sign_leading".into(),
-                    Attribute::Integer(i64::from(leading)),
-                ),
-                (
-                    "sign_separate".into(),
-                    Attribute::Integer(i64::from(separate)),
-                ),
-                ("section".into(), Attribute::Text("working".into())),
-                ("offset".into(), Attribute::Integer(0)),
-                ("length".into(), Attribute::Integer(length as i64)),
-                ("element_length".into(), Attribute::Integer(length as i64)),
-                ("occurs".into(), Attribute::Integer(1)),
-                ("parent".into(), Attribute::Text(String::new())),
-                ("condition_values".into(), Attribute::Text(String::new())),
-            ]),
+            attributes,
             Vec::new(),
             Vec::new(),
             None,
@@ -76,6 +84,80 @@ fn sign_machine(leading: bool, separate: bool) -> ReferenceMachine {
 
 fn tokens(words: &[&str]) -> Vec<String> {
     words.iter().map(|word| (*word).into()).collect()
+}
+
+#[test]
+fn trailing_sign_snapshot_and_checkpoint_match_absent_placement_attribute() {
+    for separate in [false, true] {
+        let mut explicit = sign_machine(false, separate);
+        let mut absent = sign_machine_with_attribute(None, separate);
+        for machine in [&mut explicit, &mut absent] {
+            machine.move_op(&tokens(&["-2", "TO", "R"])).unwrap();
+        }
+        assert!(!absent.layouts["R"].sign_leading);
+        assert_eq!(explicit.snapshot(), absent.snapshot());
+        let checkpoint = explicit.checkpoint().unwrap();
+        assert_eq!(absent.checkpoint(), Some(checkpoint.clone()));
+        let mut restored = sign_machine_with_attribute(None, separate);
+        restored.restore_checkpoint(&checkpoint).unwrap();
+        assert_eq!(restored.snapshot(), explicit.snapshot());
+        restored.move_op(&tokens(&["7", "TO", "R"])).unwrap();
+        assert_eq!(
+            restored.read("R").unwrap(),
+            if separate {
+                &b"000007+"[..]
+            } else {
+                &b"00000G"[..]
+            }
+        );
+    }
+}
+
+#[test]
+fn sign_attribute_defaults_to_trailing_and_rejects_malformed_values() {
+    let machine = sign_machine(false, true);
+    let mut operation = machine.operations[0].clone();
+    operation.attributes.remove("sign_leading");
+    assert_eq!(sign_placement::sign_leading(&operation), Ok(false));
+    for attribute in [
+        Attribute::Integer(-1),
+        Attribute::Integer(2),
+        Attribute::Text("1".into()),
+    ] {
+        operation
+            .attributes
+            .insert("sign_leading".into(), attribute);
+        assert_eq!(
+            sign_placement::sign_leading(&operation),
+            Err(MachineProblem::InvalidArtifact(
+                "invalid sign_leading".into()
+            ))
+        );
+    }
+}
+
+#[test]
+fn sign_leading_separate_survives_snapshot_and_checkpoint_restore() {
+    // Layout metadata stays in the executable, outside the persisted schema-12 state.
+    let mut source = sign_machine(true, true);
+    source.move_op(&tokens(&["-2", "TO", "R"])).unwrap();
+    let snapshot = source.snapshot();
+    let checkpoint = source.checkpoint().unwrap();
+    for from_checkpoint in [false, true] {
+        let mut restored = sign_machine(true, true);
+        if from_checkpoint {
+            restored.restore_checkpoint(&checkpoint).unwrap();
+        } else {
+            restored.restore(snapshot.clone()).unwrap();
+        }
+        assert_eq!(restored.snapshot(), snapshot);
+        assert_eq!(restored.checkpoint(), Some(checkpoint.clone()));
+        restored.move_op(&tokens(&["7", "TO", "R"])).unwrap();
+        assert_eq!(restored.read("R").unwrap(), b"+000007");
+        let display = restored.operations[1].clone();
+        restored.execute(&display).unwrap();
+        assert_eq!(restored.output(), b"+000007\n");
+    }
 }
 
 #[test]

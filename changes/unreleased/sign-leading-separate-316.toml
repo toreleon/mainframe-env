@@ -1,3 +1,3 @@
 schema_version = "mainframe-env.changelog-fragment@1"
 category = "fixed"
-summary = "Preserve SIGN LEADING placement in separate and non-separate numeric DISPLAY storage and numeric round trips (#316)."
+summary = "Preserve SIGN LEADING placement in separate and non-separate numeric DISPLAY storage, numeric round trips and checkpoint restore, while keeping other artifact and checkpoint bytes unchanged (#316)."

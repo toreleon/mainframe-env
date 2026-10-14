@@ -192,10 +192,6 @@ pub(crate) fn lower_to_core(
                 Attribute::Integer(i64::from(layout.signed)),
             ),
             (
-                "sign_leading".into(),
-                Attribute::Integer(i64::from(layout.sign_leading)),
-            ),
-            (
                 "sign_separate".into(),
                 Attribute::Integer(i64::from(layout.sign_separate)),
             ),
@@ -314,6 +310,9 @@ pub(crate) fn lower_to_core(
                 "float_profile".into(),
                 Attribute::Text(mainframe_env_ir::COBOL_FLOAT_HEX.into()),
             );
+        }
+        if layout.sign_leading {
+            attributes.insert("sign_leading".into(), Attribute::Integer(1));
         }
         builder
             .add_operation(

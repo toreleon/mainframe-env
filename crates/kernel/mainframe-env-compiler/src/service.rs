@@ -564,7 +564,7 @@ mod tests {
             );
             assert_eq!(
                 layout.attributes.get("sign_leading"),
-                Some(&Attribute::Integer(leading)),
+                (leading == 1).then_some(&Attribute::Integer(1)),
                 "SIGN {clause} lost its placement"
             );
         }
@@ -726,6 +726,21 @@ mod tests {
         assert!(hir.is_some());
         assert_eq!(completeness, Completeness::Complete);
     }
+    #[test]
+    fn program_without_sql_include_preserves_base_artifact_bytes() {
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(request(HELLO, CompilationMode::Executable))
+            .unwrap()
+        else {
+            panic!("program without SQL INCLUDE must publish");
+        };
+        // Exact HELLO source and golden from #419, captured on a688045a.
+        assert_eq!(
+            artifact.content_id().to_reference(),
+            "sha256:fd5ecebf2868a944a20342bc26a3dd1efc37a34e52a2b9874507e180029ea7f5"
+        );
+    }
+
     #[test]
     fn hello_publishes_legal_mir() {
         let result = CobolCompiler::default()
