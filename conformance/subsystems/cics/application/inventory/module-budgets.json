@@ -102,7 +102,7 @@
     },
     {
       "path": "crates/providers/mainframe-env-dataset/src/service.rs",
-      "max_production_lines": 9195,
+      "max_production_lines": 9087,
       "responsibility": "Dataset allocation, catalog state, sequential and VSAM I/O, AMS behavior, transactions, and replay meet here.",
       "split_boundary": "Split catalog/allocation, record I/O, VSAM access, AMS commands, and persistence/recovery command families."
     },

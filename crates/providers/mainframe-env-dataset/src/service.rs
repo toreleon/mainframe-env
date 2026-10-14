@@ -25,6 +25,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
 
+mod append_publication;
 mod browse_ops;
 mod seed_preparation;
 pub use seed_preparation::PreparedSeedSelection;
@@ -3041,11 +3042,11 @@ impl DatasetService {
                     mutation,
                     true,
                 )?;
-                let current = entry(state, dataset)?.clone();
-                if expected_version.is_some_and(|expected| expected != current.version) {
+                let mut next = entry(state, dataset)?.clone();
+                let current_version = next.version;
+                if expected_version.is_some_and(|expected| expected != current_version) {
                     return Err(HostProblem::IdempotencyConflict);
                 }
-                let mut next = current.clone();
                 let mut dependencies = state.dependencies.clone();
                 next.version = next
                     .version
@@ -3085,14 +3086,15 @@ impl DatasetService {
                 let result = DatasetResult::Mutated {
                     version: next.version,
                 };
-                self.persist_with_indexes(
+                self.persist_entry_with_indexes_and_lock_deletes(
                     state,
                     dataset.as_str(),
-                    &current,
-                    &next,
+                    current_version,
+                    std::borrow::Cow::Owned(next),
                     mutation,
                     request_digest(request)?,
                     &result,
+                    &[],
                 )?;
                 state.dependencies = dependencies;
                 Ok(result)
@@ -4459,116 +4461,6 @@ impl DatasetService {
             }
         }
     }
-    fn persist_with_indexes(
-        &self,
-        state: &mut State,
-        dataset: &str,
-        current: &Entry,
-        next: &Entry,
-        mutation: &mainframe_env_host_api::Mutation,
-        request_digest: [u8; 32],
-        result: &DatasetResult,
-    ) -> Result<(), HostProblem> {
-        self.persist_with_indexes_and_lock_deletes(
-            state,
-            dataset,
-            current,
-            next,
-            mutation,
-            request_digest,
-            result,
-            &[],
-        )
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn persist_with_indexes_and_lock_deletes(
-        &self,
-        state: &mut State,
-        dataset: &str,
-        current: &Entry,
-        next: &Entry,
-        mutation: &mainframe_env_host_api::Mutation,
-        request_digest: [u8; 32],
-        result: &DatasetResult,
-        released_locks: &[mainframe_env_host_api::DatasetLockReceipt],
-    ) -> Result<(), HostProblem> {
-        validate_entry_shape(next, self.limits)?;
-        validate_guaranteed_volume_capacity(state, dataset, next, self.limits)?;
-        if bytes(next) > self.limits.max_total_bytes {
-            return Err(HostProblem::ResourceExhausted);
-        }
-        let mut updated_indexes = Vec::new();
-        for (name, index) in state
-            .alternate_indexes
-            .iter()
-            .filter(|(_, index)| index.base == dataset && index.upgrade)
-        {
-            validate_alternate_index(next, index)?;
-            let mut updated = index.clone();
-            updated.identities = build_alternate_identities(next, &updated)?;
-            updated.version = updated
-                .version
-                .checked_add(1)
-                .ok_or(HostProblem::ResourceExhausted)?;
-            updated_indexes.push((name.clone(), index.version, updated));
-        }
-        let replay = resolved_replay(state, mutation, request_digest, result.clone())?;
-        let mut writes = Vec::with_capacity(2 + updated_indexes.len());
-        writes.push(ProviderStateWrite {
-            record: ProviderStateRecord {
-                namespace: "dataset".into(),
-                key: dataset.into(),
-                version: next.version,
-                payload: encode(next).map_err(|_| HostProblem::InfrastructureFailure)?,
-            },
-            expected_version: Some(current.version),
-        });
-        for (name, expected, index) in &updated_indexes {
-            writes.push(ProviderStateWrite {
-                record: ProviderStateRecord {
-                    namespace: "dataset-aix".into(),
-                    key: name.clone(),
-                    version: index.version,
-                    payload: encode_alternate_index(index)?,
-                },
-                expected_version: Some(*expected),
-            });
-        }
-        writes.push(ProviderStateWrite {
-            record: ProviderStateRecord {
-                namespace: "dataset-replay".into(),
-                key: mutation.idempotency_key.as_str().into(),
-                version: 2,
-                payload: encode_replay(&replay)?,
-            },
-            expected_version: Some(1),
-        });
-        let mut mutations = writes
-            .into_iter()
-            .map(ProviderStateMutation::Put)
-            .collect::<Vec<_>>();
-        mutations.extend(
-            released_locks
-                .iter()
-                .map(|lock| ProviderStateMutation::Delete {
-                    namespace: "dataset-lock".into(),
-                    key: lock.lock_id.clone(),
-                    expected_version: lock.version,
-                }),
-        );
-        let (replay_version, replay_payload) =
-            self.commit_catalog_mutations(mutations, mutation, &replay)?;
-        state.entries.insert(dataset.into(), next.clone());
-        for (name, _, index) in updated_indexes {
-            state.alternate_indexes.insert(name, index);
-        }
-        state
-            .replay
-            .record_mutation(mutation, replay_version, &replay_payload, replay);
-        Ok(())
-    }
-
     /// Commits `writes`, one of which must be the `dataset-replay` row for
     /// `mutation`'s key at version 2. Returns the version and payload the
     /// store now holds for that row, known exactly whether this call wrote
@@ -9195,6 +9087,7 @@ pub fn dataset_providers(
 
 #[cfg(test)]
 mod tests {
+    mod append_publication_tests;
     use super::*;
     use mainframe_env_execution_api::{
         ArtifactRef, BoundedPayload, ExecutionId, IdempotencyKey, Principal, RequestId,
