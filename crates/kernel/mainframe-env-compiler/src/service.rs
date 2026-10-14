@@ -435,6 +435,58 @@ mod tests {
     }
 
     #[test]
+    fn inspect_lowering_preserves_every_phrase_and_rejects_malformed_tail() {
+        let prefix = "IDENTIFICATION DIVISION. PROGRAM-ID. INSPECT-MULTI. \
+            DATA DIVISION. WORKING-STORAGE SECTION. \
+            01 X PIC X(4) VALUE 'SUSU'. 01 I PIC 9(3) VALUE 0. \
+            01 J PIC 9(3) VALUE 0. PROCEDURE DIVISION.";
+        for phrase in [
+            "TALLYING I FOR ALL 'S' ALL 'U'",
+            "TALLYING I FOR LEADING 'S' J FOR ALL 'U' CHARACTERS",
+            "REPLACING FIRST 'S' BY '1' ALL 'U' BY '2' CHARACTERS BY '0'",
+        ] {
+            let source = format!("{prefix} INSPECT X {phrase}. STOP RUN.");
+            let result = CobolCompiler::default()
+                .compile(request(&source, CompilationMode::Executable))
+                .unwrap();
+            let CompilerResult::Published { artifact, .. } = result else {
+                panic!("expected executable: {result:?}");
+            };
+            let module = decode_binary(artifact.payload(), CodecLimits::default()).unwrap();
+            let inspect = module
+                .regions()
+                .iter()
+                .flat_map(|region| &region.blocks)
+                .flat_map(|block| &block.operations)
+                .find(|operation| operation.identity.name() == "inspect")
+                .expect("lowered INSPECT");
+            let expected = std::iter::once("X")
+                .chain(phrase.split_whitespace())
+                .flat_map(|token| {
+                    (token.len() as u64)
+                        .to_be_bytes()
+                        .into_iter()
+                        .chain(token.bytes())
+                })
+                .collect();
+            assert_eq!(
+                inspect.attributes["arguments"],
+                Attribute::Bytes(expected),
+                "{phrase}"
+            );
+        }
+        for phrase in [
+            "TALLYING I FOR ALL 'S' FIRST 'U'",
+            "REPLACING ALL 'S' BY '1' ALL 'U'",
+        ] {
+            let source = format!("{prefix} INSPECT X {phrase}. STOP RUN.");
+            let analysis = CobolCompiler::default().analyze(&bundle(&source));
+            assert!(!analysis.diagnostics.is_empty(), "{phrase}");
+            assert!(analysis.hir.is_none(), "{phrase}");
+        }
+    }
+
+    #[test]
     fn sign_leading_placement_survives_executable_lowering() {
         for (clause, leading, separate) in [
             ("LEADING SEPARATE", 1, 1),
