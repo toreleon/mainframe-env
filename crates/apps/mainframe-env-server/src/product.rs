@@ -18,8 +18,8 @@ use crate::console_retention::{decode_console_log_rows, encode_console_log};
 use crate::jes_admission::ChildAdmissionResult;
 use crate::jes_worker::{
     DurableJesClock, JES_HEARTBEAT_MILLIS, JES_IDLE_MILLIS, JES_WORK_GENERATION, JES_WORKER_COUNT,
-    JES_WORKER_FRESHNESS_MILLIS, JesClock, JesWorkPayload, claim_durable_work,
-    clear_worker_progress, heartbeat_durable_work,
+    JES_WORKER_FRESHNESS_MILLIS, JesClock, JesWorkPayload, clear_worker_progress,
+    heartbeat_durable_work,
 };
 use crate::retention_maintenance::provider::RetentionPlanner;
 use crate::{
@@ -2631,7 +2631,7 @@ impl ProductServer {
     }
 
     fn claim_jes_work(&self, worker: &str) -> Result<Option<WorkRecord>, HostProblem> {
-        claim_durable_work(self.store.as_ref(), worker, self.jes_tick()?).map_err(store_error)
+        self.claim_jes_work_with_child_recovery(worker, self.jes_tick()?)
     }
 
     fn heartbeat_jes_work(&self, work: &WorkRecord) -> Result<(), HostProblem> {
@@ -2671,7 +2671,7 @@ impl ProductServer {
             if job.priority != work.priority {
                 return Err(HostProblem::Malformed);
             }
-            match job.state {
+            match self.child_admission_recovery_state(&payload, job.state)? {
                 mainframe_env_batch::JobState::Completed
                 | mainframe_env_batch::JobState::Failed => {
                     return match self.admit_internal_reader_children(
@@ -5659,6 +5659,8 @@ mod tests {
     use super::*;
     #[path = "ims_package_tests.rs"]
     mod ims_package_tests;
+    #[path = "jes_child_recovery_tests.rs"]
+    mod jes_child_recovery_tests;
     #[path = "sequential_layout_admission_tests.rs"]
     mod sequential_layout_admission_tests;
     #[path = "shisam_fixed_admission_tests.rs"]
