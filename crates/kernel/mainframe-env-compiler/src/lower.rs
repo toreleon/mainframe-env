@@ -167,7 +167,7 @@ pub(crate) fn lower_to_core(
         )
         .map_err(|_| LowerProblem::LimitExceeded)?;
     for layout in hir.layouts.iter().filter(|layout| !layout.typedef) {
-        let attributes = BTreeMap::from([
+        let mut attributes = BTreeMap::from([
             (
                 "name".into(),
                 Attribute::Text(layout.qualified_name.clone()),
@@ -302,6 +302,9 @@ pub(crate) fn lower_to_core(
                 Attribute::Text(layout.object_class.clone().unwrap_or_default()),
             ),
         ]);
+        if layout.sign_leading {
+            attributes.insert("sign_leading".into(), Attribute::Integer(1));
+        }
         builder
             .add_operation(
                 block,
