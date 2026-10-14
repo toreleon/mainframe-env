@@ -52,6 +52,9 @@ mod decimal_commit;
 mod eib;
 #[cfg(test)]
 mod floating_insertion_tests;
+#[cfg(test)]
+mod indexed_by_tests;
+mod indexes;
 mod layout_admission;
 mod layout_resolution;
 mod legacy_mq;
@@ -2711,8 +2714,9 @@ impl ReferenceMachine {
             .map(control_tokens)
             .map(|tokens| tokens.into_iter().skip(1).collect::<Vec<_>>())
             .collect::<Vec<_>>();
+        let start = self.search_start(args, &index_name)?;
         let mut found = false;
-        for occurrence in 1..=active {
+        for occurrence in start..=active {
             self.implicit.insert(
                 normalize(&index_name),
                 CobolValue::Decimal(Decimal {
@@ -4827,6 +4831,7 @@ impl ReferenceMachine {
                 } else {
                     decimal_subtract(self.arithmetic_mode, current, amount)?
                 };
+                self.validate_index_adjustment(target, amount, value, &args[direction + 2..])?;
                 if self.layout(target).is_some() {
                     layout_assignments.push((vec![target.clone()], value, false));
                 } else if matches!(
@@ -4850,6 +4855,9 @@ impl ReferenceMachine {
         let to = position(args, "TO").ok_or(MachineProblem::InvalidOperation)?;
         if to == 0 || to + 1 >= args.len() {
             return Err(MachineProblem::InvalidOperation);
+        }
+        if self.has_index_target(&args[..to]) {
+            return self.set_indexes(&args[..to], &args[to + 1..]);
         }
         let targets = self
             .arithmetic_items(&args[..to], true)?
@@ -8068,16 +8076,8 @@ impl ReferenceMachine {
                         }
                         _ => return Err(MachineProblem::SubscriptError),
                     };
-                    if index == 0 || index > *occurs {
-                        return Err(MachineProblem::SubscriptError);
-                    }
-                    offset = offset
-                        .checked_add(
-                            (index - 1)
-                                .checked_mul(*stride)
-                                .ok_or(MachineProblem::SubscriptError)?,
-                        )
-                        .ok_or(MachineProblem::SubscriptError)?;
+                    offset =
+                        self.checked_subscript_offset(tokens, index, *occurs, *stride, offset)?;
                 }
                 length = layout.element_length.min(layout.length);
             }

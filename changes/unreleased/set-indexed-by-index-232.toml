@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Make `SET TO`, `SET UP BY`, and `SET DOWN BY` work with `INDEXED BY` names; preserve table-bound index displacements and the starting index for serial `SEARCH` (#232)."
