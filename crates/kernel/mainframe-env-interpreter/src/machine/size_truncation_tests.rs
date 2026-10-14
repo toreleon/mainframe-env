@@ -50,6 +50,7 @@ fn machine_for(case: Case) -> ReferenceMachine {
         scale: case.scale,
         native_binary: false,
         signed: case.signed,
+        sign_leading: false,
         sign_separate: false,
         justified_right: false,
         blank_when_zero: false,
