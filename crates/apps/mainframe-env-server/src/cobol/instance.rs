@@ -561,10 +561,22 @@ impl Lease {
                 }
             }
         };
+        let loaded_cursors = machine.dataset_cursors().clone();
         if !initial && let Some(payload) = &instance.state {
             machine
                 .install_retained_program_state(payload)
                 .map_err(state_problem)?;
+        }
+        // Old writers committed cursor and retained-state rows separately.
+        // Never choose a winner for disagreeing (or orphaned) recovery data.
+        if machine.dataset_cursors() != &loaded_cursors
+            || instance.state.is_none() && !loaded_cursors.is_empty()
+        {
+            return Err(HostProblem::Condition {
+                name: "INSTALLED-CALL-CURSOR-MISMATCH".into(),
+                response: -10,
+                response2: 0,
+            });
         }
         instance.artifact = invocation.artifact.as_str().into();
         instance.busy = true;
