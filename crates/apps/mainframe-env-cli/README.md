@@ -30,9 +30,12 @@ not register the complete server host-service portfolio.
 
 `compile`, `inspect`, and `run` accept repeatable `--library DIRECTORY` options.
 Directories are enumerated deterministically into ordered logical libraries;
-physical paths and timestamps do not enter source identity. Supplying libraries
-also appends the explicitly ordered CICS, Db2, and MQ provider-owned ABI source
-libraries. The compiler itself supplies no compatibility fallback.
+physical paths and timestamps do not enter source identity. Db2 supplies its
+SQLCA ABI source library even without `--library`; application members take
+precedence. Supplying libraries also appends the explicitly ordered CICS, Db2,
+and MQ provider-owned ABI source libraries. The compiler itself supplies no
+compatibility fallback. SQL INCLUDE expansion is automatic when present, can
+be enabled with `--sql-precompile`, and disabled with `--no-sql-precompile`.
 
 ## Documentation
 

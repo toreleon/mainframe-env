@@ -138,7 +138,7 @@
       "normative": false,
       "path": "crates/apps/mainframe-env-cli/README.md",
       "relative_links": 4,
-      "sha256": "sha256:c5c1aefdd2b4c52d90484f79cf152e7a4243dda1884513de75a17f540e7fc858",
+      "sha256": "sha256:19b9b952d58d31432837027f8131e91452db72deebd2f50e486c63a00e481f78",
       "title": "mainframe-env-cli",
       "xtask_commands": 0
     },
