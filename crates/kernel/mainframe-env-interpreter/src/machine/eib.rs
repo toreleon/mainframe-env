@@ -10,6 +10,13 @@ pub(super) fn implicit_values(
 ) -> Result<BTreeMap<String, CobolValue>, MachineProblem> {
     Ok(BTreeMap::from([
         (
+            "EIBTASKN".into(),
+            CobolValue::Decimal(Decimal {
+                coefficient: 0,
+                scale: 0,
+            }),
+        ),
+        (
             "EIBRESP".into(),
             CobolValue::Decimal(Decimal {
                 coefficient: 0,
@@ -330,6 +337,57 @@ mod tests {
     use mainframe_env_execution_api::{InvocationLimits, Machine};
     use mainframe_env_host_api::CicsDisposition;
     use mainframe_env_ir::CodecLimits;
+
+    #[test]
+    fn intrinsic_arguments_evaluate_seeded_eib_fields() {
+        let mut machine = ReferenceMachine::from_binary(
+            &super::super::tests::binary(),
+            super::super::tests::invocation(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        assert!(matches!(
+            machine.eval_value(&["EIBTASKN".into()]),
+            Ok(CobolValue::Decimal(Decimal {
+                coefficient: 0,
+                scale: 0
+            }))
+        ));
+        for (name, coefficient) in [("EIBTASKN", 12345), ("EIBTIME", 123456)] {
+            machine
+                .write_decimal(
+                    name,
+                    Decimal {
+                        coefficient,
+                        scale: 0,
+                    },
+                )
+                .unwrap();
+        }
+        for (expression, expected) in [
+            ("FUNCTION INTEGER ( EIBTASKN )", 12345),
+            ("FUNCTION INTEGER ( EIBTIME )", 123456),
+        ] {
+            let tokens = expression
+                .split_whitespace()
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            assert!(
+                matches!(
+                    machine.eval_value(&tokens),
+                    Ok(CobolValue::Decimal(Decimal { coefficient, scale: 0 }))
+                        if coefficient == expected
+                ),
+                "{expression}"
+            );
+        }
+        let tokens = ["FUNCTION", "RANDOM", "(", "EIBTASKN", ")"].map(str::to_string);
+        let expected = super::super::deterministic_random(12345).1;
+        assert!(matches!(
+            machine.eval_value(&tokens),
+            Ok(CobolValue::Decimal(value)) if value == expected
+        ));
+    }
 
     #[test]
     fn signal_indicator_is_written_and_restored_without_stale_flag() {

@@ -56,8 +56,18 @@ pub(super) fn analyze(
     user_functions: &BTreeSet<String>,
     pointer_bytes: usize,
 ) -> Result<(Vec<CobolIntrinsicCall>, Vec<CobolSpecialRegisterReference>), SemanticProblem> {
+    let cics_context = super::strip_comments(source)
+        .to_ascii_uppercase()
+        .contains("EXEC CICS");
     Ok((
-        intrinsic_calls(source, origins, layouts, pointer_bytes, user_functions)?,
+        intrinsic_calls(
+            source,
+            origins,
+            layouts,
+            pointer_bytes,
+            user_functions,
+            cics_context,
+        )?,
         special_registers(source, origins, layouts, files, pointer_bytes)?,
     ))
 }
@@ -68,6 +78,7 @@ fn intrinsic_calls(
     layouts: &[CobolLayout],
     pointer_bytes: usize,
     user_functions: &BTreeSet<String>,
+    cics_context: bool,
 ) -> Result<Vec<CobolIntrinsicCall>, SemanticProblem> {
     let mut calls = Vec::new();
     let mut cursor = 0usize;
@@ -117,7 +128,8 @@ fn intrinsic_calls(
             .into_iter()
             .map(|range| {
                 let text = source[range].trim().to_string();
-                let value_type = argument_type(&text, layouts, pointer_bytes, user_functions)?;
+                let value_type =
+                    argument_type(&text, layouts, pointer_bytes, user_functions, cics_context)?;
                 Ok(CobolIntrinsicArgument { text, value_type })
             })
             .collect::<Result<Vec<_>, SemanticProblem>>()?;
@@ -159,11 +171,12 @@ fn argument_type(
     layouts: &[CobolLayout],
     pointer_bytes: usize,
     user_functions: &BTreeSet<String>,
+    cics_context: bool,
 ) -> Result<IntrinsicValueType, SemanticProblem> {
     let text = text.trim();
     let upper = text.to_ascii_uppercase();
     if let Some(value_type) =
-        arithmetic_argument_type(text, layouts, pointer_bytes, user_functions)?
+        arithmetic_argument_type(text, layouts, pointer_bytes, user_functions, cics_context)?
     {
         return Ok(value_type);
     }
@@ -171,7 +184,7 @@ fn argument_type(
         return Ok(IntrinsicValueType::Keyword);
     }
     if upper.starts_with("FUNCTION ") {
-        return infer_nested_function(text, layouts, pointer_bytes, user_functions);
+        return infer_nested_function(text, layouts, pointer_bytes, user_functions, cics_context);
     }
     if quoted_literal(text) {
         return Ok(if upper.starts_with("N'") || upper.starts_with("N\"") {
@@ -210,12 +223,27 @@ fn argument_type(
         .collect::<Vec<_>>();
     match candidates.as_slice() {
         [layout] => Ok(layout_value_type(layout)),
-        [] => Err(SemanticProblem::InvalidIntrinsic(format!(
-            "unresolved intrinsic argument {text}"
-        ))),
+        [] => cics_context
+            .then(|| eib_argument_type(&reference))
+            .flatten()
+            .ok_or_else(|| {
+                SemanticProblem::InvalidIntrinsic(format!("unresolved intrinsic argument {text}"))
+            }),
         _ => Err(SemanticProblem::InvalidIntrinsic(format!(
             "ambiguous intrinsic argument {text}"
         ))),
+    }
+}
+
+// Keep the implicit names aligned with the interpreter's EIB operand values.
+fn eib_argument_type(reference: &str) -> Option<IntrinsicValueType> {
+    match reference {
+        "EIBTASKN" | "EIBDATE" | "EIBTIME" | "EIBCALEN" | "EIBCPOSN" | "EIBRESP" | "EIBRESP2" => {
+            Some(IntrinsicValueType::Integer)
+        }
+        "EIBAID" | "EIBFN" | "EIBRSRCE" | "EIBFMH" | "EIBEOC" | "EIBERR" | "EIBERRCD"
+        | "EIBRCODE" | "EIBSIG" | "EIBREQID" | "EIBTRNID" => Some(IntrinsicValueType::Alphanumeric),
+        _ => None,
     }
 }
 
@@ -224,6 +252,7 @@ fn arithmetic_argument_type(
     layouts: &[CobolLayout],
     pointer_bytes: usize,
     user_functions: &BTreeSet<String>,
+    cics_context: bool,
 ) -> Result<Option<IntrinsicValueType>, SemanticProblem> {
     if text.starts_with('(') && matching_close(text, 0) == Some(text.len() - 1) {
         return argument_type(
@@ -231,6 +260,7 @@ fn arithmetic_argument_type(
             layouts,
             pointer_bytes,
             user_functions,
+            cics_context,
         )
         .map(Some);
     }
@@ -279,8 +309,20 @@ fn arithmetic_argument_type(
     let Some(index) = operator else {
         return Ok(None);
     };
-    let left = argument_type(&text[..index], layouts, pointer_bytes, user_functions)?;
-    let right = argument_type(&text[index + 1..], layouts, pointer_bytes, user_functions)?;
+    let left = argument_type(
+        &text[..index],
+        layouts,
+        pointer_bytes,
+        user_functions,
+        cics_context,
+    )?;
+    let right = argument_type(
+        &text[index + 1..],
+        layouts,
+        pointer_bytes,
+        user_functions,
+        cics_context,
+    )?;
     if !matches!(
         left,
         IntrinsicValueType::Integer | IntrinsicValueType::Numeric
@@ -350,6 +392,7 @@ fn infer_nested_function(
     layouts: &[CobolLayout],
     pointer_bytes: usize,
     user_functions: &BTreeSet<String>,
+    cics_context: bool,
 ) -> Result<IntrinsicValueType, SemanticProblem> {
     let name_start = skip_space(text, "FUNCTION".len());
     let name_end = word_end(text, name_start);
@@ -375,7 +418,13 @@ fn infer_nested_function(
         .map(|range| {
             let argument = text[range].trim().to_string();
             Ok(CobolIntrinsicArgument {
-                value_type: argument_type(&argument, layouts, pointer_bytes, user_functions)?,
+                value_type: argument_type(
+                    &argument,
+                    layouts,
+                    pointer_bytes,
+                    user_functions,
+                    cics_context,
+                )?,
                 text: argument,
             })
         })
@@ -896,6 +945,34 @@ fn source_spans(origins: &[SourceOrigin], range: Range<usize>) -> Vec<SourceSpan
 mod tests {
     use super::*;
     use crate::semantic::SemanticModel;
+
+    #[test]
+    fn intrinsic_arguments_resolve_eib_fields_only_in_cics_programs() {
+        for (expression, value_type) in [
+            ("FUNCTION RANDOM(EIBTASKN)", IntrinsicValueType::Integer),
+            ("FUNCTION INTEGER(EIBTASKN)", IntrinsicValueType::Integer),
+            ("FUNCTION INTEGER(EIBTIME)", IntrinsicValueType::Integer),
+            ("FUNCTION INTEGER(EIBDATE)", IntrinsicValueType::Integer),
+            ("FUNCTION INTEGER(EIBCALEN)", IntrinsicValueType::Integer),
+            (
+                "FUNCTION LENGTH(EIBTRNID)",
+                IntrinsicValueType::Alphanumeric,
+            ),
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. EIBARGS. DATA DIVISION. WORKING-STORAGE SECTION. 01 N PIC 9(7). PROCEDURE DIVISION. COMPUTE N = {expression}. EXEC CICS RETURN END-EXEC."
+            );
+            let model = SemanticModel::analyze(&source, 1024, 32)
+                .unwrap_or_else(|problem| panic!("{expression}: {problem:?}"));
+            assert_eq!(model.intrinsic_calls[0].arguments[0].value_type, value_type);
+            let batch = source.replace("EXEC CICS RETURN END-EXEC", "GOBACK");
+            assert!(matches!(
+                SemanticModel::analyze(&batch, 1024, 32),
+                Err(SemanticProblem::InvalidIntrinsic(problem))
+                    if problem.contains("unresolved intrinsic argument EIB")
+            ));
+        }
+    }
 
     fn program(procedure: &str) -> String {
         format!(
