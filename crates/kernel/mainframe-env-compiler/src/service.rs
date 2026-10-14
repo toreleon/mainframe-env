@@ -727,7 +727,7 @@ mod tests {
         assert_eq!(completeness, Completeness::Complete);
     }
     #[test]
-    fn program_without_sql_include_preserves_base_artifact_bytes() {
+    fn hello_artifact_bytes_are_unchanged_without_sign_leading() {
         let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
             .compile(request(HELLO, CompilationMode::Executable))
             .unwrap()
