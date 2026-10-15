@@ -2,6 +2,74 @@ use super::*;
 use mainframe_env_execution_api::AuditResourceDigestFormat;
 use mainframe_env_store_api::EffectIntentMetadata;
 
+#[test]
+fn exact_date_read_codec_requires_its_request_and_canonical_resource() {
+    let (_, _, mut effect, _, _, _) = sample();
+    let request = date_account_read_request().unwrap();
+    effect.request_digest = canonical_request_digest(&request).unwrap();
+    effect.intent.audit_resource = Some(canonical_audit_resource_digest(&request));
+    date_cics_codec_matches(&effect, CicsReplayCodecVersion::PlainReadV4).unwrap();
+    assert!(date_cics_codec_matches(&effect, CicsReplayCodecVersion::RetentionV3).is_err());
+
+    for case in 0..3 {
+        let mut changed = effect.clone();
+        match case {
+            0 => changed.intent.audit_resource = None,
+            1 => changed.intent.audit_resource.as_mut().unwrap().value[0] ^= 1,
+            _ => {
+                changed.intent.audit_resource.as_mut().unwrap().format =
+                    AuditResourceDigestFormat::CanonicalHostOversizedResourceV1;
+            }
+        }
+        for codec in [
+            CicsReplayCodecVersion::PlainReadV4,
+            CicsReplayCodecVersion::RetentionV3,
+        ] {
+            assert!(date_cics_codec_matches(&changed, codec).is_err());
+        }
+    }
+}
+
+#[test]
+fn changed_date_read_operands_policy_and_other_calls_keep_exact_v3() {
+    let (_, _, mut effect, other, _, _) = sample();
+    let request = date_account_read_request().unwrap();
+    for name in [
+        "DATASET",
+        "RIDFLD",
+        "KEYLENGTH",
+        "LENGTH",
+        "INTO",
+        "RESP",
+        "RESP2",
+    ] {
+        let HostRequest::Cics(mut changed) = request.clone() else {
+            unreachable!();
+        };
+        let original = &changed.arguments[name];
+        let mut bytes = original.bytes().to_vec();
+        bytes[0] ^= 1;
+        let value =
+            BoundedPayload::new(original.schema(), bytes, InvocationLimits::default()).unwrap();
+        changed.arguments.insert(name.into(), value);
+        let changed = HostRequest::Cics(changed);
+        effect.request_digest = canonical_request_digest(&changed).unwrap();
+        effect.intent.audit_resource = Some(canonical_audit_resource_digest(&changed));
+        assert!(date_cics_codec_matches(&effect, CicsReplayCodecVersion::PlainReadV4).is_err());
+        date_cics_codec_matches(&effect, CicsReplayCodecVersion::RetentionV3).unwrap();
+    }
+    let HostRequest::Cics(mut changed) = request else {
+        unreachable!();
+    };
+    changed.condition_policy = CicsConditionPolicy::Default;
+    for changed in [HostRequest::Cics(changed), other] {
+        effect.request_digest = canonical_request_digest(&changed).unwrap();
+        effect.intent.audit_resource = Some(canonical_audit_resource_digest(&changed));
+        assert!(date_cics_codec_matches(&effect, CicsReplayCodecVersion::PlainReadV4).is_err());
+        date_cics_codec_matches(&effect, CicsReplayCodecVersion::RetentionV3).unwrap();
+    }
+}
+
 fn actor() -> ExecutionRecord {
     let limits = InvocationLimits::default();
     ExecutionRecord {

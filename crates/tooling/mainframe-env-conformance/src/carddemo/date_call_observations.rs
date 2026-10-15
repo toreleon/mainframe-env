@@ -8,9 +8,9 @@ use mainframe_env_execution_api::{
     AuditDecision, AuditRecord, AuditResourceDigestFormat, LifecycleEventKind,
 };
 use mainframe_env_host_api::{
-    HostRequest, HostResult, ProgramName, ProgramRequest, RuntimeServiceKind, RuntimeServiceName,
-    RuntimeServiceSelector, canonical_audit_resource_digest, canonical_request_digest,
-    canonical_result_digest,
+    CicsConditionPolicy, CicsOperation, CicsRequest, HostRequest, HostResult, ProgramName,
+    ProgramRequest, RuntimeServiceKind, RuntimeServiceName, RuntimeServiceSelector,
+    canonical_audit_resource_digest, canonical_request_digest, canonical_result_digest,
 };
 use mainframe_env_store::LocalArtifactStore;
 use mainframe_env_store_api::{
@@ -37,12 +37,19 @@ const CEE_NAMES: &[&str] = &[
     "FEEDBACK-CODE",
 ];
 
+#[track_caller]
 fn problem() -> CorpusProblem {
+    let location = std::panic::Location::caller();
     CorpusProblem::new(
         "carddemo.transaction.date_call_binding",
-        "selected date CALL inputs, linkage result or completed owner differ",
+        format!(
+            "selected date CALL inputs, linkage result or completed owner differ; observer={}:{}",
+            location.file(),
+            location.line(),
+        ),
     )
 }
+#[track_caller]
 fn refuse(value: bool) -> Result<(), CorpusProblem> {
     if value { Err(problem()) } else { Ok(()) }
 }
@@ -499,6 +506,72 @@ fn cics_effect_matches(effect: &EffectRecord, actor: &ExecutionRecord) -> bool {
         })
         && effect.intent.audit_invocation_key.is_some()
 }
+
+fn date_account_read_request() -> Result<HostRequest, CorpusProblem> {
+    // Pinned COTRN02C READ-CXACAIX-FILE, after ACTIDIN 00000000050 in fields().
+    // These operands precede date validation even when no date CALL is made.
+    let operands: [(&str, &str, &[u8]); 7] = [
+        ("DATASET", "mainframe-env.cics.storage-value@1", b"CXACAIX "),
+        (
+            "RIDFLD",
+            "mainframe-env.cics.storage-value@1",
+            b"00000000050",
+        ),
+        ("KEYLENGTH", "mainframe-env.cics.decimal@1", b"11"),
+        ("LENGTH", "mainframe-env.cics.decimal@1", b"50"),
+        ("INTO", "mainframe-env.cics.argument@1", b"CARD-XREF-RECORD"),
+        (
+            "RESP",
+            "mainframe-env.cics.argument@1",
+            b"WS-VARIABLES.WS-RESP-CD",
+        ),
+        (
+            "RESP2",
+            "mainframe-env.cics.argument@1",
+            b"WS-VARIABLES.WS-REAS-CD",
+        ),
+    ];
+    let mut arguments = BTreeMap::new();
+    for (name, schema, bytes) in operands {
+        arguments.insert(
+            name.into(),
+            BoundedPayload::new(schema, bytes.to_vec(), InvocationLimits::default())
+                .map_err(|_| problem())?,
+        );
+    }
+    Ok(HostRequest::Cics(CicsRequest {
+        operation: CicsOperation::Read,
+        arguments,
+        condition_policy: CicsConditionPolicy::Respond {
+            response_field: "WS-VARIABLES.WS-RESP-CD".into(),
+            response2_field: Some("WS-VARIABLES.WS-REAS-CD".into()),
+        },
+        mutation: None,
+    }))
+}
+
+fn date_cics_codec_matches(
+    effect: &EffectRecord,
+    codec: CicsReplayCodecVersion,
+) -> Result<(), CorpusProblem> {
+    let request = date_account_read_request()?;
+    let expected = if effect.request_digest
+        == canonical_request_digest(&request).map_err(|_| problem())?
+    {
+        let HostRequest::Cics(read) = &request else {
+            return Err(problem());
+        };
+        refuse(
+            !read.is_completed_plain_read_replay()
+                || effect.intent.audit_resource != Some(canonical_audit_resource_digest(&request)),
+        )?;
+        CicsReplayCodecVersion::PlainReadV4
+    } else {
+        CicsReplayCodecVersion::RetentionV3
+    };
+    refuse(codec != expected)
+}
+
 fn terminal_caller(
     store: &dyn PlatformStore,
     before: &BeforeStage,
@@ -519,11 +592,20 @@ fn terminal_caller(
             .ok_or_else(problem)?;
         let descriptor = describe_cics_replay_row(row, Some(&effect), CicsLimits::default())
             .map_err(|_| problem())?;
+        date_cics_codec_matches(&effect, descriptor.codec)?;
         refuse(
-            descriptor.codec != CicsReplayCodecVersion::RetentionV3
-                || descriptor.retention != CicsReplayRetentionState::Terminal
+            descriptor.retention != CicsReplayRetentionState::Terminal
                 || descriptor.owner_run_unit.as_deref() != Some(run.as_str()),
-        )?;
+        )
+        .map_err(|mut error| {
+            error.detail.push_str(&format!(
+                "; codec={:?}; retention={:?}; run_unit_matches={}",
+                descriptor.codec,
+                descriptor.retention,
+                descriptor.owner_run_unit.as_deref() == Some(run.as_str()),
+            ));
+            error
+        })?;
         let actor = completed(
             store,
             descriptor.owner_execution.as_deref().ok_or_else(problem)?,

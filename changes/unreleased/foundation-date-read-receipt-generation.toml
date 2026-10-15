@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Bind date CALL observation to the exact source-derived COTRN02C account READ receipt generation and canonical audit resource, preserving V3 for every other request and all original caller, lifecycle and date comparisons."
