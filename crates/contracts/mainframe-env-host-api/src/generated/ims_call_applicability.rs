@@ -2,7 +2,7 @@
 // Call-site validation only; no executed, recovered, or differential credit.
 
 pub const IMS_CALL_APPLICABILITY_RULES_SHA256: &str =
-    "sha256:a6dcad455b2e00e942792cfdb7e6bf7251dc0a2c8cabd95c9ca3da19b1d52ccf";
+    "sha256:72c4eb3e19d42001ed9a08edde96704e3c0fe66a0b46eccafa5b724ba8cabb28";
 pub const IMS_CALL_APPLICABILITY: &[ImsCallApplicabilityDescriptor] = &[
     ImsCallApplicabilityDescriptor {
         ordinal: 1,
