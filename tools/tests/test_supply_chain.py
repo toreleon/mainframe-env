@@ -31,6 +31,39 @@ def digest(path: Path) -> str:
 
 
 class SupplyChainTests(unittest.TestCase):
+    def test_stream_hash_integrity_is_optional_without_changing_sha256_or_bounds(self):
+        payload = bytes(range(256)) * 4097
+        expected = hashlib.sha256(payload).hexdigest()
+        self.assertEqual(
+            supply_chain.stream_hash(io.BytesIO(payload), len(payload)),
+            (expected, hashlib.sha512(payload).digest(), len(payload)),
+        )
+        with mock.patch.object(supply_chain.hashlib, "sha512", side_effect=AssertionError("unused SRI")):
+            self.assertEqual(
+                supply_chain.stream_hash(io.BytesIO(payload), len(payload), require_integrity=False),
+                (expected, b"", len(payload)),
+            )
+            with self.assertRaises(supply_chain.SupplyChainError):
+                supply_chain.stream_hash(io.BytesIO(payload), len(payload) - 1, require_integrity=False)
+
+    def test_profile_file_preserves_required_sri_and_same_length_corruption_refusal(self):
+        payload = b"independent-profile-digest-control"
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "payload"
+            path.write_bytes(payload)
+            path.chmod(0o644)
+            pin = {"bytes": len(payload), "sha256": hashlib.sha256(payload).hexdigest()}
+            with mock.patch.object(supply_chain.hashlib, "sha512", side_effect=AssertionError("unused SRI")):
+                self.assertEqual(supply_chain.verify_profile_file(path, pin)["sha256"], pin["sha256"])
+            sri = "sha512-" + base64.b64encode(hashlib.sha512(payload).digest()).decode()
+            self.assertEqual(supply_chain.verify_profile_file(path, {**pin, "integrity": sri})["bytes"], len(payload))
+            wrong = "sha512-" + base64.b64encode(bytes(64)).decode()
+            with self.assertRaises(supply_chain.SupplyChainError):
+                supply_chain.verify_profile_file(path, {**pin, "integrity": wrong})
+            path.write_bytes(b"X" + payload[1:])
+            with self.assertRaises(supply_chain.SupplyChainError):
+                supply_chain.verify_profile_file(path, pin)
+
     def test_archive_name_refuses_control_boundaries_and_preserves_unicode(self):
         for character in ("\x00", "\x09", "\x1f", "\x7f", "\x80", "\x85", "\x9f"):
             with self.subTest(codepoint=ord(character)):
@@ -489,8 +522,8 @@ class DevelopmentInputTests(unittest.TestCase):
     def test_changed_input_during_read_is_rejected(self):
         original = supply_chain.stream_hash
         node = self.files["node"]
-        def hash_then_change(source, maximum):
-            value = original(source, maximum)
+        def hash_then_change(source, maximum, **options):
+            value = original(source, maximum, **options)
             if os.fstat(source.fileno()).st_ino == node.stat().st_ino:
                 node.write_bytes(b"other node\n")
             return value
@@ -648,8 +681,8 @@ class CommandInputValidationTests(unittest.TestCase):
         # successful PRE; unchanged bytes/sha256 cannot stand in for SHA-512.
         with self.session() as (_, post):
             original = supply_chain.stream_hash
-            def wrong_sri(source, maximum):
-                value = original(source, maximum)
+            def wrong_sri(source, maximum, **options):
+                value = original(source, maximum, **options)
                 if os.fstat(source.fileno()).st_ino == self.files['zowe-archive'].stat().st_ino:
                     return value[0], b'x' * 64, value[2]
                 return value
@@ -816,8 +849,8 @@ class TreeDirectoryAuthorityTests(unittest.TestCase):
         original = supply_chain.stream_hash
         path = self.tree / 'package/lib'
         leaf_inode = (path / 'main.js').stat().st_ino
-        def rebind(source, maximum):
-            result = original(source, maximum)
+        def rebind(source, maximum, **options):
+            result = original(source, maximum, **options)
             try: descriptor = source.fileno()
             except (AttributeError, io.UnsupportedOperation): return result
             if os.fstat(descriptor).st_ino == leaf_inode:
@@ -900,12 +933,12 @@ class TreeDirectoryAuthorityTests(unittest.TestCase):
     def test_leaf_read_failure_closes_ancestors(self):
         original = supply_chain.stream_hash
         inode = (self.tree / 'package/lib/main.js').stat().st_ino
-        def unreadable(source, maximum):
+        def unreadable(source, maximum, **options):
             try: descriptor = source.fileno()
-            except (AttributeError, io.UnsupportedOperation): return original(source, maximum)
+            except (AttributeError, io.UnsupportedOperation): return original(source, maximum, **options)
             if os.fstat(descriptor).st_ino == inode:
                 raise OSError('controlled leaf read failure')
-            return original(source, maximum)
+            return original(source, maximum, **options)
         with self.directory_audit(), mock.patch.object(supply_chain, 'stream_hash', side_effect=unreadable), \
                 self.assertRaises(supply_chain.SupplyChainError): self.command_pair()
 

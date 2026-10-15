@@ -293,16 +293,17 @@ def checked_input(path: Path, pin: dict):
         require(file_state(os.fstat(source.fileno())) == file_state(before) == file_state(path.lstat()), f"profile input changed during read: {path}")
 
 
-def stream_hash(source, maximum: int) -> tuple[str, bytes, int]:
+def stream_hash(source, maximum: int, *, require_integrity: bool = True) -> tuple[str, bytes, int]:
     digest = hashlib.sha256()
-    integrity = hashlib.sha512()
+    integrity = hashlib.sha512() if require_integrity else None
     total = 0
     while chunk := source.read(min(1024 * 1024, maximum - total + 1)):
         total += len(chunk)
         require(total <= maximum, "profile payload exceeds byte bound")
         digest.update(chunk)
-        integrity.update(chunk)
-    return digest.hexdigest(), integrity.digest(), total
+        if integrity is not None:
+            integrity.update(chunk)
+    return digest.hexdigest(), integrity.digest() if integrity is not None else b"", total
 
 
 def verify_profile_file(path: Path, pin: dict) -> dict:
@@ -312,7 +313,7 @@ def verify_profile_file(path: Path, pin: dict) -> dict:
 
 
 def _verify_profile_source(path: Path, source, metadata: os.stat_result, pin: dict) -> dict:
-    digest, integrity, size = stream_hash(source, pin["bytes"])
+    digest, integrity, size = stream_hash(source, pin["bytes"], require_integrity="integrity" in pin)
     require(digest == pin["sha256"] and size == pin["bytes"], f"profile input digest differs: {path}")
     if "integrity" in pin:
         require(integrity == sri_digest(pin["integrity"]), "Zowe archive SRI differs")
@@ -360,7 +361,7 @@ class DecompressedLimit:
 def profile_archive(path: Path, pin: dict, compression: str, maximum: int):
     try:
         with checked_input(path, pin) as (source, _):
-            digest, integrity, size = stream_hash(source, pin["bytes"])
+            digest, integrity, size = stream_hash(source, pin["bytes"], require_integrity="integrity" in pin)
             require(digest == pin["sha256"] and size == pin["bytes"], "profile archive digest differs")
             if "integrity" in pin:
                 require(integrity == sri_digest(pin["integrity"]), "profile archive SRI differs")
@@ -390,7 +391,7 @@ def member_hash(archive, member) -> str:
     source = archive.extractfile(member)
     require(source is not None, "archive regular payload is missing")
     with source:
-        digest, _, size = stream_hash(source, member.size)
+        digest, _, size = stream_hash(source, member.size, require_integrity=False)
     require(size == member.size, "archive regular payload is truncated")
     return digest
 
