@@ -675,10 +675,22 @@ def _development_input_parts(lock: dict, profile_name: str, files: dict[str, Pat
     pins = {"node-archive": profile["node"]["archive"], "node": profile["node"]["binary"], "zowe-archive": profile["zowe"]["archive"], "bubblewrap": profile["bubblewrap"], **profile["libraries"]}
     try:
         identities = {name: verify_profile_file(files[name], pins[name]) for name in sorted(CLIENT_ROLES)}
-        validate_node_archive(files["node-archive"], profile["node"])
-        rows = zowe_archive_rows(files["zowe-archive"], profile["zowe"])
-        identities["tree"] = (validate_zowe_tree(tree, rows, profile["zowe"], True) if _command
-                              else validate_zowe_tree(tree, rows, profile["zowe"]))
+        if _command:
+            # PRE has two independent read-only branches. The scoped executor
+            # joins its sole worker before returning or propagating any error.
+            with ThreadPoolExecutor(max_workers=1, thread_name_prefix="profile-node-pre") as executor:
+                node = executor.submit(validate_node_archive, files["node-archive"], profile["node"])
+                try:
+                    rows = zowe_archive_rows(files["zowe-archive"], profile["zowe"])
+                    identities["tree"] = validate_zowe_tree(tree, rows, profile["zowe"], True)
+                finally:
+                    # Preserve Node-before-Zowe refusal priority, including
+                    # BaseException paths, and never mint a proof before Node.
+                    node.result()
+        else:
+            validate_node_archive(files["node-archive"], profile["node"])
+            rows = zowe_archive_rows(files["zowe-archive"], profile["zowe"])
+            identities["tree"] = validate_zowe_tree(tree, rows, profile["zowe"])
     except OSError as error:
         raise SupplyChainError(f"development input unavailable: {error}") from error
     return {"files": dict(files), "tree": tree, "identities": identities}, rows

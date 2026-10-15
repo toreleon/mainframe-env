@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import tarfile
 import tempfile
+import threading
 import unittest
 from unittest import mock
 import zipfile
@@ -832,6 +833,221 @@ class CommandInputValidationTests(unittest.TestCase):
                 else:
                     with mock.patch.object(supply_chain.os, 'open', side_effect=PermissionError('read refused')), \
                             self.assertRaises(supply_chain.SupplyChainError): self.post(post)
+
+
+class CommandPreWorkerTests(unittest.TestCase):
+    class Aborted(BaseException):
+        pass
+
+    def setUp(self):
+        self.fixture = DevelopmentInputTests()
+        self.fixture.setUp()
+        self.addCleanup(self.fixture.doCleanups)
+        self.main = threading.current_thread()
+
+    def parts(self):
+        return supply_chain._development_input_parts(self.fixture.lock, PROFILE,
+                self.fixture.files, self.fixture.tree, True)
+
+    def joined(self, workers, descriptors=()):
+        self.assertEqual(len(workers), 1)
+        self.assertIsNot(workers[0], self.main)
+        self.assertFalse(workers[0].is_alive(), 'PRE returned with a live worker')
+        for descriptor in descriptors:
+            with self.assertRaises(OSError): os.fstat(descriptor)
+
+    def test_actual_archives_overlap_on_one_joined_worker(self):
+        started, tree_done = threading.Event(), threading.Event()
+        workers = []
+        node = supply_chain.validate_node_archive
+        zowe = supply_chain.zowe_archive_rows
+        tree = supply_chain.validate_zowe_tree
+        executor = supply_chain.ThreadPoolExecutor
+        def node_check(*args):
+            workers.append(threading.current_thread()); started.set()
+            self.assertTrue(tree_done.wait(3), 'main tree did not overlap Node')
+            return node(*args)
+        def zowe_check(*args):
+            self.assertIs(threading.current_thread(), self.main)
+            self.assertTrue(started.wait(3), 'Node worker did not start')
+            return zowe(*args)
+        def tree_check(*args):
+            self.assertIs(threading.current_thread(), self.main)
+            try: return tree(*args)
+            finally: tree_done.set()
+        with mock.patch.object(supply_chain, 'ThreadPoolExecutor', wraps=executor) as pool, \
+                mock.patch.object(supply_chain, 'validate_node_archive', side_effect=node_check), \
+                mock.patch.object(supply_chain, 'zowe_archive_rows', side_effect=zowe_check), \
+                mock.patch.object(supply_chain, 'validate_zowe_tree', side_effect=tree_check):
+            actual, rows = self.parts()
+        pool.assert_called_once_with(max_workers=1, thread_name_prefix='profile-node-pre')
+        self.joined(workers)
+        self.assertEqual(actual, self.fixture.check())
+        self.assertEqual(set(rows), set(self.fixture.payloads))
+
+    def test_ordinary_validation_stays_serial(self):
+        with mock.patch.object(supply_chain, 'ThreadPoolExecutor',
+                               side_effect=AssertionError('ordinary validation started a worker')):
+            self.fixture.check()
+
+    def test_main_row_or_tree_failure_joins_worker_before_propagating(self):
+        for stage in ('zowe_archive_rows', 'validate_zowe_tree'):
+            for error_type in (RuntimeError, OSError, self.Aborted):
+                with self.subTest(stage=stage, error=error_type.__name__):
+                    started, released, finished = (threading.Event() for _ in range(3))
+                    workers = []
+                    failure = error_type('main validation refused')
+                    node = supply_chain.validate_node_archive
+                    def node_check(*args):
+                        workers.append(threading.current_thread()); started.set()
+                        try:
+                            self.assertTrue(released.wait(3), 'main failure did not release worker')
+                            return node(*args)
+                        finally: finished.set()
+                    def refuse(*args):
+                        try:
+                            self.assertTrue(started.wait(3), 'Node worker did not start')
+                            raise failure
+                        finally: released.set()
+                    expected = supply_chain.SupplyChainError if error_type is OSError else error_type
+                    with mock.patch.object(supply_chain, 'validate_node_archive', side_effect=node_check), \
+                            mock.patch.object(supply_chain, stage, side_effect=refuse), \
+                            self.assertRaises(expected) as observed:
+                        self.parts()
+                    self.assertIs(observed.exception.__cause__ if error_type is OSError
+                                  else observed.exception, failure)
+                    self.assertTrue(finished.is_set())
+                    self.joined(workers)
+
+    def test_node_failure_priority_and_join_include_base_exceptions(self):
+        cases = ((supply_chain.SupplyChainError, None), (self.Aborted, None),
+                 (OSError, None), (supply_chain.SupplyChainError, self.Aborted),
+                 (self.Aborted, supply_chain.SupplyChainError),
+                 (OSError, supply_chain.SupplyChainError))
+        for node_type, main_type in cases:
+            with self.subTest(node=node_type.__name__, main=main_type):
+                started, released = threading.Event(), threading.Event()
+                workers = []
+                node_failure = node_type('Node refused first')
+                main_failure = main_type('tree refused second') if main_type else None
+                tree = supply_chain.validate_zowe_tree
+                def node_check(*args):
+                    workers.append(threading.current_thread()); started.set()
+                    self.assertTrue(released.wait(3), 'main tree did not release worker')
+                    raise node_failure
+                def tree_check(*args):
+                    try:
+                        self.assertTrue(started.wait(3), 'Node worker did not start')
+                        result = tree(*args)
+                        if main_failure: raise main_failure
+                        return result
+                    finally: released.set()
+                expected = supply_chain.SupplyChainError if node_type is OSError else node_type
+                with mock.patch.object(supply_chain, 'validate_node_archive', side_effect=node_check), \
+                        mock.patch.object(supply_chain, 'validate_zowe_tree', side_effect=tree_check), \
+                        self.assertRaises(expected) as observed:
+                    self.parts()
+                self.assertIs(observed.exception.__cause__ if node_type is OSError
+                              else observed.exception, node_failure)
+                self.joined(workers)
+
+    def test_worker_archive_mutations_refuse_and_close_held_descriptor(self):
+        from contextlib import contextmanager
+        for kind in ('bytes', 'replacement', 'mode'):
+            with self.subTest(kind=kind):
+                path = self.fixture.files['node-archive']
+                original, mode = path.read_bytes(), path.stat().st_mode & 0o7777
+                held, released = threading.Event(), threading.Event()
+                workers, descriptors = [], []
+                checked = supply_chain.checked_input
+                tree = supply_chain.validate_zowe_tree
+                @contextmanager
+                def hold_node(candidate, pin):
+                    with checked(candidate, pin) as opened:
+                        if candidate == path and threading.current_thread() is not self.main:
+                            workers.append(threading.current_thread())
+                            descriptors.append(opened[0].fileno()); held.set()
+                            self.assertTrue(released.wait(3), 'tree did not release archive read')
+                        yield opened
+                def mutate(*args):
+                    try:
+                        self.assertTrue(held.wait(3), 'worker archive descriptor was not held')
+                        result = tree(*args)
+                        if kind == 'bytes': path.write_bytes(original[:-1] + bytes([original[-1] ^ 1]))
+                        elif kind == 'replacement':
+                            replacement = path.with_suffix('.replacement')
+                            replacement.write_bytes(original); replacement.chmod(mode); replacement.replace(path)
+                        else: path.chmod(0o600)
+                        return result
+                    finally: released.set()
+                try:
+                    with mock.patch.object(supply_chain, 'checked_input', side_effect=hold_node), \
+                            mock.patch.object(supply_chain, 'validate_zowe_tree', side_effect=mutate), \
+                            self.assertRaises(supply_chain.SupplyChainError):
+                        self.parts()
+                    self.joined(workers, descriptors)
+                finally:
+                    path.write_bytes(original); path.chmod(mode)
+
+    def test_worker_archive_capability_and_read_refusals_join_and_close(self):
+        path = self.fixture.files['node-archive']
+        for kind in ('capability', 'read'):
+            with self.subTest(kind=kind):
+                workers, descriptors = [], []
+                node, opened, getxattr = (supply_chain.validate_node_archive,
+                                         supply_chain.os.open, supply_chain.os.getxattr)
+                def node_check(*args):
+                    workers.append(threading.current_thread())
+                    return node(*args)
+                def open_file(candidate, *args, **kwargs):
+                    worker = threading.current_thread() is not self.main and candidate == path
+                    if worker and kind == 'read': raise PermissionError('worker read refused')
+                    descriptor = opened(candidate, *args, **kwargs)
+                    if worker: descriptors.append(descriptor)
+                    return descriptor
+                def capabilities(*args):
+                    if threading.current_thread() is not self.main: return b'capability'
+                    return getxattr(*args)
+                with mock.patch.object(supply_chain, 'validate_node_archive', side_effect=node_check), \
+                        mock.patch.object(supply_chain.os, 'open', side_effect=open_file), \
+                        mock.patch.object(supply_chain.os, 'getxattr', side_effect=capabilities), \
+                        self.assertRaises(supply_chain.SupplyChainError):
+                    self.parts()
+                if kind == 'capability': self.assertEqual(len(descriptors), 1)
+                self.joined(workers, descriptors)
+
+    def test_worker_lock_or_binding_change_cannot_mint_proof(self):
+        for kind in ('lock', 'binding'):
+            with self.subTest(kind=kind):
+                tree_done = threading.Event()
+                workers = []
+                node, tree = supply_chain.validate_node_archive, supply_chain.validate_zowe_tree
+                files, lock = self.fixture.files, self.fixture.lock
+                old = files['node']
+                raw = json.dumps(lock).encode()
+                def node_check(*args):
+                    workers.append(threading.current_thread())
+                    result = node(*args)
+                    self.assertTrue(tree_done.wait(3), 'main tree did not finish before worker mutation')
+                    if kind == 'lock': lock['unexpected'] = True
+                    else:
+                        replacement = self.fixture.root / 'other-node'
+                        replacement.write_bytes(old.read_bytes()); replacement.chmod(0o755)
+                        files['node'] = replacement
+                    return result
+                def tree_check(*args):
+                    try: return tree(*args)
+                    finally: tree_done.set()
+                try:
+                    with mock.patch.object(supply_chain, 'validate_node_archive', side_effect=node_check), \
+                            mock.patch.object(supply_chain, 'validate_zowe_tree', side_effect=tree_check), \
+                            self.assertRaisesRegex(supply_chain.SupplyChainError, 'PRE'):
+                        with supply_chain._development_input_command(lock, PROFILE,
+                                files, self.fixture.tree, lock_bytes=raw):
+                            self.fail('worker mutation minted a proof')
+                    self.joined(workers)
+                finally:
+                    lock.pop('unexpected', None); files['node'] = old
 
 
 class TreeDirectoryAuthorityTests(unittest.TestCase):
