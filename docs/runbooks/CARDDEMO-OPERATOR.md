@@ -99,6 +99,17 @@ The commands are certification-safe substitutions for the pinned helper
 scripts; they do not invoke the scripts, native runtime archives, Micro Focus,
 UniKix, or a legacy compiler.
 
+The full gate reuses the operator implementations in process. Its J19
+installation and compilation observation requires the same pinned corpus and
+source closure, the online package/resource/seed witnesses, and exact persisted
+batch program rows and artifact bytes before and after restart. It publishes
+the workflow observations only after the mapped authenticated dataset download,
+JES submission identities and full spool comparisons, principal refusal controls,
+server drain and owned artifact cleanup succeed. Public receipt counts and the
+declared command list cannot construct these private witnesses. The command list
+records the equivalent CLI entry points; it does not claim that the full gate
+launched separate CLI processes.
+
 ## FTP/JES substitutions
 
 The repository scripts use `tnftp`, `SITE FILETYPE=JES`, and `PUT *.jcl` only

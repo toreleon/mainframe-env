@@ -6,10 +6,10 @@
 //! size), and it runs on every nested `CALL` journal write (#55), which made
 //! `CREASTMT` quadratic in the number of calls.
 //!
-//! Those three methods now mutate the locked `State` in place. Before each
-//! mutation they call one of this module's `touch_*` methods, which records
-//! the prior value (or absence) of exactly the entry about to change. On any
-//! `Err`, [`Journal::rollback`] replays those entries in reverse order,
+//! Those three methods now mutate the locked `State` in place. `touch_*`
+//! records the prior value before mutation; atomic provider puts instead move
+//! the replaced row into the journal after successful validation and insertion.
+//! On any `Err`, [`Journal::rollback`] replays those entries in reverse order,
 //! restoring `State` to what it held before the call. Every `touch_*` call
 //! is O(1) or O(size of the one entry touched), never O(store size).
 //!
@@ -97,6 +97,14 @@ impl Journal {
             key.clone(),
             state.provider_state.get(key).cloned(),
         ));
+    }
+
+    pub(super) fn record_provider_state(
+        &mut self,
+        key: (String, String),
+        prior: Option<ProviderStateRecord>,
+    ) {
+        self.entries.push(Entry::ProviderState(key, prior));
     }
 
     pub(super) fn touch_blob_bytes(&mut self, state: &State) {

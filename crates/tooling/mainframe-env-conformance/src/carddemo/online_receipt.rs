@@ -9,6 +9,21 @@ pub fn verify_carddemo_base_online_from_env(
 pub(super) fn verify_carddemo_base_online_observed(
     inventory_path: &Path,
 ) -> Result<(CardDemoBaseOnlineReceipt, RouteObservations), CorpusProblem> {
+    verify_carddemo_base_online_with_operator(inventory_path)
+        .map(|(receipt, observations, _)| (receipt, observations))
+}
+
+pub(super) fn verify_carddemo_base_online_with_operator(
+    inventory_path: &Path,
+) -> Result<
+    (
+        CardDemoBaseOnlineReceipt,
+        RouteObservations,
+        operator_observations::OnlineProof,
+    ),
+    CorpusProblem,
+> {
+    let operator_inputs = operator_observations::Inputs::verify(inventory_path)?;
     let terminal = verify_carddemo_terminal_from_env(inventory_path)?;
     let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
@@ -99,19 +114,13 @@ pub(super) fn verify_carddemo_base_online_observed(
     fs::remove_dir_all(&artifact_root).map_err(|error| {
         CorpusProblem::new("carddemo.online.artifact_cleanup", error.to_string())
     })?;
-    exercise
-        .seed_proof
-        .observe(&mut exercise.route_observations)?;
-    exercise.catalog_proof.bind_resource_catalog(
-        &exercise.installation_proof,
+    let operator_proof = operator_observations::finish_online(
+        &operator_inputs,
+        exercise.seed_proof,
+        exercise.catalog_proof,
+        exercise.installation_proof,
         &mut exercise.route_observations,
     )?;
-    exercise
-        .catalog_proof
-        .bind(&mut exercise.route_observations)?;
-    exercise
-        .installation_proof
-        .bind(&mut exercise.route_observations)?;
     let mut shape = Sha256::new();
     digest_field(&mut shape, terminal.corpus_commit.as_bytes());
     digest_field(&mut shape, &(programs as u64).to_be_bytes());
@@ -156,6 +165,7 @@ pub(super) fn verify_carddemo_base_online_observed(
             journey_shape_sha256: format!("{:x}", shape.finalize()),
         },
         route_observations,
+        operator_proof,
     ))
 }
 

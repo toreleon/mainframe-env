@@ -5,6 +5,7 @@ pub fn verify_carddemo_full_from_env(
 ) -> Result<CardDemoFullReceipt, CorpusProblem> {
     let authority = journey_closure::ClosureAuthority::load(inventory_path)?;
     let mut route_observations = RouteObservations::default();
+    let operator_inputs = operator_observations::Inputs::verify(inventory_path)?;
     let corpus_dir = PathBuf::from(env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
@@ -31,11 +32,18 @@ pub fn verify_carddemo_full_from_env(
             "the accepted COCRDSEC source no longer resolves the sole pinned CSD orphan",
         ));
     }
-    let (online, online_observations) =
-        online_receipt::verify_carddemo_base_online_observed(inventory_path)?;
+    let (online, online_observations, online_operator) =
+        online_receipt::verify_carddemo_base_online_with_operator(inventory_path)?;
     route_observations.extend(online_observations)?;
-    let (batch, batch_observations) = verify_carddemo_base_batch_observed(inventory_path)?;
+    let (batch, batch_observations, batch_operator) =
+        verify_carddemo_base_batch_with_operator(inventory_path)?;
     route_observations.extend(batch_observations)?;
+    operator_observations::observe_install_compile(
+        &operator_inputs,
+        online_operator,
+        batch_operator,
+        &mut route_observations,
+    )?;
     let (db2, db2_observations) = verify_carddemo_db2_observed(inventory_path)?;
     route_observations.extend(db2_observations)?;
     let ims = verify_carddemo_ims_from_env(inventory_path)?;
@@ -76,11 +84,15 @@ pub fn verify_carddemo_full_from_env(
         profile_receipt_sha256.insert(profile.into(), json_value_digest(&value)?);
     }
     let operator = carddemo_operator_mapping(&corpus_dir)?;
+    let operator_workflow =
+        operator_observations::WorkflowMapping::verify(&operator_inputs, &operator.sha256)?;
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|error| CorpusProblem::new("carddemo.full.runtime", error.to_string()))?;
-    let exercise = runtime.block_on(exercise_full_certification())?;
+    let exercise = runtime.block_on(exercise_full_certification_with_operator(Some(
+        operator_workflow,
+    )))?;
     route_observations.extend(exercise.route_observations)?;
     source_resource_proof.bind(&mut route_observations)?;
     let (journeys_passed, issues_input_passed) = authority.finish(&route_observations)?;
@@ -225,8 +237,15 @@ pub(super) struct FullCertificationExercise {
     pub(super) route_observations: RouteObservations,
 }
 
+#[cfg(test)]
 pub(super) async fn exercise_full_certification() -> Result<FullCertificationExercise, CorpusProblem>
 {
+    exercise_full_certification_with_operator(None).await
+}
+
+async fn exercise_full_certification_with_operator(
+    operator_workflow: Option<operator_observations::WorkflowMapping>,
+) -> Result<FullCertificationExercise, CorpusProblem> {
     let mut route_observations = RouteObservations::default();
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -309,6 +328,16 @@ pub(super) async fn exercise_full_certification() -> Result<FullCertificationExe
             "owned dataset download did not preserve FTPJCL bytes",
         ));
     }
+    let operator_download = operator_workflow
+        .map(|workflow| {
+            workflow.compare_download(
+                &Method::GET,
+                "/zosmf/restfiles/ds/AWS.M2.CARDDEMO.FTP.TEST",
+                ftp_status,
+                &ftp_bytes,
+            )
+        })
+        .transpose()?;
     let mut tasks = Vec::new();
     for index in 0..8usize {
         let route = app.clone();
@@ -489,7 +518,8 @@ pub(super) async fn exercise_full_certification() -> Result<FullCertificationExe
     fs::remove_dir_all(&memory_root)
         .map_err(|error| CorpusProblem::new("carddemo.full.memory_cleanup", error.to_string()))?;
     // Publish positive owner evidence after actual drain and owned cleanup.
-    job_spool_proof.observe_job_ids_and_spool(&mut route_observations)?;
+    job_spool_proof
+        .observe_job_ids_and_spool_with_operator(&mut route_observations, operator_download)?;
     route_observations.compare(
         journey_closure::AuthorityKind::Journey,
         "CD.J20",

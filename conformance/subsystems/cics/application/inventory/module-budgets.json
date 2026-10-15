@@ -150,7 +150,7 @@
     },
     {
       "path": "crates/stores/mainframe-env-store/src/memory.rs",
-      "max_production_lines": 2760,
+      "max_production_lines": 2741,
       "responsibility": "The deterministic in-memory adapter implements execution, work, session, replay, and provider-state contracts in one state owner.",
       "split_boundary": "Separate domain-specific store trait implementations while retaining one bounded in-memory state and atomic lock authority."
     },
@@ -162,7 +162,7 @@
     },
     {
       "path": "crates/tooling/mainframe-env-conformance/src/carddemo.rs",
-      "max_production_lines": 11907,
+      "max_production_lines": 11789,
       "responsibility": "CardDemo conformance provisions the full fixture, drives online and batch journeys, and checks persistence and failures.",
       "split_boundary": "Separate fixture provisioning, online transactions, batch jobs, authorization, and durability/failure scenario families."
     },

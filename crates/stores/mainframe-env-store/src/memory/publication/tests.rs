@@ -1,5 +1,6 @@
 use super::*;
 use crate::publication::tests::{prepare, put};
+mod owned_prior;
 
 #[test]
 fn audited_publication_faults_restore_touched_rows_bytes_epochs_clock_and_ordinals_without_cloning()

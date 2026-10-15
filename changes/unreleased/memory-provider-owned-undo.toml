@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Keep the replaced MemoryStore provider row in the atomic undo log without copying its payload, preserving row CAS, quotas, epochs and rollback after repeated writes or late audit failures."

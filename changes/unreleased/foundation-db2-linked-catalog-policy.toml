@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Follow the declared Db2 catalog publication module in the generic catalog policy check while preserving every application identity exclusion, required API, and migration contract. Regenerate the current z/OSMF Rust contracts normally."

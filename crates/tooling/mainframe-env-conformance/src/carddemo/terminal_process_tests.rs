@@ -337,7 +337,7 @@ async fn prepare(root: &Path, corpus: &Path, marker: &Marker) -> Result<Receipt,
         .await?;
     oracles::page(&first, &route.session, 1, false)?;
     evidence::continuation(store.as_ref(), &route.session, 1)?;
-    let before_pf8 = evidence::before(store.as_ref(), &server, &route.session)?;
+    let before_pf8 = evidence::before(store.as_ref(), &server, &route.session, &first)?;
     let second = http.exchange(&route, 0xf8, BTreeMap::new()).await?;
     oracles::page(&second, &route.session, 2, false)?;
     evidence::continuation(store.as_ref(), &route.session, 2)?;
@@ -350,7 +350,7 @@ async fn prepare(root: &Path, corpus: &Path, marker: &Marker) -> Result<Receipt,
         &second,
         false,
     )?;
-    let before_empty = evidence::before(store.as_ref(), &server, &route.session)?;
+    let before_empty = evidence::before(store.as_ref(), &server, &route.session, &second)?;
     // Genuine absent input: deliberately no PUT precedes this public resume.
     let suspended = http.resume(&route).await?;
     let persisted = http.read(&route).await?;
@@ -454,7 +454,7 @@ async fn resume(root: &Path, corpus: &Path, marker: &Marker) -> Result<Receipt, 
                 .map_err(|_| problem())?
                 .is_empty(),
     )?;
-    let before = evidence::before(store.as_ref(), &server, &route.session)?;
+    let before = evidence::before(store.as_ref(), &server, &route.session, &unchanged)?;
     let third = http.exchange(&route, 0xf8, BTreeMap::new()).await?;
     oracles::page(&third, &route.session, 3, false)?;
     evidence::continuation(store.as_ref(), &route.session, 3)?;

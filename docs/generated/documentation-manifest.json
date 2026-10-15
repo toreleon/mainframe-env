@@ -2562,7 +2562,7 @@
       "normative": false,
       "path": "docs/runbooks/CARDDEMO-OPERATOR.md",
       "relative_links": 2,
-      "sha256": "sha256:3cbd5593d24dd74a7d1f0936f80dc8182d46e91314c2af10ce4031561490fa2c",
+      "sha256": "sha256:54cc889544f161ca9ce6d58f3d96b9e8a76ad3d3087b03a2cc9ba413dd914e53",
       "title": "CardDemo operator compatibility",
       "xtask_commands": 4
     },

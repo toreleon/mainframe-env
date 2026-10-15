@@ -18,15 +18,48 @@ pub(super) struct JesJobProof {
     denied: bool,
 }
 
+pub(super) struct OperatorJesProof {
+    proof: JesJobProof,
+}
+
+impl OperatorJesProof {
+    pub(super) fn refused(&self) -> bool {
+        self.proof.operator_refused()
+    }
+}
+
 impl JesJobProof {
+    fn operator_refused(&self) -> bool {
+        let expected = (0..8)
+            .map(|index| format!("MX{index:06}"))
+            .collect::<BTreeSet<_>>();
+        self.before.keys().cloned().collect::<BTreeSet<_>>() != expected
+            || self.list_before.keys().cloned().collect::<BTreeSet<_>>() != expected
+            || !self.before.values().all(|job| {
+                job.files
+                    .as_array()
+                    .is_some_and(|files| !files.is_empty() && files.len() == job.spool.len())
+                    && !job.spool.is_empty()
+            })
+            || self.principal_refused()
+    }
+
+    #[cfg(test)]
+    fn observe_job_ids_and_spool(
+        self,
+        observations: &mut RouteObservations,
+    ) -> Result<(), CorpusProblem> {
+        self.observe_job_ids_and_spool_with_operator(observations, None)
+    }
     pub(super) fn principal_refused(&self) -> bool {
         !self.denied || self.before != self.after || self.list_before != self.list_after
     }
 
     // The caller publishes only after actual memory drain and owned cleanup.
-    pub(super) fn observe_job_ids_and_spool(
+    pub(super) fn observe_job_ids_and_spool_with_operator(
         self,
         observations: &mut RouteObservations,
+        operator: Option<operator_observations::DownloadProof>,
     ) -> Result<(), CorpusProblem> {
         let expected = (0..8)
             .map(|index| format!("MX{index:06}"))
@@ -39,16 +72,21 @@ impl JesJobProof {
                     .is_some_and(|files| !files.is_empty() && files.len() == job.spool.len())
                     && !job.spool.is_empty()
             });
+        let refused = !complete || self.principal_refused();
         observations.compare(
             journey_closure::AuthorityKind::Journey,
             "CD.J19",
             "job IDs and spool",
-            !complete || self.principal_refused(),
+            refused,
             || Ok(CorpusProblem::new(
                 "carddemo.full.job_spool_drift",
                 "actual eight-job owner status/list/full spool and independent JESJCL comparisons were incomplete or changed across denial controls",
             )),
-        )
+        )?;
+        if let Some(operator) = operator {
+            operator.observe_owned_workflow(OperatorJesProof { proof: self }, observations)?;
+        }
+        Ok(())
     }
 }
 

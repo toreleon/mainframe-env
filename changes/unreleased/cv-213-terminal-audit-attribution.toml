@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Bind the private CardDemo terminal restart audit comparison to the actual pre-resume transaction admission and selected machine invocation, preserving every runtime audit and all thirteen completed CICS effect joins."

@@ -18,10 +18,12 @@ use journey_observations::RouteObservations;
 mod account_rewrite_observations;
 mod base_batch_routes;
 mod batch_observations;
+mod batch_program_runtime;
 use base_batch_routes::{
     base_batch_control_invocation, base_batch_spool_digests, base_batch_spool_text,
     exercise_base_batch_routes,
 };
+use batch_program_runtime::exercise_batch_program_routes;
 mod bill_observations;
 mod card_observations;
 mod catalog_observations;
@@ -51,6 +53,7 @@ mod user_mutation_observations;
 use full::exercise_full_certification;
 pub use full::verify_carddemo_full_from_env;
 mod online_receipt;
+mod operator_observations;
 pub use online_receipt::verify_carddemo_base_online_from_env;
 mod mq_receipt;
 pub use mq_receipt::verify_carddemo_mq_authorization_from_env;
@@ -4391,6 +4394,19 @@ pub fn verify_carddemo_utilities_from_env(
 pub fn verify_carddemo_batch_programs_from_env(
     inventory_path: &Path,
 ) -> Result<CardDemoBatchProgramReceipt, CorpusProblem> {
+    verify_carddemo_batch_programs_observed(inventory_path).map(|(receipt, _)| receipt)
+}
+
+fn verify_carddemo_batch_programs_observed(
+    inventory_path: &Path,
+) -> Result<
+    (
+        CardDemoBatchProgramReceipt,
+        operator_observations::BatchProof,
+    ),
+    CorpusProblem,
+> {
+    let operator_inputs = operator_observations::Inputs::verify(inventory_path)?;
     let corpus = verify_carddemo_corpus_from_env(inventory_path)?;
     let corpus_dir = PathBuf::from(env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
@@ -4535,6 +4551,7 @@ pub fn verify_carddemo_batch_programs_from_env(
         linkage_fixture,
         abend_fixture,
         &wait_jcl,
+        &operator_inputs,
     ))?;
     for value in [
         named.len(),
@@ -4552,26 +4569,29 @@ pub fn verify_carddemo_batch_programs_from_env(
     ] {
         digest_field(&mut shape, &(value as u64).to_be_bytes());
     }
-    Ok(CardDemoBatchProgramReceipt {
-        schema_version: "mainframe-env.carddemo-batch-program-receipt@1".into(),
-        status: "pass".into(),
-        corpus_commit: corpus.commit,
-        named_programs: named.into_iter().collect(),
-        called_programs: called_programs.into_iter().collect(),
-        compatible_services: services.into_iter().collect(),
-        compiled_artifacts: definitions.len(),
-        installed_artifacts: exercise.installed_artifacts,
-        install_replay: exercise.install_replay,
-        selected_job_routes: exercise.selected_job_routes,
-        linkage_routes: exercise.linkage_routes,
-        file_routes: exercise.file_routes,
-        abend_controls: exercise.abend_controls,
-        checkpoint_controls: 1,
-        cancellation_controls: 1,
-        timeout_controls: 1,
-        restart_routes: exercise.restart_routes,
-        program_shape_sha256: format!("{:x}", shape.finalize()),
-    })
+    Ok((
+        CardDemoBatchProgramReceipt {
+            schema_version: "mainframe-env.carddemo-batch-program-receipt@1".into(),
+            status: "pass".into(),
+            corpus_commit: corpus.commit,
+            named_programs: named.into_iter().collect(),
+            called_programs: called_programs.into_iter().collect(),
+            compatible_services: services.into_iter().collect(),
+            compiled_artifacts: definitions.len(),
+            installed_artifacts: exercise.installed_artifacts,
+            install_replay: exercise.install_replay,
+            selected_job_routes: exercise.selected_job_routes,
+            linkage_routes: exercise.linkage_routes,
+            file_routes: exercise.file_routes,
+            abend_controls: exercise.abend_controls,
+            checkpoint_controls: 1,
+            cancellation_controls: 1,
+            timeout_controls: 1,
+            restart_routes: exercise.restart_routes,
+            program_shape_sha256: format!("{:x}", shape.finalize()),
+        },
+        exercise.operator_proof,
+    ))
 }
 
 pub fn verify_carddemo_base_batch_from_env(
@@ -4583,7 +4603,21 @@ pub fn verify_carddemo_base_batch_from_env(
 fn verify_carddemo_base_batch_observed(
     inventory_path: &Path,
 ) -> Result<(CardDemoBaseBatchReceipt, RouteObservations), CorpusProblem> {
-    let batch = verify_carddemo_batch_programs_from_env(inventory_path)?;
+    verify_carddemo_base_batch_with_operator(inventory_path)
+        .map(|(receipt, observations, _)| (receipt, observations))
+}
+
+fn verify_carddemo_base_batch_with_operator(
+    inventory_path: &Path,
+) -> Result<
+    (
+        CardDemoBaseBatchReceipt,
+        RouteObservations,
+        operator_observations::BatchProof,
+    ),
+    CorpusProblem,
+> {
+    let (batch, operator_proof) = verify_carddemo_batch_programs_observed(inventory_path)?;
     let corpus_dir = PathBuf::from(env::var_os(CORPUS_ENV).ok_or_else(|| {
         CorpusProblem::new(
             "carddemo.corpus.environment_missing",
@@ -4619,12 +4653,13 @@ fn verify_carddemo_base_batch_observed(
         .enable_all()
         .build()
         .map_err(|error| CorpusProblem::new("carddemo.base_batch.runtime", error.to_string()))?;
-    runtime.block_on(exercise_base_batch_routes(
+    let (receipt, observations) = runtime.block_on(exercise_base_batch_routes(
         &corpus_dir,
         batch.corpus_commit,
         online,
         definitions,
-    ))
+    ))?;
+    Ok((receipt, observations, operator_proof))
 }
 
 pub fn verify_carddemo_db2_from_env(
@@ -8273,159 +8308,6 @@ fn compile_free_batch_definition(
         ));
     };
     Ok(BatchProgramDefinition::current(name, &artifact))
-}
-
-struct BatchProgramExercise {
-    installed_artifacts: usize,
-    install_replay: bool,
-    selected_job_routes: usize,
-    linkage_routes: usize,
-    file_routes: usize,
-    abend_controls: usize,
-    restart_routes: usize,
-}
-
-async fn exercise_batch_program_routes(
-    definitions: Vec<BatchProgramDefinition>,
-    linkage_fixture: BatchProgramDefinition,
-    abend_fixture: BatchProgramDefinition,
-    wait_jcl: &[u8],
-) -> Result<BatchProgramExercise, CorpusProblem> {
-    let artifact_root = env::temp_dir().join(format!(
-        "mainframe-env-carddemo-batch-programs-{}",
-        std::process::id()
-    ));
-    let config = ServerConfig {
-        store_profile: StoreProfile::Memory,
-        artifact_root: artifact_root.clone(),
-        tls: TlsConfig {
-            enabled: false,
-            certificate_path: None,
-            private_key_reference: None,
-        },
-        ..ServerConfig::default()
-    };
-    let store = Arc::new(MemoryStore::new(Default::default()));
-    let secrets = Arc::new(MemorySecretResolver::default());
-    let server = ProductServer::open(
-        config.clone(),
-        store.clone(),
-        secrets.clone(),
-        default_program_router(),
-    )
-    .map_err(terminal_problem)?;
-    server
-        .bootstrap_user("IBMUSER", b"TESTPASS")
-        .map_err(terminal_problem)?;
-    let first = server
-        .install_batch_programs(definitions.clone())
-        .map_err(terminal_problem)?;
-    let replay = server
-        .install_batch_programs(definitions)
-        .map_err(terminal_problem)?;
-    server
-        .install_batch_programs(vec![linkage_fixture, abend_fixture])
-        .map_err(terminal_problem)?;
-    let mut record = vec![b' '; 350];
-    record[..4].copy_from_slice(b"ABCD");
-    let mut dataset_sequence = 1u64;
-    utility_seed_dataset(
-        &server,
-        "IBMUSER.TRNX",
-        DatasetOrganization::Sequential,
-        RecordFormat::Fixed,
-        350,
-        None,
-        vec![record],
-        &mut dataset_sequence,
-    )?;
-    submit_utility_job(
-        &server,
-        &server.router(),
-        std::str::from_utf8(wait_jcl).map_err(|_| {
-            CorpusProblem::new(
-                "carddemo.batch_program.jcl_invalid",
-                "WAITSTEP is not UTF-8",
-            )
-        })?,
-    )
-    .await?;
-    submit_utility_job(
-        &server,
-        &server.router(),
-        "//LINKJOB JOB CLASS=A\n//RUN EXEC PGM=LINKMAIN\n//TRNXFILE DD DSN=IBMUSER.TRNX,DISP=SHR\n",
-    )
-    .await?;
-    let principal =
-        PrincipalId::new("IBMUSER", InvocationLimits::default()).expect("static principal");
-    let (jobs, _) = server
-        .batch_service()
-        .list(Some(&principal), None, 64)
-        .map_err(terminal_problem)?;
-    let link_job = jobs
-        .iter()
-        .find(|job| job.name == "LINKJOB")
-        .ok_or_else(|| {
-            CorpusProblem::new(
-                "carddemo.batch_program.link_missing",
-                "LINKJOB was not created",
-            )
-        })?;
-    let (output, _) = server
-        .batch_service()
-        .spool(
-            &base_batch_control_invocation()?,
-            &link_job.id,
-            "SYSPRINT",
-            0,
-            64,
-        )
-        .map_err(terminal_problem)?;
-    if !output.iter().any(|record| record == b"00")
-        || !output.iter().any(|record| record.starts_with(b"ABCD"))
-    {
-        return Err(CorpusProblem::new(
-            "carddemo.batch_program.link_drift",
-            format!("CBSTM03B linkage output differs: {output:?}"),
-        ));
-    }
-    submit_expected_abend(
-        &server,
-        &server.router(),
-        "//ABENDJOB JOB CLASS=A\n//FAIL EXEC PGM=ABENDCHK\n",
-        "ABEND U0999",
-    )
-    .await?;
-    if !server.graceful_shutdown().await {
-        return Err(CorpusProblem::new(
-            "carddemo.batch_program.shutdown_failed",
-            "first server did not shut down",
-        ));
-    }
-    let restarted = ProductServer::open(config, store, secrets, default_program_router())
-        .map_err(terminal_problem)?;
-    submit_utility_job(
-        &restarted,
-        &restarted.router(),
-        std::str::from_utf8(wait_jcl).map_err(|_| {
-            CorpusProblem::new(
-                "carddemo.batch_program.jcl_invalid",
-                "WAITSTEP is not UTF-8",
-            )
-        })?,
-    )
-    .await?;
-    let _ = restarted.graceful_shutdown().await;
-    let _ = fs::remove_dir_all(&artifact_root);
-    Ok(BatchProgramExercise {
-        installed_artifacts: first.programs,
-        install_replay: replay.replayed && replay.identity == first.identity,
-        selected_job_routes: 4,
-        linkage_routes: 1,
-        file_routes: 3,
-        abend_controls: 1,
-        restart_routes: 1,
-    })
 }
 
 fn carddemo_parsed_jcl(corpus_dir: &Path) -> Result<Vec<(String, JobPlan)>, CorpusProblem> {

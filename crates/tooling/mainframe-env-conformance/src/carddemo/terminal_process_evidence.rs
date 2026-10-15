@@ -4,12 +4,17 @@ use mainframe_env_cics::{
     CicsLimits, CicsReplayCodecVersion, CicsReplayRetentionState, CicsTraceEntry,
     describe_cics_replay_row,
 };
-use mainframe_env_execution_api::{AuditDecision, AuditResourceDigestFormat, LifecycleEventKind};
+use mainframe_env_execution_api::{
+    AuditDecision, AuditRecord, AuditResourceDigestFormat, LifecycleEventKind,
+};
 use mainframe_env_host_api::{
-    HostResult, canonical_audit_resource_digest, canonical_result_digest,
+    HostRequest, HostResult, SecurityRequest, canonical_audit_resource_digest,
+    canonical_result_digest,
 };
 use mainframe_env_store::LocalArtifactStore;
-use mainframe_env_store_api::{ArtifactStore, ExecutionState, PlatformStore, ProviderStateRecord};
+use mainframe_env_store_api::{
+    ArtifactStore, ExecutionRecord, ExecutionState, PlatformStore, ProviderStateRecord,
+};
 
 const REPLAY: &str = "cics-effect-replay-v1";
 const MAX_ROWS: usize = 512;
@@ -18,6 +23,7 @@ const MAX_BYTES: usize = 2 * 1024 * 1024;
 pub(super) struct Before {
     rows: BTreeMap<String, ProviderStateRecord>,
     trace: Vec<CicsTraceEntry>,
+    transaction: String,
 }
 
 #[derive(Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -64,13 +70,75 @@ pub(super) fn before(
     store: &dyn PlatformStore,
     server: &ProductServer,
     session: &str,
+    terminal: &serde_json::Value,
 ) -> Result<Before, CorpusProblem> {
+    require(terminal["session"] == session && terminal["principal"] == "WEBUSER")?;
     let trace = server.online_trace(session).map_err(|_| problem())?;
     require(trace.len() < 4096)?;
     Ok(Before {
         rows: row_map(store, REPLAY)?,
         trace,
+        transaction: terminal["transaction"].as_str().ok_or_else(problem)?.into(),
     })
+}
+
+pub(super) fn terminal_audits(
+    audits: &[AuditRecord],
+    actor: &ExecutionRecord,
+    machine_key: &IdempotencyKey,
+    prior_transaction: &str,
+) -> Result<(), CorpusProblem> {
+    // resume_terminal authorizes the prior public transaction at tick zero,
+    // before claiming its continuation. SourceOnlineMachine then derives the
+    // frame key by appending the selected program to that root invocation.
+    // Derive both roles from those boundaries, rather than treating two offered
+    // invocation spellings as interchangeable ownership evidence.
+    let program = actor
+        .selector
+        .as_str()
+        .strip_prefix("program:")
+        .ok_or_else(problem)?;
+    require(!program.is_empty())?;
+    let root = machine_key
+        .as_str()
+        .strip_suffix(&format!(":{program}"))
+        .ok_or_else(problem)?;
+    let root = IdempotencyKey::new(root, InvocationLimits::default()).map_err(|_| problem())?;
+    let admission = HostRequest::Security(SecurityRequest::Authorize {
+        principal: actor.principal.clone(),
+        class: "TCICSTRN".into(),
+        resource: ResourceName::new(
+            format!("CICS.{}", prior_transaction.to_ascii_uppercase()),
+            246,
+        )
+        .map_err(|_| problem())?,
+        intent: AccessIntent::Execute,
+    });
+    let admission_capability = admission.required_capability(InvocationLimits::default());
+    let admission_resource = canonical_audit_resource_digest(&admission);
+    require(!audits.is_empty() && audits.len() <= MAX_ROWS)?;
+    let mut admissions = 0;
+    for audit in audits {
+        require(
+            audit.execution_id == actor.execution_id
+                && audit.run_unit_id == actor.run_unit_id
+                && audit.principal == actor.principal
+                && audit.attempt == actor.attempt
+                && audit.effect_sequence > 0
+                && audit.decision == AuditDecision::Success,
+        )?;
+        let is_admission = audit.observed_tick == 0
+            && audit.effect_sequence == 1
+            && audit.capability == admission_capability
+            && audit.resource == admission_resource;
+        if is_admission {
+            require(audit.invocation_key == root)?;
+            admissions += 1;
+        } else {
+            require(audit.invocation_key == *machine_key)?;
+        }
+    }
+    require(admissions == 1)
 }
 
 pub(super) fn owner_digest(
@@ -119,7 +187,7 @@ pub(super) fn stage(
     terminal: &serde_json::Value,
     suspension: bool,
 ) -> Result<Owner, CorpusProblem> {
-    let after = self::before(store, server, session)?;
+    let after = self::before(store, server, session, terminal)?;
     require(
         before
             .rows
@@ -236,18 +304,11 @@ pub(super) fn stage(
     let audits = store
         .audit_records(id, 0, MAX_ROWS + 1)
         .map_err(|_| problem())?;
-    require(
-        !audits.is_empty()
-            && audits.len() <= MAX_ROWS
-            && audits.iter().all(|audit| {
-                audit.execution_id == *id
-                    && audit.run_unit_id == run
-                    && audit.principal == actor.principal
-                    && audit.attempt == actor.attempt
-                    && Some(&audit.invocation_key) == invocation_key.as_ref()
-                    && audit.effect_sequence > 0
-                    && audit.decision == AuditDecision::Success
-            }),
+    terminal_audits(
+        &audits,
+        &actor,
+        invocation_key.as_ref().ok_or_else(problem)?,
+        &before.transaction,
     )?;
     let outer = audits
         .iter()

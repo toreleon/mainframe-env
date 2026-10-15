@@ -1,7 +1,167 @@
 //! Corruptions of the private assurance comparisons; these emit no observations.
 use super::*;
 use mainframe_env_cics::CicsTraceEntry;
-use mainframe_env_host_api::{HostRequest, canonical_request_digest};
+use mainframe_env_execution_api::{AuditDecision, AuditRecord, AuditResourceDigestFormat};
+use mainframe_env_host_api::{
+    HostRequest, SecurityRequest, canonical_audit_resource_digest, canonical_request_digest,
+};
+use mainframe_env_store_api::{ExecutionRecord, ExecutionState};
+
+fn terminal_audit_fixture() -> (ExecutionRecord, IdempotencyKey, Vec<AuditRecord>) {
+    // Private comparison controls only; this fixture cannot create a journey
+    // observation or substitute for the actual two-process owner.
+    let limits = InvocationLimits::default();
+    let actor = ExecutionRecord {
+        execution_id: ExecutionId::new("control-execution", limits).unwrap(),
+        run_unit_id: RunUnitId::new("control-run", limits).unwrap(),
+        selector: Selector::new("program:COCRDLIC", limits).unwrap(),
+        artifact: ArtifactRef::new(format!("sha256:{}", "a".repeat(64)), limits).unwrap(),
+        principal: PrincipalId::new("WEBUSER", limits).unwrap(),
+        state: ExecutionState::Completed,
+        attempt: 1,
+        version: 31,
+        owner_lease: None,
+        lease_expiry_tick: None,
+        terminal_tick: Some(100),
+    };
+    let machine_key = IdempotencyKey::new("control-request:COCRDLIC", limits).unwrap();
+    let admission = HostRequest::Security(SecurityRequest::Authorize {
+        principal: actor.principal.clone(),
+        class: "TCICSTRN".into(),
+        resource: ResourceName::new("CICS.CM00", 246).unwrap(),
+        intent: AccessIntent::Execute,
+    });
+    let root = AuditRecord {
+        execution_id: actor.execution_id.clone(),
+        run_unit_id: actor.run_unit_id.clone(),
+        attempt: actor.attempt,
+        effect_sequence: 1,
+        observed_tick: 0,
+        principal: actor.principal.clone(),
+        invocation_key: IdempotencyKey::new("control-request", limits).unwrap(),
+        capability: admission.required_capability(limits),
+        resource: canonical_audit_resource_digest(&admission),
+        decision: AuditDecision::Success,
+    };
+    // A runtime authorization may protect the same resource. Its clock/key
+    // provenance must still be distinct from pre-resume admission.
+    let mut runtime_security = root.clone();
+    runtime_security.observed_tick = 77;
+    runtime_security.invocation_key = machine_key.clone();
+    let receive = oracles::receive(
+        1,
+        IdempotencyKey::new("control-request:COCRDLIC:1", limits).unwrap(),
+    )
+    .unwrap();
+    let mut runtime_cics = runtime_security.clone();
+    runtime_cics.capability = receive.required_capability(limits);
+    runtime_cics.resource = canonical_audit_resource_digest(&receive);
+    (
+        actor,
+        machine_key,
+        vec![root, runtime_security, runtime_cics],
+    )
+}
+
+#[test]
+fn process_audits_bind_prior_transaction_admission_and_selected_machine() {
+    let (actor, machine_key, audits) = terminal_audit_fixture();
+    assert!(evidence::terminal_audits(&audits, &actor, &machine_key, "CM00").is_ok());
+    let mut reversed = audits.clone();
+    reversed.reverse();
+    assert!(evidence::terminal_audits(&reversed, &actor, &machine_key, "CM00").is_ok());
+    // The completed page now says CCLI, but admission preceded that claim.
+    assert!(evidence::terminal_audits(&audits, &actor, &machine_key, "CCLI").is_err());
+    // The next inputless resume and page3 task really do admit CCLI. Check
+    // that prior-transaction evidence selects that distinct typed resource.
+    let mut continuation = audits.clone();
+    continuation[0].resource =
+        canonical_audit_resource_digest(&HostRequest::Security(SecurityRequest::Authorize {
+            principal: actor.principal.clone(),
+            class: "TCICSTRN".into(),
+            resource: ResourceName::new("CICS.CCLI", 246).unwrap(),
+            intent: AccessIntent::Execute,
+        }));
+    assert!(evidence::terminal_audits(&continuation, &actor, &machine_key, "CCLI").is_ok());
+    assert!(evidence::terminal_audits(&continuation, &actor, &machine_key, "CM00").is_err());
+    for key in ["control-request", "control-request:COMEN01C", ":COCRDLIC"] {
+        let wrong = IdempotencyKey::new(key, InvocationLimits::default()).unwrap();
+        assert!(evidence::terminal_audits(&audits, &actor, &wrong, "CM00").is_err());
+    }
+}
+
+#[test]
+fn process_audits_refuse_swapped_foreign_missing_and_duplicate_roles() {
+    let (actor, machine_key, audits) = terminal_audit_fixture();
+    for index in 0..audits.len() {
+        let mut corrupt = audits.clone();
+        corrupt[index].invocation_key =
+            IdempotencyKey::new("foreign-request", InvocationLimits::default()).unwrap();
+        assert!(evidence::terminal_audits(&corrupt, &actor, &machine_key, "CM00").is_err());
+        let mut swapped = audits.clone();
+        swapped[index].invocation_key = if index == 0 {
+            machine_key.clone()
+        } else {
+            audits[0].invocation_key.clone()
+        };
+        assert!(evidence::terminal_audits(&swapped, &actor, &machine_key, "CM00").is_err());
+    }
+    let mut both_swapped = audits.clone();
+    both_swapped.swap(0, 1);
+    both_swapped[0].invocation_key = audits[0].invocation_key.clone();
+    both_swapped[1].invocation_key = machine_key.clone();
+    assert!(evidence::terminal_audits(&both_swapped, &actor, &machine_key, "CM00").is_err());
+    let mut missing = audits.clone();
+    missing.remove(0);
+    assert!(evidence::terminal_audits(&missing, &actor, &machine_key, "CM00").is_err());
+    let mut duplicate = audits.clone();
+    duplicate.push(audits[0].clone());
+    assert!(evidence::terminal_audits(&duplicate, &actor, &machine_key, "CM00").is_err());
+    assert!(evidence::terminal_audits(&[], &actor, &machine_key, "CM00").is_err());
+}
+
+#[test]
+fn process_audits_refuse_each_owner_field_and_malformed_admission() {
+    let (actor, machine_key, audits) = terminal_audit_fixture();
+    let limits = InvocationLimits::default();
+    for index in 0..audits.len() {
+        for field in 0..6 {
+            let mut corrupt = audits.clone();
+            match field {
+                0 => {
+                    corrupt[index].execution_id =
+                        ExecutionId::new("foreign-execution", limits).unwrap()
+                }
+                1 => corrupt[index].run_unit_id = RunUnitId::new("foreign-run", limits).unwrap(),
+                2 => corrupt[index].principal = PrincipalId::new("WEBADM", limits).unwrap(),
+                3 => corrupt[index].attempt += 1,
+                4 => corrupt[index].effect_sequence = 0,
+                _ => corrupt[index].decision = AuditDecision::Deny,
+            }
+            assert!(
+                evidence::terminal_audits(&corrupt, &actor, &machine_key, "CM00").is_err(),
+                "audit {index} field {field}"
+            );
+        }
+    }
+    for field in 0..5 {
+        let mut corrupt = audits.clone();
+        match field {
+            0 => corrupt[0].observed_tick = 1,
+            1 => corrupt[0].effect_sequence = 2,
+            2 => corrupt[0].capability = CapabilityId::new("host.dataset.read", limits).unwrap(),
+            3 => corrupt[0].resource.value[0] ^= 1,
+            _ => {
+                corrupt[0].resource.format =
+                    AuditResourceDigestFormat::CanonicalHostOversizedResourceV1
+            }
+        }
+        assert!(
+            evidence::terminal_audits(&corrupt, &actor, &machine_key, "CM00").is_err(),
+            "admission field {field}"
+        );
+    }
+}
 
 fn screen(fields: &[(&str, &[u8])]) -> String {
     let mut bytes = Vec::new();

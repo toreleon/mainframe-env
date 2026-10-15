@@ -9119,7 +9119,12 @@ fn check_application_packages(root: &Path) -> TaskResult {
 
 fn check_db2_catalog(root: &Path) -> TaskResult {
     let service_path = root.join("crates/providers/mainframe-env-db2/src/service.rs");
-    let production = production_scanner::read_source(root, &service_path)?;
+    let mut production = production_scanner::read_source(root, &service_path)?;
+    production.push_str(&production_scanner::read_linked_module_source(
+        root,
+        &service_path,
+        "catalog_publication",
+    )?);
     let upper = production.to_ascii_uppercase();
     for forbidden in [
         "CARDDEMO",
