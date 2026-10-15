@@ -842,14 +842,41 @@ pub(super) fn restore_online_machine_priority(
 pub(super) fn restore_online_machine_context(
     invocation: &mut Invocation,
     continuation: Option<&OnlineMachineContinuation>,
+    exchange: Option<&OnlineExchangeState>,
 ) -> Result<(), HostProblem> {
     restore_online_machine_priority(invocation, continuation);
-    let entry = if invocation.selector.as_str().starts_with("cics:") {
-        b"initial".as_slice()
+    let initial_by_selector = if invocation.selector.as_str().starts_with("cics:") {
+        true
     } else if invocation.selector.as_str().starts_with("program:") {
-        b"xctl".as_slice()
+        false
     } else {
         return Err(HostProblem::InfrastructureFailure);
+    };
+    // Installed selector/artifact identity is independent of how the task
+    // entered that program. A normalized initial root remains initial, while
+    // an actual transferred actor keeps the original durable root owner.
+    let owned_entry = exchange
+        .filter(|state| state.run_owner.is_some())
+        .map(|state| {
+            super::validate_online_exchange(state)?;
+            let owner = state
+                .run_owner
+                .as_ref()
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            if state.execution_id != invocation.execution_id.as_str()
+                || state.run_unit_id != invocation.run_unit_id.as_str()
+                || state.principal != invocation.principal.id().as_str()
+                || crate::cobol::program_run_owner(invocation)? != owner.execution
+            {
+                return Err(HostProblem::UnknownOutcome);
+            }
+            Ok(owner.execution == state.execution_id)
+        })
+        .transpose()?;
+    let entry = if owned_entry.unwrap_or(initial_by_selector) {
+        b"initial".as_slice()
+    } else {
+        b"xctl".as_slice()
     };
     invocation
         .bindings

@@ -88,7 +88,11 @@ impl ProductServer {
                 .provider_generations
                 .clone_from(&continuation.provider_generations);
         }
-        continuation::restore_online_machine_context(&mut invocation, saved.as_ref())?;
+        continuation::restore_online_machine_context(
+            &mut invocation,
+            saved.as_ref(),
+            exchange.as_ref(),
+        )?;
         invocation.bindings.insert(
             "cics.commarea".into(),
             BoundedPayload::new(

@@ -639,6 +639,102 @@ mod tests {
     }
 
     #[test]
+    fn owned_exchange_entry_keeps_normalized_initial_root_and_real_transfer_distinct() {
+        for initial in [true, false] {
+            let server = server();
+            let mut state = state();
+            if initial {
+                state.execution_id = "root-execution".into();
+                state.run_owner = Some(new_run_owner(&state, "root-execution").unwrap());
+            } else {
+                original(
+                    server.store.as_ref(),
+                    "root-run",
+                    "IBMUSER",
+                    Some(LifecycleEventKind::HandoffCompleted),
+                );
+            }
+            let mut invocation = server.online_exchange_invocation(&state).unwrap();
+            let selector = invocation.selector.clone();
+            let artifact = invocation.artifact.clone();
+            super::super::continuation::restore_online_machine_context(
+                &mut invocation,
+                None,
+                Some(&state),
+            )
+            .unwrap();
+            assert_eq!(invocation.selector, selector);
+            assert_eq!(invocation.artifact, artifact);
+            assert_eq!(
+                invocation.bindings["cics.program-entry"].bytes(),
+                if initial {
+                    b"initial".as_slice()
+                } else {
+                    b"xctl".as_slice()
+                }
+            );
+        }
+        // Legacy records carry no retained root owner; keep their original
+        // selector classification rather than guessing a new initial entry.
+        for (selector, entry) in [
+            ("cics:PE01", b"initial".as_slice()),
+            ("program:EXIT", b"xctl"),
+        ] {
+            let server = server();
+            let mut legacy = state();
+            legacy.schema_version = ONLINE_EXCHANGE_CONTRACT.into();
+            legacy.run_owner = None;
+            legacy.selector = selector.into();
+            let mut invocation = server.online_exchange_invocation(&legacy).unwrap();
+            super::super::continuation::restore_online_machine_context(
+                &mut invocation,
+                None,
+                Some(&legacy),
+            )
+            .unwrap();
+            assert_eq!(invocation.bindings["cics.program-entry"].bytes(), entry);
+        }
+    }
+
+    #[test]
+    fn exchange_entry_restore_refuses_foreign_actor_run_and_missing_retained_owner() {
+        let server = server();
+        let state = state();
+        original(
+            server.store.as_ref(),
+            "root-run",
+            "IBMUSER",
+            Some(LifecycleEventKind::HandoffCompleted),
+        );
+        let actual = server.online_exchange_invocation(&state).unwrap();
+        for mode in 0..3 {
+            let mut invocation = actual.clone();
+            match mode {
+                0 => {
+                    invocation.execution_id =
+                        ExecutionId::new("foreign-actor", InvocationLimits::default()).unwrap();
+                }
+                1 => {
+                    invocation.run_unit_id =
+                        RunUnitId::new("foreign-run", InvocationLimits::default()).unwrap();
+                }
+                _ => invocation.bindings.clear(),
+            }
+            let before = invocation.clone();
+            assert_eq!(
+                super::super::continuation::restore_online_machine_context(
+                    &mut invocation,
+                    None,
+                    Some(&state),
+                ),
+                Err(HostProblem::UnknownOutcome),
+                "mode {mode}"
+            );
+            assert_eq!(invocation, before, "mode {mode}");
+        }
+    }
+
+    #[test]
     fn owner_codec_rejects_corruption_without_promoting_legacy_exchange() {
         let state = state();
         assert_eq!(
