@@ -217,6 +217,7 @@ explicitly names that authority as superseded.
 - [ADR-0074: Explicit local MQ process/trigger graph admission](decisions/0074-local-mq-process-trigger-graph.md)
 - [ADR 0076: Explicit local committed MQ controller occurrence](decisions/0076-local-committed-mq-controller-occurrence.md)
 - [ADR 0077: Local completed plain READ result consumption](decisions/0077-local-completed-plain-read-consumption.md)
+- [ADR 0078: CardDemo record-comparison companion](decisions/0078-carddemo-record-comparison-companion.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.
 

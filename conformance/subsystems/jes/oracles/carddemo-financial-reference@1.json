@@ -1,0 +1,90 @@
+{
+  "schema_version": "mainframe-env.carddemo-financial-reference@1",
+  "corpus_commit": "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e",
+  "scope": "Independent local Cp037 manual 50-account/300-transaction source model; record bytes only, no IBM or licensed equivalence. Legacy dataset attributes/versions are not independently credited.",
+  "source_pins": {
+    "app/cbl/CBTRN02C.cbl": "708f3cadc555acab63f11e2f3238f5372ac7180e6b01197bf960d96bf0d2e83f",
+    "app/cbl/CBACT04C.cbl": "5084bb8b0c9a0f0199f737487ae1863f12e43cabbdc459a62b6b67bedc683cc4",
+    "app/cbl/CBTRN03C.cbl": "8691e625502b7efcfd7ba4ae61797132e7b68f3fd5fedcdcc7dd6488f6871eef",
+    "app/cbl/CBSTM03A.CBL": "23c8753b6b4e0c24d4560c83861fe8162626bab195faec0fe88cf80b8bf432b5",
+    "app/cbl/CBSTM03B.CBL": "ac004f7f40dcb3f2a14dfb83a743f83fed9383675bc93452f3424c40cb6475a7",
+    "app/cpy/CVACT01Y.cpy": "81a08bad15af5664326a6f0af3650f570821c4857ffdec3a6a39f91f07dca728",
+    "app/cpy/CVACT03Y.cpy": "ffc6079e09b28739e154bf6c1e1c36d408209faa91f6cf7008078dc596a1c370",
+    "app/cpy/CVTRA01Y.cpy": "50637f13692c89b17a2fc60d249dc54e9eb3569d933afca3cdcf65b491a9d5ba",
+    "app/cpy/CVTRA02Y.cpy": "7828fae489c59944b4310e223028a8d3a525ccf4ead113c062bcaff04b52bf9c",
+    "app/cpy/CVTRA03Y.cpy": "fb15dbc4a6924cbddce0704932f9e61c067ac10004cd00839dff0ed7c7bb0667",
+    "app/cpy/CVTRA04Y.cpy": "89803bc13a06347e1f3d8a599a5383b87235b203dce9f18a486bc233186479f8",
+    "app/cpy/CVTRA05Y.cpy": "d7bde0e78ff608497087b9909c889ed39e347269f964bda767b92b547fbb5fec",
+    "app/cpy/CVTRA06Y.cpy": "c5c69f1b86c5a10156d3c5881d7cf387e6b925aae32825360f85bf4056a554a1",
+    "app/cpy/CVTRA07Y.cpy": "72ba597b1a40e1e6cf908e15da9e6a818a0ab899ef1d27d15edeb074963102fa",
+    "app/cpy/COSTM01.CPY": "108170f314aa951281fdda321c4609c89638caee8d4d7085d08cdca5dc6bec36",
+    "app/cpy/CUSTREC.cpy": "f87a0a041fbd8f38dc9c23a9519b917af9c7008527e9cb924f91c2fb4e0a2ecc",
+    "app/jcl/POSTTRAN.jcl": "ecff62c691e6ce101de08690e72ec065bc98bd845744ddf914899097d37c9191",
+    "app/jcl/INTCALC.jcl": "61afa664a807558e58213641d9f3317ab3b354a350c4c1536a630897d194d275",
+    "app/jcl/TRANBKP.jcl": "457cd00d14a1d9ac9983d92212541df3456e8428862b97cf10bab7249b9e6183",
+    "app/jcl/COMBTRAN.jcl": "ab60da6cfdc8c4ec66c8b950540553bf35e91dc1e61a1dd4ada5bb888011c85c",
+    "app/jcl/TRANIDX.jcl": "64a06b44c816ee666a0e82e24fbf040d5ed792d158c93a0ac477db5dfa30dcae",
+    "app/jcl/TRANREPT.jcl": "7d8fc0777e6b9fb1c62aee6b4b10a67d127057c84b92203c7152f230b3db9571",
+    "app/jcl/PRTCATBL.jcl": "24ba68991b615b24b642ec9365b7a06376f8a813368f6656fcbbb2f4fb2031a2",
+    "app/jcl/CREASTMT.JCL": "d32627022d7686d1811ba253faa2c5d86295c8055428b2a610a27d8f84751950",
+    "app/proc/REPROC.prc": "4562039d1c7b90f05cc946dd1cd1cb93571bb279740c5c9777acfa3ea23fbc9f",
+    "app/ctl/REPROCT.ctl": "5c6b8f26aa53c23131265e715b53130a1a7afd88b5bd3319aeca91f3d1a55bf5",
+    "app/jcl/TRANFILE.jcl": "360080ae5bf5153c3ecbf82385b070a6c7a2cdbf18870685951bf9894516730a",
+    "app/data/EBCDIC/AWS.M2.CARDDEMO.ACCTDATA.PS": "23167cdff65ca6dfa2e5bccee89112e3e83a80247a38e251f3981377ab098ec9",
+    "app/data/EBCDIC/AWS.M2.CARDDEMO.TCATBALF.PS": "725dbe47d34d67053090efde8819af686ce424ed9dc0c8fd3f33cd1bf786b68a",
+    "app/data/EBCDIC/AWS.M2.CARDDEMO.CARDXREF.PS": "b07ab2e5fa2500501c1dcaffe478ee74c4562a290174020a093dfa6f0e6325d3",
+    "app/data/EBCDIC/AWS.M2.CARDDEMO.DISCGRP.PS": "722df78926c1ac01ed8e1138d2bba72593ac21046c994685c64fc7c87a5851d3",
+    "app/data/EBCDIC/AWS.M2.CARDDEMO.DALYTRAN.PS": "479b1f99cb7adcd9b79e94708f04c8bde0a010ba87f2ed69ba8af1effe57d076",
+    "app/data/EBCDIC/AWS.M2.CARDDEMO.DALYTRAN.PS.INIT": "aef36e51163a80999656487416e9edeec70b1e190fc70185c8e86c577e135073",
+    "app/data/EBCDIC/AWS.M2.CARDDEMO.TRANTYPE.PS": "97735eb6979387143a98947a0681aed745a63c6a1f7dfbea1667dd4a6d567cf2",
+    "app/data/EBCDIC/AWS.M2.CARDDEMO.TRANCATG.PS": "3c171c53c0b90ec7b0c267305cf5ba051825dfff78021425c601141f2f3c99e2",
+    "app/data/EBCDIC/AWS.M2.CARDDEMO.CUSTDATA.PS": "0435915cd35ea3077bad9d391fea1520bc7f30ec06d6e29fbe68290f3d6f27f3"
+  },
+  "producer": {
+    "path": "conformance/tools/carddemo_financial_reference.py",
+    "sha256": "b6cbaad8f4e941b0235517de2c492d453d1ca3704b43c2bd6d63ed54b7d3a763"
+  },
+  "oracle_sha256": "6a29aa133a1e0ec73805cb4f9d1fb7c3e26f9c5c0017efb3446d627cb0ccd74d",
+  "comparisons": {
+    "posttran-tcatbalf": {
+      "dataset": "AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS",
+      "records": 100,
+      "record_u32_framed_sha256": "67f5644e79a0ca139671c497171b7994a943cbdca948f0b39fe0de7c37dff530",
+      "attributes": {
+        "organization": "key-sequenced",
+        "record_format": "fixed",
+        "logical_record_length": 50,
+        "key_offset": 0,
+        "key_length": 17,
+        "ccsid": 37
+      }
+    },
+    "tranrept-selected": {
+      "dataset": "AWS.M2.CARDDEMO.TRANSACT.DALY.G0001V00",
+      "records": 312,
+      "record_u32_framed_sha256": "68216ae9d99e5c174915143c1e19f55d65db21ba628e0d4cf24ba41606595927",
+      "attributes": {
+        "organization": "sequential",
+        "record_format": "fixed-blocked",
+        "logical_record_length": 350,
+        "key_offset": null,
+        "key_length": null,
+        "ccsid": 37
+      }
+    },
+    "tranrept-report": {
+      "dataset": "AWS.M2.CARDDEMO.TRANREPT.G0001V00",
+      "records": 519,
+      "record_u32_framed_sha256": "6082f721f3856c8c708e41100ae30b527e17d9587dd453ff82c5df4848a9d525",
+      "attributes": {
+        "organization": "sequential",
+        "record_format": "fixed-blocked",
+        "logical_record_length": 133,
+        "key_offset": null,
+        "key_length": null,
+        "ccsid": 37
+      }
+    }
+  },
+  "licensed_credit": 0
+}

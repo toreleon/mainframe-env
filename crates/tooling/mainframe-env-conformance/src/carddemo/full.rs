@@ -35,7 +35,7 @@ pub fn verify_carddemo_full_from_env(
     let (online, online_observations, online_operator) =
         online_receipt::verify_carddemo_base_online_with_operator(inventory_path)?;
     route_observations.extend(online_observations)?;
-    let (batch, batch_observations, batch_operator) =
+    let (batch, batch_observations, batch_operator, _) =
         verify_carddemo_base_batch_with_operator(inventory_path)?;
     route_observations.extend(batch_observations)?;
     operator_observations::observe_install_compile(

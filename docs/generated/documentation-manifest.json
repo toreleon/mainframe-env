@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 268,
+    "markdown_documents": 269,
     "navigation_groups": 8,
-    "normative_documents": 126,
+    "normative_documents": 127,
     "xtask_commands": 162
   },
   "documents": [
@@ -349,8 +349,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 209,
-      "sha256": "sha256:cd0c45af7225c50d0149dbc91d071bdc99a7b9d67fdb80c45b42d4c0a87243c4",
+      "relative_links": 210,
+      "sha256": "sha256:d369bcb015232223f709e54cdefa2749292cf218afdf5d7781339c5efa9c6990",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -1779,10 +1779,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env unreleased companion; runtime owner verification pending",
+      "normative": true,
+      "owner": "conformance and xtask maintainers",
+      "path": "docs/decisions/0078-carddemo-record-comparison-companion.md",
+      "relative_links": 0,
+      "scope": "issues #245 and #262, local base-batch provenance",
+      "sha256": "sha256:314843b7600b5369886508214ac1c7df3c8ae6c2783272844197b7223e4e518c",
+      "status": "Proposed on Foundation PR #393",
+      "title": "ADR-0078: CardDemo record-comparison companion",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 68,
-      "sha256": "sha256:48c150468e2d2854b25f65e175853307519d27f426ff3580a62cb589c103c1e7",
+      "relative_links": 69,
+      "sha256": "sha256:060ce480700e91f4a443fcdfd24ae8c67ccbd33246d2d4718825daf817c7b00b",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -3214,6 +3226,10 @@
         {
           "label": "ADR 0077: Local completed plain READ result consumption",
           "path": "docs/decisions/0077-local-completed-plain-read-consumption.md"
+        },
+        {
+          "label": "ADR 0078: CardDemo record-comparison companion",
+          "path": "docs/decisions/0078-carddemo-record-comparison-companion.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -3440,7 +3456,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:753e968acda3c4a4e42bfae65de8ca1a1079356eba8d9f5d287df332d4809944",
+  "registry_sha256": "sha256:31b63d8c0d2c7c1e39cef3e15a18ceee5e4cf5058f3017b34f5d4ec7c5779d9f",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

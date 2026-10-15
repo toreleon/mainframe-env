@@ -1,0 +1,465 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/carddemo-financial-reference@1.schema.json",
+  "title": "Independent local CardDemo financial record reference",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "corpus_commit",
+    "scope",
+    "source_pins",
+    "producer",
+    "oracle_sha256",
+    "comparisons",
+    "licensed_credit"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mainframe-env.carddemo-financial-reference@1"
+    },
+    "corpus_commit": {
+      "const": "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e"
+    },
+    "scope": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_pins": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "app/cbl/CBTRN02C.cbl",
+        "app/cbl/CBACT04C.cbl",
+        "app/cbl/CBTRN03C.cbl",
+        "app/cbl/CBSTM03A.CBL",
+        "app/cbl/CBSTM03B.CBL",
+        "app/cpy/CVACT01Y.cpy",
+        "app/cpy/CVACT03Y.cpy",
+        "app/cpy/CVTRA01Y.cpy",
+        "app/cpy/CVTRA02Y.cpy",
+        "app/cpy/CVTRA03Y.cpy",
+        "app/cpy/CVTRA04Y.cpy",
+        "app/cpy/CVTRA05Y.cpy",
+        "app/cpy/CVTRA06Y.cpy",
+        "app/cpy/CVTRA07Y.cpy",
+        "app/cpy/COSTM01.CPY",
+        "app/cpy/CUSTREC.cpy",
+        "app/jcl/POSTTRAN.jcl",
+        "app/jcl/INTCALC.jcl",
+        "app/jcl/TRANBKP.jcl",
+        "app/jcl/COMBTRAN.jcl",
+        "app/jcl/TRANIDX.jcl",
+        "app/jcl/TRANREPT.jcl",
+        "app/jcl/PRTCATBL.jcl",
+        "app/jcl/CREASTMT.JCL",
+        "app/proc/REPROC.prc",
+        "app/ctl/REPROCT.ctl",
+        "app/jcl/TRANFILE.jcl",
+        "app/data/EBCDIC/AWS.M2.CARDDEMO.ACCTDATA.PS",
+        "app/data/EBCDIC/AWS.M2.CARDDEMO.TCATBALF.PS",
+        "app/data/EBCDIC/AWS.M2.CARDDEMO.CARDXREF.PS",
+        "app/data/EBCDIC/AWS.M2.CARDDEMO.DISCGRP.PS",
+        "app/data/EBCDIC/AWS.M2.CARDDEMO.DALYTRAN.PS",
+        "app/data/EBCDIC/AWS.M2.CARDDEMO.DALYTRAN.PS.INIT",
+        "app/data/EBCDIC/AWS.M2.CARDDEMO.TRANTYPE.PS",
+        "app/data/EBCDIC/AWS.M2.CARDDEMO.TRANCATG.PS",
+        "app/data/EBCDIC/AWS.M2.CARDDEMO.CUSTDATA.PS"
+      ],
+      "properties": {
+        "app/cbl/CBTRN02C.cbl": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/cbl/CBACT04C.cbl": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/cbl/CBTRN03C.cbl": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/cbl/CBSTM03A.CBL": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/cbl/CBSTM03B.CBL": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/cpy/CVACT01Y.cpy": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/cpy/CVACT03Y.cpy": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/cpy/CVTRA01Y.cpy": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/cpy/CVTRA02Y.cpy": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/cpy/CVTRA03Y.cpy": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/cpy/CVTRA04Y.cpy": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/cpy/CVTRA05Y.cpy": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/cpy/CVTRA06Y.cpy": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/cpy/CVTRA07Y.cpy": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/cpy/COSTM01.CPY": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/cpy/CUSTREC.cpy": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/jcl/POSTTRAN.jcl": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/jcl/INTCALC.jcl": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/jcl/TRANBKP.jcl": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/jcl/COMBTRAN.jcl": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/jcl/TRANIDX.jcl": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/jcl/TRANREPT.jcl": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/jcl/PRTCATBL.jcl": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/jcl/CREASTMT.JCL": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/proc/REPROC.prc": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/ctl/REPROCT.ctl": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/jcl/TRANFILE.jcl": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/data/EBCDIC/AWS.M2.CARDDEMO.ACCTDATA.PS": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/data/EBCDIC/AWS.M2.CARDDEMO.TCATBALF.PS": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/data/EBCDIC/AWS.M2.CARDDEMO.CARDXREF.PS": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/data/EBCDIC/AWS.M2.CARDDEMO.DISCGRP.PS": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/data/EBCDIC/AWS.M2.CARDDEMO.DALYTRAN.PS": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/data/EBCDIC/AWS.M2.CARDDEMO.DALYTRAN.PS.INIT": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/data/EBCDIC/AWS.M2.CARDDEMO.TRANTYPE.PS": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/data/EBCDIC/AWS.M2.CARDDEMO.TRANCATG.PS": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app/data/EBCDIC/AWS.M2.CARDDEMO.CUSTDATA.PS": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "conformance/tools/carddemo_financial_reference.py"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "oracle_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "comparisons": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "posttran-tcatbalf",
+        "tranrept-selected",
+        "tranrept-report"
+      ],
+      "properties": {
+        "posttran-tcatbalf": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dataset",
+            "attributes",
+            "records",
+            "record_u32_framed_sha256"
+          ],
+          "properties": {
+            "dataset": {
+              "type": "string",
+              "minLength": 1
+            },
+            "attributes": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "organization",
+                "record_format",
+                "logical_record_length",
+                "key_offset",
+                "key_length",
+                "ccsid"
+              ],
+              "properties": {
+                "organization": {
+                  "enum": [
+                    "sequential",
+                    "key-sequenced"
+                  ]
+                },
+                "record_format": {
+                  "enum": [
+                    "fixed",
+                    "fixed-blocked"
+                  ]
+                },
+                "logical_record_length": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "key_offset": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "key_length": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "ccsid": {
+                  "const": 37
+                }
+              }
+            },
+            "records": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "record_u32_framed_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "tranrept-selected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dataset",
+            "attributes",
+            "records",
+            "record_u32_framed_sha256"
+          ],
+          "properties": {
+            "dataset": {
+              "type": "string",
+              "minLength": 1
+            },
+            "attributes": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "organization",
+                "record_format",
+                "logical_record_length",
+                "key_offset",
+                "key_length",
+                "ccsid"
+              ],
+              "properties": {
+                "organization": {
+                  "enum": [
+                    "sequential",
+                    "key-sequenced"
+                  ]
+                },
+                "record_format": {
+                  "enum": [
+                    "fixed",
+                    "fixed-blocked"
+                  ]
+                },
+                "logical_record_length": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "key_offset": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "key_length": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "ccsid": {
+                  "const": 37
+                }
+              }
+            },
+            "records": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "record_u32_framed_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "tranrept-report": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dataset",
+            "attributes",
+            "records",
+            "record_u32_framed_sha256"
+          ],
+          "properties": {
+            "dataset": {
+              "type": "string",
+              "minLength": 1
+            },
+            "attributes": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "organization",
+                "record_format",
+                "logical_record_length",
+                "key_offset",
+                "key_length",
+                "ccsid"
+              ],
+              "properties": {
+                "organization": {
+                  "enum": [
+                    "sequential",
+                    "key-sequenced"
+                  ]
+                },
+                "record_format": {
+                  "enum": [
+                    "fixed",
+                    "fixed-blocked"
+                  ]
+                },
+                "logical_record_length": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "key_offset": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "key_length": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "ccsid": {
+                  "const": 37
+                }
+              }
+            },
+            "records": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "record_u32_framed_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "licensed_credit": {
+      "const": 0
+    }
+  }
+}

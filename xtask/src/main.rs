@@ -8,7 +8,9 @@ mod license_notices_cli;
 mod batch_controller_policy_tests;
 #[cfg(test)]
 mod carddemo_base_batch_provenance;
+mod carddemo_batch_cli;
 mod carddemo_host_integration;
+use carddemo_batch_cli::{check_carddemo_base_batch, check_carddemo_base_batch_evidence};
 mod carddemo_readacct;
 mod carddemo_serve;
 mod changelog;
@@ -280,6 +282,8 @@ enum XtaskCommand {
     CarddemoUtilities(CheckArgs),
     CarddemoBatchPrograms(CheckArgs),
     CarddemoBaseBatch(CheckArgs),
+    /// Emit the additive local record-comparison companion after the complete owner.
+    CarddemoBaseBatchEvidence(CheckArgs),
     CarddemoReadacct(CheckArgs),
     CarddemoDb2(CheckArgs),
     CarddemoIms(CheckArgs),
@@ -671,6 +675,11 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
         XtaskCommand::CarddemoBaseBatch(args) => {
             checked!("carddemo-base-batch", args, check_carddemo_base_batch(root))
         }
+        XtaskCommand::CarddemoBaseBatchEvidence(args) => checked!(
+            "carddemo-base-batch-evidence",
+            args,
+            check_carddemo_base_batch_evidence(root)
+        ),
         XtaskCommand::CarddemoReadacct(args) => {
             checked!(
                 "carddemo-readacct",
@@ -6250,18 +6259,6 @@ fn check_carddemo_batch_programs(root: &Path) -> TaskResult {
     Ok(())
 }
 
-fn check_carddemo_base_batch(root: &Path) -> TaskResult {
-    let receipt = verify_carddemo_base_batch_from_env(
-        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
-    )
-    .map_err(|problem| problem.to_string())?;
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
-    );
-    Ok(())
-}
-
 fn check_carddemo_db2(root: &Path) -> TaskResult {
     let receipt = verify_carddemo_db2_from_env(
         &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
@@ -7698,6 +7695,10 @@ fn check_schemas(root: &Path) -> TaskResult {
         (
             "conformance/subsystems/jes/oracles/carddemo-tranrept-reference@1.json",
             "conformance/subsystems/jes/schemas/carddemo-tranrept-reference.schema.json",
+        ),
+        (
+            "conformance/subsystems/jes/oracles/carddemo-financial-reference@1.json",
+            "conformance/subsystems/jes/schemas/carddemo-financial-reference@1.schema.json",
         ),
         (
             "conformance/subsystems/jes/inventory/jes-dd-surface.json",

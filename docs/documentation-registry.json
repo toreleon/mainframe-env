@@ -133,7 +133,8 @@
     "docs/decisions/0075-local-complete-owned-publication.md",
     "docs/decisions/0074-local-mq-process-trigger-graph.md",
     "docs/decisions/0076-local-committed-mq-controller-occurrence.md",
-    "docs/decisions/0077-local-completed-plain-read-consumption.md"
+    "docs/decisions/0077-local-completed-plain-read-consumption.md",
+    "docs/decisions/0078-carddemo-record-comparison-companion.md"
   ],
   "navigation": [
     {
@@ -689,6 +690,10 @@
         {
           "label": "ADR 0077: Local completed plain READ result consumption",
           "path": "docs/decisions/0077-local-completed-plain-read-consumption.md"
+        },
+        {
+          "label": "ADR 0078: CardDemo record-comparison companion",
+          "path": "docs/decisions/0078-carddemo-record-comparison-companion.md"
         }
       ],
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."

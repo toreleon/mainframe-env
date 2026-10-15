@@ -56,6 +56,7 @@ pub(super) struct FinancialChecks {
     final_datasets: BTreeMap<&'static str, (DatasetExpected, CapturedDataset)>,
     restart_sealed: bool,
     reopened: bool,
+    comparisons: BTreeMap<String, serde_json::Value>,
 }
 
 fn drift(detail: impl Into<String>) -> CorpusProblem {
@@ -77,6 +78,12 @@ pub(super) fn require_source_input(relative: &str, bytes: &[u8]) -> Result<(), C
         )));
     }
     Ok(())
+}
+
+pub(super) fn source_pin_matches(relative: &str, digest: &str) -> bool {
+    fixtures::SOURCE_PINS
+        .iter()
+        .any(|&(path, expected)| path == relative && expected == digest)
 }
 
 pub(super) fn require_statement_input(bytes: &[u8]) -> Result<(), CorpusProblem> {
@@ -115,6 +122,20 @@ impl FinancialChecks {
         {
             let captured =
                 capture_dataset(expected, |request| server.dataset_service().invoke(request))?;
+            if let Some(name) =
+                super::base_batch_evidence::comparison_name(expected.phase, expected.name)
+            {
+                self.comparisons.insert(
+                    name.into(),
+                    serde_json::json!({
+                        "dataset": expected.name,
+                        "attributes": captured.attributes,
+                        "version": captured.version,
+                        "records": captured.records,
+                        "record_u32_framed_sha256": captured.framed_sha256,
+                    }),
+                );
+            }
             self.final_datasets
                 .insert(expected.name, (*expected, captured));
         }
@@ -209,7 +230,10 @@ impl FinancialChecks {
 
     /// The real wrapper calls this only after both checked drains and checked
     /// exact owned-root removal. No partial proof escapes a failed wrapper.
-    pub(super) fn finish(self, observations: &mut RouteObservations) -> Result<(), CorpusProblem> {
+    pub(super) fn finish(
+        self,
+        observations: &mut RouteObservations,
+    ) -> Result<super::base_batch_evidence::FinancialProof, CorpusProblem> {
         if !self.initial
             || self.jobs.len() != JOBS.len()
             || !self.restart_sealed
@@ -222,6 +246,7 @@ impl FinancialChecks {
         {
             return Err(drift("financial source comparisons are incomplete"));
         }
+        let proof = super::base_batch_evidence::FinancialProof::complete(self.comparisons)?;
         for name in [
             "POSTTRAN step outcomes",
             "INTCALC decimal results",
@@ -239,7 +264,7 @@ impl FinancialChecks {
         }
         // No GDG lifecycle, AIX, compiled linkage, TIOT/full statement-spool,
         // licensed IBM, inline carrier or upstream signed-EDIT observation.
-        Ok(())
+        Ok(proof)
     }
 }
 

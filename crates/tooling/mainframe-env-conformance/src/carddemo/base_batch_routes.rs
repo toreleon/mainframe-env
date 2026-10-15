@@ -7,7 +7,14 @@ pub(super) async fn exercise_base_batch_routes(
     corpus_commit: String,
     online: OnlineApplicationDefinition,
     definitions: Vec<BatchProgramDefinition>,
-) -> Result<(CardDemoBaseBatchReceipt, RouteObservations), CorpusProblem> {
+) -> Result<
+    (
+        CardDemoBaseBatchReceipt,
+        RouteObservations,
+        base_batch_evidence::FinancialProof,
+    ),
+    CorpusProblem,
+> {
     const BUSINESS_DATE: &str = "2022-07-06";
     const COBOL_CURRENT_DATE: &str = "2022070600000000+0000";
     let mut financial_checks = financial_observations::FinancialChecks::prepare(
@@ -633,7 +640,7 @@ pub(super) async fn exercise_base_batch_routes(
     })?;
     let mut route_observations = RouteObservations::default();
     file_controls.finish(&mut route_observations)?;
-    financial_checks.finish(&mut route_observations)?;
+    let financial_proof = financial_checks.finish(&mut route_observations)?;
     Ok((
         CardDemoBaseBatchReceipt {
             schema_version: "mainframe-env.carddemo-base-batch-receipt@1".into(),
@@ -655,6 +662,7 @@ pub(super) async fn exercise_base_batch_routes(
             journey_shape_sha256: format!("{:x}", shape.finalize()),
         },
         route_observations,
+        financial_proof,
     ))
 }
 

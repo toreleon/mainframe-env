@@ -24,6 +24,7 @@ use base_batch_routes::{
     exercise_base_batch_routes,
 };
 use batch_program_runtime::exercise_batch_program_routes;
+mod base_batch_evidence;
 mod bill_observations;
 mod card_observations;
 mod catalog_observations;
@@ -36,6 +37,11 @@ mod db2_local_observations;
 mod db2_observations;
 mod db2_online_rows;
 mod financial_observations;
+use base_batch_evidence::verify_carddemo_base_batch_with_operator;
+pub use base_batch_evidence::{
+    CardDemoComparisonCredit, validate_carddemo_base_batch_evidence,
+    verify_carddemo_base_batch_evidence_from_env,
+};
 mod full;
 mod insert_observations;
 mod jes_security_observations;
@@ -4604,62 +4610,7 @@ fn verify_carddemo_base_batch_observed(
     inventory_path: &Path,
 ) -> Result<(CardDemoBaseBatchReceipt, RouteObservations), CorpusProblem> {
     verify_carddemo_base_batch_with_operator(inventory_path)
-        .map(|(receipt, observations, _)| (receipt, observations))
-}
-
-fn verify_carddemo_base_batch_with_operator(
-    inventory_path: &Path,
-) -> Result<
-    (
-        CardDemoBaseBatchReceipt,
-        RouteObservations,
-        operator_observations::BatchProof,
-    ),
-    CorpusProblem,
-> {
-    let (batch, operator_proof) = verify_carddemo_batch_programs_observed(inventory_path)?;
-    let corpus_dir = PathBuf::from(env::var_os(CORPUS_ENV).ok_or_else(|| {
-        CorpusProblem::new(
-            "carddemo.corpus.environment_missing",
-            "CARDDEMO_CORPUS_DIR is required",
-        )
-    })?);
-    let bundles = explicit_carddemo_bundles(&corpus_dir)?
-        .into_iter()
-        .filter(|(path, _)| path.starts_with("app/cbl/"))
-        .map(|(path, bundle)| {
-            let name = Path::new(&path)
-                .file_stem()
-                .and_then(|value| value.to_str())
-                .ok_or_else(|| {
-                    CorpusProblem::new(
-                        "carddemo.base_batch.path_invalid",
-                        "program path is invalid",
-                    )
-                })?
-                .to_ascii_uppercase();
-            Ok((name, (path, bundle)))
-        })
-        .collect::<Result<BTreeMap<_, _>, CorpusProblem>>()?;
-    let needed = batch
-        .named_programs
-        .iter()
-        .chain(batch.called_programs.iter())
-        .cloned()
-        .collect::<BTreeSet<_>>();
-    let definitions = compile_carddemo_batch_definitions(&bundles, &needed)?;
-    let online = carddemo_base_online_definition(&corpus_dir)?;
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|error| CorpusProblem::new("carddemo.base_batch.runtime", error.to_string()))?;
-    let (receipt, observations) = runtime.block_on(exercise_base_batch_routes(
-        &corpus_dir,
-        batch.corpus_commit,
-        online,
-        definitions,
-    ))?;
-    Ok((receipt, observations, operator_proof))
+        .map(|(receipt, observations, _, _)| (receipt, observations))
 }
 
 pub fn verify_carddemo_db2_from_env(
