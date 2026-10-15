@@ -849,7 +849,10 @@ impl MemoryStore {
 pub(super) fn terminal_audit_count(state: &State) -> usize {
     state
         .provider_state
-        .keys()
-        .filter(|(namespace, _)| namespace == AUDIT_NAMESPACE)
+        .range((AUDIT_NAMESPACE.to_owned(), String::new())..)
+        .take_while(|((namespace, _), _)| namespace == AUDIT_NAMESPACE)
         .count()
 }
+
+#[cfg(test)]
+mod namespace_query_tests;

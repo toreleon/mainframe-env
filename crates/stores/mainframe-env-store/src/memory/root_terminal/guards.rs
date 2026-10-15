@@ -146,6 +146,15 @@ pub(in crate::memory) fn record_audit(
     MemoryStore::append_audit_locked(state, record, limits)
 }
 
+// Preserve the physical tuple-key predicate, including malformed rows and empty keys.
+fn has_run_namespace(state: &State) -> bool {
+    state
+        .provider_state
+        .range((RUN_NAMESPACE.to_owned(), String::new())..)
+        .next()
+        .is_some_and(|((namespace, _), _)| namespace == RUN_NAMESPACE)
+}
+
 pub(in crate::memory) fn guard_provider(
     state: &State,
     namespace: &str,
@@ -171,8 +180,7 @@ pub(in crate::memory) fn guard_provider(
             }
         }
     }
-    if namespace == AUDIT_NAMESPACE && state.provider_state.keys().any(|(n, _)| n == RUN_NAMESPACE)
-    {
+    if namespace == AUDIT_NAMESPACE && has_run_namespace(state) {
         let old = state.provider_state.get(&(namespace.into(), key.into()));
         for bytes in old
             .map(|r| r.payload.as_slice())
@@ -188,7 +196,7 @@ pub(in crate::memory) fn guard_provider(
             guard_actor(state, &audit.execution_id, None)?;
         }
     }
-    if state.provider_state.keys().any(|(n, _)| n == RUN_NAMESPACE)
+    if has_run_namespace(state)
         && matches!(
             namespace,
             "cobol-call-replay@1"
