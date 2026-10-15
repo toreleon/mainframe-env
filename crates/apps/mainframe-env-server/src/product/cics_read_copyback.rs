@@ -538,24 +538,24 @@ fn audits_match_with_terminal_admission(
     })
 }
 
-fn terminal_effect_matches(
+fn journal_effect_matches(
     effect: &EffectRecord,
     invocation: &Invocation,
-    terminal: &CicsReadCopybackEffect,
+    captured: &CicsReadCopybackEffect,
     terminal_tick: u64,
 ) -> bool {
     effect.execution_id == invocation.execution_id
         && effect.run_unit_id == invocation.run_unit_id
-        && effect.sequence == terminal.sequence()
-        && Some(&effect.key) == terminal.key()
+        && effect.sequence == captured.sequence()
+        && Some(&effect.key) == captured.key()
         && effect.digest_format == EffectDigestFormat::CanonicalHostV1
-        && effect.request_digest == *terminal.request_digest()
-        && effect.result_digest == Some(*terminal.result_digest())
+        && effect.request_digest == *captured.request_digest()
+        && effect.result_digest == Some(*captured.result_digest())
         && effect.state == EffectState::Completed
         && effect.intent.owner == invocation.execution_id
         && effect.intent.attempt == invocation.attempt
         && effect.intent.audit_invocation_key.as_ref() == Some(&invocation.idempotency_key)
-        && effect.intent.audit_resource == Some(terminal.resource())
+        && effect.intent.audit_resource == Some(captured.resource())
         && effect
             .intent
             .capability
@@ -566,6 +566,38 @@ fn terminal_effect_matches(
         && effect
             .resolved_tick
             .is_some_and(|tick| tick >= effect.intent.created_tick && tick <= terminal_tick)
+}
+
+fn current_journal_effect(
+    store: &dyn PlatformStore,
+    invocation: &Invocation,
+    captured: &CicsReadCopybackEffect,
+    terminal_tick: u64,
+) -> Result<EffectRecord, CicsReadObservationProblem> {
+    let refuse = || CicsReadObservationProblem::Ownership;
+    let effect = store
+        .effect(captured.key().ok_or_else(refuse)?)
+        .map_err(|_| refuse())?
+        .ok_or_else(refuse)?;
+    if !journal_effect_matches(&effect, invocation, captured, terminal_tick) {
+        return Err(refuse());
+    }
+    Ok(effect)
+}
+
+fn recheck_journal_effect(
+    store: &dyn PlatformStore,
+    effect: &EffectRecord,
+) -> Result<(), CicsReadObservationProblem> {
+    if store
+        .effect(&effect.key)
+        .map_err(|_| CicsReadObservationProblem::Ownership)?
+        .as_ref()
+        != Some(effect)
+    {
+        return Err(CicsReadObservationProblem::Ownership);
+    }
+    Ok(())
 }
 
 fn qualify(
@@ -589,7 +621,7 @@ fn qualify(
         || archive
             .reads()
             .iter()
-            .any(|read| read.effect().key().is_some())
+            .any(|read| read.effect().key().is_none())
         || state.owner.get()
             != Some(&(
                 invocation.execution_id.clone(),
@@ -621,15 +653,17 @@ fn qualify(
         return Err(refuse());
     }
     let tick = execution.terminal_tick.ok_or_else(refuse)?;
-    let terminal = archive.terminal();
-    let effect = server
-        .store
-        .effect(terminal.key().ok_or_else(refuse)?)
-        .map_err(|_| refuse())?
-        .ok_or_else(refuse)?;
-    if !terminal_effect_matches(&effect, invocation, terminal, tick) {
-        return Err(refuse());
+    let mut read_effects = Vec::with_capacity(archive.reads().len());
+    for read in archive.reads() {
+        read_effects.push(current_journal_effect(
+            server.store.as_ref(),
+            invocation,
+            read.effect(),
+            tick,
+        )?);
     }
+    let terminal = archive.terminal();
+    let effect = current_journal_effect(server.store.as_ref(), invocation, terminal, tick)?;
     let row = server
         .store
         .get_provider_state("cics-effect-replay-v1", effect.key.as_str())
@@ -688,6 +722,9 @@ fn qualify(
     }
     // A bounded non-atomic observation, never a durable ownership/authorization lease.
     // Refuse changed/disappearing current rows before exposing this ephemeral witness.
+    for read_effect in &read_effects {
+        recheck_journal_effect(server.store.as_ref(), read_effect)?;
+    }
     if server
         .store
         .get_execution(&invocation.execution_id)

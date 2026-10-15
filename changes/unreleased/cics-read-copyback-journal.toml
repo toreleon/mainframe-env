@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Preserve passive CICS READ copyback with exact original occurrence keys and genuine completed journal ownership checks."

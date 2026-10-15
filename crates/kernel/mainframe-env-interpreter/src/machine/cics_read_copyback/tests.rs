@@ -648,3 +648,59 @@ fn actual_changed_type_cap_plus_one_refuses_without_copy_or_runtime_change() {
     assert!(collector.reads.is_empty());
     assert_eq!(collector.incomplete, Some(CicsReadCopybackProblem::Bounds));
 }
+
+#[test]
+fn actual_read_occurrence_keys_survive_capture_without_mutation_metadata() {
+    let mut machine = machine(true);
+    let mut keys = Vec::new();
+    for (ordinal, &(_, length)) in INTO.iter().enumerate() {
+        let effect = offer(&mut machine, ordinal);
+        assert!(!effect.request.is_mutating());
+        assert!(effect.request.mutation().is_none());
+        assert_eq!(effect.idempotency_key, Some(machine.effect_key().unwrap()));
+        keys.push(effect.idempotency_key.clone().unwrap());
+        machine
+            .resume_host(reply(
+                effect.sequence,
+                vec![b'A' + ordinal as u8; length],
+                CicsDisposition::Complete,
+            ))
+            .unwrap();
+    }
+    finish(&mut machine);
+    let archive = machine.take_read_copyback().unwrap().ok().unwrap();
+    for (read, key) in archive.reads().iter().zip(&keys) {
+        assert_eq!(read.effect().key(), Some(key));
+    }
+}
+
+#[test]
+fn missing_or_foreign_read_occurrence_keys_refuse_without_changing_runtime() {
+    for replacement in [
+        None,
+        Some(IdempotencyKey::new("foreign", InvocationLimits::default()).unwrap()),
+    ] {
+        let mut machine = machine(false);
+        let mut collector = Collector::new(&machine, &plan(&machine)).unwrap();
+        let effect = offer(&mut machine, 0);
+        let snapshot = machine.snapshot();
+        let mut changed = effect.clone();
+        changed.idempotency_key = replacement;
+        collector.offered(&machine, &changed, &machine.pending.as_ref().unwrap().kind);
+        assert_eq!(collector.incomplete, Some(CicsReadCopybackProblem::Layout));
+        assert!(collector.pending.is_none());
+        assert!(collector.reads.is_empty());
+        assert_eq!(machine.snapshot(), snapshot);
+        machine
+            .resume_host(reply(
+                effect.sequence,
+                vec![b'A'; 50],
+                CicsDisposition::Complete,
+            ))
+            .unwrap();
+        assert_eq!(
+            machine.variable("CARD-XREF-RECORD").unwrap().bytes(),
+            vec![b'A'; 50]
+        );
+    }
+}

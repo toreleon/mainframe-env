@@ -104,7 +104,7 @@ impl CicsReadCopybackOrigin {
     }
 }
 
-/// Actual offered effect metadata. READ normally has no mutation key/core row.
+/// Actual offered effect metadata. READ keeps its original dispatch key without mutation metadata.
 pub struct CicsReadCopybackEffect {
     sequence: u64,
     program_counter: usize,
@@ -454,12 +454,15 @@ impl Collector {
                     .selections
                     .get(self.reads.len())
                     .ok_or(CicsReadCopybackProblem::Order)?;
+                let key = machine
+                    .effect_key()
+                    .map_err(|_| CicsReadCopybackProblem::Bounds)?;
                 if self.reads.len() >= MAX_READS
                     || !target_matches(into.as_ref(), Some(&selected.into))
                     || !target_matches(response.as_ref(), selected.response.as_ref())
                     || !target_matches(response2.as_ref(), selected.response2.as_ref())
                     || !outputs.is_empty()
-                    || effect.idempotency_key.is_some()
+                    || effect.idempotency_key.as_ref() != Some(&key)
                 {
                     return Err(CicsReadCopybackProblem::Layout);
                 }

@@ -3,6 +3,8 @@ use super::*;
 use mainframe_env_execution_api::{AuditResourceDigestFormat, ResourceLimits};
 use mainframe_env_ir::{CicsStorageSlot, IrLimits, ModuleBuilder};
 
+mod journal;
+
 fn invocation() -> Invocation {
     let limits = InvocationLimits::default();
     Invocation::new(
