@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Retain genuine coordinator intent and audited result records for compiled dataset cursor open, read-next and close operations, and refuse completed cursor replay before redispatch without changing mutation classification, cursor recovery or original overlap assertions."

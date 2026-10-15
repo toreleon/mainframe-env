@@ -27,6 +27,8 @@ mod cobol_registers;
 mod cobol_runtime;
 mod cobol_statements;
 mod dataset;
+#[cfg(test)]
+mod dataset_cursor_journal_tests;
 mod dataset_reference;
 mod db2_syntax;
 mod db2_syntax_fixtures;

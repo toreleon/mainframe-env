@@ -114,6 +114,14 @@ where
                     invocation.deadline_tick.min(effect.deadline_tick),
                     journal,
                 )?;
+                // These records attest an original call, not a live cursor or its gap.
+                // Repeating even a Completed call can allocate, advance or remove state.
+                if effect.request.is_volatile_dataset_cursor_operation() {
+                    return Err(failed_outcome(problem(
+                        FailureCategory::UnknownOutcome,
+                        "completed dataset cursor dispatch cannot restore volatile cursor state",
+                    )));
+                }
                 let effect_sequence = effect.sequence;
                 if coordinator.checked_inquiry_replay && super::checked_replay::eligible(&effect) {
                     let cursor = journal

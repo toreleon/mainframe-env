@@ -87,7 +87,11 @@ and transaction state before emitting the request. Provider and store
 authorities remain unchanged as semantic families migrate.
 
 Selected compiled dataset READ and CICS file read/browse occurrences also retain
-original dispatch keys and genuine coordinator intent/result records. This is
+original dispatch keys and genuine coordinator intent/result records. The compiled
+dataset cursor forms `StartBrowse`, `ReadNext` and `Close(Some(cursor))` also retain
+these original records; a resumed Completed cursor occurrence refuses
+`UnknownOutcome` before provider dispatch because the record cannot restore its
+volatile cursor or gap. Stateless Dataset `Read` replay remains unchanged. This is
 ownership of an observed host call; the request remains nonmutating and carries
 no fabricated nested mutation. Keyed readonly result persistence failures remain
 `UnknownOutcome`. CICS retains the actual response under the same bounded

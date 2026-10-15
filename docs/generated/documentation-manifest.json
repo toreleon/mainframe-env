@@ -481,7 +481,7 @@
       "path": "docs/architecture/EXECUTION-AND-DURABILITY.md",
       "relative_links": 3,
       "scope": "execution lifecycle, effects, work, checkpoints, and durability",
-      "sha256": "sha256:a91ba1c4a7158a6b2a00d30d347e3d2d0c9b141aa83693631bd9a5c42a73ec3c",
+      "sha256": "sha256:f841f955c12db921ddc273fe064a4f1fff6fe55bc1837dc5d5ea8bcc01625a91",
       "status": "Accepted by repository owner",
       "title": "Execution and Durability Architecture",
       "xtask_commands": 0
@@ -1604,8 +1604,8 @@
       "owner": "host, execution and CICS maintainers",
       "path": "docs/decisions/0063-readonly-dispatch-ownership.md",
       "relative_links": 0,
-      "scope": "original compiled dataset READ and CICS file read/browse intent/result attribution",
-      "sha256": "sha256:0ac9cd6e3b5221bd3ce177632a60af9ba53738f39f2d0fb4e9f5bb0188b6daa4",
+      "scope": "original compiled dataset READ/cursor and CICS file read/browse intent/result attribution",
+      "sha256": "sha256:ba696e3e41b27e101db42ed48a566bbf11fbe9e34e1f4009a1b22257dd8cdd12",
       "status": "proposed; implementation and focused controls unrun.",
       "title": "0063. Actual dispatch ownership for selected readonly effects",
       "xtask_commands": 0

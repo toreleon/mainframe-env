@@ -69,6 +69,24 @@ impl HostRequest {
         self.is_mutating()
             || matches!(self, Self::Dataset(DatasetRequest::Read { .. }))
             || matches!(self, Self::Cics(request) if request.operation.is_file_read())
+            || self.is_volatile_dataset_cursor_operation()
+    }
+
+    #[must_use]
+    /// Identify compiled dataset operations that allocate, advance or remove a volatile cursor.
+    /// A completed dispatch record cannot restore that cursor or authorize repeating the operation.
+    pub fn is_volatile_dataset_cursor_operation(&self) -> bool {
+        matches!(
+            self,
+            Self::Dataset(
+                DatasetRequest::StartBrowse { .. }
+                    | DatasetRequest::ReadNext { .. }
+                    | DatasetRequest::Close {
+                        cursor: Some(_),
+                        ..
+                    }
+            )
+        )
     }
 
     #[must_use]
