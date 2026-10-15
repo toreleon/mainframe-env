@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Buffer development-client archive streams within existing read bounds while preserving archive bytes, required SRI, structural validation and input identity fences."

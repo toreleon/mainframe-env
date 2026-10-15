@@ -64,6 +64,94 @@ class SupplyChainTests(unittest.TestCase):
             with self.assertRaises(supply_chain.SupplyChainError):
                 supply_chain.verify_profile_file(path, pin)
 
+    @staticmethod
+    def profile_archive_fixture(path, raw, compression):
+        data = (supply_chain.lzma.compress(raw) if compression == "xz"
+                else supply_chain.gzip.compress(raw))
+        path.write_bytes(data)
+        path.chmod(0o644)
+        pin = {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+        if compression == "gz":
+            pin["integrity"] = "sha512-" + base64.b64encode(hashlib.sha512(data).digest()).decode()
+        return pin
+
+    @staticmethod
+    def crossing_tar(payload, node=False):
+        output = io.BytesIO()
+        with tarfile.open(fileobj=output, mode="w", format=tarfile.USTAR_FORMAT) as archive_file:
+            names = ("node-v24.19.0-linux-x64/bin/node", "node-v24.19.0-linux-x64/LICENSE") if node else ("package/crossing", "package/after")
+            for name, data in [(names[0], payload), (names[1], b"independent-later-member")]:
+                info = tarfile.TarInfo(name)
+                info.size = len(data)
+                info.mode = 0o755 if name.endswith("/bin/node") else 0o644
+                archive_file.addfile(info, io.BytesIO(data))
+        return output.getvalue()
+
+    def test_profile_archive_buffer_crossing_preserves_complete_member_bytes(self):
+        payload = (bytes(range(251)) * 8400)[:2 * 1024 * 1024 + 513]
+        raw = self.crossing_tar(payload)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "archive"
+            for compression in ("xz", "gz"):
+                with self.subTest(compression=compression):
+                    pin = self.profile_archive_fixture(path, raw, compression)
+                    with supply_chain.profile_archive(path, pin, compression, len(raw)) as archive_file:
+                        actual = [(member.name, archive_file.extractfile(member).read()) for member in archive_file]
+                    self.assertEqual(actual, [("package/crossing", payload),
+                                              ("package/after", b"independent-later-member")])
+
+    def test_profile_archive_crossing_truncation_and_later_header_refuse(self):
+        payload = b"crossing-payload" * 70000
+        later_header = 512 + ((len(payload) + 511) // 512) * 512
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "archive"
+            for compression in ("xz", "gz"):
+                raw = self.crossing_tar(payload, node=compression == "xz")
+                def validate(pin):
+                    if compression == "xz":
+                        return supply_chain.validate_node_archive(path, {
+                            "version": "24.19.0", "archive": pin,
+                            "binary": {"bytes": len(payload), "sha256": hashlib.sha256(payload).hexdigest(), "mode": 0o755},
+                            "license": {"bytes": len(b"independent-later-member"), "sha256": hashlib.sha256(b"independent-later-member").hexdigest()},
+                        })
+                    return supply_chain.zowe_archive_rows(path, {"archive": pin, "tree": {
+                        "files": 2, "bytes": len(payload) + len(b"independent-later-member"),
+                        "max_file_bytes": len(payload), "max_depth": 2, "modes": [0o644],
+                    }})
+                validate(self.profile_archive_fixture(path, raw, compression))
+                corrupt = bytearray(raw)
+                corrupt[later_header] ^= 1  # Preserve payload; break the later header checksum.
+                cases = {"truncated-payload": raw[:512 + len(payload) - 1],
+                         "later-header": bytes(corrupt)}
+                for name, offered in cases.items():
+                    with self.subTest(compression=compression, mutation=name):
+                        # Matching compressed SHA/SRI lets the structural refusal be observed.
+                        pin = self.profile_archive_fixture(path, offered, compression)
+                        with self.assertRaises(supply_chain.SupplyChainError):
+                            validate(pin)
+
+    def test_profile_archive_decompressed_exact_limit_and_read_ahead_extra_refuse(self):
+        raw = self.crossing_tar(b"x" * (1024 * 1024 + 1))
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "archive"
+            for compression in ("xz", "gz"):
+                with self.subTest(compression=compression):
+                    pin = self.profile_archive_fixture(path, raw, compression)
+                    with supply_chain.profile_archive(path, pin, compression, len(raw)) as archive_file:
+                        self.assertEqual(len(list(archive_file)), 2)
+                    # One additional decompressed byte must refuse, including read-ahead padding.
+                    with self.assertRaisesRegex(supply_chain.SupplyChainError, "decompression exceeds bound"):
+                        with supply_chain.profile_archive(path, pin, compression, len(raw) - 1) as archive_file:
+                            list(archive_file)
+        for extra in (0, 1):
+            reader = supply_chain.DecompressedLimit(io.BytesIO(b"x" * (1024 * 1024 + extra)), 1024 * 1024)
+            self.assertEqual(reader.read(1024 * 1024), b"x" * (1024 * 1024))
+            if extra:
+                with self.assertRaisesRegex(supply_chain.SupplyChainError, "decompression exceeds bound"):
+                    reader.read(1)
+            else:
+                self.assertEqual(reader.read(1), b"")
+
     def test_archive_name_refuses_control_boundaries_and_preserves_unicode(self):
         for character in ("\x00", "\x09", "\x1f", "\x7f", "\x80", "\x85", "\x9f"):
             with self.subTest(codepoint=ord(character)):

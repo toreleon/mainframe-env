@@ -367,7 +367,8 @@ def profile_archive(path: Path, pin: dict, compression: str, maximum: int):
                 require(integrity == sri_digest(pin["integrity"]), "profile archive SRI differs")
             source.seek(0)
             reader = lzma.LZMAFile(source) if compression == "xz" else gzip.GzipFile(fileobj=source)
-            with reader, tarfile.open(fileobj=DecompressedLimit(reader, maximum), mode="r|", tarinfo=BoundedTarInfo) as archive:
+            with reader, tarfile.open(fileobj=DecompressedLimit(reader, maximum), mode="r|",
+                                      tarinfo=BoundedTarInfo, bufsize=min(1024 * 1024, MAX_JSON_BYTES)) as archive:
                 yield archive
     except (tarfile.TarError, EOFError, lzma.LZMAError, ValueError) as error:
         raise SupplyChainError(f"invalid profile archive: {path}: {error}") from error
