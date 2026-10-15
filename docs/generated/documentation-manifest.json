@@ -1814,7 +1814,7 @@
       "normative": false,
       "path": "docs/delivery/IMPLEMENTATION-STATUS.md",
       "relative_links": 21,
-      "sha256": "sha256:c5ceaf449d18a5c5618494bf4fb2603370c888ac4a9f2f5ab3db3be923b5c7dc",
+      "sha256": "sha256:af84a361574f3a4d260760128fc156c9820cbae3ebff76ed6218c29c8d453442",
       "title": "Subsystem implementation status",
       "xtask_commands": 1
     },
@@ -2058,7 +2058,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/coverage/foundation-status.md",
       "relative_links": 2,
-      "sha256": "sha256:9e41c4cbdc8a11c2f8cb4cd681bbd84861738c6f2e415106955bc36f0aaad17c",
+      "sha256": "sha256:d871827081224de58b5cd17afc4f1eb73abeef2e54f228177f6fb7e0b1e605bd",
       "title": "Coverage and conformance — Coverage authority progress",
       "xtask_commands": 5
     },
