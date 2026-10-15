@@ -13,8 +13,8 @@ impl MemoryStore {
         let mut bytes = 0;
         for ((stored_namespace, key), row) in state
             .provider_state
-            .iter()
-            .filter(|((candidate, _), _)| candidate == namespace)
+            .range((namespace.to_owned(), String::new())..)
+            .take_while(|((candidate, _), _)| candidate == namespace)
             .take(max)
         {
             crate::provider_scan::charge(
@@ -37,8 +37,8 @@ impl MemoryStore {
         rows.extend(
             state
                 .provider_state
-                .iter()
-                .filter(|((candidate, _), _)| candidate == namespace)
+                .range((namespace.to_owned(), String::new())..)
+                .take_while(|((candidate, _), _)| candidate == namespace)
                 .take(max)
                 .map(|(_, row)| row.clone()),
         );
@@ -53,11 +53,22 @@ impl MemoryStore {
         if max == 0 || max > mainframe_env_store_api::MAX_PROVIDER_STATE_SCAN {
             return Err(StoreError::CapacityExceeded);
         }
-        Ok(self
-            .lock()?
+        let state = self.lock()?;
+        // Legacy callers may query physical rows with unvalidated namespaces.
+        // Preserve that behavior without allocating a caller-sized range key.
+        if namespace.len() > mainframe_env_store_api::MAX_PROVIDER_NAMESPACE_BYTES {
+            return Ok(state
+                .provider_state
+                .iter()
+                .filter(|((candidate, _), _)| candidate == namespace)
+                .take(max)
+                .map(|(_, record)| record.clone())
+                .collect());
+        }
+        Ok(state
             .provider_state
-            .iter()
-            .filter(|((candidate, _), _)| candidate == namespace)
+            .range((namespace.to_owned(), String::new())..)
+            .take_while(|((candidate, _), _)| candidate == namespace)
             .take(max)
             .map(|(_, record)| record.clone())
             .collect())

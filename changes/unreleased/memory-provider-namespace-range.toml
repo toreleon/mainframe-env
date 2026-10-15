@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Start MemoryStore provider-state pages at their exact tuple-key namespace range, preserving row order, byte preflight, malformed-row refusals and legacy behavior without scanning unrelated namespaces."
