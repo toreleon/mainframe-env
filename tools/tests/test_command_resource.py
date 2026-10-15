@@ -22,16 +22,36 @@ ci_spec.loader.exec_module(ci)
 
 
 class CommandResourceCustodyTests(unittest.TestCase):
-    def invoke(self, directory, script, timeout=1, arguments=()):
+    def invoke(self, directory, script, timeout=1, arguments=(), on_output=None):
         destination = Path(directory) / 'actual.resource.json'
         chunks = []
         closed = []
+
+        def output(channel, data):
+            chunks.append((channel, data))
+            if on_output is not None:
+                on_output(channel, data)
+
         code, error = ci._run_owned(
             [sys.executable, '-B', str(TOOL), str(destination),
              sys.executable, '-B', '-c', script, *arguments], Path(directory),
-            lambda channel, data: chunks.append((channel, data)),
+            output,
             timeout_seconds=timeout, max_output_bytes=65536, on_closed=closed.append)
         return code, error, closed, b''.join(data for _, data in chunks), destination
+
+    def observe_stopped_fixture_wrapper(self, pid):
+        if type(pid) is not int or pid <= 1 or pid == os.getpid():
+            raise ValueError('fixture wrapper identity differs')
+        # P_PID establishes that this is our current kernel child. WNOWAIT
+        # retains the stop and never consumes the supervisor's sole exit wait.
+        observed = os.waitid(os.P_PID, pid, os.WSTOPPED | os.WNOHANG | os.WNOWAIT)
+        if observed is None or observed.si_pid != pid:
+            raise ValueError('fixture wrapper stop remains unknown')
+        if observed.si_code != os.CLD_STOPPED or observed.si_status != signal.SIGSTOP:
+            raise ValueError('fixture wrapper stop differs')
+        if os.getpgid(pid) != pid or os.getsid(pid) != pid:
+            raise ValueError('fixture wrapper session differs')
+        return pid
 
     def reap_fixture_children(self, born):
         # The serial test first proves ECHILD before birth. During its admitted
@@ -84,6 +104,47 @@ class CommandResourceCustodyTests(unittest.TestCase):
                 return errors, reaped
         errors.append('fixture ECHILD remains unobserved')
         return errors, reaped
+
+    def test_fixture_stop_requires_kernel_child_and_sigstop(self):
+        # A real foreign process cannot acquire stop/wait authority from its PID.
+        with self.assertRaises(ChildProcessError) as refused:
+            self.observe_stopped_fixture_wrapper(os.getppid())
+        self.assertEqual(refused.exception.errno, errno.ECHILD)
+        for observed in (None,
+                         SimpleNamespace(si_pid=70002, si_code=os.CLD_STOPPED,
+                                         si_status=signal.SIGSTOP),
+                         SimpleNamespace(si_pid=70001, si_code=os.CLD_EXITED, si_status=0),
+                         SimpleNamespace(si_pid=70001, si_code=os.CLD_STOPPED,
+                                         si_status=signal.SIGTSTP)):
+            with self.subTest(observed=observed), \
+                    patch.object(os, 'waitid', return_value=observed) as observation, \
+                    patch.object(resource, '_wait_primary') as wait:
+                with self.assertRaises(ValueError):
+                    self.observe_stopped_fixture_wrapper(70001)
+                observation.assert_called_once_with(
+                    os.P_PID, 70001, os.WSTOPPED | os.WNOHANG | os.WNOWAIT)
+                wait.assert_not_called()
+
+    def test_missing_known_fixture_child_remains_cleanup_failure(self):
+        # Genuine ECHILD after a missing known PID must retain the refusal.
+        with self.assertRaises(ChildProcessError) as empty:
+            os.waitid(os.P_ALL, 0, os.WEXITED | os.WNOHANG | os.WNOWAIT)
+        self.assertEqual(empty.exception.errno, errno.ECHILD)
+        errors, reaped = self.reap_fixture_children({'primary': os.getpid()})
+        self.assertTrue(any('ChildProcessError' in error for error in errors))
+        self.assertEqual(reaped, set())
+        observed = SimpleNamespace(si_pid=70001, si_code=os.CLD_KILLED,
+                                   si_status=signal.SIGKILL)
+        for problem in (OSError(errno.EIO, 'wait refused'),
+                        ChildProcessError(errno.ECHILD, 'known child missing')):
+            with self.subTest(problem=problem), \
+                    patch.object(os, 'waitid', side_effect=[
+                        observed, ChildProcessError(errno.ECHILD, 'empty')]), \
+                    patch.object(resource, '_wait_primary', side_effect=problem) as wait:
+                errors, reaped = self.reap_fixture_children({'primary': 70001})
+                self.assertTrue(any(type(problem).__name__ in error for error in errors))
+                self.assertEqual(reaped, set())
+                wait.assert_called_once_with(70001)
 
     def test_unavailable_subreaper_refuses_before_fork(self):
         with tempfile.TemporaryDirectory() as directory, \
@@ -301,13 +362,67 @@ time.sleep(10)
                 self.fail('test parent child set is not empty before fixture birth')
             admitted = True
             resource._subreaper(True)
-            script = "import json,os,signal,time\nsignal.signal(signal.SIGTERM,signal.SIG_IGN)\ngrandchild=os.fork()\nif grandchild==0:\n    print(json.dumps({'role':'adopted','pid':os.getpid()}),flush=True)\n    time.sleep(10)\n    os._exit(0)\nprint(json.dumps({'role':'primary','pid':os.getpid()}),flush=True)\ntime.sleep(10)\n"
+            # Group SIGKILL is not atomic: a running wrapper may legitimately
+            # wait4 a killed child before its own fatal delivery. Stop only our
+            # actual parent first, so both killed children must be adopted here.
+            script = '''import json,os,signal,time
+signal.signal(signal.SIGTERM,signal.SIG_IGN)
+wrapper=os.getppid()
+parent=os.pidfd_open(wrapper)
+try:
+    if os.getppid()!=wrapper or os.getpgrp()!=wrapper or os.getsid(0)!=wrapper:
+        raise RuntimeError('fixture parent identity differs')
+    signal.pidfd_send_signal(parent,signal.SIGSTOP)
+    deadline=time.monotonic()+.4
+    while True:
+        if os.getppid()!=wrapper:
+            raise RuntimeError('fixture parent changed')
+        with open('/proc/'+str(wrapper)+'/stat') as state:
+            stopped=state.read().rsplit(')',1)[1].split()[0]=='T'
+        if stopped:
+            break
+        if time.monotonic()>=deadline:
+            raise RuntimeError('fixture parent stop remains unknown')
+        time.sleep(.001)
+finally:
+    os.close(parent)
+grandchild=os.fork()
+if grandchild==0:
+    print(json.dumps({'role':'adopted','pid':os.getpid(),'wrapper':wrapper}),flush=True)
+    time.sleep(10)
+    os._exit(0)
+print(json.dumps({'role':'primary','pid':os.getpid(),'wrapper':wrapper}),flush=True)
+time.sleep(10)
+'''
+            pending = bytearray()
+            stopped = []
+            stop_errors = []
+
+            def observe_stop(channel, data):
+                pending.extend(data)
+                while b'\n' in pending:
+                    line, _, remainder = pending.partition(b'\n')
+                    pending[:] = remainder
+                    try:
+                        wrapper = json.loads(line)['wrapper']
+                        if stopped:
+                            if wrapper != stopped[0]:
+                                raise ValueError('fixture wrappers differ')
+                        else:
+                            stopped.append(self.observe_stopped_fixture_wrapper(wrapper))
+                    except Exception as problem:
+                        stop_errors.append(type(problem).__name__ + ': ' + str(problem))
+
             with tempfile.TemporaryDirectory() as directory:
-                code, error, closed, raw, destination = self.invoke(directory, script, timeout=.4)
+                code, error, closed, raw, destination = self.invoke(
+                    directory, script, timeout=.4, on_output=observe_stop)
                 for line in raw.splitlines():
                     row = json.loads(line)
                     born[row['role']] = row['pid']
                 self.assertEqual(set(born), {'primary', 'adopted'})
+                self.assertEqual(stop_errors, [])
+                self.assertEqual(len(stopped), 1)
+                self.assertFalse(pending)
                 self.assertEqual(code, -signal.SIGKILL)
                 self.assertIsNotNone(error)
                 self.assertEqual(closed, [])
