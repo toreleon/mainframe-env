@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Report the existing batch job/checkpoint and private date-observer failure location when CardDemo verification fails, preserving predicates, expected values and deadlines."
