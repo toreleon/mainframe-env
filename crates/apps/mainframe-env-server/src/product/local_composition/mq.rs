@@ -20,13 +20,27 @@ pub(in crate::product) fn bind_catalog(
     if package.sections.mq_resources.len() > mainframe_env_mq::MqLimits::default().max_queues {
         return Err(HostProblem::ResourceExhausted);
     }
-    let definitions = graph::definitions(&package.sections.mq_resources, controllers)?;
-    let mut bytes = 0usize;
-    if package.sections.mq_resources.iter().any(|resource| {
+    // The legacy queue-only profile does not interpret graph edges. Keep its
+    // Unsupported refusal until the package explicitly offers the graph marker;
+    // the existing binding below still authenticates the marker's full bytes.
+    let requires_graph = package.sections.mq_resources.iter().any(|resource| {
         resource.kind != MqResourceKind::Queue
             || resource.target.is_some()
             || resource.controller.is_some()
-    }) {
+    });
+    if requires_graph
+        && !package
+            .base
+            .manifest
+            .entries
+            .iter()
+            .any(|entry| entry.path == "resource/mq/graph-profile")
+    {
+        return Err(HostProblem::Unsupported);
+    }
+    let definitions = graph::definitions(&package.sections.mq_resources, controllers)?;
+    let mut bytes = 0usize;
+    if requires_graph {
         bind_entry(
             package,
             EntryKind::Resource,

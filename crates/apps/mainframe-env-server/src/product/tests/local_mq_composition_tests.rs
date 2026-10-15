@@ -1083,6 +1083,73 @@ fn mq_graph_missing_signed_bytes_kind_cycle_orphan_and_controller_refuse_without
     }
 }
 #[test]
+fn mq_graph_opt_in_keeps_legacy_refusal_and_signed_graph_diagnostics() {
+    for mode in 0..3 {
+        let trust = Arc::new(test_package_trust());
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let server = fixture(store.clone(), trust.clone());
+        let (mut package, definition) = graph_definitions(&server, &trust, 1);
+        let expected_problem = if mode == 0 {
+            package
+                .base
+                .manifest
+                .entries
+                .retain(|entry| entry.path != "resource/mq/graph-profile");
+            HostProblem::Unsupported
+        } else {
+            let (path, raw) = if mode == 1 {
+                // Keep the signed row consistent with the actual invalid edge,
+                // so a blob mismatch cannot stand in for graph validation.
+                package.sections.mq_resources[0].target = Some("LOCAL.QUEUE".into());
+                (
+                    "resource/mq/LOCAL.QUEUE",
+                    serde_json::to_vec(&package.sections.mq_resources[0]).unwrap(),
+                )
+            } else {
+                (
+                    "resource/mq/graph-profile",
+                    b"mainframe-env.local-mq-process-trigger-graph@0".to_vec(),
+                )
+            };
+            let sha = format!("sha256:{:x}", Sha256::digest(&raw));
+            let entry = package
+                .base
+                .manifest
+                .entries
+                .iter_mut()
+                .find(|entry| entry.path == path)
+                .unwrap();
+            entry.sha256.clone_from(&sha);
+            entry.bytes = raw.len();
+            package.base.blobs.insert(sha, raw);
+            HostProblem::IdempotencyConflict
+        };
+        let used = package
+            .base
+            .manifest
+            .entries
+            .iter()
+            .map(|entry| entry.sha256.clone())
+            .collect::<BTreeSet<_>>();
+        package.base.blobs.retain(|sha, _| used.contains(sha));
+        resign_package(&mut package, &trust);
+        let expected = server.install_application_package_v2(&package).unwrap();
+        let before = graph_rows(store.as_ref());
+        assert_eq!(
+            server
+                .publish_local_application(&expected, definition)
+                .err(),
+            Some(expected_problem),
+            "mode {mode}"
+        );
+        assert_eq!(graph_rows(store.as_ref()), before, "mode {mode}");
+        assert_eq!(
+            server.selected_local_application("LOCAL-COMPOSE").unwrap(),
+            None
+        );
+    }
+}
+#[test]
 fn mq_graph_retry_upgrade_rollback_keep_real_runtime_and_exact_controller_artifact() {
     let trust = Arc::new(test_package_trust());
     let store = Arc::new(MemoryStore::new(Default::default()));
