@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Hash admitted Zowe regular members directly from their current bounded tar stream, avoiding per-member extracted-file wrappers while retaining exact payload hashes, truncation and cursor refusals, archive parsing, input fences and public-client command limits."

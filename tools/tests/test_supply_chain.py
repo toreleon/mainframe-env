@@ -101,6 +101,64 @@ class SupplyChainTests(unittest.TestCase):
                     self.assertEqual(actual, [("package/crossing", payload),
                                               ("package/after", b"independent-later-member")])
 
+    def test_zowe_streamed_member_hashes_preserve_empty_crossing_and_extended_headers(self):
+        payload = (bytes(range(251)) * 8400)[:2 * 1024 * 1024 + 513]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "archive"
+            for format in (tarfile.USTAR_FORMAT, tarfile.PAX_FORMAT, tarfile.GNU_FORMAT):
+                members = [("package/empty", b""), ("package/crossing", payload),
+                           ("package/after", b"independent-later-member")]
+                if format != tarfile.USTAR_FORMAT:
+                    members.append(("package/" + "long-" * 28 + "é", b"extended-name-payload"))
+                raw = io.BytesIO()
+                with tarfile.open(fileobj=raw, mode="w", format=format) as archive_file:
+                    for index, (name, data) in enumerate(members):
+                        info = tarfile.TarInfo(name)
+                        info.size = len(data)
+                        info.mode = 0o644
+                        if index == 0:
+                            info.type = tarfile.AREGTYPE
+                        if format == tarfile.PAX_FORMAT:
+                            info.pax_headers = {"size": str(len(data))}
+                        archive_file.addfile(info, io.BytesIO(data))
+                pin = self.profile_archive_fixture(path, raw.getvalue(), "gz")
+                expected = {name: {"path": name, "bytes": len(data),
+                                   "sha256": hashlib.sha256(data).hexdigest(), "mode": 0o644}
+                            for name, data in members}
+                with self.subTest(format=format), mock.patch.object(
+                        tarfile.TarFile, "extractfile", side_effect=AssertionError("per-member extraction")):
+                    actual = supply_chain.zowe_archive_rows(path, {"archive": pin, "tree": {
+                        "files": len(members), "bytes": sum(len(data) for _, data in members),
+                        "max_file_bytes": len(payload), "max_depth": 2, "modes": [0o644],
+                    }})
+                self.assertEqual(actual, expected)
+
+    def test_streamed_member_hash_refuses_nonregular_sparse_and_cursor_drift(self):
+        member = tarfile.TarInfo("package/value")
+        member.offset_data = 1
+        member.size = 4
+        cases = [("directory", "type", tarfile.DIRTYPE),
+                 ("symlink", "type", tarfile.SYMTYPE),
+                 ("hardlink", "type", tarfile.LNKTYPE),
+                 ("sparse-type", "type", tarfile.GNUTYPE_SPARSE),
+                 ("unknown-type", "type", b"?"), ("sparse-map", "sparse", []),
+                 ("negative-size", "size", -1), ("noninteger-size", "size", 4.0),
+                 ("wrong-cursor", "offset_data", 2)]
+        for name, field, value in cases:
+            offered = copy.copy(member)
+            setattr(offered, field, value)
+            source = io.BytesIO(b"!data-next-header")
+            source.seek(1)
+            archive_file = mock.Mock(fileobj=source)
+            with self.subTest(case=name), mock.patch.object(
+                    source, "read", side_effect=AssertionError("refused member was read")):
+                with self.assertRaises(supply_chain.SupplyChainError):
+                    supply_chain._stream_member_hash(archive_file, offered)
+        source = io.BytesIO(b"!dat")
+        source.seek(1)
+        with self.assertRaisesRegex(supply_chain.SupplyChainError, "truncated"):
+            supply_chain._stream_member_hash(mock.Mock(fileobj=source), member)
+
     def test_profile_archive_crossing_truncation_and_later_header_refuse(self):
         payload = b"crossing-payload" * 70000
         later_header = 512 + ((len(payload) + 511) // 512) * 512

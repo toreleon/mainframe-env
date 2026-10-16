@@ -397,6 +397,27 @@ def member_hash(archive, member) -> str:
     return digest
 
 
+def _stream_member_hash(archive, member) -> str:
+    # The Zowe iterator has already admitted this regular entry. Hash only its
+    # declared bytes from the current bounded stream; the original iterator
+    # still owns padding, subsequent headers and extended metadata processing.
+    require(member.type in {tarfile.REGTYPE, tarfile.AREGTYPE} and member.sparse is None
+            and type(member.size) is int and member.size >= 0,
+            "archive stream payload must be a nonsparse regular member")
+    source = archive.fileobj
+    require(source.tell() == member.offset_data, "archive stream payload cursor differs")
+    digest = hashlib.sha256()
+    remaining = member.size
+    while remaining:
+        amount = min(1024 * 1024, remaining)
+        block = source.read(amount)
+        require(len(block) == amount, "archive regular payload is truncated")
+        digest.update(block)
+        remaining -= amount
+    require(source.tell() == member.offset_data + member.size, "archive stream payload cursor changed")
+    return digest.hexdigest()
+
+
 def validate_node_archive(path: Path, node: dict) -> None:
     root = "node-v" + node["version"] + "-linux-x64"
     selected = {root + "/bin/node": node["binary"], root + "/LICENSE": node["license"]}
@@ -457,7 +478,7 @@ def zowe_archive_rows(path: Path, zowe: dict) -> dict[str, dict]:
             bounded_integer(member.size, 0, limits["max_file_bytes"], "Zowe member")
             total += member.size
             require(total <= limits["bytes"], "Zowe archive payload exceeds bound")
-            rows[name] = {"path": name, "bytes": member.size, "sha256": member_hash(archive, member), "mode": member.mode}
+            rows[name] = {"path": name, "bytes": member.size, "sha256": _stream_member_hash(archive, member), "mode": member.mode}
     parents = {"/".join(parts[:index]) for name in rows for parts in [name.split("/")]
                for index in range(1, len(parts))}
     require(not set(rows) & parents and directories <= parents and len(parents) <= ZOWE_DIRECTORIES, "Zowe archive has file ancestors or unexpected directories")
