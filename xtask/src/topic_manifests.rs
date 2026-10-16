@@ -200,12 +200,21 @@ pub(super) fn check(root: &Path) -> TaskResult {
         "conformance/subsystems/coverage/manifests holds a manifest no baseline pins, or is missing one",
     )?;
     for registry in LATER_REGISTRIES {
-        check_later_registry(root, registry)?;
+        check_later_registry_with_schema(root, registry, &mut compiled_manifest_schema)?;
     }
     Ok(())
 }
 
+#[cfg(test)]
 fn check_later_registry(root: &Path, config: &LaterRegistry) -> TaskResult {
+    check_later_registry_with_schema(root, config, &mut None)
+}
+
+fn check_later_registry_with_schema(
+    root: &Path,
+    config: &LaterRegistry,
+    compiled_manifest_schema: &mut Option<(Value, jsonschema::Validator)>,
+) -> TaskResult {
     let registry_path = root.join(config.registry_path);
     let registry = json(&registry_path)?;
     let registry_schema = root.join(
@@ -221,7 +230,6 @@ fn check_later_registry(root: &Path, config: &LaterRegistry) -> TaskResult {
     )?;
     let manifest_schema =
         root.join("conformance/subsystems/coverage/schemas/topic-manifest.schema.json");
-    let mut compiled_manifest_schema = None;
     let mut pinned = BTreeSet::new();
     let mut scopes = BTreeSet::new();
     for entry in array(&registry, "manifests", &registry_path)? {
@@ -247,7 +255,7 @@ fn check_later_registry(root: &Path, config: &LaterRegistry) -> TaskResult {
             &json(&manifest_schema)?,
             &manifest,
             &path,
-            &mut compiled_manifest_schema,
+            compiled_manifest_schema,
         )?;
         let digest = recompute(&manifest, &path)?;
         require(
@@ -563,6 +571,56 @@ mod tests {
             .iter()
             .find(|config| config.target_subsystem == "mq.programming")
             .unwrap()
+    }
+
+    #[test]
+    fn shared_manifest_validator_rechecks_later_instances_and_schema_reads() {
+        let (first, _, _, _, _) = registry_015();
+        let (later, original, registry, path, registry_path) = registry_015();
+        let mut compiled = None;
+        check_later_registry_with_schema(&first.0, config_015(), &mut compiled).unwrap();
+        check_later_registry_with_schema(&later.0, config_015(), &mut compiled).unwrap();
+
+        // Rebinding the changed file does not bypass validation on a cache hit.
+        let mut invalid = original.clone();
+        invalid["coverage_credit"] = json!(1);
+        fs::write(&path, serde_json::to_vec_pretty(&invalid).unwrap()).unwrap();
+        let mut updated = registry.clone();
+        updated["manifests"][0]["manifest_sha256"] = json!(format!(
+            "sha256:{:x}",
+            Sha256::digest(fs::read(&path).unwrap())
+        ));
+        fs::write(&registry_path, serde_json::to_vec_pretty(&updated).unwrap()).unwrap();
+        let error =
+            check_later_registry_with_schema(&later.0, config_015(), &mut compiled).unwrap_err();
+        assert!(error.contains("violates its schema"), "{error}");
+        assert!(error.contains(&path.display().to_string()), "{error}");
+
+        fs::write(&path, serde_json::to_vec_pretty(&original).unwrap()).unwrap();
+        fs::write(
+            &registry_path,
+            serde_json::to_vec_pretty(&registry).unwrap(),
+        )
+        .unwrap();
+        let schema_path = later
+            .0
+            .join("conformance/subsystems/coverage/schemas/topic-manifest.schema.json");
+        let schema = json(&schema_path).unwrap();
+        let mut changed = schema.clone();
+        changed["allOf"] = json!([{"required": ["new-required-field"]}]);
+        fs::write(&schema_path, serde_json::to_vec_pretty(&changed).unwrap()).unwrap();
+        let error =
+            check_later_registry_with_schema(&later.0, config_015(), &mut compiled).unwrap_err();
+        assert!(error.contains("violates its schema"), "{error}");
+
+        // A later invalid schema must still fail at its original compile boundary.
+        changed["type"] = json!(7);
+        fs::write(&schema_path, serde_json::to_vec_pretty(&changed).unwrap()).unwrap();
+        let error =
+            check_later_registry_with_schema(&later.0, config_015(), &mut compiled).unwrap_err();
+        assert!(error.contains("is not valid Draft 2020-12"), "{error}");
+        fs::write(&schema_path, serde_json::to_vec_pretty(&schema).unwrap()).unwrap();
+        check_later_registry_with_schema(&later.0, config_015(), &mut compiled).unwrap();
     }
 
     #[test]
