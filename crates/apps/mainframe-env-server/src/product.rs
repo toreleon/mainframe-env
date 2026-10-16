@@ -6,6 +6,10 @@ use dataset_helpers::{dataset_attributes, join_records, member_name, records_for
 mod batch_controller;
 mod system_providers;
 use system_providers::*;
+mod host_composition;
+use host_composition::{RuntimeClocks, scoped_host_with_clock};
+#[cfg(all(test, target_os = "linux"))]
+mod codate_installed_owner;
 mod dataset_input;
 use dataset_input::wildcard;
 mod cics_security;
@@ -619,18 +623,19 @@ impl ProductServer {
         )
     }
 
-    fn open_configured(
+    fn open_configured_with_clocks(
         config: ServerConfig,
         store: Arc<dyn PlatformStore>,
         secrets: Arc<MemorySecretResolver>,
         program: Arc<DefaultProgramRouter>,
         package_trust: Arc<dyn PackageSignatureVerifier>,
         artifacts: Arc<ProductArtifactStore>,
-        jes_clock: Option<Arc<dyn JesClock>>,
+        clocks: RuntimeClocks,
     ) -> Result<Arc<Self>, HostProblem> {
         config.validate()?;
         let installed = artifact::preflight_installed(store.as_ref(), artifacts.as_ref())?;
-        let jes_clock: Arc<dyn JesClock> = match jes_clock {
+        let host_clock = clocks.host_clock(InvocationLimits::default())?;
+        let jes_clock: Arc<dyn JesClock> = match clocks.jes {
             Some(clock) => clock,
             None => Arc::new(DurableJesClock::new(store.clone()).map_err(store_error)?),
         };
@@ -683,13 +688,14 @@ impl ProductServer {
         ));
         enterprise_providers.extend(mq_providers(mq.clone(), InvocationLimits::default()));
         let inner_program: Arc<dyn HostProvider> = program.clone();
-        let inner = scoped_host(
+        let inner = scoped_host_with_clock(
             &racf,
             &dataset,
             inner_program,
             enterprise_providers,
             false,
             None,
+            host_clock.clone(),
         )?;
         let cics_work_store: Arc<dyn WorkStore> = store.clone();
         let cics = CicsService::open_with_runtime(
@@ -711,13 +717,14 @@ impl ProductServer {
         ));
         enterprise_providers.extend(mq_providers(mq.clone(), InvocationLimits::default()));
         enterprise_providers.extend(spool_providers(spool.clone(), InvocationLimits::default()));
-        let host = scoped_host(
+        let host = scoped_host_with_clock(
             &racf,
             &dataset,
             program.clone(),
             enterprise_providers,
             true,
             Some(cics_provider(cics.clone(), InvocationLimits::default())),
+            host_clock,
         )?;
         let program_artifacts: Arc<dyn ArtifactStore> = artifacts.clone();
         program.bind_product_runtime(host.clone(), store.clone(), program_artifacts, &cics)?;
@@ -4163,33 +4170,6 @@ impl Drop for ActiveGuard<'_> {
     fn drop(&mut self) {
         self.0.fetch_sub(1, Ordering::SeqCst);
     }
-}
-
-fn scoped_host(
-    racf: &Arc<RacfService>,
-    dataset: &Arc<DatasetService>,
-    program: Arc<dyn HostProvider>,
-    additional: Vec<Arc<dyn HostProvider>>,
-    include_cics: bool,
-    cics: Option<Arc<dyn HostProvider>>,
-) -> Result<Arc<ScopedHostService>, HostProblem> {
-    let limits = InvocationLimits::default();
-    let mut providers = dataset_providers(dataset.clone(), limits);
-    providers.extend(racf_providers(racf.clone(), limits));
-    providers.push(Arc::new(SystemClockProvider::new(limits)) as Arc<dyn HostProvider>);
-    providers.push(Arc::new(BatchTerminalProvider::new(limits)) as Arc<dyn HostProvider>);
-    providers.push(program);
-    providers.extend(additional);
-    if include_cics {
-        providers.push(cics.ok_or(HostProblem::InfrastructureFailure)?);
-    }
-    Ok(Arc::new(ScopedHostService::new(
-        Arc::new(
-            RegistrySnapshot::new(1, providers, limits)
-                .map_err(|_| HostProblem::InfrastructureFailure)?,
-        ),
-        HostLimits::default(),
-    )))
 }
 
 fn dataset_name(value: &str) -> Result<DatasetName, GatewayProblem> {
