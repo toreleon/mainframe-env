@@ -46,7 +46,8 @@ pub fn verify_carddemo_full_from_env(
     )?;
     let (db2, db2_observations) = verify_carddemo_db2_observed(inventory_path)?;
     route_observations.extend(db2_observations)?;
-    let ims = verify_carddemo_ims_from_env(inventory_path)?;
+    let (ims, ims_observations) = verify_carddemo_ims_observed(inventory_path)?;
+    route_observations.extend(ims_observations)?;
     let (mq, mq_observations) =
         mq_receipt::verify_carddemo_mq_authorization_observed(inventory_path)?;
     route_observations.extend(mq_observations)?;

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add a Linux-only ignored installed COACCT01 CICS START and legacy MQ test owner with independent account reply bytes, actor/replay/audit/UOW checks, physical SQLite restarts and a separate persisted reply-ID read. Add six bounded default controls; preserve typed MQI admission and original journey criteria with zero application or vendor credit."

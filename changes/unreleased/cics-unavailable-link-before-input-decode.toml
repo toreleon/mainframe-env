@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Report unavailable name-routed LINK targets before decoding their input and compare the original fraud caller's explicit NOHANDLE option."

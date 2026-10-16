@@ -2,19 +2,19 @@
 use super::*;
 use std::io::Read;
 
-pub(super) type SegmentImage = (String, Option<Vec<u8>>, Vec<u8>);
-pub(super) type CallImage = (String, Vec<SegmentImage>);
+pub(in crate::carddemo) type SegmentImage = (String, Option<Vec<u8>>, Vec<u8>);
+pub(in crate::carddemo) type CallImage = (String, Vec<SegmentImage>);
 
 const ORACLE_SHA256: &str = "6b71b5056f41ac4cf85886f854425bfa6f3fb2b3727aae1417b56f5764182ad6";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct Oracle {
-    pub(super) schema: String,
-    pub(super) account: String,
-    pub(super) root: Vec<u8>,
-    pub(super) children: Vec<Vec<u8>>,
-    pub(super) fields: BTreeMap<String, Vec<u8>>,
+pub(in crate::carddemo) struct Oracle {
+    pub(in crate::carddemo) schema: String,
+    pub(in crate::carddemo) account: String,
+    pub(in crate::carddemo) root: Vec<u8>,
+    pub(in crate::carddemo) children: Vec<Vec<u8>>,
+    pub(in crate::carddemo) fields: BTreeMap<String, Vec<u8>>,
     field_lengths: BTreeMap<String, usize>,
     expected_ims_statuses: Vec<String>,
     whole_private_guest_storage_postimage_claimed: bool,
@@ -22,7 +22,7 @@ pub(super) struct Oracle {
 }
 
 impl Oracle {
-    pub(super) fn read(path: &Path) -> Result<Self, CorpusProblem> {
+    pub(in crate::carddemo) fn read(path: &Path) -> Result<Self, CorpusProblem> {
         let parent = path.parent().ok_or_else(problem)?;
         let parent_meta = fs::symlink_metadata(parent).map_err(|_| problem())?;
         require_owned_directory(parent, (parent_meta.dev(), parent_meta.ino()))?;
@@ -119,7 +119,7 @@ impl Oracle {
                 && self.expected_ims_statuses == ["  ", "  ", "  ", "  ", "  ", "  ", "  ", "GE"],
         )
     }
-    pub(super) fn image(&self) -> ImsLoadImage {
+    pub(in crate::carddemo) fn image(&self) -> ImsLoadImage {
         ImsLoadImage {
             database: "DBPAUTP0".into(),
             roots: vec![ImsLoadRoot {
@@ -128,7 +128,10 @@ impl Oracle {
             }],
         }
     }
-    pub(super) fn compare_segments(&self, segments: &[SegmentImage]) -> Result<(), CorpusProblem> {
+    pub(in crate::carddemo) fn compare_segments(
+        &self,
+        segments: &[SegmentImage],
+    ) -> Result<(), CorpusProblem> {
         let mut expected = vec![("PAUTSUM0".into(), None, self.root.clone())];
         expected.extend(self.children.iter().map(|child| {
             (
@@ -139,13 +142,16 @@ impl Oracle {
         }));
         need(segments == expected)
     }
-    pub(super) fn compare_fields(
+    pub(in crate::carddemo) fn compare_fields(
         &self,
         fields: &BTreeMap<String, Vec<u8>>,
     ) -> Result<(), CorpusProblem> {
         need(fields == &self.fields)
     }
-    pub(super) fn compare_results(&self, results: &[CallImage]) -> Result<(), CorpusProblem> {
+    pub(in crate::carddemo) fn compare_results(
+        &self,
+        results: &[CallImage],
+    ) -> Result<(), CorpusProblem> {
         need(results.len() == 8)?;
         for (index, (status, segments)) in results.iter().enumerate() {
             need(status == &self.expected_ims_statuses[index])?;
@@ -177,7 +183,7 @@ fn need(value: bool) -> Result<(), CorpusProblem> {
     if value { Ok(()) } else { Err(problem()) }
 }
 
-pub(super) fn named_field(name: &str) -> bool {
+pub(in crate::carddemo) fn named_field(name: &str) -> bool {
     FIELD_LENGTHS.iter().any(|(expected, _)| *expected == name)
 }
 
@@ -249,7 +255,7 @@ const FIELD_LENGTHS: &[(&str, usize)] = &[
 ];
 
 #[cfg(test)]
-mod tests {
+pub(in crate::carddemo) mod tests {
     use super::*;
     fn fixture() -> Oracle {
         let mut root = vec![b'R'; 100];
@@ -288,8 +294,8 @@ mod tests {
             authority: "synthetic refusal control".into(),
         }
     }
-    #[test]
-    fn complete_copy_images_refuse_filler_parent_order_width_and_eof_drift() {
+    pub(in crate::carddemo) fn complete_copy_images_refuse_filler_parent_order_width_and_eof_drift()
+    {
         let oracle = fixture();
         oracle.validate().unwrap();
         let mut segments = vec![("PAUTSUM0".into(), None, oracle.root.clone())];
@@ -335,8 +341,7 @@ mod tests {
         results.pop();
         assert!(oracle.compare_results(&results).is_err());
     }
-    #[test]
-    fn complete_named_map_refuses_unknown_missing_binary_and_width_drift() {
+    pub(in crate::carddemo) fn complete_named_map_refuses_unknown_missing_binary_and_width_drift() {
         let oracle = fixture();
         oracle.compare_fields(&oracle.fields).unwrap();
         let mut changed = oracle.fields.clone();

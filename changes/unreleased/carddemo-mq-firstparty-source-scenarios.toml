@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add deterministic source-derived CardDemo J15/J16 logical request, input-seed and message projection fixtures with strict pure controls. Preserve the real CICS MQ integration fence and complete application proof requirements; fixture comparisons emit no journey observations or owning verdicts."

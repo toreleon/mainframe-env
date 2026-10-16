@@ -10,6 +10,7 @@ use mainframe_env_server::{
 };
 use mainframe_env_store_api::{ArtifactRecord, ArtifactStore, ExecutionState, PlatformStore};
 use std::io::Read;
+use std::os::unix::fs::PermissionsExt;
 #[cfg(test)]
 #[path = "db2_copyback_comparison/tests.rs"]
 mod tests;

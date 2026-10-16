@@ -5,8 +5,8 @@ use super::*;
 #[path = "db2_copyback_owner_tests.rs"]
 mod db2_copyback_owner_tests;
 use mainframe_env_execution_api::RunUnitId;
-use std::io::{Seek, SeekFrom, Write};
-use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt};
+use std::io::Write;
+use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt};
 
 // Separately named batch-only owner reuses this private held receipt lease.
 #[path = "db2_batch_source_owner.rs"]
@@ -15,6 +15,10 @@ mod batch_source_owner;
 // Independently named real readonly IMS guest reuses only this held receipt lease.
 #[path = "ims_firstparty_readonly_owner_tests.rs"]
 mod ims_firstparty_readonly_owner_tests;
+
+// Original first-party fraud preparation lives only in this diagnostic namespace.
+#[path = "ims_firstparty_fraud.rs"]
+mod ims_firstparty_fraud;
 
 const KEY: &str = "98";
 const SEED_KEYS: [&[u8]; 7] = [b"01", b"02", b"03", b"04", b"05", b"06", b"07"];
@@ -211,134 +215,7 @@ fn rows_failure_context(server: &ProductServer) -> serde_json::Value {
     serde_json::Value::Object(result)
 }
 
-fn require_owned_directory(path: &Path, expected: (u64, u64)) -> Result<(), CorpusProblem> {
-    let metadata =
-        fs::symlink_metadata(path).map_err(|_| refused("owned directory identity unavailable"))?;
-    if !metadata.is_dir()
-        || metadata.file_type().is_symlink()
-        || (metadata.dev(), metadata.ino()) != expected
-        || metadata.permissions().mode() & 0o777 != 0o700
-        || path
-            .canonicalize()
-            .map_err(|_| refused("owned directory canonical identity unavailable"))?
-            != path
-    {
-        return Err(refused(
-            "owned directory identity changed; preserve artifacts",
-        ));
-    }
-    Ok(())
-}
-
-// Keep the originally admitted file descriptor. Pre/post path observations
-// refuse replacements; writes never reopen a rebound receipt path. These fixed
-// private-owner observations are not atomic filesystem/process containment.
-struct ReceiptOwner {
-    evidence: PathBuf,
-    evidence_identity: (u64, u64),
-    artifacts: PathBuf,
-    artifact_identity: (u64, u64),
-    file: fs::File,
-    file_identity: (u64, u64),
-    artifacts_removed: bool,
-    retention_failed: bool,
-}
-
-impl ReceiptOwner {
-    fn open(
-        evidence: &Path,
-        evidence_identity: (u64, u64),
-        artifacts: &Path,
-        artifact_identity: (u64, u64),
-    ) -> Result<Self, CorpusProblem> {
-        require_owned_directory(evidence, evidence_identity)?;
-        require_owned_directory(artifacts, artifact_identity)?;
-        // create_new refuses existing files/symlinks. No receipt bytes are
-        // written until both roots and this exact private handle are rechecked.
-        let file = fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create_new(true)
-            .mode(0o600)
-            .open(evidence.join("actual.json"))
-            .map_err(|_| refused("exclusive receipt admission failed"))?;
-        let metadata = file
-            .metadata()
-            .map_err(|_| refused("receipt handle identity unavailable"))?;
-        let owner = Self {
-            evidence: evidence.into(),
-            evidence_identity,
-            artifacts: artifacts.into(),
-            artifact_identity,
-            file,
-            file_identity: (metadata.dev(), metadata.ino()),
-            artifacts_removed: false,
-            retention_failed: false,
-        };
-        owner.check()?;
-        Ok(owner)
-    }
-
-    fn check(&self) -> Result<(), CorpusProblem> {
-        if self.retention_failed {
-            return Err(refused("retention already refused; preserve artifacts"));
-        }
-        require_owned_directory(&self.evidence, self.evidence_identity)?;
-        if self.artifacts_removed {
-            match fs::symlink_metadata(&self.artifacts) {
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                _ => return Err(refused("checked artifact absence changed or unknown")),
-            }
-        } else {
-            require_owned_directory(&self.artifacts, self.artifact_identity)?;
-        }
-        let path = fs::symlink_metadata(self.evidence.join("actual.json"))
-            .map_err(|_| refused("receipt path identity unavailable"))?;
-        let handle = self
-            .file
-            .metadata()
-            .map_err(|_| refused("receipt handle identity unavailable"))?;
-        if [&path, &handle].into_iter().any(|metadata| {
-            !metadata.is_file()
-                || metadata.file_type().is_symlink()
-                || metadata.nlink() != 1
-                || metadata.permissions().mode() & 0o777 != 0o600
-                || (metadata.dev(), metadata.ino()) != self.file_identity
-        }) {
-            return Err(refused(
-                "receipt path or handle identity changed; preserve artifacts",
-            ));
-        }
-        Ok(())
-    }
-
-    fn save(&mut self, receipt: &serde_json::Value) -> Result<(), CorpusProblem> {
-        let saved = (|| {
-            self.check()?;
-            let bytes = serde_json::to_vec_pretty(receipt)
-                .map_err(|_| refused("receipt encoding failed"))?;
-            self.file
-                .seek(SeekFrom::Start(0))
-                .map_err(|_| refused("receipt seek failed"))?;
-            self.file
-                .write_all(&bytes)
-                .map_err(|_| refused("receipt retention failed"))?;
-            self.file
-                .set_len(bytes.len() as u64)
-                .map_err(|_| refused("receipt length retention failed"))?;
-            self.file
-                .sync_all()
-                .map_err(|_| refused("receipt sync failed"))?;
-            self.check()
-        })();
-        // A failed identity/write/retention stage cannot later authorize server
-        // admission or artifact cleanup; retain the roots and any actual bytes.
-        if saved.is_err() {
-            self.retention_failed = true;
-        }
-        saved
-    }
-}
+use super::owned_source_receipt::{ReceiptOwner, require_owned_directory};
 
 #[test]
 #[ignore = "new input98 diagnostic; exact clean CARDDEMO_CORPUS_DIR and fresh external CARDDEMO_DB2_MISSING98_EVIDENCE required; zero acceptance credit"]

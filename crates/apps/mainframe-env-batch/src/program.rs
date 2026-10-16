@@ -476,12 +476,19 @@ impl HostProvider for ProgramRouter {
                     payload,
                     service: None,
                 })
-                | HostRequest::Program(ProgramRequest::Link {
+                | HostRequest::Program(ProgramRequest::Xctl { program, payload }) => {
+                    (program, payload)
+                }
+                HostRequest::Program(ProgramRequest::Link {
                     program,
                     payload,
                     selection: None,
-                })
-                | HostRequest::Program(ProgramRequest::Xctl { program, payload }) => {
+                }) => {
+                    // A missing LINK target is unavailable before its input ABI is decoded.
+                    // Registered programs retain the existing ProgramInput validation below.
+                    if !self.programs.contains_key(program.as_str()) {
+                        return Err(HostProblem::NotFound);
+                    }
                     (program, payload)
                 }
                 HostRequest::Program(_) => return Err(HostProblem::Unsupported),
@@ -1156,6 +1163,106 @@ mod tests {
             },
         );
         assert_eq!(result.outcome, Err(HostProblem::Unsupported));
+    }
+
+    #[test]
+    fn unavailable_link_reports_not_found_before_program_input_decoding() {
+        let limits = InvocationLimits::default();
+        let invocation = invocation();
+        let router = ProgramRouter::with_builtins(limits);
+        for bytes in [b"not-a-ProgramInput".as_slice(), b"{}".as_slice()] {
+            let result = router.invoke(
+                &invocation,
+                EffectRequest {
+                    run_unit: invocation.run_unit_id.clone(),
+                    sequence: 7,
+                    deadline_tick: 100,
+                    idempotency_key: None,
+                    request: HostRequest::Program(ProgramRequest::Link {
+                        program: ProgramName::new("UNAVAIL", 128).unwrap(),
+                        payload: BoundedPayload::new(
+                            "mainframe-env.cics.payload@1",
+                            bytes.to_vec(),
+                            limits,
+                        )
+                        .unwrap(),
+                        selection: None,
+                    }),
+                },
+            );
+            assert_eq!(result.sequence, 7);
+            assert_eq!(result.outcome, Err(HostProblem::NotFound));
+        }
+    }
+
+    #[test]
+    fn registered_link_keeps_program_input_validation_and_execution() {
+        let limits = InvocationLimits::default();
+        let invocation = invocation();
+        let router = ProgramRouter::with_builtins(limits);
+        let invoke = |bytes| {
+            router.invoke(
+                &invocation,
+                EffectRequest {
+                    run_unit: invocation.run_unit_id.clone(),
+                    sequence: 8,
+                    deadline_tick: 100,
+                    idempotency_key: None,
+                    request: HostRequest::Program(ProgramRequest::Link {
+                        program: ProgramName::new("IEFBR14", 128).unwrap(),
+                        payload: BoundedPayload::new("mainframe-env.cics.payload@1", bytes, limits)
+                            .unwrap(),
+                        selection: None,
+                    }),
+                },
+            )
+        };
+        assert_eq!(
+            invoke(b"not-a-ProgramInput".to_vec()).outcome,
+            Err(HostProblem::Malformed)
+        );
+        let encoded = serde_json::to_vec(&input("SYSIN", b"")).unwrap();
+        let result = invoke(encoded);
+        assert_eq!(result.sequence, 8);
+        let Ok(HostResult::Program(payload)) = result.outcome else {
+            panic!("registered LINK must retain original valid ProgramInput dispatch");
+        };
+        let output: ProgramOutput = serde_json::from_slice(payload.bytes()).unwrap();
+        assert_eq!(output.return_code, 0);
+    }
+
+    #[test]
+    fn malformed_unavailable_call_and_xctl_keep_existing_decode_precedence() {
+        let limits = InvocationLimits::default();
+        let invocation = invocation();
+        let router = ProgramRouter::with_builtins(limits);
+        let program = ProgramName::new("UNAVAIL", 128).unwrap();
+        let payload = BoundedPayload::new(
+            "mainframe-env.cics.payload@1",
+            b"not-a-ProgramInput".to_vec(),
+            limits,
+        )
+        .unwrap();
+        for request in [
+            ProgramRequest::Call {
+                program: program.clone(),
+                payload: payload.clone(),
+                service: None,
+            },
+            ProgramRequest::Xctl { program, payload },
+        ] {
+            let result = router.invoke(
+                &invocation,
+                EffectRequest {
+                    run_unit: invocation.run_unit_id.clone(),
+                    sequence: 9,
+                    deadline_tick: 100,
+                    idempotency_key: None,
+                    request: HostRequest::Program(request),
+                },
+            );
+            assert_eq!(result.outcome, Err(HostProblem::Malformed));
+        }
     }
 
     fn input(name: &str, bytes: &[u8]) -> ProgramInput {
