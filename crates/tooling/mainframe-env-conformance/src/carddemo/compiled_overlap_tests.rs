@@ -13,6 +13,9 @@ mod driver_spans;
 #[path = "compiled_overlap_coordination.rs"]
 mod coordination;
 
+#[path = "compiled_overlap_completion.rs"]
+mod completion;
+
 const SHARED: [&str; 7] = [
     "AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS",
     "AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS",
@@ -320,7 +323,7 @@ fn pinned_corpus_compiled_online_and_batch_overlap() {
             require(session_state(&app, &account).await? == account_result && session_state(&app, &cards).await? == cards_result, "stored mixed session state differs from each exact response")?;
             retained["account_response"] = account_result; retained["cards_response"] = cards_result;
             let mut completed = BTreeSet::new();
-            loop {
+            completion::wait(deadline, || {
                 for id in &jobs {
                     let job = server.batch_service().get(id).map_err(terminal_problem)?;
                     if job.state.terminal() {
@@ -328,10 +331,9 @@ fn pinned_corpus_compiled_online_and_batch_overlap() {
                         completed.insert(id.clone());
                     }
                 }
-                if completed.len() == 16 { break; }
-                require(tokio::time::Instant::now() < deadline, "sixteen compiled jobs did not complete inside original 120-second bound")?;
-                tokio::time::sleep(Duration::from_millis(10)).await;
-            }
+                let metrics = server.metrics();
+                Ok(completion::retired(completed.len(), metrics.active, metrics.jes_active))
+            }).await?;
             require(tokio::time::Instant::now() <= deadline, "compiled mixed workload exceeded the unchanged 120-second completion bound")?;
             let mut outputs = serde_json::Map::new();
             for id in &jobs { outputs.insert(id.clone(), serde_json::json!(customer_spool(&server, id, &expected_spool)?)); }
