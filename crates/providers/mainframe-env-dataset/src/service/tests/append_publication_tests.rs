@@ -210,3 +210,142 @@ fn append_atomic_failure_and_lost_ack_preserve_state() {
     assert_eq!(persisted(&*store, &name), committed);
     assert_records(&reopened, &name, 4, &records);
 }
+
+fn record_allocations(dataset: &DatasetService, name: &DatasetName) -> Vec<usize> {
+    dataset.lock_state().unwrap().entries[name.as_str()]
+        .records
+        .iter()
+        .map(|record| record.as_ptr() as usize)
+        .collect()
+}
+
+#[test]
+fn sequential_append_keeps_prefix_allocations_and_copies_new_records() {
+    let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+    let dataset = service(store);
+    let name = DatasetName::new("APPEND.REUSE", 44).unwrap();
+    create_sequential(&dataset, &name);
+    let mut request = append(&name, 1, vec![b"AA11".to_vec(), b"BB22".to_vec()]);
+    assert_eq!(
+        dataset.invoke(request.clone()),
+        Ok(DatasetResult::Mutated { version: 2 })
+    );
+    let allocations = record_allocations(&dataset, &name);
+    if let DatasetRequest::Append { records, .. } = &mut request {
+        records[0].fill(b'X');
+    }
+    assert_eq!(
+        dataset.invoke(append(&name, 2, vec![b"CC33".to_vec()])),
+        Ok(DatasetResult::Mutated { version: 3 })
+    );
+    assert_eq!(&record_allocations(&dataset, &name)[..2], &allocations);
+    assert_records(
+        &dataset,
+        &name,
+        3,
+        &[b"AA11".to_vec(), b"BB22".to_vec(), b"CC33".to_vec()],
+    );
+}
+
+#[test]
+fn sequential_append_late_quota_refusal_restores_prefix_allocations() {
+    let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+    let dataset = DatasetService::open(
+        store.clone(),
+        DatasetLimits {
+            max_records: 2,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let name = DatasetName::new("APPEND.ROLLBACK", 44).unwrap();
+    create_sequential(&dataset, &name);
+    let records = vec![b"AA11".to_vec(), b"BB22".to_vec()];
+    assert_eq!(
+        dataset.invoke(append(&name, 1, records.clone())),
+        Ok(DatasetResult::Mutated { version: 2 })
+    );
+    let allocations = record_allocations(&dataset, &name);
+    let committed = persisted(&*store, &name);
+    assert_eq!(
+        dataset.invoke(append(&name, 2, vec![b"CC33".to_vec()])),
+        Err(HostProblem::ResourceExhausted)
+    );
+    assert_eq!(record_allocations(&dataset, &name), allocations);
+    assert_eq!(persisted(&*store, &name), committed);
+    assert_records(&dataset, &name, 2, &records);
+}
+
+#[test]
+fn sequential_append_atomic_refusal_restores_allocations_and_other_dataset() {
+    let store = Arc::new(FailAtomicOnceStore::new());
+    let dataset = service(store.clone());
+    let name = DatasetName::new("APPEND.REFUSAL", 44).unwrap();
+    let other = DatasetName::new("APPEND.OTHER", 44).unwrap();
+    create_sequential(&dataset, &name);
+    assert_eq!(
+        dataset.invoke(append(&name, 1, vec![b"AA11".to_vec()])),
+        Ok(DatasetResult::Mutated { version: 2 })
+    );
+    assert_eq!(
+        dataset.invoke(DatasetRequest::Create {
+            dataset: other.clone(),
+            attributes: attrs(DatasetOrganization::Sequential),
+            mutation: mutation(10),
+        }),
+        Ok(DatasetResult::Created { version: 1 })
+    );
+    let allocations = record_allocations(&dataset, &name);
+    let committed = persisted(&*store, &name);
+    let other_committed = persisted(&*store, &other);
+    let request = append(&name, 2, vec![b"BB22".to_vec()]);
+    store.arm();
+    assert_eq!(
+        dataset.invoke(request.clone()),
+        Err(HostProblem::UnknownOutcome)
+    );
+    assert_eq!(record_allocations(&dataset, &name), allocations);
+    assert_eq!(persisted(&*store, &name), committed);
+    assert_eq!(persisted(&*store, &other), other_committed);
+    assert_records(&dataset, &name, 2, &[b"AA11".to_vec()]);
+    assert_eq!(
+        dataset.invoke(request),
+        Ok(DatasetResult::Mutated { version: 3 })
+    );
+    assert_eq!(record_allocations(&dataset, &name)[0], allocations[0]);
+    assert_eq!(persisted(&*store, &other), other_committed);
+    assert_records(&dataset, &name, 3, &[b"AA11".to_vec(), b"BB22".to_vec()]);
+}
+
+#[test]
+fn sequential_append_after_truncate_keeps_prior_replay_from_restoring_records() {
+    let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+    let dataset = service(store.clone());
+    let name = DatasetName::new("APPEND.RESET", 44).unwrap();
+    create_sequential(&dataset, &name);
+    let first = append(&name, 1, vec![b"AA11".to_vec()]);
+    assert_eq!(
+        dataset.invoke(first.clone()),
+        Ok(DatasetResult::Mutated { version: 2 })
+    );
+    assert_eq!(
+        dataset.invoke(DatasetRequest::Truncate {
+            dataset: name.clone(),
+            expected_version: Some(2),
+            mutation: mutation(3),
+        }),
+        Ok(DatasetResult::Mutated { version: 3 })
+    );
+    assert_records(&dataset, &name, 3, &[]);
+    assert_eq!(
+        dataset.invoke(append(&name, 3, vec![b"BB22".to_vec()])),
+        Ok(DatasetResult::Mutated { version: 4 })
+    );
+    let committed = persisted(&*store, &name);
+    assert_eq!(
+        dataset.invoke(first),
+        Ok(DatasetResult::Mutated { version: 2 })
+    );
+    assert_eq!(persisted(&*store, &name), committed);
+    assert_records(&dataset, &name, 4, &[b"BB22".to_vec()]);
+}

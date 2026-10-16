@@ -3027,78 +3027,7 @@ impl DatasetService {
                 state.dependencies = dependencies;
                 Ok(result)
             }
-            DatasetRequest::Append {
-                dataset,
-                member,
-                records,
-                expected_version,
-                mutation,
-            } => {
-                validate_records(records, &entry(state, dataset)?.attributes, self.limits)?;
-                authorize_data_mutation(
-                    state,
-                    dataset,
-                    &mainframe_env_host_api::DatasetLockTarget::Dataset,
-                    mutation,
-                    true,
-                )?;
-                let mut next = entry(state, dataset)?.clone();
-                let current_version = next.version;
-                if expected_version.is_some_and(|expected| expected != current_version) {
-                    return Err(HostProblem::IdempotencyConflict);
-                }
-                let mut dependencies = state.dependencies.clone();
-                next.version = next
-                    .version
-                    .checked_add(1)
-                    .ok_or(HostProblem::ResourceExhausted)?;
-                if let Some(member) = member {
-                    if !partitioned(next.attributes.organization) {
-                        return Err(HostProblem::Unsupported);
-                    }
-                    if next.attributes.organization
-                        == mainframe_env_host_api::DatasetOrganization::PartitionedExtended
-                    {
-                        let target = resolved_member_name(&next, member).to_string();
-                        let mut combined = member_records(&next, member, 0)?.to_vec();
-                        combined.extend(records.clone());
-                        write_pdse_generation(&mut next, member, combined, false)?;
-                        dependencies.add_dependency(
-                            &format!("{}({target})", dataset.as_str()),
-                            dataset.as_str(),
-                            dependency_limits(self.limits),
-                        )?;
-                    } else {
-                        next.members
-                            .entry(member.as_str().into())
-                            .or_default()
-                            .extend(records.clone());
-                    }
-                } else if matches!(
-                    next.attributes.organization,
-                    mainframe_env_host_api::DatasetOrganization::Sequential
-                        | mainframe_env_host_api::DatasetOrganization::EntrySequenced
-                ) {
-                    next.records.extend(records.clone());
-                } else {
-                    return Err(HostProblem::Unsupported);
-                }
-                let result = DatasetResult::Mutated {
-                    version: next.version,
-                };
-                self.persist_entry_with_indexes_and_lock_deletes(
-                    state,
-                    dataset.as_str(),
-                    current_version,
-                    std::borrow::Cow::Owned(next),
-                    mutation,
-                    request_digest(request)?,
-                    &result,
-                    &[],
-                )?;
-                state.dependencies = dependencies;
-                Ok(result)
-            }
+            DatasetRequest::Append { .. } => self.append_records(state, request),
             DatasetRequest::Truncate {
                 dataset,
                 expected_version,
