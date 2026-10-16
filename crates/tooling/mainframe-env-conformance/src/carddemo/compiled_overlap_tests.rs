@@ -10,6 +10,9 @@ mod campaign;
 #[path = "compiled_overlap_driver_spans.rs"]
 mod driver_spans;
 
+#[path = "compiled_overlap_coordination.rs"]
+mod coordination;
+
 const SHARED: [&str; 7] = [
     "AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS",
     "AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS",
@@ -238,12 +241,14 @@ fn pinned_corpus_compiled_online_and_batch_overlap() {
     let result = runtime.block_on(async {
         let driver_spans = Arc::new(driver_spans::DriverSpans::new());
         let observed = Arc::new(ObservedStore::new(Arc::new(MemoryStore::new(Default::default()))));
+        let coordination = coordination::Coordination::new(batch_artifact.clone(), online_artifact.clone());
+        let scheduled_store = Arc::new(coordination::CoordinatedStore::new(observed.clone(), coordination.clone()));
         let server = ProductServer::open(ServerConfig {
             store_profile: StoreProfile::Memory, artifact_root: artifact_root.clone(), max_concurrency: 8,
             cobol_current_date: Some("2022070600000000+0000".into()),
             tls: TlsConfig { enabled: false, certificate_path: None, private_key_reference: None },
             ..ServerConfig::default()
-        }, observed.clone(), Arc::new(MemorySecretResolver::default()), default_program_router()).map_err(terminal_problem)?;
+        }, scheduled_store, Arc::new(MemorySecretResolver::default()), default_program_router()).map_err(terminal_problem)?;
         retained["server_opened"] = serde_json::json!(true);
         let app = server.router();
         let probe = async {
@@ -274,23 +279,23 @@ fn pinned_corpus_compiled_online_and_batch_overlap() {
             retained["before"] = before.clone();
             observed.arm()?;
             let deadline = tokio::time::Instant::now() + Duration::from_secs(120);
+            coordination.arm(deadline.into_std())?;
+            let _release_before_drain = coordination.release_on_drop();
             let headers = BTreeMap::from([("authorization".into(), format!("Basic {}", base64::engine::general_purpose::STANDARD.encode("IBMUSER:TESTPASS"))), ("x-csrf-zosmf-header".into(), "true".into())]);
             let mut tasks = Vec::new();
             for request_index in 0..16 {
                 let route = app.clone(); let headers = headers.clone(); let jcl = jcl.clone();
-                tasks.push(tokio::spawn(driver_spans.observe(request_index, async move { terminal_http(&route, Method::PUT, "/zosmf/restjobs/jobs", headers, jcl).await })));
+                tasks.push(tokio::spawn(coordination.clone().guard_result(driver_spans.observe(request_index, async move { terminal_http(&route, Method::PUT, "/zosmf/restjobs/jobs", headers, jcl).await }))));
             }
-            // Poll online work while the original submissions remain offered.
-            // A historical batch effect alone does not keep a batch execution
-            // active across the old all-submissions-joined barrier.
+            // Explicitly coordinate a real effect boundary. Passive capture,
+            // original requests and the completed-effect witness are unchanged.
             let exchanges = async {
-                while !observed.batch_effect_seen(&batch_artifact)? {
-                    require(tokio::time::Instant::now() < deadline, "no actual completed compiled batch effect within original completion bound")?;
-                    tokio::time::sleep(Duration::from_millis(10)).await;
-                }
+                let _release_before_joins = coordination.release_on_drop();
+                coordination.wait_for_boundary(deadline).await?;
+                require(observed.batch_effect_seen(&batch_artifact)?, "coordinated boundary has no actual completed batch effect")?;
                 let (account_result, cards_result) = tokio::join!(
-                    driver_spans.observe(16, campaign::resume_input(&app, &account)),
-                    driver_spans.observe(17, campaign::resume_input(&app, &cards)),
+                    coordination.clone().guard_result(driver_spans.observe(16, campaign::resume_input(&app, &account))),
+                    coordination.clone().guard_result(driver_spans.observe(17, campaign::resume_input(&app, &cards))),
                 );
                 Ok((account_result?, cards_result?))
             };
@@ -335,6 +340,7 @@ fn pinned_corpus_compiled_online_and_batch_overlap() {
             retained["after"] = after.clone();
             require(before == after, "read-only compiled mixed workload changed shared raw records, identities, attributes or versions")?;
             let witness = observed.prove_overlap(&batch_artifact, &online_artifact, &online_run)?;
+            coordination.finish()?;
             require(server.metrics().active == 0 && server.metrics().jes_active == 0, "compiled mixed workload retained active owners")?;
             retained["witness"] = serde_json::json!({"batch_execution":witness.batch_execution, "batch_run":witness.batch_run, "online_execution":witness.online_execution, "online_run":witness.online_run, "ordinals":witness.ordinals, "batch_effect_sequences":witness.batch_effect_sequences, "online_effect_sequence":witness.online_effect_sequence});
             Ok::<_, CorpusProblem>(())
@@ -345,6 +351,7 @@ fn pinned_corpus_compiled_online_and_batch_overlap() {
         let transcript = observed.export();
         retained["capture"] = transcript.as_ref().map_or_else(|problem| serde_json::json!({"problem":problem.detail}), Clone::clone);
         retained["driver_request_spans"] = driver_spans.export();
+        retained["explicit_coordination"] = coordination.export();
         drop(app); drop(server);
         let saved = fs::write(evidence.join("actual.json"), serde_json::to_vec_pretty(&retained).map_err(json_problem)?).map_err(|error| CorpusProblem::new("carddemo.full.compiled_overlap_retention", error.to_string()));
         // Failed/unknown owners and retention failures preserve the fresh artifact namespace.
