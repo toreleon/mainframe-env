@@ -2,6 +2,8 @@
 
 use super::*;
 
+mod failure_snapshot;
+
 pub(super) async fn exercise_base_batch_routes(
     corpus_dir: &Path,
     corpus_commit: String,
@@ -362,6 +364,8 @@ pub(super) async fn exercise_base_batch_routes(
     let statement_id = submit_job_with_retcode(&server, &app, &statement, "CC 0000")
         .await
         .map_err(|problem| {
+            let problem =
+                failure_snapshot::retain(problem, &server, store.as_ref(), &artifact_root);
             CorpusProblem::new(
                 "carddemo.base_batch.job_failed",
                 format!("app/jcl/CREASTMT.JCL: {problem}"),
