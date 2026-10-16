@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Bound passive CICS READ length receipts to the actual full-slot request while preserving storage, journal, ownership and independent-oracle checks."

@@ -281,6 +281,7 @@ struct PendingOrigin {
     request_digest: [u8; 32],
     resource: AuditResourceDigest,
     key: Option<IdempotencyKey>,
+    read_length: Option<usize>,
     result_digest: Option<[u8; 32]>,
     eligible: bool,
 }
@@ -449,6 +450,10 @@ impl Collector {
             if self.pending.is_some() || self.terminal.is_some() {
                 return Err(CicsReadCopybackProblem::Order);
             }
+            let HostRequest::Cics(request) = &effect.request else {
+                return Err(CicsReadCopybackProblem::Scope);
+            };
+            let mut read_length = None;
             if *operation == CicsOperation::Read {
                 let selected = self
                     .selections
@@ -466,11 +471,20 @@ impl Collector {
                 {
                     return Err(CicsReadCopybackProblem::Layout);
                 }
+                if let Some(length) = request.arguments.get("LENGTH") {
+                    let width = selected.into.view.length;
+                    if length.schema() != "mainframe-env.cics.decimal@1"
+                        || length.bytes() != width.to_string().as_bytes()
+                    {
+                        return Err(CicsReadCopybackProblem::Layout);
+                    }
+                    read_length = Some(width);
+                }
             }
             if effect.sequence == 0
                 || effect.run_unit != self.origin.run
                 || effect.deadline_tick != self.origin.deadline
-                || !matches!(&effect.request, HostRequest::Cics(actual) if actual.operation == *operation)
+                || request.operation != *operation
             {
                 return Err(CicsReadCopybackProblem::Scope);
             }
@@ -490,6 +504,7 @@ impl Collector {
                 request_digest,
                 resource,
                 key: effect.idempotency_key.clone(),
+                read_length,
                 result_digest: None,
                 eligible: false,
             });
@@ -517,6 +532,20 @@ impl Collector {
             } else {
                 CicsDisposition::Returned
             };
+            // LENGTH OF supplies an input without a writable output target.
+            // The provider still returns the actual length. Bind that exact
+            // receipt to the offered full-slot length; no other output or
+            // writable LENGTH target enters this observation profile.
+            let read_outputs_match = match pending.read_length {
+                Some(width) => {
+                    response.outputs.len() == 1
+                        && response.outputs.get("LENGTH").is_some_and(|length| {
+                            length.schema() == "mainframe-env.cics.decimal@1"
+                                && length.bytes() == width.to_string().as_bytes()
+                        })
+                }
+                None => response.outputs.is_empty(),
+            };
             if result.sequence != pending.sequence
                 || response.response != 0
                 || response.response2 != 0
@@ -524,7 +553,7 @@ impl Collector {
                     && (!matches!(
                         response.payload.schema(),
                         "mainframe-env.cics.into@1" | "mainframe-env.cics.payload@1"
-                    ) || !response.outputs.is_empty()))
+                    ) || !read_outputs_match))
                 || (pending.operation == CicsOperation::Read
                     && response.payload.bytes().len()
                         != self

@@ -158,6 +158,15 @@ fn target(machine: &ReferenceMachine, name: &str) -> typed_cics::CicsTarget {
 }
 
 fn offer(machine: &mut ReferenceMachine, ordinal: usize) -> EffectRequest {
+    offer_with_bindings(machine, ordinal, BTreeMap::new(), BTreeMap::new())
+}
+
+fn offer_with_bindings(
+    machine: &mut ReferenceMachine,
+    ordinal: usize,
+    arguments: BTreeMap<String, BoundedPayload>,
+    outputs: BTreeMap<String, typed_cics::CicsTarget>,
+) -> EffectRequest {
     let into = target(machine, INTO[ordinal].0);
     let response = target(machine, RESPONSE);
     let response2 = target(machine, RESPONSE2);
@@ -165,7 +174,7 @@ fn offer(machine: &mut ReferenceMachine, ordinal: usize) -> EffectRequest {
         .effect(
             HostRequest::Cics(CicsRequest {
                 operation: CicsOperation::Read,
-                arguments: BTreeMap::new(),
+                arguments,
                 mutation: None,
                 condition_policy: CicsConditionPolicy::Respond {
                     response_field: RESPONSE.into(),
@@ -178,7 +187,7 @@ fn offer(machine: &mut ReferenceMachine, ordinal: usize) -> EffectRequest {
                 argument_summary: String::new(),
                 container: None,
                 into: Some(into),
-                outputs: BTreeMap::new(),
+                outputs,
                 response: Some(response),
                 response2: Some(response2),
                 address_set: None,
@@ -375,6 +384,189 @@ fn armed_capture_preserves_original_runtime_state_effects_and_budgets() {
     assert_eq!(observed.snapshot(), plain.snapshot());
     assert_eq!(observed.invocation.limits, limits);
     assert!(plain.take_read_copyback().is_none());
+}
+
+fn length_payload(schema: &str, bytes: &[u8]) -> BoundedPayload {
+    BoundedPayload::new(schema, bytes.to_vec(), InvocationLimits::default()).unwrap()
+}
+
+fn full_length_argument(ordinal: usize) -> BTreeMap<String, BoundedPayload> {
+    BTreeMap::from([(
+        "LENGTH".into(),
+        length_payload(
+            "mainframe-env.cics.decimal@1",
+            INTO[ordinal].1.to_string().as_bytes(),
+        ),
+    )])
+}
+
+fn length_reply(sequence: u64, outputs: BTreeMap<String, BoundedPayload>) -> EffectResult {
+    let mut result = reply(sequence, vec![b'A'; 50], CicsDisposition::Complete);
+    let Ok(HostResult::Cics(response)) = &mut result.outcome else {
+        unreachable!();
+    };
+    response.outputs = outputs;
+    result
+}
+
+#[test]
+fn full_slot_length_receipts_preserve_original_execution_and_complete_capture() {
+    let mut observed = machine(true);
+    let mut plain = machine(false);
+    for (ordinal, &(_, width)) in INTO.iter().enumerate() {
+        let arguments = full_length_argument(ordinal);
+        let actual =
+            offer_with_bindings(&mut observed, ordinal, arguments.clone(), BTreeMap::new());
+        let expected = offer_with_bindings(&mut plain, ordinal, arguments.clone(), BTreeMap::new());
+        assert_eq!(actual, expected);
+        let mut result = reply(
+            actual.sequence,
+            vec![b'A' + ordinal as u8; width],
+            CicsDisposition::Complete,
+        );
+        let Ok(HostResult::Cics(response)) = &mut result.outcome else {
+            unreachable!();
+        };
+        response.outputs = arguments;
+        assert_eq!(
+            observed.resume_host(result.clone()),
+            plain.resume_host(result)
+        );
+        assert_eq!(observed.snapshot(), plain.snapshot());
+    }
+    finish(&mut observed);
+    finish(&mut plain);
+    assert_eq!(observed.snapshot(), plain.snapshot());
+    let archive = observed.take_read_copyback().unwrap().unwrap();
+    assert_eq!(archive.reads().len(), 3);
+    for (ordinal, read) in archive.reads().iter().enumerate() {
+        assert!(independent_synthetic_storage_matches(read, ordinal));
+    }
+    assert!(plain.take_read_copyback().is_none());
+}
+
+#[test]
+fn requested_length_refuses_missing_wrong_noncanonical_and_extra_receipts() {
+    let canonical = || length_payload("mainframe-env.cics.decimal@1", b"50");
+    let mut cases = vec![BTreeMap::new()];
+    for bytes in [
+        b"49".as_slice(),
+        b"51",
+        b"0",
+        b"-50",
+        b"+50",
+        b"050",
+        b" 50",
+    ] {
+        cases.push(BTreeMap::from([(
+            "LENGTH".into(),
+            length_payload("mainframe-env.cics.decimal@1", bytes),
+        )]));
+    }
+    cases.push(BTreeMap::from([(
+        "LENGTH".into(),
+        length_payload("mainframe-env.cics.literal@1", b"50"),
+    )]));
+    cases.push(BTreeMap::from([("OTHER".into(), canonical())]));
+    for name in ["OTHER", "TASK.PRIORITY", "BMS.FIELD"] {
+        cases.push(BTreeMap::from([
+            ("LENGTH".into(), canonical()),
+            (name.into(), canonical()),
+        ]));
+    }
+    for outputs in cases {
+        let mut observed = machine(true);
+        let effect =
+            offer_with_bindings(&mut observed, 0, full_length_argument(0), BTreeMap::new());
+        let result = length_reply(effect.sequence, outputs);
+        let _ = observed.resume_host(result);
+        assert!(matches!(
+            observed.take_read_copyback(),
+            Some(Err(CicsReadCopybackProblem::Application))
+        ));
+    }
+    let mut observed = machine(true);
+    let effect = offer(&mut observed, 0);
+    observed
+        .resume_host(length_reply(
+            effect.sequence,
+            BTreeMap::from([("LENGTH".into(), canonical())]),
+        ))
+        .unwrap();
+    assert!(matches!(
+        observed.take_read_copyback(),
+        Some(Err(CicsReadCopybackProblem::Application))
+    ));
+}
+
+#[test]
+fn supplied_length_must_be_canonical_full_slot_input_without_writable_outputs() {
+    for bytes in [
+        b"49".as_slice(),
+        b"51",
+        b"0",
+        b"-50",
+        b"+50",
+        b"050",
+        b" 50",
+    ] {
+        let mut observed = machine(true);
+        let arguments = BTreeMap::from([(
+            "LENGTH".into(),
+            length_payload("mainframe-env.cics.decimal@1", bytes),
+        )]);
+        offer_with_bindings(&mut observed, 0, arguments, BTreeMap::new());
+        assert!(matches!(
+            observed.take_read_copyback(),
+            Some(Err(CicsReadCopybackProblem::Layout))
+        ));
+    }
+    let mut observed = machine(true);
+    let arguments = BTreeMap::from([(
+        "LENGTH".into(),
+        length_payload("mainframe-env.cics.literal@1", b"50"),
+    )]);
+    offer_with_bindings(&mut observed, 0, arguments, BTreeMap::new());
+    assert!(matches!(
+        observed.take_read_copyback(),
+        Some(Err(CicsReadCopybackProblem::Layout))
+    ));
+    let mut observed = machine(true);
+    let writable = BTreeMap::from([("LENGTH".into(), target(&observed, RESPONSE))]);
+    offer_with_bindings(&mut observed, 0, full_length_argument(0), writable);
+    assert!(matches!(
+        observed.take_read_copyback(),
+        Some(Err(CicsReadCopybackProblem::Layout))
+    ));
+}
+
+#[test]
+fn length_receipt_never_qualifies_truncation_or_non_normal_completion() {
+    for non_normal in [false, true] {
+        let mut observed = machine(true);
+        let effect =
+            offer_with_bindings(&mut observed, 0, full_length_argument(0), BTreeMap::new());
+        let mut result = length_reply(effect.sequence, full_length_argument(0));
+        let Ok(HostResult::Cics(response)) = &mut result.outcome else {
+            unreachable!();
+        };
+        if non_normal {
+            response.condition = "LENGERR".into();
+            response.response = 22;
+        } else {
+            response.payload = BoundedPayload::new(
+                "mainframe-env.cics.into@1",
+                vec![b'A'; 49],
+                InvocationLimits::default(),
+            )
+            .unwrap();
+        }
+        let _ = observed.resume_host(result);
+        assert!(matches!(
+            observed.take_read_copyback(),
+            Some(Err(CicsReadCopybackProblem::Application))
+        ));
+    }
 }
 
 fn independent_synthetic_storage_matches(read: &CicsReadCopybackRecord, ordinal: usize) -> bool {

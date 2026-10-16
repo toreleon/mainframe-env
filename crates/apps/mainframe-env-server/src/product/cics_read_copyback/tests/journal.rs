@@ -29,6 +29,23 @@ impl HostProvider for ReadReply {
             CicsOperation::Read | CicsOperation::Return
         ));
         let read = request.operation == CicsOperation::Read;
+        let mut outputs = BTreeMap::new();
+        if let Some(length) = request.arguments.get("LENGTH") {
+            assert!(read);
+            assert_eq!(length.schema(), "mainframe-env.cics.decimal@1");
+            assert_eq!(length.bytes(), b"4");
+            // Match the existing provider's actual-length receipt. This is
+            // separate from the fixed synthetic DATA storage expectation.
+            outputs.insert(
+                "LENGTH".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.decimal@1",
+                    b"DATA".len().to_string().into_bytes(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            );
+        }
         EffectResult {
             sequence: effect.sequence,
             outcome: Ok(HostResult::Cics(CicsResponse {
@@ -52,7 +69,7 @@ impl HostProvider for ReadReply {
                     InvocationLimits::default(),
                 )
                 .unwrap(),
-                outputs: BTreeMap::new(),
+                outputs,
                 unit_of_work: None,
             })),
         }
@@ -60,14 +77,31 @@ impl HostProvider for ReadReply {
 }
 
 fn actual_journal(actor: &str) -> (Invocation, CicsReadCopybackArchive, Arc<MemoryStore>, u64) {
+    actual_journal_source(actor, false)
+}
+
+fn actual_journal_source(
+    actor: &str,
+    length_of: bool,
+) -> (Invocation, CicsReadCopybackArchive, Arc<MemoryStore>, u64) {
     let limits = SourceLimits::default();
     let path = LogicalPath::new("JOURNAL.cbl", limits.max_path_bytes).unwrap();
-    let source = b"IDENTIFICATION DIVISION. PROGRAM-ID. JOURNAL.
+    let source: &[u8] = if length_of {
+        b"IDENTIFICATION DIVISION. PROGRAM-ID. JOURNAL.
+        DATA DIVISION. WORKING-STORAGE SECTION.
+        01 KEY-X PIC X(2) VALUE 'AA'. 01 RECORD-X PIC X(4).
+        PROCEDURE DIVISION.
+        EXEC CICS READ FILE('FIXTURE') INTO(RECORD-X) RIDFLD(KEY-X)
+          LENGTH(LENGTH OF RECORD-X) END-EXEC.
+        EXEC CICS RETURN END-EXEC. STOP RUN."
+    } else {
+        b"IDENTIFICATION DIVISION. PROGRAM-ID. JOURNAL.
         DATA DIVISION. WORKING-STORAGE SECTION.
         01 KEY-X PIC X(2) VALUE 'AA'. 01 RECORD-X PIC X(4).
         PROCEDURE DIVISION.
         EXEC CICS READ FILE('FIXTURE') INTO(RECORD-X) RIDFLD(KEY-X) END-EXEC.
-        EXEC CICS RETURN END-EXEC. STOP RUN.";
+        EXEC CICS RETURN END-EXEC. STOP RUN."
+    };
     let bundle = SourceBundle::new(
         &path,
         vec![
@@ -182,6 +216,16 @@ fn actual_journal(actor: &str) -> (Invocation, CicsReadCopybackArchive, Arc<Memo
 #[test]
 fn actual_read_and_return_join_their_genuine_completed_journal_records() {
     let (invocation, archive, store, tick) = actual_journal("original");
+    for captured in [archive.reads()[0].effect(), archive.terminal()] {
+        let effect = current_journal_effect(store.as_ref(), &invocation, captured, tick).unwrap();
+        assert_eq!(effect.state, EffectState::Completed);
+        recheck_journal_effect(store.as_ref(), &effect).unwrap();
+    }
+}
+
+#[test]
+fn compiled_length_of_read_and_return_join_their_genuine_completed_journal_records() {
+    let (invocation, archive, store, tick) = actual_journal_source("length-of", true);
     for captured in [archive.reads()[0].effect(), archive.terminal()] {
         let effect = current_journal_effect(store.as_ref(), &invocation, captured, tick).unwrap();
         assert_eq!(effect.state, EffectState::Completed);

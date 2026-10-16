@@ -9197,10 +9197,10 @@ async fn exercise_base_online_smoke(
         // Exact postapplication storage is additional control evidence only.
         // All original later routes, both drains and owned removal remain required.
         copyback_prepared.compare(
-            copyback_observation.completed().map_err(|_| {
+            copyback_observation.completed().map_err(|problem| {
                 CorpusProblem::new(
                     "carddemo.online.read_copyback_storage",
-                    "actual observation incomplete",
+                    format!("actual observation refused: {problem:?}"),
                 )
             })?,
             &account_detail,
