@@ -343,14 +343,14 @@ fn assert_six(
     );
     assert_eq!(
         server.db2.table_rows("LOCAL.CODES").unwrap(),
-        vec![vec![
-            if generation.generation == 1 {
-                b"ONE".to_vec()
-            } else {
-                b"TWO".to_vec()
-            },
-            b"SIGNED".to_vec()
-        ]]
+        if generation.generation == 1 {
+            vec![vec![b"ONE".to_vec(), b"SIGNED".to_vec()]]
+        } else {
+            vec![
+                vec![b"ONE".to_vec(), b"SIGNED".to_vec()],
+                vec![b"TWO".to_vec(), b"SIGNED".to_vec()],
+            ]
+        }
     );
     let selected = json(
         &store
