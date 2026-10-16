@@ -470,10 +470,22 @@ class CommandSupervisionTests(unittest.TestCase):
             if callback:
                 callback(stream, data)
         started = time.monotonic()
-        code, error = ci._run_owned(
-            [sys.executable, '-B', '-c', script], ROOT, observe,
-            timeout_seconds=timeout, max_output_bytes=limit, separate_stderr=separate)
+        diagnostics = {'observations': [], 'omitted_observations': 0}
+        token = ci._LINUX_CENSUS_DIAGNOSTICS.set(diagnostics)
+        try:
+            code, error = ci._run_owned(
+                [sys.executable, '-B', '-c', script], ROOT, observe,
+                timeout_seconds=timeout, max_output_bytes=limit, separate_stderr=separate)
+        finally:
+            ci._LINUX_CENSUS_DIAGNOSTICS.reset(token)
         self.assertLess(time.monotonic() - started, 5)
+        if error is not None and diagnostics['observations']:
+            try:
+                print('CI_NATIVE_CENSUS_FAILURE ' + json.dumps(diagnostics, sort_keys=True),
+                      file=sys.stderr)
+            except Exception:
+                # Diagnostics cannot replace the original native result or error.
+                pass
         return code, error, chunks
 
     def recorded(self, script, *, timeout=0.3, limit=4096, minimum=None, via_cli=False):
@@ -2825,6 +2837,187 @@ class RawDescriptorStatReaderTests(unittest.TestCase):
         self.assertIs(caught.exception, problem)
         read.assert_called_once_with(71, 4096)
         closed.assert_called_once_with(71)
+
+
+
+class NativeCensusDiagnosticReceiverTests(unittest.TestCase):
+    """Pure contracts for the original native helper's failure-only observer.
+
+    These receivers never establish native membership or gate success. Synthetic
+    expired observations exercise the actual bounded collector without procfs.
+    """
+
+    def setUp(self):
+        from contextlib import ExitStack
+        self._forbidden = []
+        stack = ExitStack()
+        self.addCleanup(stack.close)
+
+        def refuse(label):
+            def denied(*args, **kwargs):
+                self._forbidden.append(label)
+                raise AssertionError('Forbidden real operation in receiver controls: ' + label)
+            return denied
+
+        for owner, name in ((ci.subprocess, 'Popen'), (ci, '_run_owned'),
+                            (ci, '_validate_limits'), (ci.os, 'scandir'),
+                            (ci, '_linux_stat_bytes'), (ci.os, 'waitid'),
+                            (ci.os, 'killpg'), (ci.os, 'pipe')):
+            # Missing platform capabilities are temporarily refused too; these
+            # injected contracts do not claim a native Linux prerequisite.
+            stack.enter_context(patch.object(owner, name, side_effect=refuse(name), create=True))
+
+    def tearDown(self):
+        self.assertEqual(self._forbidden, [])
+
+    def _owner(self):
+        # Call only the helper with an injected receiver, never native setUp/run.
+        return CommandSupervisionTests()
+
+    def _populate_failure(self):
+        collector = ci._LINUX_CENSUS_DIAGNOSTICS.get()
+        if collector != {'observations': [], 'omitted_observations': 0}:
+            raise AssertionError('Receiver did not get a fresh collector')
+        owner = ci._LINUX_CENSUS_OWNER.set((987654321, 987654321, 'synthetic_pure_control'))
+        try:
+            with patch.object(ci.time, 'monotonic', return_value=0.02), patch.object(ci.time, 'thread_time', return_value=1.0):
+                for _ in range(9):
+                    try:
+                        ci._linux_group_observation(987654321, 0.01)
+                    except OSError as problem:
+                        if str(problem) != 'owned group membership census observation deadline exceeded':
+                            raise
+                    else:
+                        raise AssertionError('Expired synthetic census unexpectedly passed')
+        finally:
+            ci._LINUX_CENSUS_OWNER.reset(owner)
+        return collector
+
+    def test_exact_arguments_result_chunks_callback_and_context_return(self):
+        outer = {'preexisting_control_context': True}
+        token = ci._LINUX_CENSUS_DIAGNOSTICS.set(outer)
+        calls = []
+        callback = []
+        script = 'inert receiver contract only'
+        payloads = [('stdout', b'\x00exact'), ('stderr', b'bytes\xff')]
+        problem = 'unchanged receiver error'
+
+        def receiver(argv, root, observe, **options):
+            self.assertEqual(argv, [sys.executable, '-B', '-c', script])
+            self.assertEqual(root, ROOT)
+            self.assertEqual(options, dict(timeout_seconds=0.7, max_output_bytes=91, separate_stderr=True))
+            current = ci._LINUX_CENSUS_DIAGNOSTICS.get()
+            self.assertIsNot(current, outer)
+            self.assertEqual(current, {'observations': [], 'omitted_observations': 0})
+            calls.append(current)
+            for stream, data in payloads:
+                observe(stream, data)
+            return (23, problem)
+        try:
+            with patch.object(ci, '_run_owned', side_effect=receiver), patch.object(sys, 'stderr', io.StringIO()) as output:
+                actual = self._owner().owned(script, timeout=0.7, limit=91, separate=True, callback=lambda stream, data: callback.append((stream, data)))
+            self.assertEqual(actual, (23, problem, payloads))
+            self.assertEqual(callback, payloads)
+            self.assertIs(actual[2][0][1], payloads[0][1])
+            self.assertEqual(output.getvalue(), '')
+            self.assertEqual(len(calls), 1)
+            self.assertIs(ci._LINUX_CENSUS_DIAGNOSTICS.get(), outer)
+        finally:
+            ci._LINUX_CENSUS_DIAGNOSTICS.reset(token)
+
+    def test_same_exception_and_partial_callback_restore_context(self):
+        problem = RuntimeError('static injected receiver failure')
+        callback = []
+        before = ci._LINUX_CENSUS_DIAGNOSTICS.get()
+
+        def receiver(argv, root, observe, **options):
+            self.assertIsNotNone(ci._LINUX_CENSUS_DIAGNOSTICS.get())
+            observe('stdout', b'original partial')
+            raise problem
+        with patch.object(ci, '_run_owned', side_effect=receiver), patch.object(sys, 'stderr', io.StringIO()) as output:
+            with self.assertRaises(RuntimeError) as stopped:
+                self._owner().owned('inert', callback=lambda stream, data: callback.append((stream, data)))
+        self.assertIs(stopped.exception, problem)
+        self.assertEqual(callback, [('stdout', b'original partial')])
+        self.assertIs(ci._LINUX_CENSUS_DIAGNOSTICS.get(), before)
+        self.assertEqual(output.getvalue(), '')
+
+    def test_bounded_actual_collector_formats_after_original_elapsed_assertion(self):
+        events = []
+        original = self._owner()
+        assert_less = original.assertLess
+
+        def elapsed(actual, bound):
+            events.append('elapsed')
+            self.assertEqual(bound, 5)
+            assert_less(actual, bound)
+        original.assertLess = elapsed
+
+        class Sink(io.StringIO):
+
+            def write(sink, value):
+                self.assertEqual(events[0], 'elapsed')
+                events.append('write')
+                return super().write(value)
+
+        def receiver(argv, root, observe, **options):
+            self._populate_failure()
+            observe('stdout', b'original bytes')
+            return (0, 'original census error')
+        with patch.object(ci, '_run_owned', side_effect=receiver), patch.object(sys, 'stderr', Sink()) as output:
+            actual = original.owned('inert')
+        self.assertEqual(actual, (0, 'original census error', [('stdout', b'original bytes')]))
+        text = output.getvalue()
+        self.assertTrue(text.startswith('CI_NATIVE_CENSUS_FAILURE '))
+        self.assertEqual(len(text.splitlines()), 1)
+        body = json.loads(text.removeprefix('CI_NATIVE_CENSUS_FAILURE '))
+        self.assertEqual((len(body['observations']), body['omitted_observations']), (8, 1))
+        self.assertTrue(all((row['stage'] == 'observation_deadline' and row['numeric_entries_per_scan'] == [] and (row['owned_leader_pid'] == 987654321) and (row['owner_phase'] == 'synthetic_pure_control') for row in body['observations'])))
+        self.assertLessEqual(len(text.encode()), 16384)
+
+    def test_stderr_write_refusal_preserves_original_result_and_bounded_attempt(self):
+        attempted = []
+
+        class Refused:
+
+            def write(sink, value):
+                attempted.append(value)
+                raise OSError(ci.errno.EIO, 'static diagnostic sink refusal')
+
+        def receiver(argv, root, observe, **options):
+            self._populate_failure()
+            observe('stderr', b'original raw')
+            return (7, 'original error object')
+        before = ci._LINUX_CENSUS_DIAGNOSTICS.get()
+        with patch.object(ci, '_run_owned', side_effect=receiver), patch.object(sys, 'stderr', Refused()):
+            actual = self._owner().owned('inert', separate=True)
+        self.assertEqual(actual, (7, 'original error object', [('stderr', b'original raw')]))
+        self.assertEqual(len(attempted), 1)
+        self.assertTrue(attempted[0].startswith('CI_NATIVE_CENSUS_FAILURE '))
+        self.assertLessEqual(len(attempted[0].encode()), 16384)
+        self.assertIs(ci._LINUX_CENSUS_DIAGNOSTICS.get(), before)
+
+    def test_successful_collector_is_silent(self):
+
+        def receiver(argv, root, observe, **options):
+            self.assertEqual(ci._LINUX_CENSUS_DIAGNOSTICS.get(), {'observations': [], 'omitted_observations': 0})
+            return (0, None)
+        with patch.object(ci, '_run_owned', side_effect=receiver), patch.object(sys, 'stderr', io.StringIO()) as output:
+            actual = self._owner().owned('inert')
+        self.assertEqual(actual, (0, None, []))
+        self.assertEqual(output.getvalue(), '')
+
+    def test_original_five_second_assertion_still_precedes_diagnostic(self):
+
+        def receiver(argv, root, observe, **options):
+            ci._LINUX_CENSUS_DIAGNOSTICS.get()['observations'].append({'synthetic': True})
+            return (0, 'original error')
+        before = ci._LINUX_CENSUS_DIAGNOSTICS.get()
+        with patch.object(ci, '_run_owned', side_effect=receiver), patch.object(time, 'monotonic', side_effect=[0, 6]), patch.object(sys, 'stderr', io.StringIO()) as output:
+            with self.assertRaises(AssertionError):
+                self._owner().owned('inert')
+        self.assertEqual(output.getvalue(), '')
+        self.assertIs(ci._LINUX_CENSUS_DIAGNOSTICS.get(), before)
 
 
 if __name__=='__main__':unittest.main()
