@@ -18,6 +18,7 @@ use super::*;
 const INDEX_PATH: &str = "conformance/subsystems/coverage/catalogs/index.json";
 const MANIFEST_DIRECTORY: &str = "conformance/subsystems/coverage/manifests";
 const MANIFEST_PREFIX: &str = "conformance/subsystems/coverage/manifests/";
+const MANIFEST_SCHEMA_ID: &str = "https://mainframe-env.invalid/schemas/topic-manifest@1";
 struct LaterRegistry {
     registry_path: &'static str,
     manifest_directory: &'static str,
@@ -60,11 +61,40 @@ const LATER_REGISTRIES: &[LaterRegistry] = &[
 const DIGEST_DEFINITION: &str = "sha256 over the concatenation, sorted by topic_path, of one \
      \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex";
 
+fn validate_manifest(
+    schema: &Value,
+    manifest: &Value,
+    path: &Path,
+    compiled: &mut Option<(Value, jsonschema::Validator)>,
+) -> TaskResult {
+    // For this ID, compile_schema uses fixed offline Draft 2020-12 options,
+    // no extra resources, and the path only in diagnostics. Keep reading later
+    // schemas at their original boundary, and recompile any changed value.
+    if schema["$id"].as_str() != Some(MANIFEST_SCHEMA_ID) {
+        return validate_schema_instance(schema, manifest, path);
+    }
+    let validate = |validator: &jsonschema::Validator| {
+        validator
+            .validate(manifest)
+            .map_err(|error| format!("{} violates its schema: {error}", path.display()))
+    };
+    if let Some((previous, validator)) = compiled.as_ref()
+        && previous == schema
+    {
+        return validate(validator);
+    }
+    let validator = compile_draft_2020_12_schema(schema, path)?;
+    validate(&validator)?;
+    *compiled = Some((schema.clone(), validator));
+    Ok(())
+}
+
 pub(super) fn check(root: &Path) -> TaskResult {
     let index_path = root.join(INDEX_PATH);
     let index = json(&index_path)?;
     let manifest_schema =
         json(&root.join("conformance/subsystems/coverage/schemas/topic-manifest.schema.json"))?;
+    let mut compiled_manifest_schema = None;
     let mut pinned = BTreeSet::new();
     for baseline in array(&index, "baselines", &index_path)? {
         let id = text(baseline, "id", &index_path)?;
@@ -81,7 +111,12 @@ pub(super) fn check(root: &Path) -> TaskResult {
         )?;
         let manifest_path = manifest_path(root, relative, id)?;
         let manifest = json(&manifest_path)?;
-        validate_schema_instance(&manifest_schema, &manifest, &manifest_path)?;
+        validate_manifest(
+            &manifest_schema,
+            &manifest,
+            &manifest_path,
+            &mut compiled_manifest_schema,
+        )?;
         let digest = recompute(&manifest, &manifest_path)?;
         require(
             text(&manifest, "topic_manifest_digest", &manifest_path)? == digest,
@@ -186,6 +221,7 @@ fn check_later_registry(root: &Path, config: &LaterRegistry) -> TaskResult {
     )?;
     let manifest_schema =
         root.join("conformance/subsystems/coverage/schemas/topic-manifest.schema.json");
+    let mut compiled_manifest_schema = None;
     let mut pinned = BTreeSet::new();
     let mut scopes = BTreeSet::new();
     for entry in array(&registry, "manifests", &registry_path)? {
@@ -207,7 +243,12 @@ fn check_later_registry(root: &Path, config: &LaterRegistry) -> TaskResult {
             )
         );
         let manifest = json(&path)?;
-        validate_schema_instance(&json(&manifest_schema)?, &manifest, &path)?;
+        validate_manifest(
+            &json(&manifest_schema)?,
+            &manifest,
+            &path,
+            &mut compiled_manifest_schema,
+        )?;
         let digest = recompute(&manifest, &path)?;
         require(
             text(&manifest, "schema_version", &path)? == "mainframe-env.topic-manifest@1"

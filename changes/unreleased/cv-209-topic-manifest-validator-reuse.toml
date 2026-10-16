@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Reuse unchanged topic-manifest schema validators within each offline check while preserving every current schema read, manifest validation, digest and source-membership check."
