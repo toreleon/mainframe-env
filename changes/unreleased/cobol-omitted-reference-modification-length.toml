@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Resolve omitted COBOL reference-modification lengths and reject invalid modified MOVE receivers before bare-prefix writes."

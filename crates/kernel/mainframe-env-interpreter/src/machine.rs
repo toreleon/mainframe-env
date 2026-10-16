@@ -72,8 +72,11 @@ mod eib;
 mod floating_insertion_tests;
 mod layout_admission;
 mod layout_resolution;
+use layout_resolution::split_reference_modification;
 mod legacy_mq;
 mod observability;
+#[cfg(test)]
+mod reference_modification_tests;
 mod snapshot_codec;
 mod string_ops;
 mod typed_cics;
@@ -4482,6 +4485,9 @@ impl ReferenceMachine {
                     },
                 );
             };
+            if let Some(problem) = self.invalid_modified_receiver(&targets[at..control], end - at) {
+                return Err(problem);
+            }
             let target = self.reference(&targets[at..end])?;
             let value = if figurative == Some(b'0') && is_numeric(target.layout.category) {
                 CobolValue::Decimal(Decimal {
@@ -7610,12 +7616,23 @@ impl ReferenceMachine {
                         .map_err(|_| MachineProblem::ReferenceModificationError)
                 };
                 let start = resolve_bound(&start)?;
-                let requested = resolve_bound(&requested)?;
-                if start == 0 || start - 1 + requested > length {
+                let requested = if requested.is_empty() {
+                    None
+                } else {
+                    Some(resolve_bound(&requested)?)
+                };
+                let relative_start = start
+                    .checked_sub(1)
+                    .ok_or(MachineProblem::ReferenceModificationError)?;
+                let remaining = length
+                    .checked_sub(relative_start)
+                    .ok_or(MachineProblem::ReferenceModificationError)?;
+                let requested = requested.unwrap_or(remaining);
+                if requested > remaining {
                     return Err(MachineProblem::ReferenceModificationError);
                 }
                 offset = offset
-                    .checked_add(start - 1)
+                    .checked_add(relative_start)
                     .ok_or(MachineProblem::ReferenceModificationError)?;
                 length = requested;
             } else {
@@ -9395,35 +9412,6 @@ fn matching_close(tokens: &[String], open: usize) -> Option<usize> {
         }
     }
     None
-}
-
-fn split_reference_modification(
-    tokens: &[String],
-) -> Result<(Vec<String>, Vec<String>), MachineProblem> {
-    let mut start = Vec::new();
-    let mut requested = Vec::new();
-    let mut found = false;
-    for token in tokens {
-        if !found {
-            if let Some((before, after)) = token.split_once(':') {
-                if !before.is_empty() {
-                    start.push(before.to_string());
-                }
-                if !after.is_empty() {
-                    requested.push(after.to_string());
-                }
-                found = true;
-            } else {
-                start.push(token.clone());
-            }
-        } else {
-            requested.push(token.clone());
-        }
-    }
-    if !found || start.is_empty() || requested.is_empty() {
-        return Err(MachineProblem::ReferenceModificationError);
-    }
-    Ok((start, requested))
 }
 
 fn value_bytes(value: CobolValue) -> Result<Vec<u8>, MachineProblem> {
