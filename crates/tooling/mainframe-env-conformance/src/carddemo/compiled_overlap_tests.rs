@@ -4,6 +4,9 @@ use super::*;
 use std::os::unix::fs::MetadataExt;
 use std::time::Duration;
 
+#[path = "compiled_overlap_campaign.rs"]
+mod campaign;
+
 const SHARED: [&str; 7] = [
     "AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS",
     "AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS",
@@ -256,6 +259,13 @@ fn pinned_corpus_compiled_online_and_batch_overlap() {
             let mut standalone_oracle = RouteObservations::default();
             bms_seed_oracles::compare_account_view(&corpus_dir, &account_baseline, &online_screen_fields(&account_baseline)?, &mut standalone_oracle)?;
             require_online_mapset(&cards_baseline, "COCRDLI", "standalone card comparison")?;
+            // Stage the exact two INPUT requests before offering the campaign.
+            // INPUT updates each existing session; only RESUME runs its actor.
+            let (account_input, cards_input) = tokio::join!(
+                campaign::stage_input(&app, &account, 0x7d, fields),
+                campaign::stage_input(&app, &cards, 0xf7, BTreeMap::new()),
+            );
+            account_input?; cards_input?;
             let before = shared_state(&server)?;
             retained["before"] = before.clone();
             observed.arm()?;
@@ -266,9 +276,23 @@ fn pinned_corpus_compiled_online_and_batch_overlap() {
                 let route = app.clone(); let headers = headers.clone(); let jcl = jcl.clone();
                 tasks.push(tokio::spawn(async move { terminal_http(&route, Method::PUT, "/zosmf/restjobs/jobs", headers, jcl).await }));
             }
-            // Every offered request is joined before any submission failure is interpreted.
-            let mut joined = Vec::new();
-            for task in tasks { joined.push(task.await); }
+            // Poll online work while the original submissions remain offered.
+            // A historical batch effect alone does not keep a batch execution
+            // active across the old all-submissions-joined barrier.
+            let exchanges = async {
+                while !observed.batch_effect_seen(&batch_artifact)? {
+                    require(tokio::time::Instant::now() < deadline, "no actual completed compiled batch effect within original completion bound")?;
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+                let (account_result, cards_result) = tokio::join!(
+                    campaign::resume_input(&app, &account),
+                    campaign::resume_input(&app, &cards),
+                );
+                Ok((account_result?, cards_result?))
+            };
+            // Both workloads finish and every submitted task joins before any
+            // failure is interpreted or the original drain/cleanup can begin.
+            let (joined, exchanges) = campaign::join_campaign(tasks, exchanges).await;
             let mut jobs = Vec::new(); let mut identities = BTreeSet::new();
             for result in joined {
                 let (status, body) = result.map_err(|error| CorpusProblem::new("carddemo.full.compiled_overlap_drift", error.to_string()))??;
@@ -279,16 +303,7 @@ fn pinned_corpus_compiled_online_and_batch_overlap() {
                 jobs.push(id);
             }
             retained["job_ids"] = serde_json::json!(jobs);
-            while !observed.batch_effect_seen(&batch_artifact)? {
-                require(tokio::time::Instant::now() < deadline, "no actual completed compiled batch effect within original completion bound")?;
-                tokio::time::sleep(Duration::from_millis(10)).await;
-            }
-            // These real compiled requests run while the admitted batch campaign remains offered.
-            let (account_result, cards_result) = tokio::join!(
-                carddemo_terminal_exchange(&app, &account.session, &account.headers, 0x7d, fields),
-                carddemo_terminal_exchange(&app, &cards.session, &cards.headers, 0xf7, BTreeMap::new()),
-            );
-            let account_result = account_result?; let cards_result = cards_result?;
+            let (account_result, cards_result) = exchanges?;
             let online_run = RunUnitId::new(account_result["run_unit"].as_str().ok_or_else(|| CorpusProblem::new("carddemo.full.compiled_overlap_drift", "online run identity missing"))?, InvocationLimits::default()).map_err(|_| CorpusProblem::new("carddemo.full.compiled_overlap_drift", "online run identity invalid"))?;
             require(account_result["session"] == account.session && cards_result["session"] == cards.session, "mixed session responses crossed identities")?;
             require(online_screen_fields(&account_result)? == online_screen_fields(&account_baseline)? && online_screen_fields(&cards_result)? == online_screen_fields(&cards_baseline)?, "mixed compiled screens differ from separate same-source outcomes")?;
