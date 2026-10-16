@@ -48,6 +48,10 @@ pub(crate) struct ReplayIndex {
     /// touches, clones or rebuilds nothing for rows that didn't change.
     #[cfg(test)]
     applied_count: usize,
+    /// Test-only witness for exact unchanged physical snapshots. No production
+    /// counter or alternate store authority is introduced.
+    #[cfg(test)]
+    unchanged_snapshot_count: usize,
 }
 
 impl ReplayIndex {
@@ -108,6 +112,30 @@ impl ReplayIndex {
         let rows = store
             .list_provider_state("dataset-replay", limits.max_idempotency)
             .map_err(store_error)?;
+
+        // Exact key-ordered equality proves the complete physical key set is
+        // unchanged, including every payload byte. Keep the physical scan above:
+        // any missing fingerprint, reordered/replaced/duplicate key or changed
+        // bytes falls through to the original fully staged validation below.
+        if rows.len() == self.entries.len()
+            && rows
+                .iter()
+                .zip(&self.entries)
+                .all(|(row, (key, existing))| {
+                    row.key.as_str() == key.as_str()
+                        && existing.seen.as_ref().is_some_and(|(version, payload)| {
+                            *version == row.version
+                                && payload.len() == row.payload.len()
+                                && *payload == row.payload
+                        })
+                })
+        {
+            #[cfg(test)]
+            {
+                self.unchanged_snapshot_count += 1;
+            }
+            return Ok(());
+        }
 
         // Sort borrowed rows once for duplicate detection and a linear merge
         // with the committed index. Preserve physical scan order for decoding:
@@ -664,5 +692,167 @@ mod tests {
             .unwrap();
         assert_eq!(index.len(), 0);
         assert!(committed_snapshot(&index).is_empty());
+    }
+
+    #[test]
+    fn exact_snapshot_unchanged_keeps_authority_and_complete_physical_scan() {
+        let rows = vec![pending_record("one", 1), pending_record("two", 2)];
+        let mut index = ReplayIndex::default();
+        index
+            .sync(&SnapshotPage::new(rows.clone()), limits())
+            .unwrap();
+        let before = committed_snapshot(&index);
+        let decodes = index.decode_count();
+        let applied = index.applied_count;
+        let page = SnapshotPage::new(rows);
+        index.sync(&page, limits()).unwrap();
+        assert_eq!(index.unchanged_snapshot_count, 1);
+        assert_eq!(committed_snapshot(&index), before);
+        assert_eq!(index.snapshot(), full_reload(&page.rows));
+        assert_eq!(index.decode_count(), decodes);
+        assert_eq!(index.applied_count, applied);
+        assert_eq!(
+            *page.calls.lock().unwrap(),
+            vec![("dataset-replay".into(), limits().max_idempotency)]
+        );
+        let mut empty = ReplayIndex::default();
+        let page = SnapshotPage::new(Vec::new());
+        empty.sync(&page, limits()).unwrap();
+        assert_eq!(empty.unchanged_snapshot_count, 1);
+        assert!(committed_snapshot(&empty).is_empty());
+        assert_eq!(page.calls.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn exact_snapshot_same_count_replacement_publishes_new_key_and_prunes_old_key() {
+        let initial = vec![
+            pending_record("a", 1),
+            pending_record("b", 2),
+            pending_record("c", 3),
+        ];
+        let mut index = ReplayIndex::default();
+        index
+            .sync(&SnapshotPage::new(initial.clone()), limits())
+            .unwrap();
+        let decodes = index.decode_count();
+        let applied = index.applied_count;
+        let page = SnapshotPage::new(vec![
+            initial[0].clone(),
+            initial[1].clone(),
+            pending_record("d", 4),
+        ]);
+        index.sync(&page, limits()).unwrap();
+        assert_eq!(index.unchanged_snapshot_count, 0);
+        assert_eq!(index.len(), 3);
+        assert!(index.get("c").is_none());
+        assert!(index.get("d").is_some());
+        assert_eq!(index.snapshot(), full_reload(&page.rows));
+        assert_eq!(index.decode_count(), decodes + 1);
+        assert_eq!(index.applied_count, applied + 1);
+        assert_eq!(page.calls.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn exact_snapshot_late_digest_byte_at_same_version_and_length_is_revalidated() {
+        let rows = vec![pending_record("a", 1), pending_record("z", 2)];
+        let mut index = ReplayIndex::default();
+        index
+            .sync(&SnapshotPage::new(rows.clone()), limits())
+            .unwrap();
+        let before = committed_snapshot(&index);
+        let before_replays = index.snapshot();
+        let decodes = index.decode_count();
+        let applied = index.applied_count;
+        let mut changed = rows;
+        // Byte36 is the last digest byte, not the result tag. Keep version,
+        // length and every earlier byte unchanged in the final physical row.
+        changed[1].payload[36] ^= 0x5a;
+        assert_eq!(changed[1].version, 1);
+        assert_eq!(
+            changed[1].payload.len(),
+            before["z"].1.as_ref().unwrap().1.len()
+        );
+        let page = SnapshotPage::new(changed);
+        index.sync(&page, limits()).unwrap();
+        assert_eq!(index.unchanged_snapshot_count, 0);
+        assert_eq!(index.snapshot(), full_reload(&page.rows));
+        assert_ne!(index.snapshot(), before_replays);
+        assert_eq!(index.decode_count(), decodes + 1);
+        assert_eq!(index.applied_count, applied + 1);
+        assert_ne!(committed_snapshot(&index), before);
+    }
+
+    #[test]
+    fn exact_snapshot_same_count_duplicate_refuses_before_any_physical_decode() {
+        let initial: Vec<_> = (0..4)
+            .map(|key| pending_record(&format!("retained-{key}"), key))
+            .collect();
+        let mut index = ReplayIndex::default();
+        index.sync(&SnapshotPage::new(initial), limits()).unwrap();
+        let before = committed_snapshot(&index);
+        let decodes = index.decode_count();
+        let applied = index.applied_count;
+        let mut malformed = pending_record("duplicate", 0);
+        malformed.payload.push(0);
+        // Both snapshots retain the same count as the committed index. Cover
+        // malformed-first, then valid-first: decoding that valid row before
+        // duplicate refusal would increment the successful decode witness.
+        let malformed_first = vec![
+            malformed.clone(),
+            pending_record("duplicate", 3),
+            pending_record("valid-one", 4),
+            pending_record("valid-two", 5),
+        ];
+        let valid_first = vec![
+            pending_record("valid-one", 4),
+            malformed,
+            pending_record("duplicate", 3),
+            pending_record("valid-two", 5),
+        ];
+        for rows in [malformed_first, valid_first] {
+            let page = SnapshotPage::new(rows);
+            assert_eq!(
+                index.sync(&page, limits()),
+                Err(HostProblem::InfrastructureFailure)
+            );
+            assert_eq!(index.unchanged_snapshot_count, 0);
+            assert_eq!(index.decode_count(), decodes);
+            assert_eq!(index.applied_count, applied);
+            assert_eq!(committed_snapshot(&index), before);
+            assert_eq!(page.calls.lock().unwrap().len(), 1);
+        }
+    }
+
+    #[test]
+    fn exact_snapshot_same_count_late_failure_keeps_physical_order_and_prior_state() {
+        let initial = vec![
+            pending_record("retained-a", 1),
+            pending_record("retained-b", 2),
+        ];
+        let mut index = ReplayIndex::default();
+        index.sync(&SnapshotPage::new(initial), limits()).unwrap();
+        let before = committed_snapshot(&index);
+        let decodes = index.decode_count();
+        let applied = index.applied_count;
+        let mut malformed = pending_record("a-invalid", 3);
+        malformed.namespace = "wrong-namespace".into();
+        let page = SnapshotPage::new(vec![pending_record("z-valid", 4), malformed]);
+        assert_eq!(
+            index.sync(&page, limits()),
+            Err(HostProblem::InfrastructureFailure)
+        );
+        assert_eq!(index.unchanged_snapshot_count, 0);
+        assert_eq!(index.decode_count(), decodes + 1);
+        assert_eq!(index.applied_count, applied);
+        assert_eq!(committed_snapshot(&index), before);
+        let page = SnapshotPage::new(vec![
+            pending_record("z-valid", 4),
+            pending_record("a-invalid", 3),
+        ]);
+        index.sync(&page, limits()).unwrap();
+        assert_eq!(index.unchanged_snapshot_count, 0);
+        assert_eq!(index.snapshot(), full_reload(&page.rows));
+        assert_eq!(index.decode_count(), decodes + 3);
+        assert_eq!(index.applied_count, applied + 2);
     }
 }
