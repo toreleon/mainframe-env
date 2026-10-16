@@ -7,6 +7,9 @@ use std::time::Duration;
 #[path = "compiled_overlap_campaign.rs"]
 mod campaign;
 
+#[path = "compiled_overlap_driver_spans.rs"]
+mod driver_spans;
+
 const SHARED: [&str; 7] = [
     "AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS",
     "AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS",
@@ -233,6 +236,7 @@ fn pinned_corpus_compiled_online_and_batch_overlap() {
     )
     .unwrap();
     let result = runtime.block_on(async {
+        let driver_spans = Arc::new(driver_spans::DriverSpans::new());
         let observed = Arc::new(ObservedStore::new(Arc::new(MemoryStore::new(Default::default()))));
         let server = ProductServer::open(ServerConfig {
             store_profile: StoreProfile::Memory, artifact_root: artifact_root.clone(), max_concurrency: 8,
@@ -272,9 +276,9 @@ fn pinned_corpus_compiled_online_and_batch_overlap() {
             let deadline = tokio::time::Instant::now() + Duration::from_secs(120);
             let headers = BTreeMap::from([("authorization".into(), format!("Basic {}", base64::engine::general_purpose::STANDARD.encode("IBMUSER:TESTPASS"))), ("x-csrf-zosmf-header".into(), "true".into())]);
             let mut tasks = Vec::new();
-            for _ in 0..16 {
+            for request_index in 0..16 {
                 let route = app.clone(); let headers = headers.clone(); let jcl = jcl.clone();
-                tasks.push(tokio::spawn(async move { terminal_http(&route, Method::PUT, "/zosmf/restjobs/jobs", headers, jcl).await }));
+                tasks.push(tokio::spawn(driver_spans.observe(request_index, async move { terminal_http(&route, Method::PUT, "/zosmf/restjobs/jobs", headers, jcl).await })));
             }
             // Poll online work while the original submissions remain offered.
             // A historical batch effect alone does not keep a batch execution
@@ -285,8 +289,8 @@ fn pinned_corpus_compiled_online_and_batch_overlap() {
                     tokio::time::sleep(Duration::from_millis(10)).await;
                 }
                 let (account_result, cards_result) = tokio::join!(
-                    campaign::resume_input(&app, &account),
-                    campaign::resume_input(&app, &cards),
+                    driver_spans.observe(16, campaign::resume_input(&app, &account)),
+                    driver_spans.observe(17, campaign::resume_input(&app, &cards)),
                 );
                 Ok((account_result?, cards_result?))
             };
@@ -340,6 +344,7 @@ fn pinned_corpus_compiled_online_and_batch_overlap() {
         retained["problem"] = serde_json::json!(probe.as_ref().err().map(|problem| (&problem.code, &problem.detail)));
         let transcript = observed.export();
         retained["capture"] = transcript.as_ref().map_or_else(|problem| serde_json::json!({"problem":problem.detail}), Clone::clone);
+        retained["driver_request_spans"] = driver_spans.export();
         drop(app); drop(server);
         let saved = fs::write(evidence.join("actual.json"), serde_json::to_vec_pretty(&retained).map_err(json_problem)?).map_err(|error| CorpusProblem::new("carddemo.full.compiled_overlap_retention", error.to_string()));
         // Failed/unknown owners and retention failures preserve the fresh artifact namespace.

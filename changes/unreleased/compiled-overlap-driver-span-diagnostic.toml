@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Retain bounded driver request spans in compiled-overlap evidence without changing workloads, deadlines, completed-effect capture or overlap proof."
