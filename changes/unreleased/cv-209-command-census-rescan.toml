@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Permit at most three fresh Linux group census observations after typed numeric-stat disappearance, within one 50 ms allowance clamped to the existing command or cleanup deadline; preserve retained-leader fencing and conservative failure for incomplete metadata."

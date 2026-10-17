@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Preserve the declared COBOL PROGRAM-ID when the name starts on a following physical line, using the existing ASCII-whitespace scope rule; retain exact full CardDemo catalog identity checks and add compiler identity/refusal regressions."

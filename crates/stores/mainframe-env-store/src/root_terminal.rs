@@ -8,8 +8,10 @@ use mainframe_env_execution_api::{
 use mainframe_env_store_api::*;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+pub(crate) mod custody;
 mod preparation;
 mod provider_writer;
+pub(crate) mod successor;
 pub(crate) use provider_writer::mutation_endpoints;
 
 pub(crate) const ACTOR_NAMESPACE: &str = "durable-root-actor-v1";
@@ -17,6 +19,7 @@ pub(crate) const RUN_NAMESPACE: &str = "durable-root-run-v1";
 pub(crate) const SCOPE_NAMESPACE: &str = "durable-root-scope-v1";
 pub(crate) const ROW_SCOPE_NAMESPACE: &str = "durable-root-row-scope-v1";
 const SCHEMA: &str = "mainframe-env.core-root-ownership@1";
+const SUCCESSOR_SCHEMA: &str = "mainframe-env.core-root-ownership@2";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Phase {
@@ -49,6 +52,7 @@ pub(crate) struct Document {
     pub(crate) provider_namespaces: Vec<String>,
     pub(crate) provider_rows: Vec<(String, String)>,
     pub(crate) winning_resource: Option<[u8; 32]>,
+    scope_versions: Vec<(String, u64)>,
 }
 
 fn fingerprint(admission: &RootDriverAdmission) -> Result<[u8; 32], StoreError> {
@@ -92,6 +96,7 @@ impl Document {
     pub(crate) fn new(admission: &RootDriverAdmission) -> Result<Self, StoreError> {
         Ok(Self {
             schema: SCHEMA.into(),
+            scope_versions: Vec::new(),
             root: admission.execution.execution_id.as_str().into(),
             run: admission.execution.run_unit_id.as_str().into(),
             principal: admission.execution.principal.as_str().into(),
@@ -155,6 +160,9 @@ impl Document {
         for namespace in &self.provider_namespaces {
             add(namespace)?;
         }
+        for (namespace, _) in &self.scope_versions {
+            add(namespace)?;
+        }
         for (namespace, key) in &self.provider_rows {
             add(namespace)?;
             add(key)?;
@@ -179,12 +187,19 @@ impl Document {
                 "namespace": call.namespace, "key": call.key, "effect_key": call.effect_key.as_str(),
                 "request_digest": call.request_digest.as_slice(), "catalog_namespace": call.catalog.namespace,
                 "catalog_key": call.catalog.key, "catalog_version": call.catalog.version })) })).collect::<Vec<_>>();
-        let payload = serde_json::to_vec(&json!({ "schema": self.schema, "root": self.root,
+        let mut value = json!({ "schema": self.schema, "root": self.root,
             "run": self.run, "principal": self.principal, "fingerprint": self.fingerprint.as_slice(),
             "deadline": self.deadline, "phase": match self.phase { Phase::Open => 0, Phase::Closing => 1, Phase::Terminal => 2, Phase::Uncertain => 3 },
             "winning_resource": self.winning_resource.as_ref().map(|r| r.as_slice()),
             "actors": actors, "provider_namespaces": self.provider_namespaces,
-            "provider_rows": self.provider_rows })).map_err(|_| StoreError::IncompatibleVersion)?;
+            "provider_rows": self.provider_rows });
+        if self.schema == SUCCESSOR_SCHEMA {
+            value
+                .as_object_mut()
+                .ok_or(StoreError::IncompatibleVersion)?
+                .insert("scope_versions".into(), json!(self.scope_versions));
+        }
+        let payload = serde_json::to_vec(&value).map_err(|_| StoreError::IncompatibleVersion)?;
         if payload.len() > (256 << 10) {
             return Err(StoreError::CapacityExceeded);
         }
@@ -340,8 +355,32 @@ impl Document {
                 .ok_or(StoreError::IncompatibleVersion)?;
             provider_rows.push((namespace.into(), key.into()));
         }
+        let schema = strings(&value, "schema", 64)?;
+        let mut scope_versions = Vec::new();
+        if schema == SUCCESSOR_SCHEMA {
+            let versions = value
+                .get("scope_versions")
+                .and_then(Value::as_array)
+                .filter(|rows| rows.len() <= 16)
+                .ok_or(StoreError::IncompatibleVersion)?;
+            for row in versions {
+                let fields = row
+                    .as_array()
+                    .filter(|fields| fields.len() == 2)
+                    .ok_or(StoreError::IncompatibleVersion)?;
+                let namespace = fields[0]
+                    .as_str()
+                    .filter(|v| !v.is_empty() && v.len() <= MAX_PROVIDER_NAMESPACE_BYTES)
+                    .ok_or(StoreError::IncompatibleVersion)?;
+                scope_versions.push((
+                    namespace.to_owned(),
+                    fields[1].as_u64().ok_or(StoreError::IncompatibleVersion)?,
+                ));
+            }
+        }
         let document = Self {
-            schema: strings(&value, "schema", 64)?,
+            schema,
+            scope_versions,
             root: strings(&value, "root", 128)?,
             run: strings(&value, "run", 128)?,
             principal: strings(&value, "principal", 128)?,
@@ -372,13 +411,27 @@ impl Document {
     }
     pub(crate) fn validate(&self) -> Result<(), StoreError> {
         let limits = InvocationLimits::default();
-        if self.schema != SCHEMA
+        if !matches!(self.schema.as_str(), SCHEMA | SUCCESSOR_SCHEMA)
             || self.deadline == 0
             || self.deadline > i64::MAX as u64
             || self.actors.is_empty()
             || self.actors.len() > MAX_ROOT_ACTORS
             || self.provider_namespaces.len() > 16
             || self.provider_rows.len() > MAX_ROOT_OPERATIONS
+        {
+            return Err(StoreError::IncompatibleVersion);
+        }
+        if (self.schema == SCHEMA && !self.scope_versions.is_empty())
+            || (self.schema == SUCCESSOR_SCHEMA
+                && (self.scope_versions.len() != self.provider_namespaces.len()
+                    || !self.scope_versions.iter().any(|(_, version)| *version >= 2)
+                    || self
+                        .scope_versions
+                        .iter()
+                        .zip(&self.provider_namespaces)
+                        .any(|((n, v), expected)| {
+                            n != expected || *v == 0 || *v > i64::MAX as u64
+                        })))
         {
             return Err(StoreError::IncompatibleVersion);
         }
@@ -472,12 +525,22 @@ impl Document {
         {
             return Err(StoreError::Conflict);
         }
-        if self.provider_namespaces != original.provider_namespaces
+        if self.schema != original.schema
+            || self.scope_versions != original.scope_versions
+            || self.provider_namespaces != original.provider_namespaces
             || !self.provider_rows.starts_with(&original.provider_rows)
         {
             return Err(StoreError::Conflict);
         }
         Ok(())
+    }
+    pub(crate) fn set_successor_scopes(
+        &mut self,
+        versions: Vec<(String, u64)>,
+    ) -> Result<(), StoreError> {
+        self.schema = SUCCESSOR_SCHEMA.into();
+        self.scope_versions = versions;
+        self.validate()
     }
     pub(crate) fn require_live(&self, tick: u64, floor: u64) -> Result<(), StoreError> {
         if tick == 0 || tick > i64::MAX as u64 || tick < floor || tick >= self.deadline {

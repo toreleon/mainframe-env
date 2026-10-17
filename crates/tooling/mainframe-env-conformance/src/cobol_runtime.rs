@@ -418,8 +418,690 @@ fn hex(bytes: &[u8]) -> String {
 mod tests {
     use super::*;
 
+    // Controlled first-party replies exercise response ownership, not a provider or IBM oracle.
+    fn check_cics_bms_reply(
+        source: &str,
+        operation: mainframe_env_host_api::CicsOperation,
+        frame: &[u8],
+        named: &[(&str, &str, &[u8])],
+        fields: &[(&str, &[u8], &[u8])],
+        refused: bool,
+    ) {
+        use mainframe_env_host_api::{CicsDisposition, CicsResponse};
+
+        retain_execution_bytes(source, "cbl", source.as_bytes()).unwrap();
+        retain_execution_bytes(source, "reply-payload", frame).unwrap();
+        let reply = serde_json::json!({
+            "operation": format!("{operation:?}"),
+            "disposition": "Complete", "condition": "NORMAL", "response": 0, "response2": 0,
+            "applid": "", "sysid": "", "transaction": "", "aid": 0,
+            "target": null, "next_transaction": null, "unit_of_work": null,
+            "payload_schema": "mainframe-env.cics.payload@1", "payload_bytes": frame,
+            "outputs": named.iter().map(|(name, schema, bytes)| {
+                serde_json::json!({"name": name, "schema": schema, "bytes": bytes})
+            }).collect::<Vec<_>>(),
+        });
+        retain_execution_bytes(
+            source,
+            "reply.json",
+            &serde_json::to_vec_pretty(&reply).unwrap(),
+        )
+        .unwrap();
+        for (name, before, after) in fields {
+            retain_execution_bytes(source, &format!("{name}.before-expected"), before).unwrap();
+            retain_execution_bytes(source, &format!("{name}.expected"), after).unwrap();
+        }
+        retain_execution_bytes(
+            source,
+            "expected-terminal",
+            if refused {
+                b"Failed"
+            } else {
+                b"Completed:0:DONE\n"
+            },
+        )
+        .unwrap();
+        let artifact = crate::compile(source).expect("controlled CICS source compiles");
+        retain_execution_bytes(source, "bin", artifact.payload()).unwrap();
+        let invocation = crate::invocation(&artifact, 4096);
+        let mut machine =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .expect("controlled CICS machine");
+        let quantum = Quantum::new(512, 64 * 1024).unwrap();
+        let mut effect = None;
+        for _ in 0..32 {
+            match machine.drive(MachineResume::Start, quantum) {
+                MachineDrive::Continue => {}
+                MachineDrive::HostCall(request) => {
+                    effect = Some(request);
+                    break;
+                }
+                other => panic!("expected one typed CICS request, got {other:?}"),
+            }
+        }
+        let effect = effect.expect("bounded source reaches a host request");
+        retain_execution_bytes(source, "request", format!("{effect:?}").as_bytes()).unwrap();
+        let HostRequest::Cics(request) = &effect.request else {
+            panic!("expected typed CICS host request");
+        };
+        assert_eq!(request.operation, operation);
+        let initial = fields
+            .iter()
+            .map(|(name, before, _)| {
+                let actual = machine
+                    .variable(name)
+                    .expect("initial storage")
+                    .bytes()
+                    .to_vec();
+                retain_execution_bytes(source, &format!("{name}.before-actual"), &actual).unwrap();
+                (name, before, actual)
+            })
+            .collect::<Vec<_>>();
+        for (name, expected, actual) in initial {
+            assert_eq!(actual, *expected, "independent initial storage {name}");
+        }
+        let payload = |schema: &str, bytes: &[u8]| {
+            BoundedPayload::new(schema, bytes.to_vec(), InvocationLimits::default()).unwrap()
+        };
+        let response = CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: String::new(),
+            sysid: String::new(),
+            transaction: String::new(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: payload("mainframe-env.cics.payload@1", frame),
+            outputs: named
+                .iter()
+                .map(|(name, schema, bytes)| ((*name).into(), payload(schema, bytes)))
+                .collect(),
+            unit_of_work: None,
+        };
+        let mut terminal = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: effect.sequence,
+                outcome: Ok(HostResult::Cics(response)),
+            }),
+            quantum,
+        );
+        for _ in 0..32 {
+            if !matches!(terminal, MachineDrive::Continue) {
+                break;
+            }
+            terminal = machine.drive(MachineResume::Start, quantum);
+        }
+        retain_execution_bytes(source, "terminal", format!("{terminal:?}").as_bytes()).unwrap();
+        let observations = fields
+            .iter()
+            .map(|(name, _, expected)| {
+                let actual = machine
+                    .variable(name)
+                    .expect("observed storage")
+                    .bytes()
+                    .to_vec();
+                retain_execution_bytes(source, &format!("{name}.actual"), &actual).unwrap();
+                eprintln!("field={name}; expected={expected:?}; actual={actual:?}");
+                (name, expected, actual)
+            })
+            .collect::<Vec<_>>();
+        eprintln!("refused={refused}; terminal={terminal:?}");
+        for (name, expected, actual) in observations {
+            assert_eq!(actual, *expected, "literal response-owned storage {name}");
+        }
+        if refused {
+            assert!(matches!(terminal, MachineDrive::Failed(_)), "{terminal:?}");
+        } else {
+            let MachineDrive::Completed(completion) = terminal else {
+                panic!("expected completion, got {terminal:?}");
+            };
+            assert_eq!(completion.return_code, 0);
+            assert_eq!(completion.output.bytes(), b"DONE\n");
+        }
+    }
+
+    const BMS_INPUT_STORAGE_DATA: &str = r#"
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 LEFT-EDGE PIC X(4) VALUE 'LEFT'.
+01 INPUT-MAP.
+   05 GUARD-L PIC X(2) VALUE '<<'.
+   05 ALPHAL PIC S9(4) COMP VALUE 258.
+   05 ALPHAF PIC X VALUE 'a'.
+   05 ALPHAI PIC X(4) VALUE 'old!'.
+   05 GUARD-M PIC X(2) VALUE '||'.
+   05 BETAL PIC S9(4) COMP VALUE 772.
+   05 BETAF PIC X VALUE 'b'.
+   05 BETAI PIC X(5) VALUE 'stay?'.
+   05 GUARD-R PIC X(2) VALUE '>>'.
+01 RIGHT-EDGE PIC X(4) VALUE 'RITE'.
+"#;
+
+    const BMS_NUMERIC_INPUT_STORAGE_DATA: &str = r#"
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 LEFT-EDGE PIC X(4) VALUE 'LEFT'.
+01 INPUT-MAP.
+   05 GUARD-L PIC X(2) VALUE '<<'.
+   05 ACCTSIDL PIC S9(4) COMP VALUE 258.
+   05 ACCTSIDA PIC X VALUE 'a'.
+   05 ACCTSIDI PIC 9(11) VALUE 12345678901.
+   05 GUARD-R PIC X(2) VALUE '>>'.
+01 RIGHT-EDGE PIC X(4) VALUE 'RITE'.
+"#;
+
+    #[test]
+    fn cics_bms_input_storage_numeric_display_keeps_terminal_bytes() {
+        // Controlled replies exercise raw storage ownership, not numeric evaluation.
+        for (id, input, expected) in [
+            (
+                "DIGITS",
+                b"00000000050".as_slice(),
+                b"<<\x00\x0ba00000000050>>".as_slice(),
+            ),
+            (
+                "SPACES",
+                b"           ".as_slice(),
+                b"<<\x00\x0ba           >>".as_slice(),
+            ),
+            (
+                "TEXT",
+                b"not-a-num!?".as_slice(),
+                b"<<\x00\x0banot-a-num!?>>".as_slice(),
+            ),
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BMS-NUMERIC-{id}. \
+                 {BMS_NUMERIC_INPUT_STORAGE_DATA}\nPROCEDURE DIVISION.\n\
+                 EXEC CICS RECEIVE MAP('SYNMAP') INTO(INPUT-MAP) END-EXEC.\n\
+                 DISPLAY 'DONE'. STOP RUN."
+            );
+            check_cics_bms_reply(
+                &source,
+                mainframe_env_host_api::CicsOperation::ReceiveMap,
+                b"NUMERIC-TRANSPORT-FRAME!",
+                &[
+                    ("BMS.ACCTSID", "mainframe-env.cics.payload@1", input),
+                    ("BMS.ACCTSID.LENGTH", "mainframe-env.cics.decimal@1", b"11"),
+                ],
+                &[
+                    ("LEFT-EDGE", b"LEFT", b"LEFT"),
+                    ("INPUT-MAP", b"<<\x01\x02a12345678901>>", expected),
+                    ("RIGHT-EDGE", b"RITE", b"RITE"),
+                ],
+                false,
+            );
+        }
+    }
+
+    #[test]
+    fn cics_bms_input_storage_numeric_display_short_prefix_preserves_surplus() {
+        // DFHMDI's input-field note preserves surplus data; no numeric conversion occurs.
+        for (id, input, count, expected) in [
+            (
+                "SHORT",
+                b"50".as_slice(),
+                b"2".as_slice(),
+                b"<<\x00\x02a50345678901>>".as_slice(),
+            ),
+            (
+                "EMPTY",
+                b"".as_slice(),
+                b"0".as_slice(),
+                b"<<\x00\x00a12345678901>>".as_slice(),
+            ),
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BMS-NUMERIC-{id}. \
+                 {BMS_NUMERIC_INPUT_STORAGE_DATA}\nPROCEDURE DIVISION.\n\
+                 EXEC CICS RECEIVE MAP('SYNMAP') INTO(INPUT-MAP) END-EXEC.\n\
+                 DISPLAY 'DONE'. STOP RUN."
+            );
+            check_cics_bms_reply(
+                &source,
+                mainframe_env_host_api::CicsOperation::ReceiveMap,
+                b"SHORT-TRANSPORT-FRAME!",
+                &[
+                    ("BMS.ACCTSID", "mainframe-env.cics.payload@1", input),
+                    ("BMS.ACCTSID.LENGTH", "mainframe-env.cics.decimal@1", count),
+                ],
+                &[("INPUT-MAP", b"<<\x01\x02a12345678901>>", expected)],
+                false,
+            );
+        }
+    }
+
+    #[test]
+    fn cics_bms_input_storage_numeric_display_omitted_preserves_storage() {
+        let source = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BMS-NUMERIC-OMITTED. \
+             {BMS_NUMERIC_INPUT_STORAGE_DATA}\nPROCEDURE DIVISION.\n\
+             EXEC CICS RECEIVE MAP('SYNMAP') INTO(INPUT-MAP) END-EXEC.\n\
+             DISPLAY 'DONE'. STOP RUN."
+        );
+        check_cics_bms_reply(
+            &source,
+            mainframe_env_host_api::CicsOperation::ReceiveMap,
+            b"OMITTED-NUMERIC-FRAME!",
+            &[],
+            &[(
+                "INPUT-MAP",
+                b"<<\x01\x02a12345678901>>",
+                b"<<\x01\x02a12345678901>>",
+            )],
+            false,
+        );
+    }
+
+    #[test]
+    fn cics_bms_input_storage_alphanumeric_digits_are_not_zero_filled() {
+        let data = BMS_INPUT_STORAGE_DATA.replace("VALUE 'old!'", "VALUE '0000'");
+        let source = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BMS-DIGIT-TEXT. {data}\n\
+             PROCEDURE DIVISION.\n\
+             EXEC CICS RECEIVE MAP('SYNMAP') INTO(INPUT-MAP) END-EXEC.\n\
+             DISPLAY 'DONE'. STOP RUN."
+        );
+        check_cics_bms_reply(
+            &source,
+            mainframe_env_host_api::CicsOperation::ReceiveMap,
+            b"DIGIT-TEXT-FRAME!",
+            &[
+                ("BMS.ALPHA", "mainframe-env.cics.payload@1", b"42"),
+                ("BMS.ALPHA.LENGTH", "mainframe-env.cics.decimal@1", b"2"),
+            ],
+            &[(
+                "INPUT-MAP",
+                b"<<\x01\x02a0000||\x03\x04bstay?>>",
+                b"<<\x00\x02a42  ||\x03\x04bstay?>>",
+            )],
+            false,
+        );
+    }
+
+    #[test]
+    fn cics_bms_input_storage_numeric_projection_refuses_before_writes() {
+        for (id, extra_name, extra_schema, extra_bytes) in [
+            (
+                "UNKNOWN",
+                "BMS.ZZZ",
+                "mainframe-env.cics.payload@1",
+                b"x".as_slice(),
+            ),
+            (
+                "OVERSIZE",
+                "BMS.ACCTSID.LENGTH",
+                "mainframe-env.cics.decimal@1",
+                b"12".as_slice(),
+            ),
+            (
+                "BAD-SCHEMA",
+                "BMS.ACCTSID.LENGTH",
+                "mainframe-env.cics.payload@1",
+                b"11".as_slice(),
+            ),
+            (
+                "BAD-LENGTH",
+                "BMS.ACCTSID.LENGTH",
+                "mainframe-env.cics.decimal@1",
+                b"-1".as_slice(),
+            ),
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BMS-NUMERIC-{id}. \
+                 {BMS_NUMERIC_INPUT_STORAGE_DATA}\nPROCEDURE DIVISION.\n\
+                 EXEC CICS RECEIVE MAP('SYNMAP') INTO(INPUT-MAP) END-EXEC.\n\
+                 DISPLAY 'DONE'. STOP RUN."
+            );
+            check_cics_bms_reply(
+                &source,
+                mainframe_env_host_api::CicsOperation::ReceiveMap,
+                b"INVALID-NUMERIC-FRAME!",
+                &[
+                    (
+                        "BMS.ACCTSID",
+                        "mainframe-env.cics.payload@1",
+                        b"00000000050",
+                    ),
+                    (extra_name, extra_schema, extra_bytes),
+                ],
+                &[(
+                    "INPUT-MAP",
+                    b"<<\x01\x02a12345678901>>",
+                    b"<<\x01\x02a12345678901>>",
+                )],
+                true,
+            );
+        }
+    }
+
+    #[test]
+    fn cics_bms_input_storage_present_fields_exclude_transport_frame() {
+        let source = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BMS-PRESENT. {BMS_INPUT_STORAGE_DATA}\n\
+             PROCEDURE DIVISION.\n\
+             EXEC CICS RECEIVE MAP('SYNMAP') INTO(INPUT-MAP) END-EXEC.\n\
+             DISPLAY 'DONE'. STOP RUN."
+        );
+        check_cics_bms_reply(
+            &source,
+            mainframe_env_host_api::CicsOperation::ReceiveMap,
+            b"FRAME!TITLE-NAME!\x00\x00\x00\x09TRANSPORT",
+            &[
+                ("BMS.ALPHA", "mainframe-env.cics.payload@1", b"HI"),
+                ("BMS.ALPHA.LENGTH", "mainframe-env.cics.decimal@1", b"2"),
+                ("BMS.BETA", "mainframe-env.cics.payload@1", b"XYZ"),
+                ("BMS.BETA.LENGTH", "mainframe-env.cics.decimal@1", b"3"),
+            ],
+            &[
+                ("LEFT-EDGE", b"LEFT", b"LEFT"),
+                (
+                    "INPUT-MAP",
+                    b"<<\x01\x02aold!||\x03\x04bstay?>>",
+                    b"<<\x00\x02aHI  ||\x00\x03bXYZ  >>",
+                ),
+                ("RIGHT-EDGE", b"RITE", b"RITE"),
+            ],
+            false,
+        );
+    }
+
+    #[test]
+    fn cics_bms_input_storage_present_empty_differs_from_omitted() {
+        let empty = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BMS-EMPTY. {BMS_INPUT_STORAGE_DATA}\n\
+             PROCEDURE DIVISION.\n\
+             EXEC CICS RECEIVE MAP('SYNMAP') INTO(INPUT-MAP) END-EXEC.\n\
+             DISPLAY 'DONE'. STOP RUN."
+        );
+        let empty_result = std::panic::catch_unwind(|| {
+            check_cics_bms_reply(
+                &empty,
+                mainframe_env_host_api::CicsOperation::ReceiveMap,
+                b"EMPTY-FRAME!",
+                &[
+                    ("BMS.ALPHA", "mainframe-env.cics.payload@1", b""),
+                    ("BMS.ALPHA.LENGTH", "mainframe-env.cics.decimal@1", b"0"),
+                ],
+                &[(
+                    "INPUT-MAP",
+                    b"<<\x01\x02aold!||\x03\x04bstay?>>",
+                    b"<<\x00\x00a    ||\x03\x04bstay?>>",
+                )],
+                false,
+            );
+        });
+        let omitted = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BMS-OMITTED. {BMS_INPUT_STORAGE_DATA}\n\
+             PROCEDURE DIVISION.\n\
+             EXEC CICS RECEIVE MAP('SYNMAP') INTO(INPUT-MAP) END-EXEC.\n\
+             DISPLAY 'DONE'. STOP RUN."
+        );
+        let omitted_result = std::panic::catch_unwind(|| {
+            check_cics_bms_reply(
+                &omitted,
+                mainframe_env_host_api::CicsOperation::ReceiveMap,
+                b"OMITTED-FRAME!",
+                &[],
+                &[(
+                    "INPUT-MAP",
+                    b"<<\x01\x02aold!||\x03\x04bstay?>>",
+                    b"<<\x01\x02aold!||\x03\x04bstay?>>",
+                )],
+                false,
+            );
+        });
+        assert!(
+            empty_result.is_ok() && omitted_result.is_ok(),
+            "empty/omitted controls"
+        );
+    }
+
+    #[test]
+    fn cics_bms_input_storage_absent_zero_and_sentinel_bits_survive() {
+        let source = r#"
+IDENTIFICATION DIVISION. PROGRAM-ID. BMS-ABSENT.
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 INPUT-MAP.
+   05 ALPHAL PIC S9(4) COMP VALUE 258.
+   05 ALPHAF PIC X VALUE 'a'.
+   05 ALPHAI PIC X(4) VALUE 'old!'.
+   05 ZEROL PIC S9(4) COMP.
+   05 ZEROF PIC X.
+   05 ZEROI PIC X(4).
+   05 SENTL PIC S9(4) COMP VALUE 1286.
+   05 SENTF PIC X VALUE '!'.
+   05 SENTI PIC X(4) VALUE 'KEEP'.
+PROCEDURE DIVISION.
+    MOVE LOW-VALUES TO ZEROL ZEROF ZEROI.
+    EXEC CICS RECEIVE MAP('SYNMAP') INTO(INPUT-MAP) END-EXEC.
+    DISPLAY 'DONE'. STOP RUN.
+"#;
+        check_cics_bms_reply(
+            source,
+            mainframe_env_host_api::CicsOperation::ReceiveMap,
+            b"ABSENT!DESCRIPTOR!\x00\x00\x00\x06TITLE!",
+            &[
+                ("BMS.ALPHA", "mainframe-env.cics.payload@1", b"NEW!"),
+                ("BMS.ALPHA.LENGTH", "mainframe-env.cics.decimal@1", b"4"),
+            ],
+            &[(
+                "INPUT-MAP",
+                b"\x01\x02aold!\x00\x00\x00\x00\x00\x00\x00\x05\x06!KEEP",
+                b"\x00\x04aNEW!\x00\x00\x00\x00\x00\x00\x00\x05\x06!KEEP",
+            )],
+            false,
+        );
+    }
+
+    #[test]
+    fn cics_bms_input_storage_duplicate_names_stay_in_selected_into_group() {
+        let source = r#"
+IDENTIFICATION DIVISION. PROGRAM-ID. BMS-QUALIFIED.
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 OTHER-MAP.
+   05 ALPHAL PIC S9(4) COMP VALUE 258.
+   05 ALPHAF PIC X VALUE 'x'.
+   05 ALPHAI PIC X(4) VALUE 'KEEP'.
+01 SELECTED-MAP.
+   05 ALPHAL PIC S9(4) COMP VALUE 772.
+   05 ALPHAF PIC X VALUE 'y'.
+   05 ALPHAI PIC X(4) VALUE 'old!'.
+01 ADJACENT-X PIC X(4) VALUE 'EDGE'.
+PROCEDURE DIVISION.
+    EXEC CICS RECEIVE MAP('SYNMAP') INTO(SELECTED-MAP) END-EXEC.
+    DISPLAY 'DONE'. STOP RUN.
+"#;
+        check_cics_bms_reply(
+            source,
+            mainframe_env_host_api::CicsOperation::ReceiveMap,
+            b"QUALIFIED-FRAME!",
+            &[
+                ("BMS.ALPHA", "mainframe-env.cics.payload@1", b"OK"),
+                ("BMS.ALPHA.LENGTH", "mainframe-env.cics.decimal@1", b"2"),
+            ],
+            &[
+                ("OTHER-MAP", b"\x01\x02xKEEP", b"\x01\x02xKEEP"),
+                ("SELECTED-MAP", b"\x03\x04yold!", b"\x00\x02yOK  "),
+                ("ADJACENT-X", b"EDGE", b"EDGE"),
+            ],
+            false,
+        );
+    }
+
+    #[test]
+    fn cics_bms_input_storage_non_symbolic_receive_keeps_raw_payload() {
+        let source = r#"
+IDENTIFICATION DIVISION. PROGRAM-ID. BMS-RAW.
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 RAW-BUFFER PIC X(8) VALUE 'oldbytes'.
+01 ADJACENT-X PIC X(4) VALUE 'EDGE'.
+PROCEDURE DIVISION.
+    EXEC CICS RECEIVE MAP('SYNMAP') INTO(RAW-BUFFER) END-EXEC.
+    DISPLAY 'DONE'. STOP RUN.
+"#;
+        check_cics_bms_reply(
+            source,
+            mainframe_env_host_api::CicsOperation::ReceiveMap,
+            b"RAW12345EXTRA",
+            &[],
+            &[
+                ("RAW-BUFFER", b"oldbytes", b"RAW12345"),
+                ("ADJACENT-X", b"EDGE", b"EDGE"),
+            ],
+            false,
+        );
+    }
+
+    #[test]
+    fn cics_bms_input_storage_non_bms_into_keeps_raw_payload() {
+        let source = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BMS-NONMAP. {BMS_INPUT_STORAGE_DATA}\n\
+             01 WS-LENGTH PIC S9(4) COMP VALUE 21.\n\
+             PROCEDURE DIVISION.\n\
+             EXEC CICS READQ TD QUEUE('SYNQ') INTO(INPUT-MAP) LENGTH(WS-LENGTH) END-EXEC.\n\
+             DISPLAY 'DONE'. STOP RUN."
+        );
+        check_cics_bms_reply(
+            &source,
+            mainframe_env_host_api::CicsOperation::ReadTransientData,
+            b"NONMAP-RAW-IMAGE-1234",
+            &[],
+            &[
+                ("LEFT-EDGE", b"LEFT", b"LEFT"),
+                (
+                    "INPUT-MAP",
+                    b"<<\x01\x02aold!||\x03\x04bstay?>>",
+                    b"NONMAP-RAW-IMAGE-1234",
+                ),
+                ("WS-LENGTH", b"\x00\x15", b"\x00\x15"),
+                ("RIGHT-EDGE", b"RITE", b"RITE"),
+            ],
+            false,
+        );
+    }
+
+    #[test]
+    fn cics_bms_input_storage_thirteen_qualified_move_spaces_baseline() {
+        let source = r#"
+IDENTIFICATION DIVISION. PROGRAM-ID. BMS-MOVE-BASELINE.
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 RESULT-MAP.
+   05 FIELD-01 PIC X(16) VALUE 'AAAAAAAAAAAAAAAA'.
+   05 FIELD-02 PIC X(16) VALUE 'BBBBBBBBBBBBBBBB'.
+   05 FIELD-03 PIC X(2) VALUE 'CC'.
+   05 FIELD-04 PIC X(4) VALUE 'DDDD'.
+   05 FIELD-05 PIC X(10) VALUE 'EEEEEEEEEE'.
+   05 FIELD-06 PIC X(60) VALUE
+       'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF'.
+   05 FIELD-07 PIC X(12) VALUE 'GGGGGGGGGGGG'.
+   05 FIELD-08 PIC X(10) VALUE 'HHHHHHHHHH'.
+   05 FIELD-09 PIC X(10) VALUE 'IIIIIIIIII'.
+   05 FIELD-10 PIC X(9) VALUE 'JJJJJJJJJ'.
+   05 FIELD-11 PIC X(30) VALUE 'KKKKKKKKKKKKKKKKKKKKKKKKKKKKKK'.
+   05 FIELD-12 PIC X(25) VALUE 'LLLLLLLLLLLLLLLLLLLLLLLLL'.
+   05 FIELD-13 PIC X(10) VALUE 'MMMMMMMMMM'.
+01 SHADOW-MAP.
+   05 FIELD-01 PIC X VALUE 'a'.
+   05 FIELD-02 PIC X VALUE 'b'.
+   05 FIELD-03 PIC X VALUE 'c'.
+   05 FIELD-04 PIC X VALUE 'd'.
+   05 FIELD-05 PIC X VALUE 'e'.
+   05 FIELD-06 PIC X VALUE 'f'.
+   05 FIELD-07 PIC X VALUE 'g'.
+   05 FIELD-08 PIC X VALUE 'h'.
+   05 FIELD-09 PIC X VALUE 'i'.
+   05 FIELD-10 PIC X VALUE 'j'.
+   05 FIELD-11 PIC X VALUE 'k'.
+   05 FIELD-12 PIC X VALUE 'l'.
+   05 FIELD-13 PIC X VALUE 'm'.
+PROCEDURE DIVISION.
+    MOVE SPACES TO FIELD-01 OF RESULT-MAP FIELD-02 OF RESULT-MAP
+        FIELD-03 OF RESULT-MAP FIELD-04 OF RESULT-MAP FIELD-05 OF RESULT-MAP
+        FIELD-06 OF RESULT-MAP FIELD-07 OF RESULT-MAP FIELD-08 OF RESULT-MAP
+        FIELD-09 OF RESULT-MAP FIELD-10 OF RESULT-MAP FIELD-11 OF RESULT-MAP
+        FIELD-12 OF RESULT-MAP FIELD-13 OF RESULT-MAP.
+    DISPLAY 'DONE'. STOP RUN.
+"#;
+        let expected = &[0x20; 214];
+        retain_execution_bytes(source, "cbl", source.as_bytes()).unwrap();
+        retain_execution_bytes(source, "expected-output", b"DONE\n").unwrap();
+        retain_execution_bytes(source, "expected-terminal", b"Completed:0:DONE\n").unwrap();
+        retain_execution_bytes(source, "RESULT-MAP.expected", expected).unwrap();
+        retain_execution_bytes(source, "SHADOW-MAP.expected", b"abcdefghijklm").unwrap();
+        let (output, machine) = execute_without_effects(source).expect("qualified MOVE baseline");
+        let result = machine.variable("RESULT-MAP").unwrap();
+        let shadow = machine.variable("SHADOW-MAP").unwrap();
+        retain_execution_bytes(source, "RESULT-MAP.actual", result.bytes()).unwrap();
+        retain_execution_bytes(source, "SHADOW-MAP.actual", shadow.bytes()).unwrap();
+        assert_eq!(result.bytes(), expected);
+        assert_eq!(shadow.bytes(), b"abcdefghijklm");
+        assert_eq!(output, b"DONE\n");
+    }
+
+    #[test]
+    fn cics_bms_input_storage_malformed_projection_refuses_before_mapped_writes() {
+        let malformed = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BMS-BAD-LENGTH. {BMS_INPUT_STORAGE_DATA}\n\
+             PROCEDURE DIVISION.\n\
+             EXEC CICS RECEIVE MAP('SYNMAP') INTO(INPUT-MAP) END-EXEC.\n\
+             DISPLAY 'DONE'. STOP RUN."
+        );
+        let malformed_result = std::panic::catch_unwind(|| {
+            check_cics_bms_reply(
+                &malformed,
+                mainframe_env_host_api::CicsOperation::ReceiveMap,
+                b"BAD-LENGTH-FRAME!",
+                &[
+                    ("BMS.ALPHA", "mainframe-env.cics.payload@1", b"OK"),
+                    ("BMS.ALPHA.LENGTH", "mainframe-env.cics.decimal@1", b"2"),
+                    ("BMS.BETA", "mainframe-env.cics.payload@1", b"XYZ"),
+                    ("BMS.BETA.LENGTH", "mainframe-env.cics.decimal@1", b"bad"),
+                ],
+                &[(
+                    "INPUT-MAP",
+                    b"<<\x01\x02aold!||\x03\x04bstay?>>",
+                    b"<<\x01\x02aold!||\x03\x04bstay?>>",
+                )],
+                true,
+            );
+        });
+        let oversized = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BMS-OVERSIZED. {BMS_INPUT_STORAGE_DATA}\n\
+             PROCEDURE DIVISION.\n\
+             EXEC CICS RECEIVE MAP('SYNMAP') INTO(INPUT-MAP) END-EXEC.\n\
+             DISPLAY 'DONE'. STOP RUN."
+        );
+        let oversized_result = std::panic::catch_unwind(|| {
+            check_cics_bms_reply(
+                &oversized,
+                mainframe_env_host_api::CicsOperation::ReceiveMap,
+                b"OVERSIZED-FRAME!",
+                &[
+                    ("BMS.ALPHA", "mainframe-env.cics.payload@1", b"OK"),
+                    ("BMS.ALPHA.LENGTH", "mainframe-env.cics.decimal@1", b"2"),
+                    ("BMS.BETA", "mainframe-env.cics.payload@1", b"TOOLONG"),
+                    ("BMS.BETA.LENGTH", "mainframe-env.cics.decimal@1", b"7"),
+                ],
+                &[(
+                    "INPUT-MAP",
+                    b"<<\x01\x02aold!||\x03\x04bstay?>>",
+                    b"<<\x01\x02aold!||\x03\x04bstay?>>",
+                )],
+                true,
+            );
+        });
+        assert!(
+            malformed_result.is_ok() && oversized_result.is_ok(),
+            "malformed/oversized controls"
+        );
+    }
+
     fn execute_without_effects(source: &str) -> Result<(Vec<u8>, ReferenceMachine), String> {
         let artifact = crate::compile(source)?;
+        retain_execution_bytes(source, "cbl", source.as_bytes())?;
+        retain_execution_bytes(source, "bin", artifact.payload())?;
         let invocation = crate::invocation(&artifact, 4096);
         let mut machine =
             ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
@@ -440,7 +1122,511 @@ mod tests {
                 }
             }
         };
+        retain_execution_bytes(source, "output", &output)?;
         Ok((output, machine))
+    }
+
+    fn retain_execution_bytes(source: &str, extension: &str, bytes: &[u8]) -> Result<(), String> {
+        let Some(directory) = std::env::var_os("MAINFRAME_COBOL_TEST_RECEIPTS") else {
+            return Ok(());
+        };
+        let name = source
+            .split_whitespace()
+            .skip_while(|token| *token != "PROGRAM-ID.")
+            .nth(1)
+            .ok_or("test source has no program identity")?
+            .trim_end_matches('.');
+        std::fs::write(
+            std::path::Path::new(&directory).join(format!("{name}.{extension}")),
+            bytes,
+        )
+        .map_err(|error| format!("retain test execution bytes: {error}"))
+    }
+
+    fn check_figurative_relation(source: &str, expected_output: &[u8], fields: &[(&str, &[u8])]) {
+        retain_execution_bytes(source, "cbl", source.as_bytes()).unwrap();
+        retain_execution_bytes(source, "expected-output", expected_output).unwrap();
+        let (output, machine) =
+            execute_without_effects(source).expect("figurative relation runtime");
+        let mut observations = Vec::new();
+        for (name, expected) in fields {
+            let actual = machine
+                .variable(name)
+                .expect("observed storage")
+                .bytes()
+                .to_vec();
+            retain_execution_bytes(source, &format!("{name}.actual"), &actual).unwrap();
+            retain_execution_bytes(source, &format!("{name}.expected"), expected).unwrap();
+            eprintln!("field={name}; expected={expected:?}; actual={actual:?}");
+            observations.push((name, expected, actual));
+        }
+        eprintln!("expected-output={expected_output:?}; actual-output={output:?}");
+        for (name, expected, actual) in observations {
+            assert_eq!(actual, *expected, "unchanged storage {name}");
+        }
+        assert_eq!(output, expected_output, "literal branch outcomes");
+    }
+
+    #[test]
+    fn figurative_relation_low_both_positions() {
+        let source = r#"
+IDENTIFICATION DIVISION. PROGRAM-ID. FIG-LOW.
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 WIDE-X PIC X(16).
+PROCEDURE DIVISION.
+    MOVE LOW-VALUES TO WIDE-X.
+    IF WIDE-X = LOW-VALUES DISPLAY 'T1' ELSE DISPLAY 'F1' END-IF.
+    IF LOW-VALUES = WIDE-X DISPLAY 'T2' ELSE DISPLAY 'F2' END-IF.
+    IF WIDE-X = LOW-VALUE DISPLAY 'T3' ELSE DISPLAY 'F3' END-IF.
+    IF LOW-VALUE = WIDE-X DISPLAY 'T4' ELSE DISPLAY 'F4' END-IF.
+    STOP RUN.
+"#;
+        check_figurative_relation(source, b"T1\nT2\nT3\nT4\n", &[("WIDE-X", &[0; 16])]);
+    }
+
+    #[test]
+    fn figurative_relation_high_null_aliases() {
+        let source = r#"
+IDENTIFICATION DIVISION. PROGRAM-ID. FIG-HIGH-NULL.
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 HIGH-X PIC X(5). 01 NULL-X PIC X(7).
+PROCEDURE DIVISION.
+    MOVE HIGH-VALUES TO HIGH-X. MOVE LOW-VALUES TO NULL-X.
+    IF HIGH-X = HIGH-VALUE DISPLAY 'T1' ELSE DISPLAY 'F1' END-IF.
+    IF HIGH-VALUE = HIGH-X DISPLAY 'T2' ELSE DISPLAY 'F2' END-IF.
+    IF HIGH-X = HIGH-VALUES DISPLAY 'T3' ELSE DISPLAY 'F3' END-IF.
+    IF HIGH-VALUES = HIGH-X DISPLAY 'T4' ELSE DISPLAY 'F4' END-IF.
+    IF NULL-X = NULL DISPLAY 'T5' ELSE DISPLAY 'F5' END-IF.
+    IF NULL = NULL-X DISPLAY 'T6' ELSE DISPLAY 'F6' END-IF.
+    IF NULL-X = NULLS DISPLAY 'T7' ELSE DISPLAY 'F7' END-IF.
+    IF NULLS = NULL-X DISPLAY 'T8' ELSE DISPLAY 'F8' END-IF.
+    STOP RUN.
+"#;
+        check_figurative_relation(
+            source,
+            b"T1\nT2\nT3\nT4\nT5\nT6\nT7\nT8\n",
+            &[("HIGH-X", &[255; 5]), ("NULL-X", &[0; 7])],
+        );
+    }
+
+    #[test]
+    fn figurative_relation_abbreviated_branches() {
+        let source = r#"
+IDENTIFICATION DIVISION. PROGRAM-ID. FIG-ABBREVIATED.
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 LOW-X PIC X(4). 01 SPACE-X PIC X(4) VALUE SPACES.
+01 OTHER-X PIC X(4) VALUE 'ABCD'.
+PROCEDURE DIVISION.
+    MOVE LOW-VALUES TO LOW-X.
+    IF LOW-X = SPACES OR LOW-VALUES DISPLAY 'T1' ELSE DISPLAY 'F1' END-IF.
+    IF SPACE-X = SPACES OR LOW-VALUES DISPLAY 'T2' ELSE DISPLAY 'F2' END-IF.
+    IF OTHER-X = SPACES OR LOW-VALUES DISPLAY 'T3' ELSE DISPLAY 'F3' END-IF.
+    IF LOW-X NOT = SPACES AND LOW-VALUES DISPLAY 'T4' ELSE DISPLAY 'F4' END-IF.
+    IF SPACE-X NOT = SPACES AND LOW-VALUES DISPLAY 'T5' ELSE DISPLAY 'F5' END-IF.
+    IF OTHER-X NOT = SPACES AND LOW-VALUES DISPLAY 'T6' ELSE DISPLAY 'F6' END-IF.
+    IF NOT (LOW-X = SPACES OR LOW-VALUES) DISPLAY 'T7' ELSE DISPLAY 'F7' END-IF.
+    IF NOT (SPACE-X = SPACES OR LOW-VALUES) DISPLAY 'T8' ELSE DISPLAY 'F8' END-IF.
+    IF NOT (OTHER-X = SPACES OR LOW-VALUES) DISPLAY 'T9' ELSE DISPLAY 'F9' END-IF.
+    STOP RUN.
+"#;
+        check_figurative_relation(
+            source,
+            b"T1\nT2\nF3\nF4\nF5\nT6\nF7\nF8\nT9\n",
+            &[
+                ("LOW-X", &[0; 4]),
+                ("SPACE-X", b"    "),
+                ("OTHER-X", b"ABCD"),
+            ],
+        );
+    }
+
+    #[test]
+    fn figurative_relation_alphanumeric_zero_space_aliases() {
+        let source = r#"
+IDENTIFICATION DIVISION. PROGRAM-ID. FIG-ZERO-SPACE.
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 ZERO-X PIC X(6) VALUE '000000'. 01 SPACE-X PIC X(6) VALUE SPACES.
+PROCEDURE DIVISION.
+    IF ZERO-X = ZERO DISPLAY 'T1' ELSE DISPLAY 'F1' END-IF.
+    IF ZERO = ZERO-X DISPLAY 'T2' ELSE DISPLAY 'F2' END-IF.
+    IF ZERO-X = ZEROS DISPLAY 'T3' ELSE DISPLAY 'F3' END-IF.
+    IF ZEROS = ZERO-X DISPLAY 'T4' ELSE DISPLAY 'F4' END-IF.
+    IF ZERO-X = ZEROES DISPLAY 'T5' ELSE DISPLAY 'F5' END-IF.
+    IF ZEROES = ZERO-X DISPLAY 'T6' ELSE DISPLAY 'F6' END-IF.
+    IF SPACE-X = SPACE DISPLAY 'T7' ELSE DISPLAY 'F7' END-IF.
+    IF SPACE = SPACE-X DISPLAY 'T8' ELSE DISPLAY 'F8' END-IF.
+    IF SPACE-X = SPACES DISPLAY 'T9' ELSE DISPLAY 'F9' END-IF.
+    IF SPACES = SPACE-X DISPLAY 'TA' ELSE DISPLAY 'FA' END-IF.
+    STOP RUN.
+"#;
+        check_figurative_relation(
+            source,
+            b"T1\nT2\nT3\nT4\nT5\nT6\nT7\nT8\nT9\nTA\n",
+            &[("ZERO-X", b"000000"), ("SPACE-X", b"      ")],
+        );
+    }
+
+    #[test]
+    fn figurative_relation_ordinary_padding_quoted_literals() {
+        let source = r#"
+IDENTIFICATION DIVISION. PROGRAM-ID. FIG-ORDINARY.
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 SHORT-X PIC X. 01 WIDE-X PIC X(4).
+01 PAD-X PIC X(4). 01 TEXT-X PIC X(10) VALUE 'LOW-VALUES'.
+01 ZERO-TEXT PIC X(6) VALUE 'ZERO'. 01 ASCII-X PIC X(6) VALUE '000000'.
+01 LETTER-X PIC X(4) VALUE 'A'.
+PROCEDURE DIVISION.
+    MOVE LOW-VALUES TO SHORT-X WIDE-X.
+    MOVE SPACES TO PAD-X. MOVE LOW-VALUES TO PAD-X(1:1).
+    IF SHORT-X = WIDE-X DISPLAY 'T1' ELSE DISPLAY 'F1' END-IF.
+    IF WIDE-X = SHORT-X DISPLAY 'T2' ELSE DISPLAY 'F2' END-IF.
+    IF SHORT-X = PAD-X DISPLAY 'T3' ELSE DISPLAY 'F3' END-IF.
+    IF TEXT-X = 'LOW-VALUES' DISPLAY 'T4' ELSE DISPLAY 'F4' END-IF.
+    IF 'LOW-VALUES' = TEXT-X DISPLAY 'T5' ELSE DISPLAY 'F5' END-IF.
+    IF ZERO-TEXT = 'ZERO' DISPLAY 'T6' ELSE DISPLAY 'F6' END-IF.
+    IF 'ZERO' = ZERO-TEXT DISPLAY 'T7' ELSE DISPLAY 'F7' END-IF.
+    IF WIDE-X = 'LOW-VALUES' DISPLAY 'T8' ELSE DISPLAY 'F8' END-IF.
+    IF ASCII-X = 'ZERO' DISPLAY 'T9' ELSE DISPLAY 'F9' END-IF.
+    IF LETTER-X = 'A' DISPLAY 'TA' ELSE DISPLAY 'FA' END-IF.
+    STOP RUN.
+"#;
+        check_figurative_relation(
+            source,
+            b"F1\nF2\nT3\nT4\nT5\nT6\nT7\nF8\nF9\nTA\n",
+            &[
+                ("SHORT-X", &[0]),
+                ("WIDE-X", &[0; 4]),
+                ("PAD-X", b"\0   "),
+                ("TEXT-X", b"LOW-VALUES"),
+                ("ZERO-TEXT", b"ZERO  "),
+                ("ASCII-X", b"000000"),
+                ("LETTER-X", b"A   "),
+            ],
+        );
+    }
+
+    #[test]
+    fn figurative_relation_selected_reference_width() {
+        let source = r#"
+IDENTIFICATION DIVISION. PROGRAM-ID. FIG-REFERENCES.
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 FIRST-GROUP. 05 LEAF-X PIC X(6) VALUE 'ABCDEF'.
+01 SECOND-GROUP. 05 LEAF-X PIC X(6) VALUE 'L000R!'.
+01 TABLE-ROOT. 05 ITEM-X PIC X(3) OCCURS 2 TIMES.
+01 WS-IDX PIC 9 VALUE 2.
+PROCEDURE DIVISION.
+    MOVE LOW-VALUES TO LEAF-X OF SECOND-GROUP(2:3).
+    MOVE 'ONE' TO ITEM-X(1). MOVE HIGH-VALUES TO ITEM-X(2).
+    IF LEAF-X OF SECOND-GROUP(2:3) = LOW-VALUES DISPLAY 'T1' ELSE DISPLAY 'F1' END-IF.
+    IF LOW-VALUES = LEAF-X OF SECOND-GROUP(2:3) DISPLAY 'T2' ELSE DISPLAY 'F2' END-IF.
+    IF LEAF-X OF SECOND-GROUP = LOW-VALUES DISPLAY 'T3' ELSE DISPLAY 'F3' END-IF.
+    IF ITEM-X(WS-IDX) = HIGH-VALUES DISPLAY 'T4' ELSE DISPLAY 'F4' END-IF.
+    IF HIGH-VALUES = ITEM-X(WS-IDX) DISPLAY 'T5' ELSE DISPLAY 'F5' END-IF.
+    STOP RUN.
+"#;
+        check_figurative_relation(
+            source,
+            b"T1\nT2\nF3\nT4\nT5\n",
+            &[
+                ("FIRST-GROUP", b"ABCDEF"),
+                ("SECOND-GROUP", b"L\0\0\0R!"),
+                ("TABLE-ROOT", b"ONE\xff\xff\xff"),
+                ("WS-IDX", b"2"),
+            ],
+        );
+    }
+
+    #[test]
+    fn figurative_relation_numeric_level88_baseline() {
+        let source = r#"
+IDENTIFICATION DIVISION. PROGRAM-ID. FIG-BASELINE.
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 NUM PIC 9(3) VALUE 0.
+01 LOW-X PIC X(4). 88 IS-LOW VALUE LOW-VALUES.
+01 HIGH-X PIC X(4). 88 IS-HIGH VALUE HIGH-VALUES.
+01 SPACE-X PIC X(4) VALUE SPACES. 88 IS-SPACE VALUE SPACES.
+01 ZERO-X PIC X(4) VALUE '0000'. 88 IS-ZERO VALUE ZEROS.
+PROCEDURE DIVISION.
+    MOVE LOW-VALUES TO LOW-X. MOVE HIGH-VALUES TO HIGH-X.
+    IF NUM = ZERO DISPLAY 'T1' ELSE DISPLAY 'F1' END-IF.
+    IF NUM = ZEROS DISPLAY 'T2' ELSE DISPLAY 'F2' END-IF.
+    IF NUM = ZEROES DISPLAY 'T3' ELSE DISPLAY 'F3' END-IF.
+    IF IS-LOW DISPLAY 'T4' ELSE DISPLAY 'F4' END-IF.
+    IF IS-HIGH DISPLAY 'T5' ELSE DISPLAY 'F5' END-IF.
+    IF IS-SPACE DISPLAY 'T6' ELSE DISPLAY 'F6' END-IF.
+    IF IS-ZERO DISPLAY 'T7' ELSE DISPLAY 'F7' END-IF.
+    STOP RUN.
+"#;
+        check_figurative_relation(
+            source,
+            b"T1\nT2\nT3\nT4\nT5\nT6\nT7\n",
+            &[
+                ("NUM", b"000"),
+                ("LOW-X", &[0; 4]),
+                ("HIGH-X", &[255; 4]),
+                ("SPACE-X", b"    "),
+                ("ZERO-X", b"0000"),
+            ],
+        );
+    }
+
+    #[test]
+    fn figurative_relation_operators_collation() {
+        let source = r#"
+IDENTIFICATION DIVISION. PROGRAM-ID. FIG-OPERATORS.
+DATA DIVISION. WORKING-STORAGE SECTION.
+01 LOW-X PIC X(4). 01 HIGH-X PIC X(4).
+01 LETTER-X PIC X(4) VALUE 'AAAA'. 01 DIGIT-X PIC X(4) VALUE '0000'.
+PROCEDURE DIVISION.
+    MOVE LOW-VALUES TO LOW-X. MOVE HIGH-VALUES TO HIGH-X.
+    IF LOW-X = LOW-VALUES DISPLAY 'T1' ELSE DISPLAY 'F1' END-IF.
+    IF LOW-X <> LOW-VALUES DISPLAY 'T2' ELSE DISPLAY 'F2' END-IF.
+    IF LOW-X >= LOW-VALUES DISPLAY 'T3' ELSE DISPLAY 'F3' END-IF.
+    IF LOW-X <= LOW-VALUES DISPLAY 'T4' ELSE DISPLAY 'F4' END-IF.
+    IF LOW-X < LOW-VALUES DISPLAY 'T5' ELSE DISPLAY 'F5' END-IF.
+    IF LOW-X > LOW-VALUES DISPLAY 'T6' ELSE DISPLAY 'F6' END-IF.
+    IF LOW-X NOT = LOW-VALUES DISPLAY 'T7' ELSE DISPLAY 'F7' END-IF.
+    IF HIGH-X = HIGH-VALUES DISPLAY 'T8' ELSE DISPLAY 'F8' END-IF.
+    IF HIGH-X <> HIGH-VALUES DISPLAY 'T9' ELSE DISPLAY 'F9' END-IF.
+    IF HIGH-X >= HIGH-VALUES DISPLAY 'TA' ELSE DISPLAY 'FA' END-IF.
+    IF HIGH-X <= HIGH-VALUES DISPLAY 'TB' ELSE DISPLAY 'FB' END-IF.
+    IF HIGH-X < HIGH-VALUES DISPLAY 'TC' ELSE DISPLAY 'FC' END-IF.
+    IF HIGH-X > HIGH-VALUES DISPLAY 'TD' ELSE DISPLAY 'FD' END-IF.
+    IF HIGH-X NOT = HIGH-VALUES DISPLAY 'TE' ELSE DISPLAY 'FE' END-IF.
+    IF LOW-VALUES < LETTER-X DISPLAY 'TF' ELSE DISPLAY 'FF' END-IF.
+    IF HIGH-VALUES > LETTER-X DISPLAY 'TG' ELSE DISPLAY 'FG' END-IF.
+    IF LETTER-X < ZEROES DISPLAY 'TH' ELSE DISPLAY 'FH' END-IF.
+    IF DIGIT-X > LETTER-X DISPLAY 'TI' ELSE DISPLAY 'FI' END-IF.
+    STOP RUN.
+"#;
+        check_figurative_relation(
+            source,
+            b"T1\nF2\nT3\nT4\nF5\nF6\nF7\nT8\nF9\nTA\nTB\nFC\nFD\nFE\nTF\nTG\nTH\nTI\n",
+            &[
+                ("LOW-X", &[0; 4]),
+                ("HIGH-X", &[255; 4]),
+                ("LETTER-X", b"AAAA"),
+                ("DIGIT-X", b"0000"),
+            ],
+        );
+    }
+
+    const STRING_REFERENCE_MENU_DATA: &str = r#"
+DATA DIVISION.
+WORKING-STORAGE SECTION.
+01 WS-IDX PIC S9(4) COMP VALUE 2.
+01 WS-TEXT PIC X(40) VALUE SPACES.
+01 MENU-ROOT.
+   05 MENU-DATA.
+      10 FILLER PIC 9(2) VALUE 1.
+      10 FILLER PIC X(35) VALUE 'Account View'.
+      10 FILLER PIC X(8) VALUE 'COACTVWC'.
+      10 FILLER PIC X VALUE 'U'.
+      10 FILLER PIC 9(2) VALUE 6.
+      10 FILLER PIC X(35) VALUE 'Transaction List'.
+      10 FILLER PIC X(8) VALUE 'COTRN00C'.
+      10 FILLER PIC X VALUE 'U'.
+   05 MENU-TABLE REDEFINES MENU-DATA.
+      10 MENU-ENTRY OCCURS 2 TIMES.
+         15 MENU-NUM PIC 9(2).
+         15 MENU-NAME PIC X(35).
+         15 MENU-PGM PIC X(8).
+         15 MENU-USER PIC X.
+"#;
+
+    #[test]
+    fn string_reference_occurs_sender() {
+        let source = r#"
+IDENTIFICATION DIVISION.
+PROGRAM-ID. STRING-REFERENCE-OCCURS.
+DATA DIVISION.
+WORKING-STORAGE SECTION.
+01 WS-IDX PIC S9(4) COMP VALUE 2.
+01 WS-TEXT PIC X(8) VALUE '--------'.
+01 TABLE-ROOT.
+   05 ITEM-X PIC X(3) OCCURS 2 TIMES.
+PROCEDURE DIVISION.
+    MOVE 'ONE' TO ITEM-X(1).
+    MOVE 'TWO' TO ITEM-X(2).
+    STRING ITEM-X(WS-IDX) DELIMITED BY SIZE
+           '!' DELIMITED BY SIZE INTO WS-TEXT END-STRING.
+    DISPLAY WS-TEXT.
+    STOP RUN.
+"#;
+        let (output, machine) = execute_without_effects(source).expect("OCCURS sender runtime");
+        assert_eq!(output, b"TWO!----\n");
+        assert_eq!(machine.variable("WS-TEXT").unwrap().bytes(), b"TWO!----");
+        assert_eq!(machine.variable("TABLE-ROOT").unwrap().bytes(), b"ONETWO");
+    }
+
+    #[test]
+    fn string_reference_redefines_menu_sender() {
+        let source = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. STRING-REFERENCE-MENU. {STRING_REFERENCE_MENU_DATA}\n\
+             PROCEDURE DIVISION.\n\
+             STRING MENU-NUM(WS-IDX) DELIMITED BY SIZE\n\
+                    '. ' DELIMITED BY SIZE\n\
+                    MENU-NAME(WS-IDX) DELIMITED BY SIZE\n\
+                 INTO WS-TEXT END-STRING.\n\
+             DISPLAY WS-TEXT. STOP RUN."
+        );
+        let (output, machine) = execute_without_effects(&source).expect("menu sender runtime");
+        assert_eq!(output, b"06. Transaction List                    \n");
+        assert_eq!(
+            machine.variable("WS-TEXT").unwrap().bytes(),
+            b"06. Transaction List                    "
+        );
+    }
+
+    #[test]
+    fn string_reference_shared_redefines_baseline() {
+        let source = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. STRING-REFERENCE-BASELINE. {STRING_REFERENCE_MENU_DATA}\n\
+             PROCEDURE DIVISION.\n\
+             DISPLAY MENU-NUM(WS-IDX).\n\
+             DISPLAY MENU-NAME(WS-IDX).\n\
+             DISPLAY MENU-PGM(WS-IDX).\n\
+             DISPLAY MENU-USER(WS-IDX). STOP RUN."
+        );
+        let (output, machine) =
+            execute_without_effects(&source).expect("shared reference baseline");
+        assert_eq!(
+            output,
+            b"06\nTransaction List                   \nCOTRN00C\nU\n"
+        );
+        assert_eq!(
+            machine.variable("WS-TEXT").unwrap().bytes(),
+            b"                                        "
+        );
+        assert_eq!(
+            machine.variable("MENU-DATA").unwrap().bytes(),
+            b"01Account View                       COACTVWCU06Transaction List                   COTRN00CU"
+        );
+    }
+
+    #[test]
+    fn string_reference_qualified_modified_sender() {
+        let source = r#"
+IDENTIFICATION DIVISION.
+PROGRAM-ID. STRING-REFERENCE-QUALIFIED.
+DATA DIVISION.
+WORKING-STORAGE SECTION.
+01 FIRST-GROUP.
+   05 LEAF-X PIC X(6) VALUE 'ABCDEF'.
+01 SECOND-GROUP.
+   05 LEAF-X PIC X(6) VALUE 'uvwxyz'.
+01 WS-TEXT PIC X(10) VALUE '----------'.
+PROCEDURE DIVISION.
+    STRING LEAF-X OF SECOND-GROUP(2:3) DELIMITED BY SIZE
+           '(Q)' DELIMITED BY SIZE INTO WS-TEXT END-STRING.
+    DISPLAY WS-TEXT.
+    STOP RUN.
+"#;
+        let (output, machine) = execute_without_effects(source).expect("qualified modified sender");
+        assert_eq!(output, b"vwx(Q)----\n");
+        assert_eq!(machine.variable("WS-TEXT").unwrap().bytes(), b"vwx(Q)----");
+        assert_eq!(machine.variable("FIRST-GROUP").unwrap().bytes(), b"ABCDEF");
+        assert_eq!(machine.variable("SECOND-GROUP").unwrap().bytes(), b"uvwxyz");
+    }
+
+    #[test]
+    fn string_reference_indexed_delimiter() {
+        let source = r#"
+IDENTIFICATION DIVISION.
+PROGRAM-ID. STRING-REFERENCE-DELIMITER.
+DATA DIVISION.
+WORKING-STORAGE SECTION.
+01 SOURCE-X PIC X(5) VALUE 'AA#BB'.
+01 WS-IDX PIC S9(4) COMP VALUE 2.
+01 WS-TEXT PIC X(8) VALUE '--------'.
+01 DELIMITER-ROOT.
+   05 DELIMITER-X PIC X OCCURS 2 TIMES.
+PROCEDURE DIVISION.
+    MOVE '!' TO DELIMITER-X(1).
+    MOVE '#' TO DELIMITER-X(2).
+    STRING SOURCE-X DELIMITED BY DELIMITER-X(WS-IDX)
+        INTO WS-TEXT END-STRING.
+    DISPLAY WS-TEXT.
+    STOP RUN.
+"#;
+        let (output, machine) = execute_without_effects(source).expect("indexed delimiter runtime");
+        assert_eq!(output, b"AA------\n");
+        assert_eq!(machine.variable("WS-TEXT").unwrap().bytes(), b"AA------");
+        assert_eq!(machine.variable("SOURCE-X").unwrap().bytes(), b"AA#BB");
+        assert_eq!(machine.variable("DELIMITER-ROOT").unwrap().bytes(), b"!#");
+    }
+
+    #[test]
+    fn string_reference_invalid_subscript() {
+        let mut observations = Vec::new();
+        for index in [0, 3] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. STRING-REFERENCE-INVALID-{index}.\n\
+                 DATA DIVISION. WORKING-STORAGE SECTION.\n\
+                 01 WS-IDX PIC S9(4) COMP VALUE {index}.\n\
+                 01 WS-TEXT PIC X(8) VALUE '--------'.\n\
+                 01 TABLE-ROOT. 05 ITEM-X PIC X(3) OCCURS 2 TIMES.\n\
+                 PROCEDURE DIVISION.\n\
+                 MOVE 'ONE' TO ITEM-X(1). MOVE 'TWO' TO ITEM-X(2).\n\
+                 STRING ITEM-X(WS-IDX) DELIMITED BY SIZE INTO WS-TEXT END-STRING.\n\
+                 STOP RUN."
+            );
+            let artifact = crate::compile(&source).expect("invalid-subscript source compiles");
+            retain_execution_bytes(&source, "cbl", source.as_bytes()).unwrap();
+            retain_execution_bytes(&source, "bin", artifact.payload()).unwrap();
+            let mut machine = ReferenceMachine::from_binary(
+                artifact.payload(),
+                crate::invocation(&artifact, 4096),
+                CodecLimits::default(),
+            )
+            .unwrap();
+            let terminal = loop {
+                match machine.drive(MachineResume::Start, Quantum::new(512, 64 * 1024).unwrap()) {
+                    MachineDrive::Continue => {}
+                    terminal => break terminal,
+                }
+            };
+            let target = machine.variable("WS-TEXT").unwrap().bytes().to_vec();
+            let table = machine.variable("TABLE-ROOT").unwrap().bytes().to_vec();
+            retain_execution_bytes(&source, "target", &target).unwrap();
+            eprintln!("index={index}; terminal={terminal:?}; target={target:?}; table={table:?}");
+            observations.push((index, terminal, target, table));
+        }
+        for (index, terminal, target, table) in observations {
+            assert_eq!(
+                target, b"--------",
+                "index {index} must not mutate the target"
+            );
+            assert_eq!(table, b"ONETWO");
+            let MachineDrive::Condition(condition) = terminal else {
+                panic!("index {index} expected checked SubscriptError, got {terminal:?}");
+            };
+            assert_eq!(condition.name, "SUBSCRIPT-ERROR");
+            assert_eq!(condition.response, 3);
+            assert!(!condition.handled);
+        }
+    }
+
+    #[test]
+    fn string_reference_literal_pointer_overflow() {
+        let source = r#"
+IDENTIFICATION DIVISION.
+PROGRAM-ID. STRING-REFERENCE-OVERFLOW.
+DATA DIVISION.
+WORKING-STORAGE SECTION.
+01 WS-TEXT PIC X(5) VALUE '-----'.
+01 PTR-X PIC 9 VALUE 3.
+PROCEDURE DIVISION.
+    STRING 'A(B)' DELIMITED BY SIZE INTO WS-TEXT WITH POINTER PTR-X
+        ON OVERFLOW DISPLAY 'OVERFLOW' END-STRING.
+    DISPLAY WS-TEXT.
+    DISPLAY PTR-X.
+    STOP RUN.
+"#;
+        let (output, machine) = execute_without_effects(source).expect("literal pointer overflow");
+        assert_eq!(output, b"OVERFLOW\n--A(B\n6\n");
+        assert_eq!(machine.variable("WS-TEXT").unwrap().bytes(), b"--A(B");
+        assert_eq!(machine.variable("PTR-X").unwrap().bytes(), b"6");
     }
 
     #[test]

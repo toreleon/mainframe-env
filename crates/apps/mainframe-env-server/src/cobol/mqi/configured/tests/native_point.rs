@@ -3,10 +3,13 @@ use super::setup::*;
 use super::*;
 use mainframe_env_execution_api::{AuditDecision, AuditSubjectRecord, ExecutionOutcome};
 use mainframe_env_host_api::mq_md_value::MqMdCharacterEncoding;
+use mainframe_env_interpreter::MqMqiProgramFrame;
 use mainframe_env_mq::MqTrustedBatchProducerSource;
 use mainframe_env_store_api::{EffectState, ExecutionState, ExecutionStore, ProviderStateStore};
 use std::sync::atomic::Ordering;
+mod custody;
 mod refusals;
+mod successor;
 
 pub(super) fn native(sqlite: bool, version: i32) -> Fixture {
     Fixture::native_points(
@@ -138,7 +141,7 @@ fn genuine_compiled_native_root_open_close_disc_on_memory_owned_sqlite() {
                 assert_eq!(done.output.bytes(), b"POINT-DONE\n");
                 assert_eq!(original, before);
                 assert!(original.parent_execution_id.is_none());
-                assert!(original.bindings.get("mq.host-context").is_none());
+                assert!(!original.bindings.contains_key("mq.host-context"));
                 assert_receipts(&f, &original, 4);
                 let execution = f
                     .store

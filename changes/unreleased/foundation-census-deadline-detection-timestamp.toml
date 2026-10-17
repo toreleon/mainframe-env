@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Record the original Linux census deadline-detection clock sample separately from later failure retention, preserving census limits, membership decisions and command closure behavior."

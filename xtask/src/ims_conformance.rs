@@ -142,12 +142,12 @@ pub(super) fn run(root: &Path, args: &ConformanceArgs) -> TaskResult {
         .map_err(|e| e.to_string())?;
     let report = runtime.prepare(&candidate, &selection, &context)?;
     let mutants = runtime.mutation_checks()?;
-    println!(
+    conformance_output::diagnostic(format_args!(
         "ims-candidate-preparation checks={} mismatches={} observation-mutants-rejected={} official-credit=0/25 licensed-credit=0/25 review=pending-maintainer",
         report.checks,
         report.mismatches.len(),
         mutants
-    );
+    ))?;
     require(
         report.checks > 0,
         "IMS preparation selection executed zero checks",
@@ -278,6 +278,7 @@ mod tests {
             gate: Some("local".into()),
             shard: None,
             replay: None,
+            output: None,
             prepare_candidates: false,
             check: true,
         };

@@ -88,4 +88,9 @@ pub use program::{
     UtilityDisposition, common_program_catalog_sha256, decode_program_output,
     resolve_program_registration, system_service_program, utility_disposition,
 };
-pub use service::{BatchLimits, BatchService, JobSnapshot};
+pub use service::{
+    BatchControllerProjection, BatchLimits, BatchPublicationWrite, BatchService, JobSnapshot,
+    PreparedBatchControllers,
+};
+
+pub use service::{PreparedLocalController, validate_local_controller_plan};

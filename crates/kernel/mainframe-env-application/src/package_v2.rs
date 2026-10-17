@@ -1,7 +1,9 @@
 mod sections;
 use sections::validate_sections;
+mod bounded_codec;
 mod preflight;
 use preflight::*;
+mod framed_identity;
 
 use super::{
     ApplicationPackage, EntryKind, InstallProblem, InstallState, digest_field, package_identity,
@@ -17,6 +19,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
 
 pub const APPLICATION_PACKAGE_V2_CONTRACT: &str = "mainframe-env.application-package@2";
+pub const APPLICATION_PACKAGE_V3_CONTRACT: &str = "mainframe-env.application-package@3";
 pub const ABI_LIBRARY_SECTION_CONTRACT: &str = "mainframe-env.application.host-abi-libraries@1";
 pub const SQL_SECTION_CONTRACT: &str = "mainframe-env.application.sql@1";
 pub const SECURITY_RESOURCE_SECTION_CONTRACT: &str =
@@ -185,6 +188,12 @@ pub struct ApplicationPackageV2 {
 
 pub trait PackageSignatureVerifier: Send + Sync {
     fn verify(&self, key_id: &str, algorithm: &str, identity: &str, signature: &str) -> bool;
+
+    /// Pure admission policy; verification and secret resolution belong to `verify` alone.
+    /// Trusted injected verifiers retain their existing explicit algorithm policy by default.
+    fn allows_fresh_algorithm(&self, _algorithm: &str) -> bool {
+        true
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -358,6 +367,12 @@ pub struct ApplicationInstallerV2 {
     applications: Arc<Mutex<BTreeMap<String, InstalledApplication>>>,
 }
 
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum PackageAdmission {
+    Fresh,
+    TrustedRecovery,
+}
+
 impl ApplicationInstallerV2 {
     #[must_use]
     pub fn new(
@@ -377,10 +392,21 @@ impl ApplicationInstallerV2 {
         &self,
         package: &ApplicationPackageV2,
     ) -> Result<ApplicationGenerationRecord, InstallProblem> {
+        self.stage_package(package, PackageAdmission::Fresh)
+    }
+
+    fn stage_package(
+        &self,
+        package: &ApplicationPackageV2,
+        admission: PackageAdmission,
+    ) -> Result<ApplicationGenerationRecord, InstallProblem> {
         let ValidatedPackage {
             identity,
             footprint,
         } = validate_v2(package, &self.product, self.limits, self.verifier.as_ref())?;
+        let allows_fresh = self
+            .verifier
+            .allows_fresh_algorithm(&package.signature.algorithm);
         let key = package.base.manifest.name.to_ascii_uppercase();
         let mut applications = self
             .applications
@@ -393,11 +419,30 @@ impl ApplicationInstallerV2 {
             .get(&key)
             .and_then(|installed| installed.generations.get(&package.generation))
         {
-            return if existing.identity == identity {
+            let retained = applications
+                .get(&key)
+                .and_then(|installed| installed.packages.get(&package.generation))
+                .ok_or(InstallProblem::IdentityConflict)?;
+            let exact_retry = package.sections.schema_version == APPLICATION_PACKAGE_V2_CONTRACT
+                || !allows_fresh
+                || !self
+                    .verifier
+                    .allows_fresh_algorithm(&retained.signature.algorithm);
+            return if existing.identity == identity
+                && (!exact_retry || retained.as_ref() == package)
+            {
                 Ok(existing.clone())
             } else {
                 Err(InstallProblem::IdentityConflict)
             };
+        }
+        if admission == PackageAdmission::Fresh
+            && package.sections.schema_version != APPLICATION_PACKAGE_V3_CONTRACT
+        {
+            return Err(InstallProblem::InvalidIdentity);
+        }
+        if admission == PackageAdmission::Fresh && !allows_fresh {
+            return Err(InstallProblem::InvalidSignature);
         }
         let _total_retained_bytes = applications
             .values()
@@ -470,7 +515,18 @@ impl ApplicationInstallerV2 {
             .generations
             .get(&package.generation)
             .ok_or(InstallProblem::UnknownStage)?;
-        if record.identity != identity {
+        let retained = installed
+            .packages
+            .get(&package.generation)
+            .ok_or(InstallProblem::IdentityConflict)?;
+        let exact_retry = package.sections.schema_version == APPLICATION_PACKAGE_V2_CONTRACT
+            || !self
+                .verifier
+                .allows_fresh_algorithm(&package.signature.algorithm)
+            || !self
+                .verifier
+                .allows_fresh_algorithm(&retained.signature.algorithm);
+        if record.identity != identity || (exact_retry && retained.as_ref() != package) {
             return Err(InstallProblem::IdentityConflict);
         }
         if record.state == InstallState::Ready {
@@ -650,52 +706,18 @@ impl ApplicationInstallerV2 {
             .applications
             .lock()
             .map_err(|_| InstallProblem::Poisoned)?;
-        let applications = applications
-            .iter()
-            .map(|(application, installed)| {
-                let generations = installed
-                    .packages
-                    .iter()
-                    .map(|(generation, package)| {
-                        let state = installed
-                            .generations
-                            .get(generation)
-                            .map(|record| record.state)
-                            .ok_or(InstallProblem::UnknownStage)?;
-                        Ok(RetainedPackage {
-                            package: package.as_ref().clone(),
-                            state,
-                        })
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
-                Ok(RetainedApplication {
-                    application: application.clone(),
-                    selected: installed.selected,
-                    generations,
-                })
-            })
-            .collect::<Result<Vec<_>, InstallProblem>>()?;
-        let payload = serde_json::to_vec(&ApplicationInstallerState {
-            schema_version: APPLICATION_INSTALLER_STATE_CONTRACT.into(),
-            applications,
-        })
-        .map_err(|_| InstallProblem::InvalidIdentity)?;
-        if payload.len() > self.limits.max_total_retained_package_bytes {
-            Err(InstallProblem::LimitExceeded)
-        } else {
-            Ok(payload)
-        }
+        bounded_codec::export(&applications, self.limits.max_total_retained_package_bytes)
     }
 
+    /// Restore only from the host's trusted retained-state authority or its own snapshot.
+    /// Package signatures do not authenticate arbitrary snapshot bytes or legacy graph ownership.
     pub fn from_state_payload(
         product: impl Into<String>,
         limits: PackageLimits,
         verifier: Arc<dyn PackageSignatureVerifier>,
         payload: &[u8],
     ) -> Result<Self, InstallProblem> {
-        if payload.len() > limits.max_total_retained_package_bytes {
-            return Err(InstallProblem::LimitExceeded);
-        }
+        bounded_codec::preflight(payload, limits)?;
         let state: ApplicationInstallerState =
             serde_json::from_slice(payload).map_err(|_| InstallProblem::InvalidIdentity)?;
         validate_retained_state(&state, limits)?;
@@ -705,7 +727,7 @@ impl ApplicationInstallerV2 {
                 .generations
                 .sort_by_key(|retained| retained.package.generation);
             for retained in &application.generations {
-                installer.stage(&retained.package)?;
+                installer.stage_package(&retained.package, PackageAdmission::TrustedRecovery)?;
             }
             let mut applications = installer
                 .applications
@@ -725,7 +747,52 @@ impl ApplicationInstallerV2 {
     }
 }
 
+/// Reproduce the frozen historical @2 identity. Other package domains refuse.
 pub fn package_v2_identity(package: &ApplicationPackageV2) -> Result<String, InstallProblem> {
+    if package.sections.schema_version != APPLICATION_PACKAGE_V2_CONTRACT {
+        return Err(InstallProblem::InvalidIdentity);
+    }
+    validate_identity_bounds(package, PackageLimits::default())?;
+    legacy_package_identity(package)
+}
+
+/// Compute a bounded identity using exactly the declared @2 or current @3 domain.
+pub fn package_generation_identity(
+    package: &ApplicationPackageV2,
+) -> Result<String, InstallProblem> {
+    package_generation_identity_with_limits(package, PackageLimits::default())
+}
+
+/// Compute a finite-domain identity within the host's explicit resource budget.
+/// Resource preflight precedes sorting, optional JSON materialization and hashing.
+/// This does not replace reference validation or current-trust admission.
+pub fn package_generation_identity_with_limits(
+    package: &ApplicationPackageV2,
+    limits: PackageLimits,
+) -> Result<String, InstallProblem> {
+    validate_generation_domain(package)?;
+    validate_identity_bounds(package, limits)?;
+    generation_identity_after_preflight(package)
+}
+
+fn validate_generation_domain(package: &ApplicationPackageV2) -> Result<(), InstallProblem> {
+    match package.sections.schema_version.as_str() {
+        APPLICATION_PACKAGE_V2_CONTRACT | APPLICATION_PACKAGE_V3_CONTRACT => Ok(()),
+        _ => Err(InstallProblem::InvalidIdentity),
+    }
+}
+
+fn generation_identity_after_preflight(
+    package: &ApplicationPackageV2,
+) -> Result<String, InstallProblem> {
+    match package.sections.schema_version.as_str() {
+        APPLICATION_PACKAGE_V2_CONTRACT => legacy_package_identity(package),
+        APPLICATION_PACKAGE_V3_CONTRACT => framed_identity::identity(package),
+        _ => Err(InstallProblem::InvalidIdentity),
+    }
+}
+
+fn legacy_package_identity(package: &ApplicationPackageV2) -> Result<String, InstallProblem> {
     let mut digest = Sha256::new();
     digest_field(&mut digest, APPLICATION_PACKAGE_V2_CONTRACT.as_bytes());
     digest_field(
@@ -858,19 +925,17 @@ fn validate_v2(
     limits: PackageLimits,
     verifier: &dyn PackageSignatureVerifier,
 ) -> Result<ValidatedPackage, InstallProblem> {
+    validate_generation_domain(package)?;
     let footprint = validate_aggregate_bounds(package, limits)?;
     validate_package(&package.base, product)?;
-    if package.generation == 0
-        || package.sections.schema_version != APPLICATION_PACKAGE_V2_CONTRACT
-        || limits.max_sections < APPLICATION_SECTION_COUNT
-    {
+    if package.generation == 0 || limits.max_sections < APPLICATION_SECTION_COUNT {
         return Err(InstallProblem::InvalidIdentity);
     }
     validate_text(&package.signature.algorithm)?;
     validate_text(&package.signature.key_id)?;
     validate_text(&package.signature.value)?;
     validate_sections(package, limits)?;
-    let identity = package_v2_identity(package)?;
+    let identity = generation_identity_after_preflight(package)?;
     if !verifier.verify(
         &package.signature.key_id,
         &package.signature.algorithm,
@@ -924,6 +989,8 @@ fn digest_optional(digest: &mut Sha256, value: Option<&str>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    mod identity_framing;
+    mod standard_envelope;
     use crate::package_v1::sha256;
     use crate::{ApplicationManifest, EntryKind, PackageEntry};
 
@@ -978,7 +1045,7 @@ mod tests {
         let base = base_package();
         let abi_blob = base.manifest.entries[0].sha256.clone();
         let sections = ApplicationSections {
-            schema_version: APPLICATION_PACKAGE_V2_CONTRACT.into(),
+            schema_version: APPLICATION_PACKAGE_V3_CONTRACT.into(),
             host_abi_libraries: vec![AbiLibrary {
                 id: "CICS-ABI".into(),
                 subsystem: HostSubsystem::Cics,
@@ -1045,12 +1112,166 @@ mod tests {
                 value: "pending".into(),
             },
         };
-        package.signature.value = format!("signed:{}", package_v2_identity(&package).unwrap());
+        package.signature.value =
+            format!("signed:{}", package_generation_identity(&package).unwrap());
         package
     }
 
     fn resign(package: &mut ApplicationPackageV2) {
-        package.signature.value = format!("signed:{}", package_v2_identity(package).unwrap());
+        package.signature.value =
+            format!("signed:{}", package_generation_identity(package).unwrap());
+    }
+
+    // Independent graph expectations: one definition owns B/C/D; the other
+    // graph assigns D to a second definition. No identity bytes are duplicated.
+    fn identity_framing_graph_pair(
+        generation: u64,
+    ) -> (ApplicationPackageV2, ApplicationPackageV2) {
+        let mut first = package(generation);
+        first.sections.ims_rows.clear();
+        first.sections.ims_definitions = vec![ImsDefinition {
+            name: "A".into(),
+            segments: BTreeSet::from(["B".into(), "C".into(), "D".into()]),
+        }];
+        resign(&mut first);
+        let mut second = first.clone();
+        second.sections.ims_definitions = vec![
+            ImsDefinition {
+                name: "A".into(),
+                segments: BTreeSet::from(["B".into()]),
+            },
+            ImsDefinition {
+                name: "C".into(),
+                segments: BTreeSet::from(["D".into()]),
+            },
+        ];
+        (first, second)
+    }
+
+    #[test]
+    fn identity_framing_both_graphs_are_valid_when_individually_signed() {
+        let (first, mut second) = identity_framing_graph_pair(1);
+        assert_ne!(
+            first.sections.ims_definitions,
+            second.sections.ims_definitions
+        );
+        let mut normalized = second.clone();
+        normalized.sections.ims_definitions = first.sections.ims_definitions.clone();
+        assert_eq!(normalized, first);
+        for candidate in [&first, &second] {
+            validate_sections(candidate, PackageLimits::default()).unwrap();
+        }
+        resign(&mut second);
+        for candidate in [&first, &second] {
+            let installer = ApplicationInstallerV2::new(
+                "0.2.0",
+                PackageLimits::default(),
+                Arc::new(TestVerifier),
+            );
+            assert_eq!(
+                installer.install(candidate).unwrap().state,
+                InstallState::Ready
+            );
+            assert_eq!(
+                installer
+                    .selected_package("DEMO")
+                    .unwrap()
+                    .unwrap()
+                    .as_ref(),
+                candidate
+            );
+        }
+    }
+
+    #[test]
+    fn identity_framing_distinct_valid_graphs_have_distinct_identities() {
+        let (first, second) = identity_framing_graph_pair(1);
+        validate_sections(&first, PackageLimits::default()).unwrap();
+        validate_sections(&second, PackageLimits::default()).unwrap();
+        assert_ne!(
+            package_generation_identity(&first).unwrap(),
+            package_generation_identity(&second).unwrap()
+        );
+    }
+
+    #[test]
+    fn identity_framing_original_signature_cannot_authenticate_substitute_graph() {
+        let (first, second) = identity_framing_graph_pair(1);
+        validate_v2(&first, "0.2.0", PackageLimits::default(), &TestVerifier).unwrap();
+        assert_eq!(second.signature, first.signature);
+        assert_eq!(
+            validate_v2(&second, "0.2.0", PackageLimits::default(), &TestVerifier).map(|_| ()),
+            Err(InstallProblem::InvalidSignature),
+        );
+    }
+
+    #[test]
+    fn identity_framing_substitution_preserves_all_retained_and_selected_state() {
+        let installer =
+            ApplicationInstallerV2::new("0.2.0", PackageLimits::default(), Arc::new(TestVerifier));
+        let installed = package(1);
+        installer.install(&installed).unwrap();
+        let (_, substitute) = identity_framing_graph_pair(2);
+        let before = installer.state_payload().unwrap();
+        let result = installer.install(&substitute);
+        // Observe state before checking the error so an admitted substitution
+        // reports its mutation independently of signature-rejection assertions.
+        assert_eq!(installer.state_payload().unwrap(), before);
+        assert_eq!(installer.selected("DEMO").unwrap().unwrap().generation, 1);
+        assert_eq!(
+            installer
+                .selected_package("DEMO")
+                .unwrap()
+                .unwrap()
+                .as_ref(),
+            &installed
+        );
+        assert_eq!(result, Err(InstallProblem::InvalidSignature));
+    }
+
+    #[test]
+    fn identity_framing_substitution_is_not_an_identical_generation_retry() {
+        let (first, second) = identity_framing_graph_pair(1);
+        let installer =
+            ApplicationInstallerV2::new("0.2.0", PackageLimits::default(), Arc::new(TestVerifier));
+        installer.install(&first).unwrap();
+        let before = installer.state_payload().unwrap();
+        let result = installer.stage(&second);
+        assert_eq!(installer.state_payload().unwrap(), before);
+        assert_eq!(
+            installer
+                .selected_package("DEMO")
+                .unwrap()
+                .unwrap()
+                .as_ref(),
+            &first
+        );
+        assert_eq!(result, Err(InstallProblem::InvalidSignature));
+    }
+
+    fn legacy_package(generation: u64) -> ApplicationPackageV2 {
+        let mut candidate = package(generation);
+        candidate.sections.schema_version = APPLICATION_PACKAGE_V2_CONTRACT.into();
+        resign(&mut candidate);
+        candidate
+    }
+
+    fn trusted_state_fixture(
+        packages: Vec<(ApplicationPackageV2, InstallState)>,
+        selected: Option<u64>,
+    ) -> Vec<u8> {
+        serde_json::to_vec(&ApplicationInstallerState {
+            schema_version: APPLICATION_INSTALLER_STATE_CONTRACT.into(),
+            applications: vec![RetainedApplication {
+                application: "DEMO".into(),
+                selected,
+                generations: packages
+                    .into_iter()
+                    .map(|(package, state)| RetainedPackage { package, state })
+                    .collect(),
+            }],
+        })
+        .unwrap()
     }
 
     fn assert_limit(package: &ApplicationPackageV2, limits: PackageLimits) {
@@ -1063,12 +1284,401 @@ mod tests {
     }
 
     #[test]
+    fn package_bounds_precede_optional_metadata_validation_and_leave_state_unchanged() {
+        let verifier = Arc::new(RecoveryVerifier(std::sync::atomic::AtomicUsize::new(0)));
+        let limits = PackageLimits {
+            max_items_per_section: 1,
+            ..PackageLimits::default()
+        };
+        let installer = ApplicationInstallerV2::new("0.2.0", limits, verifier.clone());
+        installer.install(&package(1)).unwrap();
+        let before = installer.state_payload().unwrap();
+        verifier.0.store(0, std::sync::atomic::Ordering::Relaxed);
+        let mut oversized = package(2);
+        oversized
+            .sections
+            .sql_rows
+            .push(oversized.sections.sql_rows[0].clone());
+        oversized.sections.ims_metadata = Some(ImsMetadataCatalog {
+            schema_version: "invalid".into(),
+            databases: Vec::new(),
+            psbs: Vec::new(),
+        });
+        assert_eq!(
+            installer.stage(&oversized),
+            Err(InstallProblem::LimitExceeded)
+        );
+        assert_eq!(verifier.0.load(std::sync::atomic::Ordering::Relaxed), 0);
+        assert_eq!(installer.state_payload().unwrap(), before);
+    }
+
+    #[test]
+    fn package_bounds_recovery_checks_aggregate_before_any_verifier_call() {
+        let installer =
+            ApplicationInstallerV2::new("0.2.0", PackageLimits::default(), Arc::new(TestVerifier));
+        installer.install(&package(1)).unwrap();
+        installer.install(&package(2)).unwrap();
+        let payload = installer.state_payload().unwrap();
+        let verifier = Arc::new(RecoveryVerifier(std::sync::atomic::AtomicUsize::new(0)));
+        let one = validate_aggregate_bounds(&package(1), PackageLimits::default()).unwrap();
+        let result = ApplicationInstallerV2::from_state_payload(
+            "0.2.0",
+            PackageLimits {
+                max_retained_nested_items: one.items,
+                ..PackageLimits::default()
+            },
+            verifier.clone(),
+            &payload,
+        );
+        assert!(matches!(result, Err(InstallProblem::LimitExceeded)));
+        assert_eq!(verifier.0.load(std::sync::atomic::Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn package_bounds_recovery_rejects_duplicate_nested_map_members() {
+        let installer =
+            ApplicationInstallerV2::new("0.2.0", PackageLimits::default(), Arc::new(TestVerifier));
+        installer.install(&package(1)).unwrap();
+        let payload = String::from_utf8(installer.state_payload().unwrap()).unwrap();
+        let duplicate = payload.replacen(
+            "\"values\":{\"ID\":\"1\"}",
+            "\"values\":{\"ID\":\"1\",\"ID\":\"1\"}",
+            1,
+        );
+        assert_ne!(duplicate, payload);
+        assert_invalid_retained_topology(duplicate.as_bytes(), InstallProblem::InvalidIdentity);
+    }
+
+    fn bounded_state(packages: Vec<ApplicationPackageV2>) -> ApplicationInstallerState {
+        ApplicationInstallerState {
+            schema_version: APPLICATION_INSTALLER_STATE_CONTRACT.into(),
+            applications: vec![RetainedApplication {
+                application: "DEMO".into(),
+                selected: Some(1),
+                generations: packages
+                    .into_iter()
+                    .map(|package| RetainedPackage {
+                        package,
+                        state: InstallState::Ready,
+                    })
+                    .collect(),
+            }],
+        }
+    }
+
+    fn package_with_optional_sections() -> ApplicationPackageV2 {
+        let mut candidate = package(1);
+        candidate.sections.ims_metadata = Some(serde_json::from_value(serde_json::json!({
+            "schema_version": "mainframe-env.ims-metadata@1",
+            "databases": [{"name": "APPDB", "version": 1, "organization": "HDAM",
+                "segments": [{"name": "ROOT", "min_length": 1, "max_length": 1,
+                    "fields": [{"name": "KEY", "offset": 0, "length": 1,
+                        "sequence": true, "unique": true}]}],
+                "secondary_indexes": [], "logical_relationships": []}],
+            "psbs": [{"name": "APPPSB", "database_level": "current", "pcbs": [
+                {"kind": "database", "name": "DBPCB", "database": "APPDB",
+                    "processing_options": "G", "sensitive_segments": [{"name": "ROOT"}]},
+                {"kind": "alternate-terminal", "name": "OUTPCB", "destination": "TERM",
+                    "modifiable": false, "express": false, "same_terminal": false, "response_mode": false}
+            ]}]
+        })).unwrap());
+        candidate.sections.ims_tm = Some(serde_json::from_value(serde_json::json!({
+            "transactions": [{"code": "TXN", "psb": "APPPSB",
+                "program_selector": "program/2", "artifact": candidate.base.manifest.entries[2].sha256,
+                "required_generation": "generation-1", "context": "message-processing",
+                "priority": 0, "timeout_ticks": 1, "conversational": false, "spa_size": 0,
+                "alternate_pcbs": [{"name": "OUTPCB", "destination": {"fixed": "TERM"}, "express": false}]}]
+        })).unwrap());
+        resign(&mut candidate);
+        candidate
+    }
+
+    #[test]
+    fn package_bounds_tiny_recovery_limits_refuse_without_verifier_calls() {
+        let state = bounded_state(vec![package_with_optional_sections()]);
+        let payload = serde_json::to_vec(&state).unwrap();
+        let default = PackageLimits::default();
+        let cases = [
+            PackageLimits {
+                max_applications: 0,
+                ..default
+            },
+            PackageLimits {
+                max_retained_generations: 0,
+                ..default
+            },
+            PackageLimits {
+                max_manifest_entries: 5,
+                ..default
+            },
+            PackageLimits {
+                max_dependencies_per_entry: 0,
+                ..default
+            },
+            PackageLimits {
+                max_items_per_section: 0,
+                ..default
+            },
+            PackageLimits {
+                max_members_per_abi_library: 0,
+                ..default
+            },
+            PackageLimits {
+                max_columns_per_sql_table: 1,
+                ..default
+            },
+            PackageLimits {
+                max_key_columns_per_sql_table: 0,
+                ..default
+            },
+            PackageLimits {
+                max_segments_per_ims_definition: 0,
+                ..default
+            },
+            PackageLimits {
+                max_properties_per_controller: 0,
+                ..default
+            },
+            PackageLimits {
+                max_fields_per_record: 0,
+                ..default
+            },
+            PackageLimits {
+                max_value_bytes: 0,
+                ..default
+            },
+            PackageLimits {
+                max_rows_per_sql_table: 0,
+                ..default
+            },
+            PackageLimits {
+                max_rows_per_ims_definition: 0,
+                ..default
+            },
+            PackageLimits {
+                max_total_blob_bytes: 53,
+                ..default
+            },
+            PackageLimits {
+                max_total_section_bytes: 1,
+                ..default
+            },
+            PackageLimits {
+                max_total_nested_items: 1,
+                ..default
+            },
+            PackageLimits {
+                max_retained_nested_items: 1,
+                ..default
+            },
+            PackageLimits {
+                max_total_retained_nested_items: 1,
+                ..default
+            },
+            PackageLimits {
+                max_retained_package_bytes: 1,
+                ..default
+            },
+            PackageLimits {
+                max_total_retained_package_bytes: payload.len() - 1,
+                ..default
+            },
+        ];
+        for limits in cases {
+            let verifier = Arc::new(RecoveryVerifier(std::sync::atomic::AtomicUsize::new(0)));
+            assert_eq!(
+                bounded_codec::preflight(&payload, limits),
+                Err(InstallProblem::LimitExceeded),
+                "{limits:?}"
+            );
+            assert!(matches!(
+                ApplicationInstallerV2::from_state_payload(
+                    "0.2.0",
+                    limits,
+                    verifier.clone(),
+                    &payload
+                ),
+                Err(InstallProblem::LimitExceeded)
+            ));
+            assert_eq!(verifier.0.load(std::sync::atomic::Ordering::Relaxed), 0);
+        }
+    }
+
+    #[test]
+    fn package_bounds_exact_footprint_wire_and_optional_historical_forms_are_preserved() {
+        for candidate in [package(1), package_with_optional_sections()] {
+            let footprint =
+                validate_aggregate_bounds(&candidate, PackageLimits::default()).unwrap();
+            if candidate.sections.ims_metadata.is_none() {
+                // Six entries/five dependencies, seven section record graphs, six blobs and 16 fixed items.
+                assert_eq!(footprint.items, 53);
+            }
+            let expected = serde_json::to_vec(&bounded_state(vec![candidate.clone()])).unwrap();
+            let limits = PackageLimits {
+                max_total_nested_items: footprint.items,
+                max_total_section_bytes: footprint.bytes - 54 - footprint.items * 256,
+                max_total_blob_bytes: 54,
+                max_retained_nested_items: footprint.items,
+                max_total_retained_nested_items: footprint.items,
+                max_retained_package_bytes: footprint.bytes,
+                max_total_retained_package_bytes: footprint.bytes.max(expected.len()),
+                ..PackageLimits::default()
+            };
+            let installer = ApplicationInstallerV2::new("0.2.0", limits, Arc::new(TestVerifier));
+            installer.install(&candidate).unwrap();
+            assert_eq!(installer.state_payload().unwrap(), expected);
+            for historical in [false, true] {
+                let mut input: serde_json::Value = serde_json::from_slice(&expected).unwrap();
+                if historical {
+                    let sections =
+                        &mut input["applications"][0]["generations"][0]["package"]["sections"];
+                    if candidate.sections.ims_metadata.is_none() {
+                        sections["ims_metadata"] = serde_json::Value::Null;
+                        sections["ims_tm"] = serde_json::Value::Null;
+                    } else {
+                        let db = &mut sections["ims_metadata"]["databases"][0];
+                        db["gsam_format"] = serde_json::Value::Null;
+                        db["segments"][0].as_object_mut().unwrap().remove("parent");
+                        let pcb = &mut sections["ims_metadata"]["psbs"][0]["pcbs"][0];
+                        pcb["secondary_index"] = serde_json::Value::Null;
+                        pcb.as_object_mut().unwrap().remove("database_version");
+                        pcb["sensitive_segments"][0]
+                            .as_object_mut()
+                            .unwrap()
+                            .remove("parent");
+                        pcb["sensitive_segments"][0]
+                            .as_object_mut()
+                            .unwrap()
+                            .remove("processing_options");
+                    }
+                }
+                let bytes = serde_json::to_vec_pretty(&input).unwrap();
+                let verifier = Arc::new(RecoveryVerifier(std::sync::atomic::AtomicUsize::new(0)));
+                let reopened = ApplicationInstallerV2::from_state_payload(
+                    "0.2.0",
+                    limits,
+                    verifier.clone(),
+                    &bytes,
+                )
+                .unwrap();
+                assert_eq!(reopened.state_payload().unwrap(), expected);
+                assert_eq!(verifier.0.load(std::sync::atomic::Ordering::Relaxed), 1);
+            }
+            let mut under = limits;
+            under.max_total_section_bytes -= 1;
+            assert_eq!(
+                bounded_codec::preflight(&expected, under),
+                Err(InstallProblem::LimitExceeded)
+            );
+            under = limits;
+            under.max_total_nested_items -= 1;
+            assert_eq!(
+                bounded_codec::preflight(&expected, under),
+                Err(InstallProblem::LimitExceeded)
+            );
+            let applications = installer.applications.lock().unwrap();
+            assert_eq!(
+                bounded_codec::export(&applications, expected.len()).unwrap(),
+                expected
+            );
+            assert_eq!(
+                bounded_codec::export(&applications, expected.len() - 1),
+                Err(InstallProblem::LimitExceeded)
+            );
+        }
+    }
+
+    #[test]
+    fn package_bounds_nested_text_malformed_and_duplicate_recovery_fail_closed() {
+        let state = bounded_state(vec![package_with_optional_sections()]);
+        let payload = serde_json::to_vec(&state).unwrap();
+        let mut nested: serde_json::Value = serde_json::from_slice(&payload).unwrap();
+        nested["applications"][0]["generations"][0]["package"]["sections"]["ims_metadata"]["psbs"]
+            [0]["pcbs"][0]["sensitive_segments"][0]["name"] = "X".repeat(257).into();
+        assert_invalid_retained_topology(
+            &serde_json::to_vec(&nested).unwrap(),
+            InstallProblem::LimitExceeded,
+        );
+        let text = String::from_utf8(payload.clone()).unwrap();
+        let duplicate = text.replacen("\"min_length\":1", "\"min_length\":1,\"min_length\":1", 1);
+        assert_ne!(duplicate, text);
+        assert_invalid_retained_topology(duplicate.as_bytes(), InstallProblem::InvalidIdentity);
+        let duplicate = text.replacen(
+            "\"commit\":\"step\"",
+            "\"commit\":\"step\",\"commit\":\"step\"",
+            1,
+        );
+        assert_invalid_retained_topology(duplicate.as_bytes(), InstallProblem::InvalidIdentity);
+        assert_invalid_retained_topology(
+            &payload[..payload.len() - 1],
+            InstallProblem::InvalidIdentity,
+        );
+        let trailing = [payload.as_slice(), b" null"].concat();
+        assert_invalid_retained_topology(&trailing, InstallProblem::InvalidIdentity);
+    }
+
+    #[test]
+    fn package_bounds_gsam_and_escaped_text_keep_admitted_wire_bytes() {
+        let mut candidate = package_with_optional_sections();
+        candidate.sections.ims_tm = None;
+        let metadata = candidate.sections.ims_metadata.as_mut().unwrap();
+        metadata.psbs.clear();
+        let database = &mut metadata.databases[0];
+        database.organization = mainframe_env_host_api::ImsDatabaseOrganization::Gsam;
+        database.segments[0].min_length = 12;
+        database.segments[0].max_length = 16;
+        database.segments[0].fields.clear();
+        database.gsam_format = Some(mainframe_env_host_api::ImsGsamFormat {
+            version: 1,
+            record_format: mainframe_env_host_api::ImsGsamRecordFormat::U,
+            access_method: mainframe_env_host_api::ImsGsamAccessMethod::Bsam,
+            block_size: 16,
+            control: mainframe_env_host_api::ImsGsamControl::None,
+        });
+        candidate.sections.sql_rows[0]
+            .values
+            .insert("VALUE".into(), "é\\\"".repeat(64));
+        resign(&mut candidate);
+        let limits = PackageLimits {
+            max_value_bytes: 256,
+            ..PackageLimits::default()
+        };
+        let installer = ApplicationInstallerV2::new("0.2.0", limits, Arc::new(TestVerifier));
+        installer.install(&candidate).unwrap();
+        let expected = serde_json::to_vec(&bounded_state(vec![candidate])).unwrap();
+        assert_eq!(installer.state_payload().unwrap(), expected);
+        // Escaped member names and values are parsed by serde and keep the same writer bytes.
+        let input = String::from_utf8(expected.clone())
+            .unwrap()
+            .replace("\"VALUE\":", "\"V\\u0041LUE\":");
+        let reopened = ApplicationInstallerV2::from_state_payload(
+            "0.2.0",
+            limits,
+            Arc::new(TestVerifier),
+            input.as_bytes(),
+        )
+        .unwrap();
+        assert_eq!(reopened.state_payload().unwrap(), expected);
+        assert_eq!(
+            bounded_codec::preflight(
+                &expected,
+                PackageLimits {
+                    max_value_bytes: 255,
+                    ..limits
+                }
+            ),
+            Err(InstallProblem::LimitExceeded)
+        );
+    }
+
+    #[test]
     fn all_subsystem_sections_are_reference_validated_before_staging() {
         let installer =
             ApplicationInstallerV2::new("0.2.0", PackageLimits::default(), Arc::new(TestVerifier));
         let mut invalid = package(1);
         invalid.sections.sql_rows[0].table = "MISSING".into();
-        invalid.signature.value = format!("signed:{}", package_v2_identity(&invalid).unwrap());
+        invalid.signature.value =
+            format!("signed:{}", package_generation_identity(&invalid).unwrap());
         assert_eq!(
             installer.stage(&invalid),
             Err(InstallProblem::MissingReference)
@@ -1491,7 +2101,7 @@ mod tests {
 
     #[test]
     fn package_identity_is_order_independent_but_section_content_sensitive() {
-        let mut package = package(1);
+        let mut package = legacy_package(1);
         package.sections.sql_rows.push(SqlSeedRow {
             table: "APP.TABLE".into(),
             values: BTreeMap::from([("ID".into(), "2".into())]),
@@ -1508,7 +2118,7 @@ mod tests {
 
     #[test]
     fn optional_ims_metadata_preserves_legacy_package_wire_and_identity() {
-        let package = package(1);
+        let package = legacy_package(1);
         let legacy_identity = package_v2_identity(&package).unwrap();
         let mut value = serde_json::to_value(&package).unwrap();
         assert!(value["sections"].get("ims_metadata").is_none());
@@ -1520,10 +2130,20 @@ mod tests {
         assert_eq!(decoded.sections.ims_tm, None);
         assert_eq!(package_v2_identity(&decoded).unwrap(), legacy_identity);
 
-        let installer =
-            ApplicationInstallerV2::new("0.2.0", PackageLimits::default(), Arc::new(TestVerifier));
-        installer.install(&package).unwrap();
-        installer.install(&self::package(2)).unwrap();
+        let original = trusted_state_fixture(
+            vec![
+                (package.clone(), InstallState::Ready),
+                (legacy_package(2), InstallState::Ready),
+            ],
+            Some(2),
+        );
+        let installer = ApplicationInstallerV2::from_state_payload(
+            "0.2.0",
+            PackageLimits::default(),
+            Arc::new(TestVerifier),
+            &original,
+        )
+        .unwrap();
         installer.rollback("DEMO", 1).unwrap();
         let before = installer.state_payload().unwrap();
         for explicit_null in [false, true] {

@@ -1,0 +1,20 @@
+# 0065. Local EXEC DLI exact storage copyback
+
+Status: proposed. Unrun local storage admission; no first-party or IBM acceptance.
+Owner: interpreter and IMS assurance maintainers
+Scope: fixed working-storage views on the existing typed EXEC DLI request/result route
+Applies from: mainframe-env local typed EXEC DLI storage proposal
+
+The compiler's admitted MIR retains actual storage identities and complete layouts. The existing machine emits an owned typed IMS request; it does not emit an IMS-issued PCB or a raw CBLTDLI frame. This proposal preserves that route, host validation, provider admission, statuses, replay and resource limits. ADR-0033 remains the authority for the separate missing raw CALL boundary.
+
+Before an offer, the machine resolves the complete INTO view to one MIR StorageId, canonical layout name, exact id/name/view mapping and in-range fixed byte extent. It separately captures an optional unambiguous declared two-byte DIBSTAT view and the existing two-byte implicit DIBSTAT. Dynamic, unbounded, linkage, zero-width, ambiguous or overlapping status/area views refuse this local profile before dispatch. No equivalent bytes or simple-name guess grants storage identity. Structured option groups cannot be reinterpreted by the older positional USING fallback; requests without parsed option groups preserve that fallback.
+
+After the ordinary envelope/sequence validation, a reply must contain exactly two status bytes and no more than the original offered one segment. A returned explicit segment name must match the offered target segment. If an INTO area and segment are present, data must equal the complete captured width. Zero returned segments remain status-only and leave the area unchanged. Status codes are copied without interpretation or invention; no suppression or padding is inferred from them. Existing checkpoint, affected-count and system-result behavior is unchanged.
+
+Every allocation, exact identity/range recheck, implicit-cell check and write-set preparation completes before the first guest write. The machine then copies the complete returned bytes directly into the already-admitted area and optional status view, and replaces the implicit status. No callbacks, fallible lookups or allocations follow that first write. Refusal preserves base storage and implicit values; it does not assert undo of an already-dispatched provider operation or restoration of the program counter.
+
+The pending capture is volatile. MachineSnapshot schema and codec remain unchanged; existing restore clears pending host work. An original before-offer checkpoint can reoffer through the same capture construction. This proposal does not serialize pending plans or authorize redispatch after uncertainty. Native host reply ownership, coordinator intent/result records and provider replay remain their existing authorities.
+
+Eight local control groups are drafted: checked-range overflow and postcapture identity/view/status drift; actual compiled exact-width/status-only, short/oversized/multiple/foreign reply refusal, status overlap, structured versus positional requests, and fresh real-provider root/child plus reopen/replay controls. Synthetic control records use the pinned 100/200-byte root/child dimensions and six/eight-byte key extents. They do not execute COPAUA0C, COPAUS0C, COPAUS1C or CBPAUP0C, derive an application oracle from provider output, or attest their complete behavior.
+
+Exact IMS 15.6 topic rows are pinned, but matching retained programming/raw-boundary bodies are unavailable in the inspected configured/default retained roots. The offline-path inspection is recorded separately; no refresh or IBM CLI execution is claimed under the source-only authoring constraint. This proposal implements local source/DTO/storage consistency, not new IBM subsystem semantics. Full J15-J18 source, installation, actor, navigation, return ABI, fraud/backout, expiry, checkpoint/restart and independent byte comparisons remain required and unearned. Application receipt counters and Foundation floors are unchanged.

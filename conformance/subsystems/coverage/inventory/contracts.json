@@ -20,6 +20,7 @@
     "generated_semantic_identity": "mainframe-env.generated-semantic-identity@1",
     "subsystem_handler_registry": "mainframe-env.subsystem-handler-registry@1",
     "application_package_v2": "mainframe-env.application-package@2",
+    "application_package_v3": "mainframe-env.application-package@3",
     "application_install_generation": "mainframe-env.application-install-generation@1",
     "application_installer_state": "mainframe-env.application-installer@1",
     "application_publication_state": "mainframe-env.application-publication@1",

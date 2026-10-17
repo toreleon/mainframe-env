@@ -1,6 +1,7 @@
 //! Task-owned file update tokens with a durable, never-reused numeric allocator.
 
 use super::super::{CicsService, Run, store_error};
+use mainframe_env_execution_api::Invocation;
 use mainframe_env_host_api::{CicsRequest, HostProblem};
 use mainframe_env_store_api::{ProviderStateRecord, StoreError};
 use std::collections::BTreeMap;
@@ -20,6 +21,15 @@ pub(in crate::service) struct FileUpdateToken {
 pub(in crate::service) struct FileUpdateState {
     pub(in crate::service) current_record_values: BTreeMap<String, Vec<u8>>,
     pub(in crate::service) file_tokens: BTreeMap<u32, FileUpdateToken>,
+    /// Confirmed STARTBR owners, retained even when a later browse replaces the active cursor.
+    pub(in crate::service) task_browses: BTreeMap<(String, String), FileBrowseOwner>,
+}
+
+#[derive(Clone)]
+pub(in crate::service) struct FileBrowseOwner {
+    pub(in crate::service) actor: Invocation,
+    /// An unbound or uncertain retirement reply cannot authorize another END attempt.
+    pub(in crate::service) retirement_unknown: bool,
 }
 
 fn invalid_token() -> HostProblem {

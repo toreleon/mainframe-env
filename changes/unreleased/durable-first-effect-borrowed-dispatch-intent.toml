@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added an opt-in borrowed first-dispatch Intent boundary, preserving ordinary scoped host invocation and conservatively retaining failed wrapping owners."

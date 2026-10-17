@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add independently pinned, read-only CardDemo screen navigation comparisons and physical AIX controls, binding only the observed CD.J06 navigation result after exact comparisons and owned shutdown. Full public application acceptance remains pending."

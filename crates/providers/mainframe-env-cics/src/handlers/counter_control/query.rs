@@ -83,7 +83,7 @@ pub(super) fn invoke(
 }
 
 fn overflow(value: u64) -> Option<i32> {
-    (value > i32::MAX as u64).then(|| {
+    (value > i32::MAX as u64).then_some({
         if value <= u32::MAX as u64 {
             1
         } else if value < (1u64 << 33) {

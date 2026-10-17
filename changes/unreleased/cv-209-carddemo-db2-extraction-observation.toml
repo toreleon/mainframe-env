@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Compare ordered CardDemo Db2 PS extraction and actual VSAM imports against independent pinned first-party Cp037 literal records and keys and carry only the exercised CD.J14 observation into full closure; preserve public receipt schemas and require reopened server shutdown and owned artifact cleanup before returning evidence."

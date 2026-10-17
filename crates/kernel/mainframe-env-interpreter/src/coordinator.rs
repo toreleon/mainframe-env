@@ -19,9 +19,20 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+type NativePreparation<'a, M> = dyn FnMut(&mut M) -> Result<(), HostProblem> + 'a;
+
 mod checked_replay;
+mod completed_plain_read;
+mod durable_dispatch;
+pub use completed_plain_read::DurableCompletedPlainRead;
 mod original_dispatch;
 pub use checked_replay::{CheckedReplayAuditCapture, CheckedReplayObservations};
+pub use durable_dispatch::{DurableEffectDispatch, DurableEffectDispatchHook};
+mod protected_storage;
+use protected_storage::ProtectedStorageProgress;
+pub use protected_storage::{
+    ProtectedStorageAdmission, ProtectedStorageConfiguration, ProtectedStorageDispatchHooks,
+};
 mod root_terminal;
 use root_terminal::NativeProgress;
 pub use root_terminal::{
@@ -33,6 +44,13 @@ const LIFECYCLE_OUTBOX_TOPIC: &str = "execution.lifecycle.v1";
 
 mod completion;
 mod handoff;
+
+#[derive(Default)]
+struct DriveDispatch<'n, 'h> {
+    child: Option<&'n root_terminal::NativeChildEnrollment>,
+    hook: Option<&'n mut dyn DurableEffectDispatchHook>,
+    storage: Option<&'n mut ProtectedStorageProgress<'h>>,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CoordinatorLimits {
@@ -193,7 +211,15 @@ impl ExecutionCoordinator {
         M: Machine<Effect = EffectRequest, EffectResult = EffectResult>,
         F: FnMut() -> Result<ExecutionControl, ExecutionControlError>,
     {
-        self.execute_inner(machine, invocation, observe, false, None, None, None)
+        self.execute_inner(
+            machine,
+            invocation,
+            observe,
+            false,
+            None,
+            None,
+            DriveDispatch::default(),
+        )
     }
 
     /// Resume a durably journaled execution after a process boundary.
@@ -212,7 +238,47 @@ impl ExecutionCoordinator {
         M: Machine<Effect = EffectRequest, EffectResult = EffectResult>,
         F: FnMut() -> Result<ExecutionControl, ExecutionControlError>,
     {
-        self.execute_inner(machine, invocation, observe, true, None, None, None)
+        self.execute_inner(
+            machine,
+            invocation,
+            observe,
+            true,
+            None,
+            None,
+            DriveDispatch::default(),
+        )
+    }
+
+    /// Opt-in borrowed journal/dispatch boundary for one actual durable drive.
+    ///
+    /// The hook wraps each first dispatch after its actual Intent and controls.
+    /// It cannot return a substitute host result or invoke twice. Completed
+    /// plain READ replay has a separate opt-in wrapping callback; all other replay
+    /// remains on the original path. This is not a protected native-root admission,
+    /// compiled-artifact attestation, CICS task loan or MQ/UOW authority.
+    pub fn execute_resumable_with_dispatch_control<M, F>(
+        &self,
+        machine: &mut M,
+        invocation: &Invocation,
+        observe: F,
+        hook: &mut dyn DurableEffectDispatchHook,
+    ) -> ExecutionOutcome
+    where
+        M: Machine<Effect = EffectRequest, EffectResult = EffectResult>,
+        F: FnMut() -> Result<ExecutionControl, ExecutionControlError>,
+    {
+        self.execute_inner(
+            machine,
+            invocation,
+            observe,
+            true,
+            None,
+            None,
+            DriveDispatch {
+                hook: Some(hook),
+                ..DriveDispatch::default()
+            },
+        )
     }
 
     /// Close a suspended execution after its checkpoint has been durably
@@ -230,7 +296,7 @@ impl ExecutionCoordinator {
             StoreError::Infrastructure("handoff completion requires an execution store".into())
         })?;
         let (mut journal, state) =
-            JournalCursor::open(Arc::clone(store), invocation, tick, true, None, None)?;
+            JournalCursor::open(Arc::clone(store), invocation, tick, true, None, None, None)?;
         if state != Some(ExecutionState::Suspended) {
             return Err(StoreError::InvalidTransition);
         }
@@ -247,20 +313,25 @@ impl ExecutionCoordinator {
         }
     }
 
-    fn execute_inner<M, F>(
+    fn execute_inner<'h, M, F>(
         &self,
         machine: &mut M,
         invocation: &Invocation,
         mut observe: F,
         resumable: bool,
-        native: Option<&mut NativeProgress<'_>>,
-        prepare_native: Option<&mut dyn FnMut(&mut M) -> Result<(), HostProblem>>,
-        child: Option<&root_terminal::NativeChildEnrollment>,
+        native: Option<&mut NativeProgress<'h>>,
+        prepare_native: Option<&mut NativePreparation<'_, M>>,
+        dispatch: DriveDispatch<'_, 'h>,
     ) -> ExecutionOutcome
     where
         M: Machine<Effect = EffectRequest, EffectResult = EffectResult>,
         F: FnMut() -> Result<ExecutionControl, ExecutionControlError>,
     {
+        let DriveDispatch {
+            child,
+            hook: mut dispatch_hook,
+            storage,
+        } = dispatch;
         if self.checked_inquiry_replay
             && !self
                 .checked_replay_pending
@@ -290,6 +361,7 @@ impl ExecutionCoordinator {
                     resumable,
                     native,
                     child,
+                    storage,
                 )
             })
             .transpose()
@@ -298,13 +370,16 @@ impl ExecutionCoordinator {
             Ok(None) => (None, None),
             Err(_) => return infrastructure_failure("execution admission persistence failed"),
         };
-        if let Some(prepare) = prepare_native {
-            if !journal.as_ref().is_some_and(|j| j.native.is_some()) || prepare(machine).is_err() {
-                return failed_outcome(problem(
-                    FailureCategory::UnknownOutcome,
-                    "native compiled machine preparation refused",
-                ));
-            }
+        if let Some(prepare) = prepare_native
+            && (!journal
+                .as_ref()
+                .is_some_and(|j| j.native.is_some() || j.storage.is_some())
+                || prepare(machine).is_err())
+        {
+            return failed_outcome(problem(
+                FailureCategory::UnknownOutcome,
+                "native compiled machine preparation refused",
+            ));
         }
         if journal.as_ref().is_some_and(|j| j.native.is_some()) {
             control = match observe_checked(
@@ -388,6 +463,7 @@ impl ExecutionCoordinator {
                         observe: &mut observe,
                         resumable,
                         native_child: child.is_some(),
+                        dispatch_hook: &mut dispatch_hook,
                     };
                     match dispatch.dispatch(effect) {
                         Ok(result) => resume = MachineResume::HostResult(result),
@@ -582,6 +658,7 @@ struct JournalCursor<'n, 'h> {
     version: u64,
     sequence: u64,
     native: Option<&'n mut NativeProgress<'h>>,
+    storage: Option<&'n mut ProtectedStorageProgress<'h>>,
 }
 
 impl<'n, 'h> JournalCursor<'n, 'h> {
@@ -592,7 +669,11 @@ impl<'n, 'h> JournalCursor<'n, 'h> {
         resumable: bool,
         mut native: Option<&'n mut NativeProgress<'h>>,
         child: Option<&root_terminal::NativeChildEnrollment>,
+        mut storage: Option<&'n mut ProtectedStorageProgress<'h>>,
     ) -> Result<(Self, Option<ExecutionState>), StoreError> {
+        if storage.is_some() && (native.is_some() || child.is_some()) {
+            return Err(StoreError::Conflict);
+        }
         if let Some(execution) = store.get_execution(&invocation.execution_id)? {
             if !resumable
                 || execution.run_unit_id != invocation.run_unit_id
@@ -624,6 +705,7 @@ impl<'n, 'h> JournalCursor<'n, 'h> {
                     version: execution.version,
                     sequence: last.sequence,
                     native,
+                    storage,
                 },
                 Some(state),
             ));
@@ -654,6 +736,8 @@ impl<'n, 'h> JournalCursor<'n, 'h> {
             child.admit(&store, invocation, execution, event, notification)?;
         } else if let Some(progress) = native.as_deref_mut() {
             progress.admit(&store, execution, event, notification)?;
+        } else if let Some(progress) = storage.as_deref_mut() {
+            progress.admit(&store, execution, event, notification)?;
         } else {
             store.admit_execution(execution, event, notification)?;
         }
@@ -667,6 +751,7 @@ impl<'n, 'h> JournalCursor<'n, 'h> {
                 version: 1,
                 sequence: 1,
                 native,
+                storage,
             },
             None,
         ))
@@ -680,6 +765,21 @@ impl<'n, 'h> JournalCursor<'n, 'h> {
         checkpoint: Option<CheckpointRecord>,
         audit: Option<AuditRecord>,
     ) -> Result<(), StoreError> {
+        if self.storage.is_some()
+            && (checkpoint.is_some()
+                || next_state.is_some_and(|state| {
+                    state.terminal()
+                        || state == ExecutionState::Completing
+                        || state == ExecutionState::Suspended
+                }))
+        {
+            let progress = self
+                .storage
+                .as_deref_mut()
+                .ok_or(StoreError::InvalidTransition)?;
+            progress.protect(&self.store, self.tick);
+            return Err(StoreError::InvalidTransition);
+        }
         if self.native.is_some()
             && (checkpoint.is_some()
                 || next_state.is_some_and(|s| {

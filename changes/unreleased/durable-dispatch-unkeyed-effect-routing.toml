@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Fixed durable borrowed dispatch routing so unkeyed host effects use the ordinary audited path while keyed effects retain the original Intent and single-dispatch guards."

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Represent large existing COBOL initializer byte vectors with versioned bounded IR chunks while preserving whole-view initialization and legacy artifacts."

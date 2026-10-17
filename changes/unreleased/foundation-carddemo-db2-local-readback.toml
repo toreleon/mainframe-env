@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Compare complete ordered local CardDemo Db2 metadata and rows, actual CREADB2 and TRANEXTR terminal steps, and full bounded selected utility spool bytes against pinned first-party inputs across reopen; retain existing observations, limits and receipt schemas, with broader DDL and application rollback pending."

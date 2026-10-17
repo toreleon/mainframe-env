@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Stabilize the Linux SIGKILL resource test with an observed stop of its pidfd-held parent wrapper before fixture children are killed and adopted. Preserve production supervision, all original refusal and child-reaping assertions, and existing deadlines; missing children and unknown stops still fail."

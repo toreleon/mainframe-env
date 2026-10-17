@@ -1,0 +1,18 @@
+# ADR-0072: Owned local fixed MQ queue catalog composition
+
+Status: Proposed
+Owner: MQ and product application maintainers
+Scope: local signed queue declaration and same-store application selection
+Applies from: mainframe-env 0.2.0 local owned application composition profile
+
+The existing MqService legacy route owns one typed local object catalog, its original versioned queue rows, handles, pending units and replay records. This participant joins that actual owner to the finite application composition. Each Queue resource authenticates exact full JSON bytes at resource/mq/NAME. Its name must already be canonical, target and controller must be absent. The original catalog constructor, DEFAULT.QM metadata, queue definitions, original codecs and runtime limits remain authoritative. The projection binds full definitions and the complete original catalog encoding digest.
+
+The fixed catalog cannot change after initial installation. Generation advance and retained rollback select the same catalog, preserving all existing runtime payloads. Active pending units refuse publication. Unowned legacy catalog adoption, foreign ownership, missing selection, changed declarations, stale actual rows and versions refuse before writes. Initial installation creates genuine empty local queues. This is a local storage contract, not new IBM MQI behavior.
+
+Preparation holds the genuine MQ service durable lock after IMS and before RACF. The existing runtime takes MQ before authorization. Complete bounded original-codec rows must equal the live cache. The shared CAS advances the original manifest, which every existing runtime publication also advances; a concurrent second service therefore conflicts. The actual same-Arc acknowledgement covers every prepared row. Unknown acknowledgement quarantines the provider and server until authoritative reopen. Independent direct store administration remains trusted: immediate scans and held service ownership provide no hostile-namespace atomic or continuous exclusion claim.
+
+The new finite profile bounds observed original rows to 16 MiB and the original store scan maximum, signed static projection to 8 MiB and prepared writes to 16 MiB. The original 64 MiB runtime state ceiling and other caps remain unchanged. These are finite admission bounds, not aggregate resident-memory measurements.
+
+Process and Trigger entries are currently unsupported in this participant because the package resource DTO has name/kind/target/controller while the existing legacy constructor expects queue trigger_program and typed process definitions. A precise local graph mapping and authentic source/controller admission are additional feasible implementations; no implicit mapping is inferred here. Queue target is not a queue-only DTO field: typed alias/remote/model catalog kinds already exist, but choosing a package mapping and channel/dynamic runtime ownership is additional work. Controller dispatch is also separate: the existing queue result reports trigger_program and does not itself own a Batch controller launch, source compilation, return or completion. These local TODOs are not blanket normative-source blockers. Any future native MQI behavior must separately obtain its relevant pinned IBM MQ 9.4 body and real ABI/owner evidence; this proposal makes no HCONN, MQOD version, native unit-of-work or vendor execution claim.
+
+Local Ready checks actual selected package identity, complete static catalog and current provider rows. It does not fabricate ApplicationPublicationState::Complete, CD009 application completion, 114 observations, 105 criteria, whole-workspace or vendor acceptance. Existing failure history and all acceptance predicates remain unchanged. New controls are draft-only until Root runs them.

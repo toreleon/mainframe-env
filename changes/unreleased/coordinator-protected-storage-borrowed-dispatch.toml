@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added an opt-in fresh coordinator protected-storage admission and actual Intent dispatch boundary, retaining unclassified exits without native terminal or MQ unit-of-work settlement."

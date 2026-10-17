@@ -22,6 +22,8 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, MutexGuard};
 mod application_backout;
+mod catalog_preparation;
+pub use catalog_preparation::{ImsCatalogProjection, PreparedImsCatalog};
 mod application_recovery;
 mod execution;
 mod generic;
@@ -342,6 +344,7 @@ pub struct ImsService {
     durable: Mutex<DurableState>,
     authorizer: Option<Arc<dyn EnterpriseAuthorizer>>,
     replay_clock: Option<Arc<dyn ImsReplayClock>>,
+    composition_uncertain: std::sync::atomic::AtomicBool,
 }
 
 impl ImsService {
@@ -392,49 +395,8 @@ impl ImsService {
             durable: Mutex::new(DurableState { versions, state }),
             authorizer,
             replay_clock,
+            composition_uncertain: std::sync::atomic::AtomicBool::new(false),
         }))
-    }
-
-    pub fn install(
-        &self,
-        definition: ImsApplicationDefinition,
-    ) -> Result<ImsInstallReceipt, HostProblem> {
-        validate_definition(&definition, self.limits)?;
-        let identity = format!(
-            "sha256:{:x}",
-            Sha256::digest(
-                serde_json::to_vec(&definition).map_err(|_| HostProblem::ProviderFailure)?
-            )
-        );
-        let mut durable = self.lock()?;
-        if let Some(current) = &durable.state.definitions {
-            if current != &definition {
-                return Err(HostProblem::IdempotencyConflict);
-            }
-            return Ok(install_receipt(&definition, identity, true));
-        }
-        if durable.state.metadata.as_ref().is_some_and(|metadata| {
-            definition.databases.iter().any(|db| {
-                metadata
-                    .databases
-                    .iter()
-                    .any(|candidate| normalize(&candidate.name) == normalize(&db.name))
-            }) || definition.psbs.iter().any(|psb| {
-                metadata
-                    .psbs
-                    .iter()
-                    .any(|candidate| normalize(&candidate.name) == normalize(&psb.name))
-            })
-        }) {
-            return Err(HostProblem::IdempotencyConflict);
-        }
-        let mut next = durable.state.scoped_snapshot();
-        for database in &definition.databases {
-            next.databases.entry(normalize(&database.name)).or_default();
-        }
-        next.definitions = Some(definition.clone());
-        self.persist(&mut durable, next)?;
-        Ok(install_receipt(&definition, identity, false))
     }
 
     /// Publish one validated generic DBD/PSB catalog through the existing IMS row store.
@@ -473,9 +435,23 @@ impl ImsService {
     }
 
     fn lock(&self) -> Result<MutexGuard<'_, DurableState>, HostProblem> {
-        self.durable
+        if self
+            .composition_uncertain
+            .load(std::sync::atomic::Ordering::SeqCst)
+        {
+            return Err(HostProblem::UnknownOutcome);
+        }
+        let owner = self
+            .durable
             .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        if self
+            .composition_uncertain
+            .load(std::sync::atomic::Ordering::SeqCst)
+        {
+            return Err(HostProblem::UnknownOutcome);
+        }
+        Ok(owner)
     }
 
     fn persist(&self, durable: &mut DurableState, state: State) -> Result<(), HostProblem> {

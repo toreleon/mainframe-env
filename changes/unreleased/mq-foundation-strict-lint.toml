@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Move unused MQ import, profile, storage and lifecycle fixture setup out of production owners, retaining rich-store marker identities, unsupported admission classification and all existing local controls without adding production routes or lint waivers."

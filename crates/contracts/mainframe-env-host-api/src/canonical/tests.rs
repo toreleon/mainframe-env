@@ -444,3 +444,338 @@ fn canonical_encoding_never_invokes_debug() {
     }
     assert_eq!(bytes(&FormattingBomb, b""), bytes("stable", b""));
 }
+
+fn positioned_request(dataset: &str) -> DatasetRequest {
+    DatasetRequest::ReadBrowsePosition {
+        dataset: DatasetName::new(dataset, 128).unwrap(),
+        cursor: "CURSOR-1".into(),
+        expected_key: b"BB".to_vec(),
+    }
+}
+
+#[test]
+fn read_browse_position_has_bounded_read_admission() {
+    let limits = HostLimits {
+        max_name_bytes: 8,
+        max_record_bytes: 2,
+        ..Default::default()
+    };
+    let request = HostRequest::Dataset(positioned_request("REVFILE"));
+    assert_eq!(request.validate(limits), Ok(()));
+    assert!(!request.is_mutating());
+    assert_eq!(
+        request
+            .required_capability(mainframe_env_execution_api::InvocationLimits::default())
+            .as_str(),
+        "host.dataset.read"
+    );
+    for (cursor, key, expected) in [
+        ("CURSOR-1", &b""[..], HostProblem::Malformed),
+        ("CURSOR-1", &b"BBB"[..], HostProblem::ResourceExhausted),
+        ("", &b"BB"[..], HostProblem::Malformed),
+        ("CURSOR-12", &b"BB"[..], HostProblem::Malformed),
+    ] {
+        let request = HostRequest::Dataset(DatasetRequest::ReadBrowsePosition {
+            dataset: DatasetName::new("REVFILE", 128).unwrap(),
+            cursor: cursor.into(),
+            expected_key: key.to_vec(),
+        });
+        assert_eq!(request.validate(limits), Err(expected));
+    }
+}
+
+#[test]
+fn read_browse_position_has_frozen_canonical_bytes_and_domains() {
+    let request = positioned_request("CARDDEMO.ACCTDAT");
+    assert_eq!(
+        hex(&bytes(&request, b"")),
+        "41010e0000000000000044617461736574526571756573740112000000000000005265616442726f777365506f736974696f6e0300000000000000010600000000000000637572736f72010800000000000000435552534f522d310107000000000000006461746173657442010b00000000000000446174617365744e616d650110000000000000004341524444454d4f2e41434354444154010c0000000000000065787065637465645f6b65790202000000000000004242"
+    );
+    assert_eq!(
+        hex(&digest(&request, b"").unwrap()),
+        "b6ea832688566b11f20d96e676e6b95bc8aa2d87fc22085350793870df05e2fb"
+    );
+    let request = HostRequest::Dataset(request);
+    assert_eq!(
+        hex(&bytes(&request, REQUEST_DIGEST_DOMAIN)),
+        "6d61696e6672616d652d656e762e6566666563742d7265717565737440310041010b00000000000000486f7374526571756573740107000000000000004461746173657401000000000000000101000000000000003041010e0000000000000044617461736574526571756573740112000000000000005265616442726f777365506f736974696f6e0300000000000000010600000000000000637572736f72010800000000000000435552534f522d310107000000000000006461746173657442010b00000000000000446174617365744e616d650110000000000000004341524444454d4f2e41434354444154010c0000000000000065787065637465645f6b65790202000000000000004242"
+    );
+    assert_eq!(
+        hex(&canonical_request_digest(&request).unwrap()),
+        "1e869ea546c10dd4ab3d9ba4e7534d62ca086547cb481149667a455a7852179a"
+    );
+    assert_eq!(
+        hex(&digest(&request, RESULT_DIGEST_DOMAIN).unwrap()),
+        "3ef07089e272e6a4dde4cf1b8d90f69667876ff914ef7a0f1c73ae426084d048"
+    );
+    assert_ne!(
+        digest(&request, REQUEST_DIGEST_DOMAIN).unwrap(),
+        digest(&request, RESULT_DIGEST_DOMAIN).unwrap()
+    );
+    let mut actual = Vec::new();
+    assert_eq!(
+        encode(&request, REQUEST_DIGEST_DOMAIN, 271, &mut |part| actual
+            .extend_from_slice(part)),
+        Ok(271)
+    );
+    assert_eq!(
+        encode(&request, REQUEST_DIGEST_DOMAIN, 270, &mut |_| {}),
+        Err(HostProblem::ResourceExhausted)
+    );
+    // Independently frozen legacy vectors: additive positioning cannot change gap-read framing.
+    for (reverse, expected_hex, expected_digest) in [
+        (
+            false,
+            "41010e000000000000004461746173657452657175657374010800000000000000526561644e6578740400000000000000010700000000000000636f6e74726f6c400112000000000000004461746173657452656164436f6e74726f6c02000000000000000104000000000000006c6f636b4101130000000000000044617461736574526561644c6f636b4d6f646501070000000000000044656661756c7400000000000000000104000000000000007761697420010600000000000000637572736f72010800000000000000435552534f522d310107000000000000006461746173657442010b00000000000000446174617365744e616d650110000000000000004341524444454d4f2e414343544441540107000000000000007265766572736503",
+            "71ca3b6212b41dd26b26c21776611c4f00640e2113986f7af5dad0219a6b5446",
+        ),
+        (
+            true,
+            "41010e000000000000004461746173657452657175657374010800000000000000526561644e6578740400000000000000010700000000000000636f6e74726f6c400112000000000000004461746173657452656164436f6e74726f6c02000000000000000104000000000000006c6f636b4101130000000000000044617461736574526561644c6f636b4d6f646501070000000000000044656661756c7400000000000000000104000000000000007761697420010600000000000000637572736f72010800000000000000435552534f522d310107000000000000006461746173657442010b00000000000000446174617365744e616d650110000000000000004341524444454d4f2e414343544441540107000000000000007265766572736504",
+            "184b9b7d52c6ff8a904643963de91b1a72d7b3e9156eb03d77a2cd9f0e98a2eb",
+        ),
+    ] {
+        let old = DatasetRequest::ReadNext {
+            dataset: DatasetName::new("CARDDEMO.ACCTDAT", 128).unwrap(),
+            cursor: "CURSOR-1".into(),
+            reverse,
+            control: Default::default(),
+        };
+        assert_eq!(hex(&bytes(&old, b"")), expected_hex);
+        assert_eq!(hex(&digest(&old, b"").unwrap()), expected_digest);
+        assert_eq!(bytes(&old, b"").len(), 292);
+    }
+}
+
+#[test]
+fn read_browse_position_retains_existing_browse_result_shape_bounds() {
+    let limits = HostLimits {
+        max_record_bytes: 4,
+        ..Default::default()
+    };
+    let reply = |record, identity, key| {
+        HostResult::Dataset(DatasetResult::Browse {
+            cursor: "CURSOR-1".into(),
+            record,
+            identity,
+            key,
+        })
+    };
+    assert_eq!(
+        reply(
+            Some(b"BB02".to_vec()),
+            Some(b"BB".to_vec()),
+            Some(b"BB".to_vec())
+        )
+        .validate(limits),
+        Ok(())
+    );
+    assert_eq!(reply(None, None, None).validate(limits), Ok(()));
+    for missing in 0..3 {
+        let mut fields = [
+            Some(b"BB02".to_vec()),
+            Some(b"BB".to_vec()),
+            Some(b"BB".to_vec()),
+        ];
+        fields[missing] = None;
+        assert_eq!(
+            reply(fields[0].clone(), fields[1].clone(), fields[2].clone()).validate(limits),
+            Err(HostProblem::Malformed)
+        );
+    }
+    for oversized in 0..3 {
+        let mut fields = [
+            Some(b"BB02".to_vec()),
+            Some(b"BB".to_vec()),
+            Some(b"BB".to_vec()),
+        ];
+        fields[oversized] = Some(b"BBBBB".to_vec());
+        assert_eq!(
+            reply(fields[0].clone(), fields[1].clone(), fields[2].clone()).validate(limits),
+            Err(HostProblem::ResourceExhausted)
+        );
+    }
+}
+
+#[test]
+fn read_browse_position_scoped_host_refuses_before_dispatch() {
+    use mainframe_env_execution_api::{
+        ArtifactRef, CancellationProbe, CapabilityId, ExecutionId, IdempotencyKey, Invocation,
+        InvocationLimits, Principal, PrincipalId, RequestId, ResourceLimits, RunUnitId, Selector,
+        ServiceClass, TraceId,
+    };
+    use std::collections::{BTreeMap, BTreeSet};
+    use std::sync::{Arc, Mutex};
+    struct Provider {
+        descriptor: crate::CapabilityDescriptor,
+        calls: Arc<Mutex<Vec<(Invocation, EffectRequest)>>>,
+    }
+    impl crate::HostProvider for Provider {
+        fn descriptor(&self) -> &crate::CapabilityDescriptor {
+            &self.descriptor
+        }
+        fn invoke(&self, actor: &Invocation, request: EffectRequest) -> EffectResult {
+            self.calls
+                .lock()
+                .unwrap()
+                .push((actor.clone(), request.clone()));
+            EffectResult {
+                sequence: request.sequence,
+                outcome: Ok(HostResult::Dataset(DatasetResult::Browse {
+                    cursor: "CURSOR-1".into(),
+                    record: Some(b"BB02".to_vec()),
+                    identity: Some(b"BB".to_vec()),
+                    key: Some(b"BB".to_vec()),
+                })),
+            }
+        }
+    }
+    let limits = InvocationLimits::default();
+    let capability = CapabilityId::new("host.dataset.read", limits).unwrap();
+    let actor = |granted| {
+        Invocation::new(
+            RequestId::new("request", limits).unwrap(),
+            ExecutionId::new("execution", limits).unwrap(),
+            RunUnitId::new("run", limits).unwrap(),
+            None,
+            Selector::new("test", limits).unwrap(),
+            ArtifactRef::new("artifact", limits).unwrap(),
+            Principal::new(
+                PrincipalId::new("IBMUSER", limits).unwrap(),
+                if granted {
+                    BTreeSet::from([capability.clone()])
+                } else {
+                    BTreeSet::new()
+                },
+                limits,
+            )
+            .unwrap(),
+            ServiceClass::System,
+            0,
+            100,
+            TraceId::new("trace", limits).unwrap(),
+            IdempotencyKey::new("idem", limits).unwrap(),
+            1,
+            ResourceLimits::default(),
+            BTreeMap::new(),
+            limits,
+        )
+        .unwrap()
+    };
+    let active = actor(true);
+    let probe = CancellationProbe::new();
+    let cancelled = active.clone().with_cancellation_probe(probe.clone());
+    probe.request();
+    let stale = active
+        .clone()
+        .with_provider_generations(
+            BTreeMap::from([(capability.clone(), "stale".into())]),
+            limits,
+        )
+        .unwrap();
+    for (invocation, now, cancellation, deadline, budget, expected) in [
+        (active.clone(), 1, false, 100, 271, None),
+        (
+            active.clone(),
+            1,
+            true,
+            100,
+            271,
+            Some(HostProblem::Cancelled),
+        ),
+        (cancelled, 1, false, 100, 271, Some(HostProblem::Cancelled)),
+        (
+            active.clone(),
+            100,
+            false,
+            100,
+            271,
+            Some(HostProblem::TimedOut),
+        ),
+        (
+            active.clone(),
+            90,
+            false,
+            90,
+            271,
+            Some(HostProblem::TimedOut),
+        ),
+        (
+            actor(false),
+            1,
+            false,
+            100,
+            271,
+            Some(HostProblem::Unauthorized),
+        ),
+        (
+            stale,
+            1,
+            false,
+            100,
+            271,
+            Some(HostProblem::ProviderFailure),
+        ),
+        (
+            active.clone(),
+            1,
+            false,
+            100,
+            270,
+            Some(HostProblem::ResourceExhausted),
+        ),
+    ] {
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let provider = Arc::new(Provider {
+            descriptor: crate::CapabilityDescriptor {
+                capability: capability.clone(),
+                provider_id: "position-guard".into(),
+                generation: "1".into(),
+                request_schema: crate::DATASET_REQUEST_CONTRACT.into(),
+                result_schema: crate::DATASET_RESULT_CONTRACT.into(),
+                max_request_bytes: budget,
+                max_result_bytes: 4096,
+                ready: true,
+            },
+            calls: calls.clone(),
+        });
+        let host = crate::ScopedHostService::new(
+            Arc::new(crate::RegistrySnapshot::new(1, vec![provider], limits).unwrap()),
+            HostLimits::default(),
+        );
+        let request = EffectRequest {
+            run_unit: invocation.run_unit_id.clone(),
+            sequence: 1,
+            deadline_tick: deadline,
+            idempotency_key: None,
+            request: HostRequest::Dataset(positioned_request("CARDDEMO.ACCTDAT")),
+        };
+        let (effect, _audit) = host
+            .invoke(&invocation, now, cancellation, request)
+            .into_transaction_parts();
+        let result = effect.outcome;
+        if let Some(expected) = expected {
+            assert_eq!(result, Err(expected));
+            assert!(calls.lock().unwrap().is_empty());
+        } else {
+            assert_eq!(
+                result,
+                Ok(HostResult::Dataset(DatasetResult::Browse {
+                    cursor: "CURSOR-1".into(),
+                    record: Some(b"BB02".to_vec()),
+                    identity: Some(b"BB".to_vec()),
+                    key: Some(b"BB".to_vec())
+                }))
+            );
+            let calls = calls.lock().unwrap();
+            assert_eq!(calls.len(), 1);
+            assert_eq!(calls[0].0.run_unit_id, active.run_unit_id);
+            assert_eq!(calls[0].1.run_unit, active.run_unit_id);
+            assert_eq!(calls[0].1.deadline_tick, 100);
+            assert_eq!(calls[0].1.idempotency_key, None);
+            assert!(calls[0].0.bindings.is_empty());
+            assert!(!calls[0].1.request.is_mutating());
+        }
+    }
+    // Direct logical-tick admission is not a trusted real-clock expiry proof for nested CICS.
+}

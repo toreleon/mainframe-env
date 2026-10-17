@@ -18,6 +18,7 @@ use super::*;
 const INDEX_PATH: &str = "conformance/subsystems/coverage/catalogs/index.json";
 const MANIFEST_DIRECTORY: &str = "conformance/subsystems/coverage/manifests";
 const MANIFEST_PREFIX: &str = "conformance/subsystems/coverage/manifests/";
+const MANIFEST_SCHEMA_ID: &str = "https://mainframe-env.invalid/schemas/topic-manifest@1";
 struct LaterRegistry {
     registry_path: &'static str,
     manifest_directory: &'static str,
@@ -60,11 +61,40 @@ const LATER_REGISTRIES: &[LaterRegistry] = &[
 const DIGEST_DEFINITION: &str = "sha256 over the concatenation, sorted by topic_path, of one \
      \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex";
 
+fn validate_manifest(
+    schema: &Value,
+    manifest: &Value,
+    path: &Path,
+    compiled: &mut Option<(Value, jsonschema::Validator)>,
+) -> TaskResult {
+    // For this ID, compile_schema uses fixed offline Draft 2020-12 options,
+    // no extra resources, and the path only in diagnostics. Keep reading later
+    // schemas at their original boundary, and recompile any changed value.
+    if schema["$id"].as_str() != Some(MANIFEST_SCHEMA_ID) {
+        return validate_schema_instance(schema, manifest, path);
+    }
+    let validate = |validator: &jsonschema::Validator| {
+        validator
+            .validate(manifest)
+            .map_err(|error| format!("{} violates its schema: {error}", path.display()))
+    };
+    if let Some((previous, validator)) = compiled.as_ref()
+        && previous == schema
+    {
+        return validate(validator);
+    }
+    let validator = compile_draft_2020_12_schema(schema, path)?;
+    validate(&validator)?;
+    *compiled = Some((schema.clone(), validator));
+    Ok(())
+}
+
 pub(super) fn check(root: &Path) -> TaskResult {
     let index_path = root.join(INDEX_PATH);
     let index = json(&index_path)?;
     let manifest_schema =
         json(&root.join("conformance/subsystems/coverage/schemas/topic-manifest.schema.json"))?;
+    let mut compiled_manifest_schema = None;
     let mut pinned = BTreeSet::new();
     for baseline in array(&index, "baselines", &index_path)? {
         let id = text(baseline, "id", &index_path)?;
@@ -81,7 +111,12 @@ pub(super) fn check(root: &Path) -> TaskResult {
         )?;
         let manifest_path = manifest_path(root, relative, id)?;
         let manifest = json(&manifest_path)?;
-        validate_schema_instance(&manifest_schema, &manifest, &manifest_path)?;
+        validate_manifest(
+            &manifest_schema,
+            &manifest,
+            &manifest_path,
+            &mut compiled_manifest_schema,
+        )?;
         let digest = recompute(&manifest, &manifest_path)?;
         require(
             text(&manifest, "topic_manifest_digest", &manifest_path)? == digest,
@@ -165,12 +200,21 @@ pub(super) fn check(root: &Path) -> TaskResult {
         "conformance/subsystems/coverage/manifests holds a manifest no baseline pins, or is missing one",
     )?;
     for registry in LATER_REGISTRIES {
-        check_later_registry(root, registry)?;
+        check_later_registry_with_schema(root, registry, &mut compiled_manifest_schema)?;
     }
     Ok(())
 }
 
+#[cfg(test)]
 fn check_later_registry(root: &Path, config: &LaterRegistry) -> TaskResult {
+    check_later_registry_with_schema(root, config, &mut None)
+}
+
+fn check_later_registry_with_schema(
+    root: &Path,
+    config: &LaterRegistry,
+    compiled_manifest_schema: &mut Option<(Value, jsonschema::Validator)>,
+) -> TaskResult {
     let registry_path = root.join(config.registry_path);
     let registry = json(&registry_path)?;
     let registry_schema = root.join(
@@ -207,7 +251,12 @@ fn check_later_registry(root: &Path, config: &LaterRegistry) -> TaskResult {
             )
         );
         let manifest = json(&path)?;
-        validate_schema_instance(&json(&manifest_schema)?, &manifest, &path)?;
+        validate_manifest(
+            &json(&manifest_schema)?,
+            &manifest,
+            &path,
+            compiled_manifest_schema,
+        )?;
         let digest = recompute(&manifest, &path)?;
         require(
             text(&manifest, "schema_version", &path)? == "mainframe-env.topic-manifest@1"
@@ -292,6 +341,48 @@ pub(super) fn locator_topic_path(locator: &str) -> Option<&str> {
     let rest = locator.strip_prefix("topic:")?;
     let path = rest.split(';').next()?;
     (!path.is_empty()).then_some(path)
+}
+
+/// Resolve a baseline's source authority without consulting publication bodies.
+/// Supporting receipts name individual topics outside its primary book manifest.
+pub(super) fn catalog_topic_paths(
+    root: &Path,
+    baseline: &Value,
+    index_path: &Path,
+) -> TaskResult<(BTreeSet<String>, BTreeSet<String>)> {
+    let id = text(baseline, "id", index_path)?;
+    let source = &baseline["source"];
+    let product = text(source, "product", index_path)?;
+    let pinned = pinned_topic_paths(
+        root,
+        text(source, "manifest", index_path)?,
+        id,
+        text(source, "sha256", index_path)?,
+    )?;
+    let mut supporting = BTreeSet::new();
+    if let Some(receipts) = baseline.get("supporting_sources") {
+        let receipts = receipts
+            .as_array()
+            .ok_or_else(|| format!("baseline {id} supporting_sources is not an array"))?;
+        for receipt in receipts {
+            validate_official_source(receipt, index_path, id)?;
+            let topic = text(receipt, "topic_path", index_path)?;
+            require(
+                text(receipt, "kind", index_path)? == "documentation-topic"
+                    && text(receipt, "product", index_path)? == product
+                    && topic.starts_with(&format!("{product}/"))
+                    && !topic.contains("..")
+                    && text(receipt, "url", index_path)?
+                        .starts_with(&format!("https://www.ibm.com/docs/api/v1/content/{topic}?")),
+                &format!("baseline {id} supporting topic receipt identity differs: {topic}"),
+            )?;
+            require(
+                supporting.insert(topic.to_string()),
+                &format!("baseline {id} repeats supporting topic {topic}"),
+            )?;
+        }
+    }
+    Ok((pinned, supporting))
 }
 
 fn manifest_path(root: &Path, relative: &str, owner: &str) -> TaskResult<PathBuf> {
@@ -480,6 +571,56 @@ mod tests {
             .iter()
             .find(|config| config.target_subsystem == "mq.programming")
             .unwrap()
+    }
+
+    #[test]
+    fn shared_manifest_validator_rechecks_later_instances_and_schema_reads() {
+        let (first, _, _, _, _) = registry_015();
+        let (later, original, registry, path, registry_path) = registry_015();
+        let mut compiled = None;
+        check_later_registry_with_schema(&first.0, config_015(), &mut compiled).unwrap();
+        check_later_registry_with_schema(&later.0, config_015(), &mut compiled).unwrap();
+
+        // Rebinding the changed file does not bypass validation on a cache hit.
+        let mut invalid = original.clone();
+        invalid["coverage_credit"] = json!(1);
+        fs::write(&path, serde_json::to_vec_pretty(&invalid).unwrap()).unwrap();
+        let mut updated = registry.clone();
+        updated["manifests"][0]["manifest_sha256"] = json!(format!(
+            "sha256:{:x}",
+            Sha256::digest(fs::read(&path).unwrap())
+        ));
+        fs::write(&registry_path, serde_json::to_vec_pretty(&updated).unwrap()).unwrap();
+        let error =
+            check_later_registry_with_schema(&later.0, config_015(), &mut compiled).unwrap_err();
+        assert!(error.contains("violates its schema"), "{error}");
+        assert!(error.contains(&path.display().to_string()), "{error}");
+
+        fs::write(&path, serde_json::to_vec_pretty(&original).unwrap()).unwrap();
+        fs::write(
+            &registry_path,
+            serde_json::to_vec_pretty(&registry).unwrap(),
+        )
+        .unwrap();
+        let schema_path = later
+            .0
+            .join("conformance/subsystems/coverage/schemas/topic-manifest.schema.json");
+        let schema = json(&schema_path).unwrap();
+        let mut changed = schema.clone();
+        changed["allOf"] = json!([{"required": ["new-required-field"]}]);
+        fs::write(&schema_path, serde_json::to_vec_pretty(&changed).unwrap()).unwrap();
+        let error =
+            check_later_registry_with_schema(&later.0, config_015(), &mut compiled).unwrap_err();
+        assert!(error.contains("violates its schema"), "{error}");
+
+        // A later invalid schema must still fail at its original compile boundary.
+        changed["type"] = json!(7);
+        fs::write(&schema_path, serde_json::to_vec_pretty(&changed).unwrap()).unwrap();
+        let error =
+            check_later_registry_with_schema(&later.0, config_015(), &mut compiled).unwrap_err();
+        assert!(error.contains("is not valid Draft 2020-12"), "{error}");
+        fs::write(&schema_path, serde_json::to_vec_pretty(&schema).unwrap()).unwrap();
+        check_later_registry_with_schema(&later.0, config_015(), &mut compiled).unwrap();
     }
 
     #[test]

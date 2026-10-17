@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Extract Memory and SQLite provider-state trait implementations into bounded private modules while preserving their sole state and transaction authorities; lower or remove exact legacy inventory ceilings after the split."

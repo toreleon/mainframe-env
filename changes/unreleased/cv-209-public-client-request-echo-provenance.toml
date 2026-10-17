@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add six independent request-echo provenance guards and a finite bad-password refusal check that admits only exact caller JCL in three pinned SDK diagnostic strings after strict wire, listener and server-response validation. Full live compatibility acceptance remains pending."

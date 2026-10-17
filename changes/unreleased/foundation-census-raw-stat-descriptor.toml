@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Read Linux process-group stat metadata through raw descriptors to avoid per-PID FileIO allocation while preserving complete EOF reads, I/O refusal, descriptor closure, and the existing census limits."

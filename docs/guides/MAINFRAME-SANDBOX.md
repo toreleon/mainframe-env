@@ -15,7 +15,9 @@ application profiles and agent access around those existing authorities.
 Native execution requires Linux, Python 3.12.13, the pinned Rust 1.98.0 toolchain,
 Git 2.50.1 and native build tools. Setup builds a relocatable bundle, includes
 complete target-filtered third-party notices, and checks out the pinned AWS
-CardDemo sample. Runtime startup verifies that reference checkout. Setup clears
+CardDemo sample. Runtime startup verifies that reference checkout. Prepare the
+locked dependencies with `cargo fetch --locked` before setup; its build and
+notice metadata run offline, and the build uses `--frozen --offline`. Setup clears
 the checkout's Cargo target after preserving its executables and notices,
 including on build failure; an inherited shared Cargo target is left untouched.
 
@@ -24,6 +26,37 @@ bin/mainframe-sandbox setup --destination "$PWD/dist/sandbox"
 dist/sandbox/bin/mainframe-sandbox serve \
   --instance "$PWD/.tmp/sandbox/carddemo" --profile carddemo-online
 ```
+
+To retain the actual native producer independently of disposable build output,
+select a fresh directory below this checkout's `target/` and an external evidence
+directory:
+
+```bash
+bin/mainframe-sandbox setup \
+  --destination /path/to/external/sandbox-bundle \
+  --target-directory "$PWD/target/sandbox-setup-01" \
+  --producer-evidence /path/to/external/sandbox-producers/setup-01 \
+  --corpus /path/to/carddemo
+```
+
+The explicit target must not exist. Setup rejects symlink components, shared or
+broad targets and overlapping bundle, reference and evidence paths. It retains
+the actual build, notice and runtime-help logs, produced executables (including
+`xtask`), notices and SHA-256 identities under a unique output directory named
+by `setup-receipt.json`. The receipt records source and lockfile identities at
+launch and completion, actual tool versions, command exit codes and cleanup.
+Source changes during setup refuse readiness. Failed attempts retain their
+available outputs and failure receipt, then remove only the target they claimed;
+unclaimed or replaced targets are left with their owner. Retention failure keeps
+the target available for recovery. A passed setup receipt establishes packaging
+and its runtime-help probe; application acceptance uses the separate verifier.
+
+The bundle's atomic `ready` marker becomes true after reference validation,
+the runtime probe and successful owned cleanup. Setup serializes each bundle's
+writers. Use a fresh evidence directory for each attempt; setup never overwrites
+an existing receipt. `--producer-evidence` requires `--target-directory`.
+The legacy `--no-build` option consumes the default `target/release` executables
+and cannot be combined with either option for a fresh producer.
 
 If the pinned upstream sample is already available, pass `--corpus /path/to/carddemo`
 to setup. It creates a separate reference clone and leaves the supplied checkout

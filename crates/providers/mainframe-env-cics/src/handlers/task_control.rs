@@ -106,6 +106,7 @@ pub(in crate::service) fn new_run_with_state(
         undo: seed.undo,
         undo_version: seed.undo_version,
         browses: BTreeMap::new(),
+        initial_browse_positions: BTreeMap::new(),
         trace: Vec::new(),
     }
 }

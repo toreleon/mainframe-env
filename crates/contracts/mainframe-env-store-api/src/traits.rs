@@ -4,8 +4,8 @@ use crate::{
     ProviderStateArchiveDeletionWithCapacity, ProviderStateArchiveReplacement,
     ProviderStateMutation, ProviderStateRecord, ProviderStateWrite, RetentionAgeReconciliation,
     RetentionArchive, RetentionForecast, RetentionLegacyRow, RetentionPolicy, RetentionReceipt,
-    RetentionReconciliationReceipt, RetentionRequest, RetentionTarget, SessionRecord, StoreError,
-    WorkRecord,
+    RetentionReconciliationReceipt, RetentionRequest, RetentionTarget, RootDriverClaim,
+    SessionRecord, StoreError, WorkRecord,
 };
 use mainframe_env_execution_api::{
     ArtifactRef, AuditRecord, ExecutionId, IdempotencyKey, LifecycleEvent,
@@ -310,6 +310,29 @@ pub trait JournalStore: Send + Sync {
         _execution: &ExecutionRecord,
         _observed_tick: u64,
     ) -> Result<ProviderStateRecord, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Explicit backend profile observation, never a host custody permit.
+    fn root_custody_supported(&self) -> bool {
+        false
+    }
+    /// Storage-only explicit successor transaction. Closed host custody and
+    /// actual compiled original admission remain higher-layer prerequisites.
+    fn admit_root_successor(
+        &self,
+        _request: crate::RootCustodySuccessor,
+    ) -> Result<RootDriverClaim, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Capture and fence one complete actual Open synchronous root atomically.
+    /// Unsupported backends refuse without writes. This admits no successor,
+    /// settles no unit and fabricates no completion/audit/effect.
+    fn capture_root_custody_cutoff(
+        &self,
+        _claim: &crate::RootDriverClaim,
+        _execution: &ExecutionRecord,
+        _observed_tick: u64,
+    ) -> Result<crate::RootCustodyCutoff, StoreError> {
         Err(StoreError::InvalidTransition)
     }
     /// Gate new enrolled writes and capture one complete bounded Closing graph.

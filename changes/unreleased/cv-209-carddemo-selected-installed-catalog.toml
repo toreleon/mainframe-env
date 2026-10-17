@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Compare all selected CardDemo installed map and FILE records and local RACF profile metadata/intent decisions against frozen first-party/local fixture literals; expose the bounded J01 catalog observations after reopen, drains and owned cleanup."

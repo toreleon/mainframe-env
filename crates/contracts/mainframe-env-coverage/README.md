@@ -14,8 +14,7 @@ evidence records are content-addressed and never replaced; and a baseline's
 catalog digest and denominator cannot change inside an existing store. Generated
 rows begin with zero numerators. Verify with
 `cargo test -p mainframe-env-coverage --locked` and
-`cargo xtask coverage --check`. From 0.3 onward also run
-`cargo xtask spec --check`.
+`cargo xtask coverage --check`, and `cargo xtask spec --check`.
 
 ## Documentation
 

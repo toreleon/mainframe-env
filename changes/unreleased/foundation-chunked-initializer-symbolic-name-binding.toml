@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Bind chunked COBOL initializer symbolic names to the compiler's ASCII storage-name representation while preserving exact storage IDs, whole-view extents, effects, chunk bounds, and retained metadata."

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Emit versioned CardDemo base-batch comparison evidence only after the complete owner and checked cleanup; derive independent local record credit without changing legacy digest or licensed authority."

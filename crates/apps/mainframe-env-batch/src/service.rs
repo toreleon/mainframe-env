@@ -1,11 +1,18 @@
+mod controller_preparation;
 mod dd_allocation;
+mod dd_records;
 mod effect_loan;
 mod hex_encoding;
 mod host_dispatch;
 mod ims_controller;
+mod local_controller;
 mod prepared_selection;
 mod problem;
 mod program_dispatch;
+mod publication;
+pub use controller_preparation::{BatchControllerProjection, PreparedBatchControllers};
+pub use local_controller::{PreparedLocalController, validate_local_controller_plan};
+pub use publication::BatchPublicationWrite;
 mod run_retirement;
 mod run_selection;
 mod run_stop;
@@ -63,7 +70,7 @@ use mainframe_env_store_api::{
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
 const CONTROLLER_STATE_NAMESPACE: &str = "batch-controller-state";
 const CONTROLLER_STATE_KEY: &str = "registry";
@@ -218,6 +225,7 @@ struct DurableTopology {
 }
 
 pub struct BatchService {
+    publication_exclusion: Arc<RwLock<()>>,
     host: Arc<ScopedHostService>,
     store: Arc<dyn ProviderStateStore>,
     checkpoint_store: Option<Arc<dyn CheckpointStore>>,
@@ -226,25 +234,11 @@ pub struct BatchService {
     scheduler: Mutex<DurableScheduler>,
     topology: Mutex<DurableTopology>,
     controllers: Mutex<DurableControllers>,
+    controller_composition_uncertain: std::sync::atomic::AtomicBool,
     state: Mutex<State>,
 }
 
 impl BatchService {
-    pub fn open(
-        host: Arc<ScopedHostService>,
-        store: Arc<dyn ProviderStateStore>,
-        jcl_limits: JclLimits,
-        limits: BatchLimits,
-    ) -> Result<Arc<Self>, HostProblem> {
-        Self::open_with_scheduler(
-            host,
-            store,
-            jcl_limits,
-            limits,
-            JesSchedulerConfiguration::single_node(limits.max_active),
-        )
-    }
-
     pub fn open_with_scheduler(
         host: Arc<ScopedHostService>,
         store: Arc<dyn ProviderStateStore>,
@@ -252,7 +246,15 @@ impl BatchService {
         limits: BatchLimits,
         scheduler: JesSchedulerConfiguration,
     ) -> Result<Arc<Self>, HostProblem> {
-        Self::open_configured(host, store, None, jcl_limits, limits, scheduler)
+        Self::open_configured(
+            host,
+            store,
+            None,
+            jcl_limits,
+            limits,
+            scheduler,
+            Arc::new(RwLock::new(())),
+        )
     }
 
     pub fn open_with_checkpoint_store(
@@ -269,6 +271,28 @@ impl BatchService {
             jcl_limits,
             limits,
             JesSchedulerConfiguration::single_node(limits.max_active),
+            Arc::new(RwLock::new(())),
+        )
+    }
+
+    /// Inject the composition owner's local publication exclusion before admission.
+    /// Selected controllers require durable complete state even for standalone services.
+    pub fn open_with_checkpoint_store_and_publication_exclusion(
+        host: Arc<ScopedHostService>,
+        store: Arc<dyn ProviderStateStore>,
+        checkpoint_store: Arc<dyn CheckpointStore>,
+        jcl_limits: JclLimits,
+        limits: BatchLimits,
+        publication_exclusion: Arc<RwLock<()>>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_configured(
+            host,
+            store,
+            Some(checkpoint_store),
+            jcl_limits,
+            limits,
+            JesSchedulerConfiguration::single_node(limits.max_active),
+            publication_exclusion,
         )
     }
 
@@ -279,6 +303,7 @@ impl BatchService {
         jcl_limits: JclLimits,
         limits: BatchLimits,
         scheduler: JesSchedulerConfiguration,
+        publication_exclusion: Arc<RwLock<()>>,
     ) -> Result<Arc<Self>, HostProblem> {
         scheduler.validate()?;
         if limits.max_nje_nodes == 0
@@ -489,6 +514,7 @@ impl BatchService {
             }
         }
         Ok(Arc::new(Self {
+            publication_exclusion,
             host,
             store,
             checkpoint_store,
@@ -502,6 +528,7 @@ impl BatchService {
                 store_version: topology_store_version,
                 configuration: topology,
             }),
+            controller_composition_uncertain: std::sync::atomic::AtomicBool::new(false),
             controllers: Mutex::new(DurableControllers {
                 store_version: controller_store_version,
                 registry: controller_registry,
@@ -512,36 +539,6 @@ impl BatchService {
                 next_id,
             }),
         }))
-    }
-
-    pub fn install_controllers(
-        &self,
-        generation: BatchControllerGeneration,
-    ) -> Result<BatchControllerInstallReceipt, HostProblem> {
-        let mut durable = self
-            .controllers
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        durable.registry.preflight_install(&generation)?;
-        let mut replacement = durable.registry.clone();
-        let receipt = replacement.install(generation)?;
-        self.persist_controllers(&mut durable, replacement)?;
-        Ok(receipt)
-    }
-
-    pub fn rollback_controllers(
-        &self,
-        application: &str,
-        generation: u64,
-    ) -> Result<BatchControllerInstallReceipt, HostProblem> {
-        let mut durable = self
-            .controllers
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let mut replacement = durable.registry.clone();
-        let receipt = replacement.select(application, generation)?;
-        self.persist_controllers(&mut durable, replacement)?;
-        Ok(receipt)
     }
 
     /// Parse and validate the immutable JCL plan used for admission decisions.
@@ -1524,10 +1521,10 @@ impl BatchService {
                 }
                 Ok(output)
             });
-            if let Err(problem) = &step_result {
-                if run_stop::fence_step_error(invocation.contained(), problem) {
-                    return Err(invocation.poison(problem.clone()));
-                }
+            if let Err(problem) = &step_result
+                && run_stop::fence_step_error(invocation.contained(), problem)
+            {
+                return Err(invocation.poison(problem.clone()));
             }
             invocation.check()?;
             let output = match step_result {
@@ -2221,7 +2218,9 @@ impl BatchService {
             crate::db2_tso::Action::Run { program, command } => (program, command),
         };
         let selector = BatchControllerSelector::tso(&program)?;
-        if let Some(controller) = self.resolve_controller(&selector)? {
+        let (publication, controller) = self.admit_controller(&selector)?;
+        if let Some(controller) = controller {
+            self.require_local_controller_binding(job, &controller)?;
             return match controller.plan {
                 BatchControllerPlan::ProgramCall => {
                     let program = self.verify_controller_program(&controller.program)?;
@@ -2237,6 +2236,7 @@ impl BatchService {
                 _ => Err(HostProblem::ProviderFailure),
             };
         }
+        drop(publication);
         validate_tso_action_controls(&program, &control)?;
         let statement = input_dd_text(input, "SYSIN")?;
         let operation = match tso_program_execution(&program).ok_or(HostProblem::Unsupported)? {
@@ -2299,37 +2299,6 @@ impl BatchService {
             dd_outputs,
             termination: None,
         })
-    }
-
-    fn resolve_controller(
-        &self,
-        selector: &BatchControllerSelector,
-    ) -> Result<Option<ResolvedBatchController>, HostProblem> {
-        self.controllers
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)
-            .map(|durable| durable.registry.resolve(selector))
-    }
-
-    fn verify_controller_program(
-        &self,
-        program: &crate::BatchControllerProgram,
-    ) -> Result<String, HostProblem> {
-        let name = program
-            .path
-            .rsplit('/')
-            .next()
-            .ok_or(HostProblem::InfrastructureFailure)?
-            .to_ascii_uppercase();
-        let record = self
-            .store
-            .get_provider_state("batch-program", &name)
-            .map_err(store_error)?
-            .ok_or(HostProblem::NotFound)?;
-        if record.payload != program.identity.as_bytes() {
-            return Err(HostProblem::IdempotencyConflict);
-        }
-        Ok(name)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -2809,21 +2778,8 @@ impl BatchService {
         } else {
             let dataset =
                 dataset_name(&operand(statement, &["INDATASET"]).ok_or(HostProblem::Malformed)?)?;
-            let DatasetResult::Records { records, .. } = self.ams_dataset_read(
-                invocation,
-                effect_sequence,
-                DatasetRequest::Read {
-                    dataset,
-                    member: None,
-                    key: None,
-                    max_records: 4_096,
-                    control: Default::default(),
-                },
-            )?
-            else {
-                return Err(HostProblem::ProviderFailure);
-            };
-            records
+            self.read_repro_dataset_records(invocation, &dataset, effect_sequence, statement)?
+                .into_records()?
         };
         let skip = operand(statement, &["SKIP"])
             .map(|value| value.parse::<usize>().map_err(|_| HostProblem::Malformed))
@@ -2836,6 +2792,12 @@ impl BatchService {
         if skip > 4_096 || count > 4_096 {
             return Err(HostProblem::ResourceExhausted);
         }
+        crate::dd_hydration::refuse_implicit_repro_prefix(
+            records.len(),
+            skip,
+            count,
+            operand(statement, &["COUNT"]).is_some(),
+        )?;
         let records = records
             .into_iter()
             .skip(skip)
@@ -4010,38 +3972,6 @@ impl BatchService {
         Ok(allocations)
     }
 
-    fn read_dataset_records(
-        &self,
-        invocation: &(impl RunInput + ?Sized),
-        allocation: &DdRuntimeAllocation,
-        effect_sequence: &mut u64,
-    ) -> Result<Vec<Vec<u8>>, HostProblem> {
-        invocation.check()?;
-        let sequence = next_effect_sequence(invocation, effect_sequence)?;
-        let result = self.invoke_host(
-            invocation,
-            invocation.original().deadline_tick.saturating_sub(1),
-            false,
-            EffectRequest {
-                run_unit: invocation.original().run_unit_id.clone(),
-                sequence,
-                deadline_tick: invocation.original().deadline_tick,
-                idempotency_key: None,
-                request: HostRequest::Dataset(DatasetRequest::Read {
-                    dataset: allocation.dataset.clone(),
-                    member: allocation.member.clone(),
-                    key: None,
-                    max_records: 4_096,
-                    control: Default::default(),
-                }),
-            },
-        );
-        let HostResult::Dataset(DatasetResult::Records { records, .. }) = result.outcome? else {
-            return Err(HostProblem::ProviderFailure);
-        };
-        Ok(records)
-    }
-
     fn hydrate_dds(
         &self,
         invocation: &(impl RunInput + ?Sized),
@@ -4089,37 +4019,49 @@ impl BatchService {
                 ccsid = attributes.ccsid;
             }
             if can_read_as_concatenation {
-                let sequence = next_effect_sequence(invocation, effect_sequence)?;
-                let result = self.invoke_host(
-                    invocation,
-                    invocation.original().deadline_tick.saturating_sub(1),
-                    false,
-                    EffectRequest {
-                        run_unit: invocation.original().run_unit_id.clone(),
-                        sequence,
-                        deadline_tick: invocation.original().deadline_tick,
-                        idempotency_key: None,
-                        request: HostRequest::Dataset(DatasetRequest::ReadConcatenation {
-                            datasets: group_allocations
-                                .iter()
-                                .map(|allocation| allocation.dataset.clone())
-                                .collect(),
-                            member: group_allocations[0].member.clone(),
-                            max_records: 4_096,
-                        }),
-                    },
-                );
-                let HostResult::Dataset(DatasetResult::Records {
-                    records: dataset_records,
-                    ..
-                }) = result.outcome?
-                else {
-                    return Err(HostProblem::ProviderFailure);
-                };
-                if retains_flattened_dataset_bytes(&name) {
-                    append_inline_records(&mut payload, &dataset_records);
+                let member = group_allocations[0].member.as_ref();
+                for allocation in &group_allocations {
+                    let dataset_records = match self.read_dataset_records(
+                        invocation,
+                        Some(allocation),
+                        &allocation.dataset,
+                        member,
+                        effect_sequence,
+                    ) {
+                        // Only confirmed absent members select the next library.
+                        Ok(crate::dd_hydration::CompleteDatasetRead::MissingMember)
+                            if member.is_some() =>
+                        {
+                            continue;
+                        }
+                        Ok(crate::dd_hydration::CompleteDatasetRead::Records(records)) => records,
+                        Ok(crate::dd_hydration::CompleteDatasetRead::MissingMember) => {
+                            return Err(HostProblem::ProviderFailure);
+                        }
+                        Err(problem) => return Err(problem),
+                    };
+                    if member.is_some() && dataset_records.is_empty() {
+                        return Err(HostProblem::Condition {
+                            name: "NOTFND".into(),
+                            response: 13,
+                            response2: 0,
+                        });
+                    }
+                    if retains_flattened_dataset_bytes(&name) {
+                        append_inline_records(&mut payload, &dataset_records);
+                    }
+                    records.extend(dataset_records);
+                    if member.is_some() {
+                        break;
+                    }
                 }
-                records.extend(dataset_records);
+                if member.is_some() && records.is_empty() {
+                    return Err(HostProblem::Condition {
+                        name: "NOTFND".into(),
+                        response: 13,
+                        response2: 0,
+                    });
+                }
             } else {
                 for (ordinal, dd) in dds.iter().enumerate().take(end).skip(start) {
                     if let Some(allocation) = allocations
@@ -4127,8 +4069,15 @@ impl BatchService {
                         .find(|allocation| allocation.ordinal == ordinal)
                     {
                         if allocation.disposition.status != DdStatusDisposition::New {
-                            let dataset_records =
-                                self.read_dataset_records(invocation, allocation, effect_sequence)?;
+                            let dataset_records = self
+                                .read_dataset_records(
+                                    invocation,
+                                    Some(allocation),
+                                    &allocation.dataset,
+                                    allocation.member.as_ref(),
+                                    effect_sequence,
+                                )?
+                                .into_records()?;
                             if retains_flattened_dataset_bytes(&name) {
                                 append_inline_records(&mut payload, &dataset_records);
                             }
@@ -4152,6 +4101,11 @@ impl BatchService {
             }
             start = end;
         }
+        crate::dd_hydration::check_hydration_storage(
+            dds,
+            &hydrated,
+            invocation.original().limits.max_storage_bytes,
+        )?;
         Ok(hydrated)
     }
 
@@ -5300,32 +5254,6 @@ impl BatchService {
                 payload,
             })
             .map_err(|_| HostProblem::UnknownOutcome)
-    }
-
-    fn persist_controllers(
-        &self,
-        durable: &mut DurableControllers,
-        registry: BatchControllerRegistry,
-    ) -> Result<(), HostProblem> {
-        let payload = registry.state_payload()?;
-        let version = durable
-            .store_version
-            .checked_add(1)
-            .ok_or(HostProblem::ResourceExhausted)?;
-        self.store
-            .put_provider_state(
-                ProviderStateRecord {
-                    namespace: CONTROLLER_STATE_NAMESPACE.into(),
-                    key: CONTROLLER_STATE_KEY.into(),
-                    version,
-                    payload,
-                },
-                (durable.store_version != 0).then_some(durable.store_version),
-            )
-            .map_err(store_error)?;
-        durable.store_version = version;
-        durable.registry = registry;
-        Ok(())
     }
 
     pub(crate) fn lock(&self) -> Result<std::sync::MutexGuard<'_, State>, HostProblem> {
@@ -6827,6 +6755,7 @@ fn dcollect_catalog_names(
 
 #[cfg(test)]
 mod tests {
+    mod bounded_dataset_pages;
     mod ims_completion;
     mod run_stop;
     mod running_step;
@@ -7090,6 +7019,11 @@ mod tests {
                             }))
                             .ok_or(HostProblem::NotFound)
                     }),
+                HostRequest::Dataset(DatasetRequest::ReadSequential {
+                    dataset, member, start, reverse, max_records,
+                }) => bounded_dataset_pages::test_provider_page(
+                    &self.records, &dataset, member.as_ref(), start, reverse, max_records,
+                ).map(HostResult::Dataset),
                 HostRequest::Dataset(DatasetRequest::Read { dataset, .. }) => self
                     .records
                     .lock()
@@ -7900,6 +7834,79 @@ mod tests {
             RecordFormat::FixedBlocked,
             350,
         );
+    }
+
+    #[test]
+    fn new_generation_uses_exact_supported_unblocked_dd_attributes() {
+        for (recfm, record_format) in [
+            ("F", RecordFormat::Fixed),
+            ("FB", RecordFormat::FixedBlocked),
+            ("V", RecordFormat::Variable),
+            ("VB", RecordFormat::VariableBlocked),
+        ] {
+            let (service, dataset) = service_with_real_datasets();
+            let base = DatasetName::new("USER.REJECTS", 128).unwrap();
+            dataset
+                .invoke(DatasetRequest::DefineGenerationGroup {
+                    base: base.clone(),
+                    limit: 3,
+                    scratch: true,
+                    empty: false,
+                    mutation: dataset_test_mutation(612),
+                })
+                .unwrap();
+            let invocation = invocation();
+            let submitted = service
+                .submit(
+                    &invocation,
+                    &JclBundle {
+                        primary: format!(
+                            "//GDGFORMT JOB CLASS=A\n//STEP15 EXEC PGM=IEFBR14\n//DALYREJS DD DISP=(NEW,CATLG,DELETE),\n//         DCB=(RECFM={recfm},LRECL=430,BLKSIZE=0),\n//         DSN=USER.REJECTS(+1)\n"
+                        ),
+                        ..Default::default()
+                    },
+                    &IdempotencyKey::new("exact-gdg-format", InvocationLimits::default()).unwrap(),
+                    false,
+                )
+                .unwrap();
+            let completed = service.run_next(&invocation, false).unwrap().unwrap();
+            assert_eq!(completed.id, submitted.id);
+            assert_eq!(completed.state, JobState::Completed);
+            assert_eq!(completed.return_code, Some(0));
+            let DatasetResult::Generation {
+                dataset: generated,
+                absolute_generation,
+                ..
+            } = dataset
+                .invoke(DatasetRequest::ResolveGeneration { base, relative: 0 })
+                .unwrap()
+            else {
+                panic!("actual generated dataset is required");
+            };
+            assert_eq!(generated.as_str(), "USER.REJECTS.G0001V00");
+            assert_eq!(absolute_generation, 1);
+            let DatasetResult::Attributes {
+                attributes,
+                version,
+            } = dataset
+                .invoke(DatasetRequest::Attributes { dataset: generated })
+                .unwrap()
+            else {
+                panic!("actual generated attributes are required");
+            };
+            assert!(version > 0);
+            assert_eq!(
+                attributes,
+                DatasetAttributes {
+                    organization: DatasetOrganization::Sequential,
+                    record_format,
+                    logical_record_length: 430,
+                    key_offset: None,
+                    key_length: None,
+                    ccsid: Some(37),
+                }
+            );
+        }
     }
 
     #[test]

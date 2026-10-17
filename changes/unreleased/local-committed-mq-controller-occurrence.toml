@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add an explicit local committed PUT1 and selected JES controller occurrence boundary; preserve separate Complete/Applied publication and IBM MQ limits."

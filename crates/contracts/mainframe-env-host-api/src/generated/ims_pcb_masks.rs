@@ -2,7 +2,7 @@
 // Reviewed PCB metadata is not behavioral coverage.
 
 pub const IMS_PCB_STATUS_RULES_SHA256: &str =
-    "sha256:9ad82bb99ffacb11fef725c56d72708f866d99e40752206043ea46ca7da841a2";
+    "sha256:e1a53abd126d5c605f8900e800f32c1507ac22b77513184d940aa77240bb2338";
 pub const IMS_PCB_STATUS_TOPIC_MANIFEST_SHA256: &str =
     "sha256:119dd5e589399cb023f70c7a28fa9a1a937be1fa2c2393679ab65402ac735182";
 pub const IMS_PCB_MASK_COUNT: usize = 4;

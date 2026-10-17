@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Move the selected CardDemo base batch exercise and unchanged dataset/spool helpers into their owning module, retaining the existing module review limits and terminal test suffix."

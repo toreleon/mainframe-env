@@ -80,6 +80,23 @@ pub trait HostProvider: Send + Sync {
         }
     }
 
+    /// Separate completed plain READ replay transport. Type erasure is not authority.
+    /// The receiver must validate its private same-store/frame capture and exact receipt;
+    /// the default never calls ordinary invoke or recomputes data.
+    fn replay_completed_plain_read(
+        &self,
+        _invocation: &Invocation,
+        request: EffectRequest,
+        _expected_result_digest: [u8; 32],
+        _observed_tick: u64,
+        _context: &(dyn std::any::Any + Send + Sync),
+    ) -> EffectResult {
+        EffectResult {
+            sequence: request.sequence,
+            outcome: Err(HostProblem::Unsupported),
+        }
+    }
+
     /// Transport a borrowed Rust-only context for an original Program request.
     /// Type erasure conveys no admission, JES, lifecycle, SAF or core authority;
     /// an implementing receiver must independently validate its closed owner type.

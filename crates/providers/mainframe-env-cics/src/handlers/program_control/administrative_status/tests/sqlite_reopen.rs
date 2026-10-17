@@ -137,7 +137,8 @@ fn stable_catalog_and_immutable_references_survive_last_sqlite_owner_close() {
     cics.register_programs(&BTreeSet::from(["LEGACY".into()]))
         .unwrap();
     let entry = application_entry(&old);
-    cics.register_application_entries(&[entry.clone()]).unwrap();
+    cics.register_application_entries(std::slice::from_ref(&entry))
+        .unwrap();
     let saved = observe_named_status(&cics, "VERSIONS").unwrap();
     assert_eq!(saved, ProgramStatusObservation::Definition(latest.clone()));
     let before = provider_bytes(&store);
@@ -234,7 +235,8 @@ fn corrupt_then_physically_reopen(damage: Damage) {
     let cics = open_service(store.clone()).unwrap();
     cics.bind_artifact_store(artifacts.clone()).unwrap();
     let value = local_definition(&artifacts, "CORRUPT", 2, true);
-    cics.register_program_definitions(&[value.clone()]).unwrap();
+    cics.register_program_definitions(std::slice::from_ref(&value))
+        .unwrap();
     if matches!(damage, Damage::DanglingApplication) {
         cics.register_application_entries(&[application_entry(&value)])
             .unwrap();

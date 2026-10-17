@@ -100,13 +100,41 @@
     "docs/decisions/0048-carddemo-interactive-application.md",
     "docs/decisions/0049-executable-agent-sandbox.md",
     "docs/decisions/0050-host-effect-envelope-layout.md",
+    "docs/decisions/0051-package-identity-framing.md",
+    "docs/decisions/0052-cics-operation-contexts.md",
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
     "docs/delivery/IMPLEMENTATION-ROADMAP.md",
     "docs/delivery/VERIFICATION-STRATEGY.md",
     "docs/delivery/WORK-COORDINATION.md",
     "docs/delivery/ZOSMF-API.md",
     "docs/delivery/subsystems/mq/inquiry-source-boundary.md",
-    "docs/guides/MAINFRAME-SANDBOX.md"
+    "docs/guides/MAINFRAME-SANDBOX.md",
+    "docs/decisions/0053-selected-controller-publication-fence.md",
+    "docs/decisions/0054-focused-conformance-output.md",
+    "docs/decisions/0055-standard-package-mac-envelope.md",
+    "docs/decisions/0056-cics-first-reverse-position.md",
+    "docs/decisions/0057-native-mq-root-custody-cutoff.md",
+    "docs/decisions/0058-native-mq-protected-scope-succession.md",
+    "docs/decisions/0059-native-mq-serial-owned-sqlite-file-custody.md",
+    "docs/decisions/0060-passive-cics-read-copyback.md",
+    "docs/decisions/0061-cobol-chunked-initializer-carrier.md",
+    "docs/decisions/0062-passive-db2-copyback.md",
+    "docs/decisions/0063-readonly-dispatch-ownership.md",
+    "docs/decisions/0064-local-application-composition.md",
+    "docs/decisions/0065-local-exec-dli-exact-storage-copyback.md",
+    "docs/decisions/0068-local-racf-profile-composition.md",
+    "docs/decisions/0069-local-db2-catalog-composition.md",
+    "docs/decisions/0071-local-fixed-ims-catalog-composition.md",
+    "docs/decisions/0072-local-fixed-mq-queue-composition.md",
+    "docs/decisions/0073-local-batch-controller-composition.md",
+    "docs/decisions/0066-cics-current-program-borrowed-task-custody.md",
+    "docs/decisions/0067-durable-first-dispatch-borrowed-intent.md",
+    "docs/decisions/0070-compiled-cics-first-protected-dispatch.md",
+    "docs/decisions/0075-local-complete-owned-publication.md",
+    "docs/decisions/0074-local-mq-process-trigger-graph.md",
+    "docs/decisions/0076-local-committed-mq-controller-occurrence.md",
+    "docs/decisions/0077-local-completed-plain-read-consumption.md",
+    "docs/decisions/0078-carddemo-record-comparison-companion.md"
   ],
   "navigation": [
     {
@@ -554,6 +582,118 @@
         {
           "label": "ADR-0050: Boxed shared host-effect payloads",
           "path": "docs/decisions/0050-host-effect-envelope-layout.md"
+        },
+        {
+          "label": "ADR-0051: Framed package identity and retained compatibility",
+          "path": "docs/decisions/0051-package-identity-framing.md"
+        },
+        {
+          "label": "ADR-0052: Borrowed CICS operation inputs",
+          "path": "docs/decisions/0052-cics-operation-contexts.md"
+        },
+        {
+          "label": "ADR-0053: Selected controller publication fence",
+          "path": "docs/decisions/0053-selected-controller-publication-fence.md"
+        },
+        {
+          "label": "ADR-0054: Canonical focused conformance output",
+          "path": "docs/decisions/0054-focused-conformance-output.md"
+        },
+        {
+          "label": "ADR-0055: Standard package MAC envelope",
+          "path": "docs/decisions/0055-standard-package-mac-envelope.md"
+        },
+        {
+          "label": "ADR-0056: CICS first reverse read at a retained position",
+          "path": "docs/decisions/0056-cics-first-reverse-position.md"
+        },
+        {
+          "label": "ADR-0057: Explicit native MQ root custody cutoff",
+          "path": "docs/decisions/0057-native-mq-root-custody-cutoff.md"
+        },
+        {
+          "label": "ADR-0058: Protected native MQ scope succession",
+          "path": "docs/decisions/0058-native-mq-protected-scope-succession.md"
+        },
+        {
+          "label": "ADR-0059: Serial owned SQLite file custody",
+          "path": "docs/decisions/0059-native-mq-serial-owned-sqlite-file-custody.md"
+        },
+        {
+          "label": "ADR-0060: Passive CICS READ copyback observation",
+          "path": "docs/decisions/0060-passive-cics-read-copyback.md"
+        },
+        {
+          "label": "ADR-0061: Bounded COBOL initializer byte carrier",
+          "path": "docs/decisions/0061-cobol-chunked-initializer-carrier.md"
+        },
+        {
+          "label": "ADR-0062: Provisional passive Db2 machine copyback trace",
+          "path": "docs/decisions/0062-passive-db2-copyback.md"
+        },
+        {
+          "label": "ADR-0063: Actual dispatch ownership for selected readonly effects",
+          "path": "docs/decisions/0063-readonly-dispatch-ownership.md"
+        },
+        {
+          "label": "ADR-0064: Owned local application composition",
+          "path": "docs/decisions/0064-local-application-composition.md"
+        },
+        {
+          "label": "ADR-0065: Local EXEC DLI exact storage copyback",
+          "path": "docs/decisions/0065-local-exec-dli-exact-storage-copyback.md"
+        },
+        {
+          "label": "ADR-0068: Owned local RACF profile composition",
+          "path": "docs/decisions/0068-local-racf-profile-composition.md"
+        },
+        {
+          "label": "ADR-0069: Owned local Db2 catalog composition",
+          "path": "docs/decisions/0069-local-db2-catalog-composition.md"
+        },
+        {
+          "label": "ADR-0071: Owned local fixed IMS catalog composition",
+          "path": "docs/decisions/0071-local-fixed-ims-catalog-composition.md"
+        },
+        {
+          "label": "ADR-0072: Owned local fixed MQ queue catalog composition",
+          "path": "docs/decisions/0072-local-fixed-mq-queue-composition.md"
+        },
+        {
+          "label": "ADR-0073: Owned local TSO ProgramCall controller composition",
+          "path": "docs/decisions/0073-local-batch-controller-composition.md"
+        },
+        {
+          "label": "ADR-0066: Borrowed CICS current-program task custody",
+          "path": "docs/decisions/0066-cics-current-program-borrowed-task-custody.md"
+        },
+        {
+          "label": "ADR-0067: Borrowed durable first-dispatch Intent",
+          "path": "docs/decisions/0067-durable-first-dispatch-borrowed-intent.md"
+        },
+        {
+          "label": "ADR-0070: Compiled CICS first protected dispatch",
+          "path": "docs/decisions/0070-compiled-cics-first-protected-dispatch.md"
+        },
+        {
+          "label": "ADR-0075: Owned initial local Complete publication",
+          "path": "docs/decisions/0075-local-complete-owned-publication.md"
+        },
+        {
+          "label": "ADR-0074: Explicit local MQ process/trigger graph admission",
+          "path": "docs/decisions/0074-local-mq-process-trigger-graph.md"
+        },
+        {
+          "label": "ADR 0076: Explicit local committed MQ controller occurrence",
+          "path": "docs/decisions/0076-local-committed-mq-controller-occurrence.md"
+        },
+        {
+          "label": "ADR 0077: Local completed plain READ result consumption",
+          "path": "docs/decisions/0077-local-completed-plain-read-consumption.md"
+        },
+        {
+          "label": "ADR 0078: CardDemo record-comparison companion",
+          "path": "docs/decisions/0078-carddemo-record-comparison-companion.md"
         }
       ],
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."

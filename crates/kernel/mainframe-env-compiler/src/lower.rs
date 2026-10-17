@@ -4,7 +4,8 @@ use mainframe_env_ir::{
     Attribute, COBOL_ENTRY_FORMALS_V1, COBOL_MAX_UNBOUNDED_OCCURRENCES,
     COBOL_MAX_UNBOUNDED_STORAGE_BYTES, Effect, IrLimits, LegalityProfile, Module, ModuleBuilder,
     OperationCatalog, OperationIdentity, OperationSchema, StorageReference,
-    cobol_layout_definition_schema,
+    cobol_chunked_initialization_attributes, cobol_chunked_initialization_identity,
+    cobol_chunked_initialization_schema, cobol_layout_definition_schema,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -392,30 +393,45 @@ pub(crate) fn lower_to_core(
         } else {
             layout.length
         };
-        let attributes = BTreeMap::from([
+        let initial = runtime_root_initial(
+            layout,
+            &hir.layouts,
+            if layout.unbounded {
+                unbounded_occurrences(layout)?
+            } else {
+                layout.occurs
+            },
+        );
+        let (identity, attributes) = if initial.len() > limits.max_attribute_bytes {
             (
-                "name".into(),
-                Attribute::Text(layout.qualified_name.clone()),
-            ),
+                cobol_chunked_initialization_identity(),
+                cobol_chunked_initialization_attributes(
+                    &layout.qualified_name,
+                    layout.offset as u64,
+                    storage_length as u64,
+                    &initial,
+                    limits,
+                )
+                .map_err(|_| LowerProblem::LimitExceeded)?,
+            )
+        } else {
             (
-                "initial".into(),
-                Attribute::Bytes(runtime_root_initial(
-                    layout,
-                    &hir.layouts,
-                    if layout.unbounded {
-                        unbounded_occurrences(layout)?
-                    } else {
-                        layout.occurs
-                    },
-                )),
-            ),
-            ("offset".into(), Attribute::Integer(layout.offset as i64)),
-            ("length".into(), Attribute::Integer(storage_length as i64)),
-        ]);
+                core_identity("init")?,
+                BTreeMap::from([
+                    (
+                        "name".into(),
+                        Attribute::Text(layout.qualified_name.clone()),
+                    ),
+                    ("initial".into(), Attribute::Bytes(initial)),
+                    ("offset".into(), Attribute::Integer(layout.offset as i64)),
+                    ("length".into(), Attribute::Integer(storage_length as i64)),
+                ]),
+            )
+        };
         builder
             .add_operation(
                 block,
-                core_identity("init")?,
+                identity,
                 Vec::new(),
                 0,
                 attributes,
@@ -977,6 +993,9 @@ pub fn core_mir_catalog() -> OperationCatalog {
         schema.runtime_import = runtime_import(kind).map(str::to_string);
         catalog.register(schema).expect("unique core operation");
     }
+    catalog
+        .register(cobol_chunked_initialization_schema())
+        .expect("unique chunked COBOL initialization schema");
     crate::hir::decimal::register_executable_operation(&mut catalog);
     crate::hir::cics::register_executable_operations(&mut catalog);
     catalog

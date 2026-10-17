@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Admit fixed unsigned numeric DISPLAY fields in symbolic RECEIVE MAP and copy prevalidated input bytes without numeric coercion, preserving omitted fields and rejecting malformed projections before mapped writes."

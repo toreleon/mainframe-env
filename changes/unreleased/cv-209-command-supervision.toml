@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add optional Linux command deadlines and shared output ceilings to CI recording, binding current logs and retaining leader identity through owned group cleanup."

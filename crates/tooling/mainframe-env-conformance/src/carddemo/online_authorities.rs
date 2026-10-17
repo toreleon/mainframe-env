@@ -84,6 +84,15 @@ pub(super) fn install_base_online_authorities(
             ))
         })
         .collect::<Result<BTreeMap<_, _>, CorpusProblem>>()?;
+    install_online_resources(server, definition, &objects, &aliases)
+}
+
+fn install_online_resources(
+    server: &ProductServer,
+    definition: &OnlineApplicationDefinition,
+    objects: &[DatasetSeedObject],
+    aliases: &BTreeMap<String, DatasetName>,
+) -> Result<(), CorpusProblem> {
     server
         .cics_service()
         .register_file_definitions(
@@ -175,6 +184,124 @@ pub(super) fn install_db2_authorities(server: &ProductServer) -> Result<(), Corp
             .map_err(terminal_problem)?;
     }
     Ok(())
+}
+
+pub(super) fn install_transaction_authorities(
+    server: &ProductServer,
+    corpus_dir: &Path,
+    definition: &OnlineApplicationDefinition,
+) -> Result<(), CorpusProblem> {
+    let objects = [
+        (
+            "AWS.M2.CARDDEMO.USRSEC.PS",
+            "AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS",
+            80,
+            8,
+        ),
+        (
+            "AWS.M2.CARDDEMO.CARDXREF.PS",
+            "AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS",
+            50,
+            16,
+        ),
+        (
+            "AWS.M2.CARDDEMO.DALYTRAN.PS.INIT",
+            "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS",
+            350,
+            16,
+        ),
+    ]
+    .into_iter()
+    .map(|(source, target, record_length, key_length)| {
+        let relative = format!("app/data/EBCDIC/{source}");
+        let bytes = read_corpus_file(corpus_dir, &corpus_dir.join(&relative))?;
+        Ok(DatasetSeedObject {
+            source_id: relative,
+            dataset: DatasetName::new(target, 128).map_err(|_| {
+                CorpusProblem::new("carddemo.online.seed_invalid", "seed target is invalid")
+            })?,
+            attributes: DatasetAttributes {
+                organization: DatasetOrganization::KeySequenced,
+                record_format: RecordFormat::Fixed,
+                logical_record_length: record_length,
+                key_offset: Some(0),
+                key_length: Some(key_length),
+                ccsid: Some(37),
+            },
+            record_length,
+            sha256: format!("sha256:{:x}", Sha256::digest(&bytes)),
+            bytes,
+        })
+    })
+    .collect::<Result<Vec<_>, CorpusProblem>>()?;
+    let dataset = server.dataset_service();
+    dataset
+        .install_seed_generation("CARDDEMO", "g1", objects.clone())
+        .map_err(terminal_problem)?;
+    for (sequence, index, base, offset, length) in [
+        (
+            2,
+            "AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH",
+            "AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS",
+            25,
+            11,
+        ),
+        (
+            3,
+            "AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH",
+            "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS",
+            304,
+            26,
+        ),
+    ] {
+        dataset
+            .invoke(DatasetRequest::DefineAlternateIndex {
+                base: DatasetName::new(base, 128).expect("static base"),
+                index: DatasetName::new(index, 128).expect("static index"),
+                key_offset: offset,
+                key_length: length,
+                allow_duplicates: true,
+                upgrade: true,
+                mutation: Mutation {
+                    sequence,
+                    idempotency_key: IdempotencyKey::new(
+                        format!("carddemo-online-index-{sequence}"),
+                        InvocationLimits::default(),
+                    )
+                    .expect("static mutation key"),
+                    transaction: Some("CARDDEMO-INSTALL".into()),
+                },
+            })
+            .map_err(terminal_problem)?;
+    }
+    let csd = String::from_utf8(read_corpus_file(
+        corpus_dir,
+        &corpus_dir.join("app/csd/CARDDEMO.CSD"),
+    )?)
+    .map_err(|_| CorpusProblem::new("carddemo.online.csd_invalid", "base CSD is not UTF-8"))?;
+    let resources = parse_csd(&csd).map_err(package_problem)?;
+    let mut aliases = BTreeMap::new();
+    for (alias, expected_dataset) in [
+        ("USRSEC", "AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS"),
+        ("CCXREF", "AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS"),
+        ("CXACAIX", "AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH"),
+        ("TRANSACT", "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS"),
+    ] {
+        let matching = resources
+            .iter()
+            .filter(|resource| resource.kind == "FILE" && resource.name == alias)
+            .collect::<Vec<_>>();
+        if matching.len() != 1
+            || matching[0].properties.get("DSNAME").map(String::as_str) != Some(expected_dataset)
+        {
+            return Err(CorpusProblem::new("carddemo.transaction.csd_drift", alias));
+        }
+        aliases.insert(
+            alias.into(),
+            DatasetName::new(expected_dataset, 128).expect("static dataset"),
+        );
+    }
+    install_online_resources(server, definition, &objects, &aliases)
 }
 
 #[cfg(test)]

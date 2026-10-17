@@ -8,7 +8,7 @@ Start gate: coverage.foundation catalog/handler contracts, cobol.execution COBOL
 Completion dependencies: coverage.foundation, cobol.execution, racf.security
 Estimate: 24–36 engineer-months
 
-The [common release contract](../README.md#shared-validation-contract) and
+The [shared validation contract](../README.md#shared-validation-contract) and
 [hardened slice acceptance](../../../prompts/subsystems/README.md#hardened-slice-acceptance)
 apply, including early participant-contract and licensed-harness preparation.
 These requirements do not themselves certify implementation or waive an exit gate.

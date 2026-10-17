@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a default-off passive typed CICS READ copyback collector and opaque same-server observation manager, requiring actual ordinary actor/effect/audit evidence and successful existing cleanup without application-specific production dispatch, HTTP or checkpoint changes."

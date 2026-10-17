@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Align subsystem phase prompts and plan links with current delivery and validation ownership while preserving semantic, source and licensed acceptance gates."

@@ -41,6 +41,14 @@ pub struct CicsPartitionDefinition {
     pub columns: u16,
 }
 
+/// Borrowed input submitted from an authenticated terminal partition.
+pub struct CicsPartitionInput<'a> {
+    pub aid: u8,
+    pub partition: &'a str,
+    pub data: &'a [u8],
+    pub cursor: u16,
+}
+
 /// Immutable BMS partition-set resource admitted for SEND PARTNSET.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CicsPartitionSetDefinition {
@@ -130,12 +138,15 @@ impl CicsService {
         session: &SessionId,
         principal: &PrincipalId,
         csrf_token: &str,
-        aid: u8,
-        partition: &str,
-        data: &[u8],
-        cursor: u16,
+        input: CicsPartitionInput<'_>,
         now_tick: u64,
     ) -> Result<CicsTerminalSnapshot, HostProblem> {
+        let CicsPartitionInput {
+            aid,
+            partition,
+            data,
+            cursor,
+        } = input;
         if !super::valid_aid(aid) || data.len() > self.limits.max_screen_bytes {
             return Err(HostProblem::Malformed);
         }

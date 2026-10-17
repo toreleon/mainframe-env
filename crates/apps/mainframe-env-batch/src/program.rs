@@ -135,6 +135,7 @@ pub(crate) struct CommonProgramEntry {
     pub disposition: UtilityDisposition,
     pub execution: ProgramExecution,
     pub builtin: Option<BuiltinProgram>,
+    control: ControlDeclaration,
 }
 
 #[must_use]
@@ -185,8 +186,9 @@ pub(crate) fn tso_program_execution(program: &str) -> Option<TsoProgramExecution
 
 // These declarations are consulted before execution; a source absent from the list is
 // never interpreted as control input by this handler. Data DDs are not control sources.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ControlGrammar {
+    IgnoreInput,
     ReadsNone,
     Cards(&'static [(&'static str, &'static [&'static str])]),
     UpdateCards,
@@ -198,45 +200,23 @@ enum ControlGrammar {
     Unavailable,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct ControlDeclaration {
     sources: &'static [&'static str],
     grammar: ControlGrammar,
 }
 
 fn control_declaration(program: &str) -> Option<ControlDeclaration> {
-    let (sources, grammar) = match program {
-        "IEFBR14" => (&[][..], ControlGrammar::ReadsNone),
-        "IEBGENER" | "IEBCOMPR" => (&["SYSIN"][..], ControlGrammar::ReadsNone),
-        "IEBCOPY" => (
-            &["SYSIN"][..],
-            ControlGrammar::Cards(&[("COPY", &["INDD", "OUTDD"])]),
-        ),
-        "IEBDG" => (
-            &["SYSIN"][..],
-            ControlGrammar::Cards(&[
-                ("DSD", &["OUTPUT"]),
-                ("FD", &["NAME", "LENGTH", "VALUE"]),
-                ("CREATE", &["QUANTITY", "RECORDS", "LENGTH", "VALUE"]),
-                ("END", &[]),
-            ]),
-        ),
-        "IEBEDIT" => (
-            &["SYSIN"][..],
-            ControlGrammar::Cards(&[("EDIT", &["START", "STOP", "END", "STEPNAME"])]),
-        ),
-        "IEBUPDTE" => (&["SYSIN"][..], ControlGrammar::UpdateCards),
-        "SORT" => (&["SYSIN", "SYMNAMES"][..], ControlGrammar::Sort),
-        "IDCAMS" => (&["SYSIN", "PARM"][..], ControlGrammar::Idcams),
-        "SDSF" => (&["ISFIN"][..], ControlGrammar::Sdsf),
-        "IKJEFT01" => (&["SYSTSIN", "SYSIN"][..], ControlGrammar::Tso),
-        // SYSIN belongs to the selected signed application controller, which
-        // validates it after launcher selection and before any IMS operation.
-        "DFSRRC00" => (&["PARM", "SYSIN"][..], ControlGrammar::Ims),
-        "DSNTEP4" | "DSNTIAD" | "DSNTIAUL" => (&["SYSTSIN", "SYSIN"][..], ControlGrammar::Tso),
-        "FTP" | "IKJEFT1B" => (&[][..], ControlGrammar::Unavailable),
-        _ => return None,
-    };
-    Some(ControlDeclaration { sources, grammar })
+    COMMON_PROGRAMS
+        .iter()
+        .find(|entry| entry.name == program)
+        .map(|entry| entry.control)
+        .or_else(|| {
+            TSO_PROGRAMS
+                .iter()
+                .find(|(name, _)| *name == program)
+                .map(|(_, execution)| execution.control_declaration())
+        })
 }
 
 pub(crate) fn validate_program_controls(
@@ -244,7 +224,7 @@ pub(crate) fn validate_program_controls(
     input: &ProgramInput,
 ) -> Result<(), HostProblem> {
     let declaration = control_declaration(program).ok_or(HostProblem::Unsupported)?;
-    if matches!(declaration.grammar, ControlGrammar::ReadsNone) && program == "IEFBR14" {
+    if matches!(declaration.grammar, ControlGrammar::IgnoreInput) {
         return Ok(());
     }
     if matches!(declaration.grammar, ControlGrammar::Unavailable) {
@@ -258,7 +238,7 @@ pub(crate) fn validate_program_controls(
     {
         return Err(HostProblem::Unsupported);
     }
-    if program == "IDCAMS"
+    if matches!(declaration.grammar, ControlGrammar::Idcams)
         && input
             .parameter
             .as_ref()
@@ -274,6 +254,7 @@ pub(crate) fn validate_program_controls(
         }
     }
     match declaration.grammar {
+        ControlGrammar::IgnoreInput => Ok(()),
         ControlGrammar::ReadsNone => {
             if control_source_has_data(input, "SYSIN") {
                 Err(HostProblem::Unsupported)
@@ -495,12 +476,19 @@ impl HostProvider for ProgramRouter {
                     payload,
                     service: None,
                 })
-                | HostRequest::Program(ProgramRequest::Link {
+                | HostRequest::Program(ProgramRequest::Xctl { program, payload }) => {
+                    (program, payload)
+                }
+                HostRequest::Program(ProgramRequest::Link {
                     program,
                     payload,
                     selection: None,
-                })
-                | HostRequest::Program(ProgramRequest::Xctl { program, payload }) => {
+                }) => {
+                    // A missing LINK target is unavailable before its input ABI is decoded.
+                    // Registered programs retain the existing ProgramInput validation below.
+                    if !self.programs.contains_key(program.as_str()) {
+                        return Err(HostProblem::NotFound);
+                    }
                     (program, payload)
                 }
                 HostRequest::Program(_) => return Err(HostProblem::Unsupported),
@@ -1177,6 +1165,106 @@ mod tests {
         assert_eq!(result.outcome, Err(HostProblem::Unsupported));
     }
 
+    #[test]
+    fn unavailable_link_reports_not_found_before_program_input_decoding() {
+        let limits = InvocationLimits::default();
+        let invocation = invocation();
+        let router = ProgramRouter::with_builtins(limits);
+        for bytes in [b"not-a-ProgramInput".as_slice(), b"{}".as_slice()] {
+            let result = router.invoke(
+                &invocation,
+                EffectRequest {
+                    run_unit: invocation.run_unit_id.clone(),
+                    sequence: 7,
+                    deadline_tick: 100,
+                    idempotency_key: None,
+                    request: HostRequest::Program(ProgramRequest::Link {
+                        program: ProgramName::new("UNAVAIL", 128).unwrap(),
+                        payload: BoundedPayload::new(
+                            "mainframe-env.cics.payload@1",
+                            bytes.to_vec(),
+                            limits,
+                        )
+                        .unwrap(),
+                        selection: None,
+                    }),
+                },
+            );
+            assert_eq!(result.sequence, 7);
+            assert_eq!(result.outcome, Err(HostProblem::NotFound));
+        }
+    }
+
+    #[test]
+    fn registered_link_keeps_program_input_validation_and_execution() {
+        let limits = InvocationLimits::default();
+        let invocation = invocation();
+        let router = ProgramRouter::with_builtins(limits);
+        let invoke = |bytes| {
+            router.invoke(
+                &invocation,
+                EffectRequest {
+                    run_unit: invocation.run_unit_id.clone(),
+                    sequence: 8,
+                    deadline_tick: 100,
+                    idempotency_key: None,
+                    request: HostRequest::Program(ProgramRequest::Link {
+                        program: ProgramName::new("IEFBR14", 128).unwrap(),
+                        payload: BoundedPayload::new("mainframe-env.cics.payload@1", bytes, limits)
+                            .unwrap(),
+                        selection: None,
+                    }),
+                },
+            )
+        };
+        assert_eq!(
+            invoke(b"not-a-ProgramInput".to_vec()).outcome,
+            Err(HostProblem::Malformed)
+        );
+        let encoded = serde_json::to_vec(&input("SYSIN", b"")).unwrap();
+        let result = invoke(encoded);
+        assert_eq!(result.sequence, 8);
+        let Ok(HostResult::Program(payload)) = result.outcome else {
+            panic!("registered LINK must retain original valid ProgramInput dispatch");
+        };
+        let output: ProgramOutput = serde_json::from_slice(payload.bytes()).unwrap();
+        assert_eq!(output.return_code, 0);
+    }
+
+    #[test]
+    fn malformed_unavailable_call_and_xctl_keep_existing_decode_precedence() {
+        let limits = InvocationLimits::default();
+        let invocation = invocation();
+        let router = ProgramRouter::with_builtins(limits);
+        let program = ProgramName::new("UNAVAIL", 128).unwrap();
+        let payload = BoundedPayload::new(
+            "mainframe-env.cics.payload@1",
+            b"not-a-ProgramInput".to_vec(),
+            limits,
+        )
+        .unwrap();
+        for request in [
+            ProgramRequest::Call {
+                program: program.clone(),
+                payload: payload.clone(),
+                service: None,
+            },
+            ProgramRequest::Xctl { program, payload },
+        ] {
+            let result = router.invoke(
+                &invocation,
+                EffectRequest {
+                    run_unit: invocation.run_unit_id.clone(),
+                    sequence: 9,
+                    deadline_tick: 100,
+                    idempotency_key: None,
+                    request: HostRequest::Program(request),
+                },
+            );
+            assert_eq!(result.outcome, Err(HostProblem::Malformed));
+        }
+    }
+
     fn input(name: &str, bytes: &[u8]) -> ProgramInput {
         ProgramInput {
             parameter: None,
@@ -1768,5 +1856,363 @@ mod tests {
                 .execute(&invocation(), &input("SYSIN", b"UNKNOWN THING")),
             Err(HostProblem::Unsupported)
         );
+    }
+    fn policy_route(program: &str, input: &ProgramInput) -> Result<ProgramOutput, HostProblem> {
+        let invocation = invocation();
+        let limits = InvocationLimits::default();
+        let router = ProgramRouter::with_builtins(limits);
+        let result = router.invoke(
+            &invocation,
+            EffectRequest {
+                run_unit: invocation.run_unit_id.clone(),
+                sequence: 17,
+                deadline_tick: 100,
+                idempotency_key: None,
+                request: HostRequest::Program(ProgramRequest::Call {
+                    program: ProgramName::new(program, 128).unwrap(),
+                    payload: BoundedPayload::new(
+                        "mainframe-env.program.input@1",
+                        serde_json::to_vec(input).unwrap(),
+                        limits,
+                    )
+                    .unwrap(),
+                    service: None,
+                }),
+            },
+        );
+        assert_eq!(result.sequence, 17);
+        match result.outcome? {
+            HostResult::Program(payload) => decode_program_output(&payload),
+            other => panic!("wrong common-program route result: {other:?}"),
+        }
+    }
+
+    fn policy_data() -> ProgramInput {
+        let mut case = input("SYSUT1", b"A\nB\n");
+        add_dd(&mut case, "SYSUT2", b"A\nB\n");
+        case.dds.last_mut().unwrap().member = Some("M".into());
+        add_dd(&mut case, "SORTIN", b"B\nA\n");
+        add_dd(&mut case, "SORTOUT", b"");
+        case
+    }
+
+    #[test]
+    fn common_program_policy_real_route_retains_all_nine_builtin_controls() {
+        for program in ["IEFBR14", "IEBGENER", "IEBCOMPR", "IEBCOPY"] {
+            let result = policy_route(program, &policy_data()).unwrap();
+            assert_eq!(result.return_code, 0, "{program}");
+            match program {
+                "IEFBR14" => assert_eq!(result.records, [b"IEFBR14".to_vec()]),
+                "IEBCOMPR" => assert_eq!(result.records, [b"IEBCOMPR EQUAL".to_vec()]),
+                _ => assert_eq!(result.dd_outputs["SYSUT2"], [b"A".to_vec(), b"B".to_vec()]),
+            }
+        }
+        for (program, control, output_dd, expected) in [
+            (
+                "IEBDG",
+                "DSD OUTPUT=(SYSUT2)\nCREATE QUANTITY=2,LENGTH=3,VALUE=Z\n",
+                "SYSUT2",
+                vec![b"ZZZ".to_vec(), b"ZZZ".to_vec()],
+            ),
+            (
+                "IEBEDIT",
+                "EDIT START=1,STOP=1\n",
+                "SYSUT2",
+                vec![b"A".to_vec()],
+            ),
+            (
+                "IEBUPDTE",
+                "./ ADD NAME=M\nbody untouched\n./ ENDUP\n",
+                "SYSUT2",
+                vec![b"body untouched".to_vec()],
+            ),
+            (
+                "SORT",
+                " SORT FIELDS=(1,1,CH,A)\n",
+                "SORTOUT",
+                vec![b"A".to_vec(), b"B".to_vec()],
+            ),
+        ] {
+            let mut case = policy_data();
+            add_dd(&mut case, "SYSIN", control.as_bytes());
+            let result = policy_route(program, &case)
+                .unwrap_or_else(|problem| panic!("{program}: {problem:?}"));
+            assert_eq!(result.return_code, 0, "{program}");
+            assert_eq!(result.dd_outputs[output_dd], expected, "{program}");
+        }
+        let case = input("SYSIN", b"LISTCAT\n");
+        let result = policy_route("IDCAMS", &case).unwrap();
+        assert_eq!(result.return_code, 0);
+        assert_eq!(result.records, [b"IDCAMS LISTCAT".to_vec()]);
+    }
+
+    #[test]
+    fn common_program_policy_real_route_refuses_omitted_or_weakened_policy() {
+        // For Cards/UpdateCards these operands are ignored by the downstream utility
+        // if declaration validation is omitted, so these are meaningful policy mutants.
+        for (program, source, control) in [
+            ("IEBGENER", "SYSIN", "COPY\n"),
+            ("IEBCOMPR", "SYSIN", "COMPARE\n"),
+            (
+                "IEBCOPY",
+                "SYSIN",
+                "COPY INDD=SYSUT1,OUTDD=SYSUT2,EXTRA=YES\n",
+            ),
+            (
+                "IEBDG",
+                "SYSIN",
+                "DSD OUTPUT=(SYSUT2),EXTRA=YES\nCREATE QUANTITY=1,LENGTH=1\n",
+            ),
+            ("IEBEDIT", "SYSIN", "EDIT START=1,STOP=1,EXTRA=YES\n"),
+            (
+                "IEBUPDTE",
+                "SYSIN",
+                "./ ADD NAME=M,EXTRA=YES\nbody\n./ ENDUP\n",
+            ),
+            ("SORT", "SYSTSIN", "UNDECLARED\n"),
+        ] {
+            let mut case = policy_data();
+            if program == "SORT" {
+                add_dd(&mut case, "SYSIN", b" SORT FIELDS=(1,1,CH,A)\n");
+            }
+            add_dd(&mut case, source, control.as_bytes());
+            assert_eq!(
+                policy_route(program, &case),
+                Err(HostProblem::Unsupported),
+                "{program}"
+            );
+        }
+        let mut case = input("SYSIN", b"LISTCAT\n");
+        case.parameter = Some("LISTCAT".into());
+        assert_eq!(policy_route("IDCAMS", &case), Err(HostProblem::Unsupported));
+    }
+
+    #[test]
+    fn common_program_policy_data_dds_are_not_control_sources() {
+        let data = b"COPY UNKNOWN=YES\n./ DELETE NAME=M\n";
+        let mut case = input("sysut1", data);
+        add_dd(&mut case, "SYSUT2", b"");
+        assert_eq!(
+            policy_route("iebgener", &case).unwrap().dd_outputs["SYSUT2"],
+            [b"COPY UNKNOWN=YES".to_vec(), b"./ DELETE NAME=M".to_vec()]
+        );
+        let mut compare = input("SYSUT1", data);
+        add_dd(&mut compare, "SYSUT2", data);
+        assert_eq!(policy_route("IEBCOMPR", &compare).unwrap().return_code, 0);
+        let mut copy = input("INPUT", data);
+        add_dd(&mut copy, "OUTPUT", b"");
+        add_dd(&mut copy, "SYSIN", b"copy indd=INPUT,outdd=OUTPUT\n");
+        assert_eq!(
+            policy_route("IEBCOPY", &copy).unwrap().dd_outputs["OUTPUT"],
+            [b"COPY UNKNOWN=YES".to_vec(), b"./ DELETE NAME=M".to_vec()]
+        );
+    }
+
+    #[test]
+    fn common_program_policy_ignored_input_and_exact_normalization_remain_distinct() {
+        let mut ignored = input("SYSIN", b"\xff\n");
+        add_dd(&mut ignored, "SYSTSIN", b"UNKNOWN\n");
+        add_dd(&mut ignored, "ISFIN", b"UNKNOWN\n");
+        add_dd(&mut ignored, "SYMNAMES", b"UNKNOWN\n");
+        ignored.parameter = Some("arbitrary".into());
+        assert_eq!(
+            policy_route("iefbr14", &ignored).unwrap().records,
+            [b"IEFBR14".to_vec()]
+        );
+        assert_eq!(
+            resolve_program_registration("iebcopy").unwrap().program,
+            "IEBCOPY"
+        );
+        // The existing crate-private declaration helper is exact-uppercase-only.
+        assert_eq!(
+            validate_program_controls("iebcopy", &policy_data()),
+            Err(HostProblem::Unsupported)
+        );
+        assert_eq!(
+            validate_program_controls("UNKNOWN", &policy_data()),
+            Err(HostProblem::Unsupported)
+        );
+        assert_eq!(
+            resolve_program_registration("APPLICATION").unwrap().handler,
+            RegisteredProgramHandler::ProgramService
+        );
+        assert_eq!(
+            policy_route("APPLICATION", &policy_data()),
+            Err(HostProblem::NotFound)
+        );
+    }
+
+    #[test]
+    fn common_program_policy_control_detection_retains_record_and_blank_rules() {
+        let mut case = policy_data();
+        add_dd(&mut case, "sysin", b" \t\n");
+        assert!(policy_route("IEBGENER", &case).is_ok());
+        case.dd_records
+            .insert("SYSIN".into(), vec![b" \t".to_vec(), vec![]]);
+        assert!(policy_route("IEBGENER", &case).is_ok());
+        case.dd_records
+            .insert("SYSIN".into(), vec![b"COPY".to_vec()]);
+        assert_eq!(
+            policy_route("IEBGENER", &case),
+            Err(HostProblem::Unsupported)
+        );
+        // dd_records detection uses the exact map key; it is not ASCII-normalized.
+        case.dd_records.clear();
+        case.dd_records
+            .insert("sysin".into(), vec![b"COPY".to_vec()]);
+        assert!(policy_route("IEBGENER", &case).is_ok());
+        // Inline nonblank source is still detected even with an empty record-map value.
+        case.dd_records.insert("SYSIN".into(), vec![]);
+        case.dds.last_mut().unwrap().inline_data = b"COPY\n".to_vec();
+        assert_eq!(
+            policy_route("IEBGENER", &case),
+            Err(HostProblem::Unsupported)
+        );
+    }
+
+    #[test]
+    fn common_program_policy_card_tokens_and_refusal_order_are_unchanged() {
+        // Admission must refuse before utility execution discovers a missing data DD.
+        let missing_data = input("SYSIN", b"COPY EXTRA=YES\n");
+        assert_eq!(
+            policy_route("IEBCOPY", &missing_data),
+            Err(HostProblem::Unsupported)
+        );
+        for control in [
+            "COPY INDD=SYSUT1,OUTDD=SYSUT2,EXTRA=YES\n",
+            "COPY INDD=\n",
+            "COPY\nCOPY\n",
+            "COPY INDD=(SYSUT1\n",
+            "COMPRESS\n",
+        ] {
+            let mut case = policy_data();
+            add_dd(&mut case, "SYSIN", control.as_bytes());
+            assert_eq!(
+                policy_route("IEBCOPY", &case),
+                Err(HostProblem::Unsupported),
+                "{control}"
+            );
+        }
+        let mut case = policy_data();
+        add_dd(&mut case, "SYSIN", b"\xff\n");
+        assert_eq!(policy_route("IEBCOPY", &case), Err(HostProblem::Malformed));
+        case.parameter = Some("NONBLANK".into());
+        assert_eq!(
+            policy_route("IEBCOPY", &case),
+            Err(HostProblem::Unsupported)
+        );
+        case.parameter = None;
+        add_dd(&mut case, "ISFIN", b"UNDECLARED\n");
+        assert_eq!(
+            policy_route("IEBCOPY", &case),
+            Err(HostProblem::Unsupported)
+        );
+        let mut update = policy_data();
+        add_dd(
+            &mut update,
+            "SYSIN",
+            b"./ ADD NAME=M\nbody\n./ ENDUP\ntrailing\n",
+        );
+        assert_eq!(
+            policy_route("IEBUPDTE", &update),
+            Err(HostProblem::Unsupported)
+        );
+    }
+
+    #[test]
+    fn common_program_policy_delegates_are_neither_eagerly_parsed_nor_generic_success() {
+        // These validators only admit declared sources; they do not certify controls.
+        for (program, source) in [("SDSF", "ISFIN"), ("IKJEFT01", "SYSTSIN")] {
+            assert_eq!(
+                validate_program_controls(program, &input(source, b"UNKNOWN\n")),
+                Ok(())
+            );
+        }
+        for (program, source) in [("SDSF", "SYSIN"), ("IKJEFT01", "ISFIN")] {
+            assert_eq!(
+                validate_program_controls(program, &input(source, b"UNKNOWN\n")),
+                Err(HostProblem::Unsupported)
+            );
+        }
+        let case = input("SYSIN", b"UNKNOWN\n");
+        assert_eq!(validate_program_controls("IDCAMS", &case), Ok(()));
+        assert_eq!(policy_route("IDCAMS", &case), Err(HostProblem::Unsupported));
+        let mut sort = policy_data();
+        add_dd(&mut sort, "SYSIN", b" INCLUDE COND=(1,1,CH,EQ,C'A')\n");
+        assert_eq!(validate_program_controls("SORT", &sort), Ok(()));
+        assert_eq!(policy_route("SORT", &sort), Err(HostProblem::Unsupported));
+        for program in ["FTP", "IKJEFT1B"] {
+            assert_eq!(
+                resolve_program_registration(program).unwrap().handler,
+                RegisteredProgramHandler::Unsupported
+            );
+            assert_eq!(
+                validate_program_controls(program, &policy_data()),
+                Err(HostProblem::Unsupported)
+            );
+            // They are cataloged dispositions, not newly installed builtin routes.
+            assert_eq!(
+                policy_route(program, &policy_data()),
+                Err(HostProblem::NotFound)
+            );
+        }
+        for program in ["CEE3ABD", "CEEDAYS", "COBDATFT", "MVSWAIT"] {
+            assert_eq!(
+                resolve_program_registration(program).unwrap().handler,
+                RegisteredProgramHandler::ProgramService
+            );
+            assert_eq!(
+                validate_program_controls(program, &policy_data()),
+                Err(HostProblem::Unsupported)
+            );
+        }
+    }
+
+    #[test]
+    fn common_program_policy_ims_and_nested_tso_keep_their_existing_owners() {
+        let mut ims = input("SYSIN", b"application-owned bytes\n");
+        ims.parameter = Some("DLI,ANYPROG,ANYPSB".into());
+        assert_eq!(validate_program_controls("DFSRRC00", &ims), Ok(()));
+        ims.parameter = Some("UNKNOWN,CONTROL=YES".into());
+        assert_eq!(
+            validate_program_controls("DFSRRC00", &ims),
+            Err(HostProblem::Malformed)
+        );
+        add_dd(&mut ims, "SYMNAMES", b"UNDECLARED\n");
+        assert_eq!(
+            validate_program_controls("DFSRRC00", &ims),
+            Err(HostProblem::Unsupported)
+        );
+        ims.dds.pop();
+        ims.parameter = Some("x".repeat(513));
+        assert_eq!(
+            validate_program_controls("DFSRRC00", &ims),
+            Err(HostProblem::ResourceExhausted)
+        );
+        for (program, accepted) in [
+            (
+                "DSNTEP4",
+                "RUN PROGRAM(DSNTEP4) PARMS('/ALIGN(LHS) MIXED')\n",
+            ),
+            ("DSNTIAD", "RUN PROGRAM(DSNTIAD) PARMS('RC0')\n"),
+            ("DSNTIAUL", "RUN PROGRAM(DSNTIAUL) PARMS('SQL')\n"),
+        ] {
+            assert!(validate_program_controls(program, &input("SYSTSIN", b"UNKNOWN\n")).is_ok());
+            assert_eq!(validate_tso_action_controls(program, accepted), Ok(()));
+            assert_eq!(
+                validate_tso_action_controls(program, "RUN PROGRAM(OTHER)\n"),
+                Err(HostProblem::Unsupported)
+            );
+            assert_eq!(
+                validate_tso_action_controls(program, "FREE PLAN(P)\n"),
+                Err(HostProblem::Unsupported)
+            );
+            let mut input = input("SYSIN", b"selected SQL bytes\n");
+            input.parameter = Some("NEWCONTROL".into());
+            assert_eq!(
+                validate_program_controls(program, &input),
+                Err(HostProblem::Unsupported)
+            );
+        }
     }
 }

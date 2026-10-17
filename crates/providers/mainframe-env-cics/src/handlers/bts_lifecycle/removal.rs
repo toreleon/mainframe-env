@@ -98,13 +98,16 @@ impl<'a> BtsLifecycleStore<'a> {
         &self,
         process_type: &str,
         process_name: &str,
-        run_unit: &str,
-        owner_execution: &str,
-        owner_principal: &str,
-        replay_key: &str,
-        request_digest: [u8; 32],
+        replay: BtsReplayContext<'_>,
         removal: &BtsRemoval,
     ) -> Result<BtsReply, HostProblem> {
+        let BtsReplayContext {
+            run_unit,
+            owner_execution,
+            owner_principal,
+            replay_key,
+            request_digest,
+        } = replay;
         validate_identifier(run_unit, 256)?;
         validate_identifier(owner_execution, 256)?;
         validate_identifier(owner_principal, 256)?;
@@ -339,11 +342,13 @@ mod tests {
             .mutate_process(
                 "TYPE",
                 "ORDER",
-                "UOW2",
-                "EXEC2",
-                "USER",
-                "start",
-                [1; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "start",
+                    request_digest: [1; 32],
+                },
                 |p| {
                     p.start(&root, None, true)?;
                     Ok(BtsReply::normal())
@@ -362,11 +367,13 @@ mod tests {
                     transid: "BTS2".into(),
                     userid: "USER".into(),
                 },
-                "UOW2",
-                "EXEC2",
-                "USER",
-                "define",
-                [2; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "define",
+                    request_digest: [2; 32],
+                },
             )
             .unwrap();
         authority
@@ -386,24 +393,41 @@ mod tests {
         };
         let reply = authority
             .remove_subtree(
-                "TYPE", "ORDER", "UOW2", "EXEC2", "USER", "delete", [3; 32], &removal,
+                "TYPE",
+                "ORDER",
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "delete",
+                    request_digest: [3; 32],
+                },
+                &removal,
             )
             .unwrap();
         assert_eq!(reply, BtsReply::normal());
         assert!(authority.load_activity_index(&child).unwrap().is_none());
         assert!(
-            authority
+            !authority
                 .load_process("TYPE", "ORDER")
                 .unwrap()
                 .unwrap()
                 .activities
-                .get(&child)
-                .is_none()
+                .contains_key(&child)
         );
         assert_eq!(
             authority
                 .remove_subtree(
-                    "TYPE", "ORDER", "UOW2", "EXEC2", "USER", "delete", [3; 32], &removal
+                    "TYPE",
+                    "ORDER",
+                    crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                        run_unit: "UOW2",
+                        owner_execution: "EXEC2",
+                        owner_principal: "USER",
+                        replay_key: "delete",
+                        request_digest: [3; 32]
+                    },
+                    &removal
                 )
                 .unwrap(),
             reply
@@ -421,7 +445,16 @@ mod tests {
         assert!(
             authority
                 .remove_subtree(
-                    "TYPE", "ORDER", "UOW2", "EXEC2", "USER", "reset", [4; 32], &removal
+                    "TYPE",
+                    "ORDER",
+                    crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                        run_unit: "UOW2",
+                        owner_execution: "EXEC2",
+                        owner_principal: "USER",
+                        replay_key: "reset",
+                        request_digest: [4; 32]
+                    },
+                    &removal
                 )
                 .is_err()
         );
@@ -429,11 +462,13 @@ mod tests {
             .mutate_process(
                 "TYPE",
                 "ORDER",
-                "UOW2",
-                "EXEC2",
-                "USER",
-                "finish",
-                [5; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "finish",
+                    request_digest: [5; 32],
+                },
                 |p| {
                     p.finish(&root, 1, 1, BtsCompletion::Normal, None, None)?;
                     Ok(BtsReply::normal())
@@ -442,7 +477,16 @@ mod tests {
             .unwrap();
         authority
             .remove_subtree(
-                "TYPE", "ORDER", "UOW2", "EXEC2", "USER", "reset", [4; 32], &removal,
+                "TYPE",
+                "ORDER",
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "reset",
+                    request_digest: [4; 32],
+                },
+                &removal,
             )
             .unwrap();
         assert!(authority.load_activity_index(&child).unwrap().is_none());
@@ -468,11 +512,13 @@ mod tests {
                     transid: "BTS2".into(),
                     userid: "USER".into(),
                 },
-                "UOW3",
-                "EXEC3",
-                "USER",
-                "define-pending",
-                [6; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: "UOW3",
+                    owner_execution: "EXEC3",
+                    owner_principal: "USER",
+                    replay_key: "define-pending",
+                    request_digest: [6; 32],
+                },
             )
             .unwrap();
         let before = authority.load_process("TYPE", "ORDER").unwrap().unwrap();
@@ -480,11 +526,13 @@ mod tests {
             authority.remove_subtree(
                 "TYPE",
                 "ORDER",
-                "UOW2",
-                "EXEC2",
-                "USER",
-                "delete-pending",
-                [7; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "delete-pending",
+                    request_digest: [7; 32]
+                },
                 &BtsRemoval::Delete {
                     parent_id: root,
                     child_name: "PENDING".into(),
@@ -501,11 +549,13 @@ mod tests {
             authority.remove_subtree(
                 "TYPE",
                 "ORDER",
-                "UOW2",
-                "EXEC2",
-                "USER",
-                "reset-pending",
-                [8; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "reset-pending",
+                    request_digest: [8; 32]
+                },
                 &BtsRemoval::Reset {
                     activity_id: pending.clone(),
                 },
@@ -527,11 +577,13 @@ mod tests {
             .mutate_process(
                 "TYPE",
                 "ORDER",
-                "UOW2",
-                "EXEC2",
-                "USER",
-                "suspend-child",
-                [9; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "suspend-child",
+                    request_digest: [9; 32],
+                },
                 |process| {
                     process.set_suspended(&child, true)?;
                     Ok(BtsReply::normal())
@@ -562,11 +614,13 @@ mod tests {
             .remove_subtree(
                 "TYPE",
                 "ORDER",
-                "UOW2",
-                "EXEC2",
-                "USER",
-                "delete-deferred",
-                [11; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "delete-deferred",
+                    request_digest: [11; 32],
+                },
                 &BtsRemoval::Delete {
                     parent_id: root,
                     child_name: "CHILD".into(),

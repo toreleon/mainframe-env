@@ -39,6 +39,8 @@ pub enum OperationSemanticContract {
     /// defensive VM admission to share one checker. Language HIR has no
     /// executable layout definitions and retains its storage-only proof.
     CobolLayoutDefinition,
+    /// Canonically chunked already-computed bytes for `mainframe.core.cobol@2.init`.
+    CobolChunkedInitialization,
     /// Decimal assignment plan encoded in one bytes attribute.
     DecimalAssignment(DecimalOperationContract),
     /// Typed CICS effect plan encoded in one bytes attribute.

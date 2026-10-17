@@ -87,9 +87,20 @@ impl MqService {
             replay_clock: Some(replay_clock),
             producer_sources: None,
             producer_sampling: AtomicBool::new(false),
+            selected_revoked: AtomicBool::new(false),
         }))
     }
 
+    pub(crate) fn require_selected_live(&self) -> Result<(), HostProblem> {
+        if self.selected_revoked.load(Ordering::SeqCst) {
+            Err(HostProblem::UnknownOutcome)
+        } else {
+            Ok(())
+        }
+    }
+    pub(crate) fn revoke_selected_authority(&self) {
+        self.selected_revoked.store(true, Ordering::SeqCst);
+    }
     /// Later selected operations use this same union/lock. Historical service
     /// entry points cannot acquire it, and no rich state is projected to v1.
     pub(super) fn lock_selected(
@@ -104,9 +115,13 @@ impl MqService {
         if self.producer_sampling.load(Ordering::SeqCst) {
             return Err(HostProblem::Unsupported);
         }
-        self.durable
+        self.require_selected_live()?;
+        let guard = self
+            .durable
             .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        self.require_selected_live()?;
+        Ok(guard)
     }
 }
 

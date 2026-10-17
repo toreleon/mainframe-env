@@ -88,7 +88,7 @@ pub struct Db2CatalogGeneration {
 }
 
 impl Db2CatalogGeneration {
-    pub(crate) fn validate(&self, limits: Db2Limits) -> Result<(), HostProblem> {
+    pub fn validate(&self, limits: Db2Limits) -> Result<(), HostProblem> {
         validate_name(&self.application)?;
         validate_sha256(&self.identity)?;
         if self.generation == 0 || self.tables.is_empty() || self.tables.len() > limits.max_tables {

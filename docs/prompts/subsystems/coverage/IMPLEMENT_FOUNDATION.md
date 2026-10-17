@@ -20,10 +20,10 @@ Read `docs/prompts/subsystems/README.md`,
 `docs/delivery/subsystems/coverage/foundation-plan.md`,
 `docs/research/IBM-OFFICIAL-COVERAGE-ROADMAP.md`,
 `conformance/roadmap/ibm-official-coverage-roadmap.json`, and all referenced
-architecture, evidence, application-package, profile, and release contracts.
+architecture, evidence, application-package, profile, and public distribution contracts.
 
 The accepted profile.carddemo source/evidence is the baseline. Record its exact identity
-and inventory the current tree before editing. There is no earlier minor
+and inventory the current tree before editing. There is no earlier phase
 dependency, but no profile.carddemo behavior may regress.
 
 ## Implement in this order
@@ -44,27 +44,29 @@ dependency, but no profile.carddemo behavior may regress.
 ## Reuse and architecture guardrails
 
 - CV-201/CV-202 must freeze the four shared authorities used by every later
-  minor: one contract/catalog compiler, one application-package trust/install
+  phase: one contract/catalog compiler, one application-package trust/install
   runtime, one store/migration/artifact adapter family, and one
   conformance/oracle evidence harness. Do not leave each subsystem to recreate
   these facilities.
 - Compile the normative Draft 2020-12 schemas with a reviewed validator and
-  validate every catalog, package, evidence, migration, profile, and release
+  validate every catalog, package, evidence, migration, profile, and distribution
   artifact mapped by the schema gate. Handwritten top-level field checks are not
   schema validation.
-- Use a standard signed-envelope representation such as COSE Sign1 with the
-  reviewed crypto provider. Mainframe-env owns the bounded package manifest,
-  semantic identity, reference closure, generation selection, rollback, and
-  trust policy; it does not own a new signature format or crypto primitive.
+- Use the accepted bounded canonical COSE_Mac0 profile through the reviewed
+  library and existing HMAC-SHA256 trust owner; see ADR-0055 and the application
+  package contract. Preserve exact retained verification without resigning or
+  implicit profile conversion. Mainframe-env owns manifest/identity closure,
+  generation selection, rollback and trust policy; MAC authentication does not
+  provide public-key signing, nonrepudiation or arbitrary snapshot authentication.
 - Keep immutable large-blob storage behind the artifact-store port and evaluate
   a reviewed multi-backend object-store library rather than implementing local,
-  S3, Azure, or GCS clients. This minor need only ship the adapters required by
+  S3, Azure, or GCS clients. This phase need only ship the adapters required by
   its accepted profiles.
 - Record dependency/license/MSRV and semantic-gap decisions in CV-201 evidence.
   Generated DTOs, schema libraries, signature libraries, and storage adapters
   remain replaceable and do not enter durable public contracts.
 
-## Version-specific invariants
+## Foundation invariants
 
 - Eliminate all 29 audited Db2 and three batch production H1/H3 hits. CardDemo
   identities may remain only in application packages, fixtures, tests, and
@@ -86,9 +88,11 @@ Do not finish until:
 - coverage rows cannot become complete without every applicable gate;
 - production H1 application-hardcode and application string-dispatch counts are
   exactly zero under deterministic scans;
-- CardDemo remains 20/20 through installed package data, not production branches;
+- CardDemo must pass all 20 journeys, all 26 transaction requirements and all
+  105 issue acceptance requirements through installed package data, not
+  production branches; those gates remain pending until actually observed;
 - the existing 260-test floor, PostgreSQL controls, CardDemo, live Zowe route,
-  architecture/profile/schema/evidence and release checks pass; and
+  architecture/profile/schema/evidence and public distribution checks pass; and
 - no compatibility numerator is credited solely from code generation.
 
 At handoff, provide per-work-package evidence, before/after hardcode scan counts,

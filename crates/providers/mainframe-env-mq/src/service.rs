@@ -60,6 +60,24 @@ mod selection;
 use selection::LegacyAccess;
 pub(crate) use selection::operations::native_terminal::SelectedTerminalPreparation;
 
+pub(crate) fn selected_custody_handoff_rows() -> Vec<mainframe_env_store_api::ProviderStateIdentity>
+{
+    let (control, key) = selection::operations::custody_control_identity();
+    [
+        (control, key),
+        (STATE_NAMESPACE, STATE_KEY),
+        (CATALOG_NAMESPACE, CATALOG_KEY),
+        crate::delivery::checkpoint::rows::custody_metadata_identity(),
+    ]
+    .into_iter()
+    .map(
+        |(namespace, key)| mainframe_env_store_api::ProviderStateIdentity {
+            namespace: namespace.into(),
+            key: key.into(),
+        },
+    )
+    .collect()
+}
 pub(crate) fn selected_terminal_namespaces() -> Vec<String> {
     [
         STATE_NAMESPACE,
@@ -80,6 +98,11 @@ pub(crate) fn selected_terminal_namespaces() -> Vec<String> {
 #[path = "service_object_integration.rs"]
 mod object_integration;
 use object_integration::{encode_catalog_row, load_catalog_row};
+#[path = "service_catalog_composition.rs"]
+mod catalog_composition;
+pub use catalog_composition::{
+    MqCatalogProjection, MqCommittedPutOffer, PreparedMqCatalog, PreparedMqCommittedPut,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MqLimits {
@@ -268,6 +291,13 @@ pub trait MqReplayClock: Send + Sync {
     /// point observations contain panics and refuse selected-service reentry;
     /// returned ticks never replace physical core/provider dependency checks.
     fn now_tick(&self) -> Result<u64, HostProblem>;
+    /// Optional explicit custody observation from this same actual trusted
+    /// clock authority. It must return its current durable logical tick without
+    /// callbacks, service reentry, publication, cleanup or another authority.
+    /// No stale-cache/caller-selected fallback is accepted by the manager.
+    fn custody_tick(&self) -> Result<u64, HostProblem> {
+        Err(HostProblem::Unsupported)
+    }
 }
 
 pub struct MqService {
@@ -281,6 +311,7 @@ pub struct MqService {
     replay_clock: Option<Arc<dyn MqReplayClock>>,
     producer_sources: Option<selection::operations::producer::ProducerSources>,
     producer_sampling: AtomicBool,
+    selected_revoked: AtomicBool,
     pub(crate) rfh2_source:
         Option<Arc<dyn crate::trusted_batch_embedding::MqBatchLeDllCodesetSource>>,
 }
@@ -341,45 +372,8 @@ impl MqService {
             replay_clock,
             producer_sources: None,
             producer_sampling: AtomicBool::new(false),
+            selected_revoked: AtomicBool::new(false),
         }))
-    }
-
-    pub fn install(
-        &self,
-        definitions: Vec<MqQueueDefinition>,
-    ) -> Result<MqInstallReceipt, HostProblem> {
-        let definitions = (definitions.into_iter().map(canonical_definition))
-            .collect::<Result<Vec<_>, HostProblem>>()?;
-        validate_definitions(&definitions, self.limits)?;
-        let identity = format!(
-            "sha256:{:x}",
-            Sha256::digest(
-                serde_json::to_vec(&definitions).map_err(|_| HostProblem::ProviderFailure)?
-            )
-        );
-        let catalog = legacy_catalog(&definitions, self.limits)?;
-        let mut durable = self.lock()?;
-        if let Some(current) = &durable.state.catalog {
-            return if *current.as_ref() == catalog {
-                Ok(install_receipt(&definitions, identity, true))
-            } else {
-                Err(HostProblem::IdempotencyConflict)
-            };
-        }
-        let mut next = durable.state.scoped_snapshot();
-        for definition in &definitions {
-            next.queues.insert(
-                definition.name.clone(),
-                Arc::new(Queue {
-                    trigger_program: definition.trigger_program.clone(),
-                    messages: Vec::new(),
-                }),
-            );
-        }
-        next.catalog = Some(Arc::new(catalog));
-        validate_state(&next, self.limits)?;
-        self.persist(&mut durable, next)?;
-        Ok(install_receipt(&definitions, identity, false))
     }
 
     pub fn execute(
@@ -591,11 +585,13 @@ impl MqService {
         if self.selected_store.is_some() {
             return Err(HostProblem::Unsupported);
         }
-        LegacyAccess::new(
-            self.durable
-                .lock()
-                .map_err(|_| HostProblem::InfrastructureFailure)?,
-        )
+        self.require_selected_live()?;
+        let guard = self
+            .durable
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        self.require_selected_live()?;
+        LegacyAccess::new(guard)
     }
 
     fn persist(&self, durable: &mut DurableState, state: State) -> Result<(), HostProblem> {

@@ -1,17 +1,26 @@
+mod package_authentication;
+pub use package_authentication::HmacSha256PackageTrust;
+
 mod dataset_helpers;
-use dataset_helpers::{
-    dataset_attributes, dataset_mutation, join_records, member_name, records_for_write,
-};
+use dataset_helpers::{dataset_attributes, join_records, member_name, records_for_write};
 mod batch_controller;
-use batch_controller::decode_application_batch_controller;
 mod system_providers;
 use system_providers::*;
+mod host_composition;
+use host_composition::{RuntimeClocks, scoped_host_with_clock};
+#[cfg(all(test, target_os = "linux"))]
+mod codate_installed_owner;
 mod dataset_input;
 use dataset_input::wildcard;
 mod cics_security;
 mod ims;
+mod local_composition;
+mod online_install;
 mod services;
 use cics_security::{MAX_AUTH_SESSIONS_PER_USER, terminal_principal};
+pub use local_composition::{
+    LocalApplicationDefinition, LocalApplicationReceipt, LocalSourceCompilation,
+};
 
 use crate::cobol::{artifact::admit_executable_artifact, bind_compatible_runtime_services};
 use crate::console_retention::{decode_console_log_rows, encode_console_log};
@@ -22,22 +31,21 @@ use crate::jes_worker::{
     clear_worker_progress, heartbeat_durable_work,
 };
 use crate::retention_maintenance::provider::RetentionPlanner;
-use crate::{
-    ArtifactProfile, DefaultProgramRouter, EnvironmentSecretResolver, ServerConfig,
-    default_program_router,
-};
+use crate::{ArtifactProfile, DefaultProgramRouter, ServerConfig, default_program_router};
 use axum::http::StatusCode;
 use base64::Engine;
 use mainframe_env_application::{
+    APPLICATION_PUBLICATION_CONTRACT, APPLICATION_PUBLICATION_NAMESPACE,
     ApplicationGenerationRecord, ApplicationInstaller, ApplicationInstallerV2,
-    ApplicationPackageV2, BatchController as ApplicationBatchController, BatchControllerKind,
-    EntryKind, InstallProblem, InstallState, PackageLimits, PackageSignatureVerifier,
-    SelectedApplicationGeneration,
+    ApplicationPackageV2, ApplicationPublicationState,
+    BatchController as ApplicationBatchController, BatchControllerKind, EntryKind, InstallProblem,
+    InstallState, MAX_APPLICATION_PUBLICATION_BYTES, PackageLimits, PackageSignatureVerifier,
+    PublicationAction, PublicationSectionState, SelectedApplicationGeneration,
 };
 use mainframe_env_batch::{
     BATCH_CONTROLLER_REGISTRY_CONTRACT, BatchControllerDefinition, BatchControllerGeneration,
-    BatchControllerInstallReceipt, BatchControllerPlan, BatchControllerProgram,
-    BatchControllerSelector, BatchLimits, BatchService, JclBundle,
+    BatchControllerPlan, BatchControllerProgram, BatchControllerSelector, BatchLimits,
+    BatchPublicationWrite, BatchService, JclBundle,
 };
 use mainframe_env_cics::{
     BmsMapDefinition, CicsReplayClock, CicsService, CicsTerminalExecution, CicsTerminalSnapshot,
@@ -87,7 +95,6 @@ use mainframe_env_zosmf::{
     Authentication, GatewayCallContext, GatewayProblem, GatewayRequest, GatewayResponse,
     ZosmfBackend, ZosmfLimits,
 };
-use ring::hmac;
 use ring::rand::{SecureRandom, SystemRandom};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use serde::{Deserialize, Serialize};
@@ -97,7 +104,7 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex, RwLock, RwLockWriteGuard, TryLockError, Weak};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio_rustls::TlsAcceptor;
 use zeroize::Zeroizing;
@@ -180,12 +187,28 @@ mod artifact;
 mod bridge_start;
 pub use artifact::{BatchProgramDefinition, OnlineProgramDefinition};
 mod bootstrap;
+#[cfg(feature = "assurance-observers")]
+mod cics_read_copyback;
+mod cics_resume;
+#[cfg(feature = "assurance-observers")]
+pub use cics_read_copyback::{
+    ArmedReadCopybackObservation, CicsReadObservationProblem, CicsReadObserverManager,
+    CompletedReadCopyback, SourceBoundReadCopybackProfile,
+};
+#[cfg(feature = "assurance-observers")]
+mod db2_copyback;
+#[cfg(feature = "assurance-observers")]
+pub use db2_copyback::{
+    ArmedDb2CopybackObservation, CompletedDb2Copyback, Db2ObservationProblem, Db2ObserverManager,
+    SourceBoundDb2CopybackProfile,
+};
 mod continuation;
 mod exchange;
 pub(crate) use continuation::online_continuation_dependencies;
 pub(crate) use exchange::online_exchange_dependencies;
 use exchange::{decode_online_exchange, encode_online_exchange, validate_online_exchange};
 mod interval_wakeup;
+mod online_machine;
 mod operator_console;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -204,41 +227,6 @@ pub struct ApplicationPublicationReceipt {
     pub db2_catalog: bool,
     pub ims_metadata: bool,
     pub replayed: bool,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "kebab-case")]
-enum PublicationSectionState {
-    NotApplicable,
-    Pending,
-    Applying,
-    Applied,
-    Failed,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "kebab-case")]
-enum PublicationAction {
-    Install,
-    Rollback,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-struct ApplicationPublicationState {
-    schema_version: String,
-    package: String,
-    generation: u64,
-    identity: String,
-    action: PublicationAction,
-    controllers: PublicationSectionState,
-    db2: PublicationSectionState,
-    #[serde(default = "publication_not_applicable")]
-    ims: PublicationSectionState,
-    complete: bool,
-}
-
-const fn publication_not_applicable() -> PublicationSectionState {
-    PublicationSectionState::NotApplicable
 }
 
 struct DurableApplicationPublication {
@@ -393,6 +381,9 @@ impl SpoolRetentionClock for EnterpriseReplayClock {
     }
 }
 
+/// Composes one publishing server per store. The shared exclusion fences local
+/// selected-controller dispatch; raw writers and cross-process concurrency remain
+/// the trusted embedding's responsibility.
 pub struct ProductServer {
     config: ServerConfig,
     pub(crate) store: Arc<dyn PlatformStore>,
@@ -411,11 +402,15 @@ pub struct ProductServer {
     program: Arc<DefaultProgramRouter>,
     applications: ApplicationInstaller,
     applications_v2: Mutex<DurableApplicationsV2>,
-    application_publication: Mutex<()>,
+    application_publication: Arc<RwLock<()>>,
     job_submission: Mutex<()>,
     online_programs: Mutex<BTreeMap<String, ArtifactRef>>,
     online_transactions: Mutex<BTreeMap<String, String>>,
     online_traces: Mutex<BTreeMap<String, Vec<CicsTraceEntry>>>,
+    #[cfg(feature = "assurance-observers")]
+    cics_read_copyback: Mutex<cics_read_copyback::Registry>,
+    #[cfg(feature = "assurance-observers")]
+    db2_copyback: Mutex<db2_copyback::Registry>,
     sessions: Mutex<BTreeMap<String, AuthSession>>,
     console: Mutex<Vec<ConsoleMessage>>,
     sequence: Mutex<SequenceState>,
@@ -430,6 +425,7 @@ pub struct ProductServer {
     jes_worker_failures: AtomicU64,
     outbox_delivery: Mutex<()>,
     accepting: AtomicBool,
+    local_composition_uncertain: AtomicBool,
     requests: AtomicU64,
     failures: AtomicU64,
     active: AtomicUsize,
@@ -479,8 +475,6 @@ impl ArtifactStore for ProductArtifactStore {
 
 const APPLICATION_V2_STATE_NAMESPACE: &str = "application-package-v2";
 const APPLICATION_V2_STATE_KEY: &str = "registry";
-const APPLICATION_PUBLICATION_NAMESPACE: &str = "application-publication-v2";
-const APPLICATION_PUBLICATION_CONTRACT: &str = "mainframe-env.application-publication@1";
 const AUTH_SESSION_NAMESPACE: &str = "auth-session-v2";
 const AUTH_SESSION_INDEX_NAMESPACE: &str = "auth-session-index-v2";
 const AUTH_SESSION_INDEX_KEY: &str = "global";
@@ -539,76 +533,6 @@ struct DurableApplicationsV2 {
     installer: ApplicationInstallerV2,
     store_version: u64,
     verifier: Arc<dyn PackageSignatureVerifier>,
-}
-
-pub struct HmacSha256PackageTrust {
-    references: BTreeMap<String, SecretRef>,
-    secrets: Arc<dyn SecretResolver>,
-}
-
-impl HmacSha256PackageTrust {
-    pub fn new(
-        references: BTreeMap<String, SecretRef>,
-        secrets: Arc<dyn SecretResolver>,
-    ) -> Result<Self, HostProblem> {
-        if references.len() > 1_024
-            || references.iter().any(|(key_id, _)| {
-                key_id.is_empty() || key_id.len() > 128 || key_id.chars().any(char::is_control)
-            })
-        {
-            return Err(HostProblem::Malformed);
-        }
-        Ok(Self {
-            references,
-            secrets,
-        })
-    }
-
-    pub fn from_environment(
-        environment: &BTreeMap<String, String>,
-        secrets: Arc<dyn SecretResolver>,
-    ) -> Result<Self, HostProblem> {
-        let Some(encoded) = environment.get("MAINFRAME_ENV_PACKAGE_HMAC_KEY_REFS") else {
-            return Self::new(BTreeMap::new(), secrets);
-        };
-        let encoded: BTreeMap<String, String> =
-            serde_json::from_str(encoded).map_err(|_| HostProblem::Malformed)?;
-        let references = encoded
-            .into_iter()
-            .map(|(key_id, reference)| {
-                EnvironmentSecretResolver::parse_reference(&reference)
-                    .map(|reference| (key_id, reference))
-            })
-            .collect::<Result<BTreeMap<_, _>, _>>()?;
-        Self::new(references, secrets)
-    }
-}
-
-impl PackageSignatureVerifier for HmacSha256PackageTrust {
-    fn verify(&self, key_id: &str, algorithm: &str, identity: &str, signature: &str) -> bool {
-        if algorithm != "hmac-sha256@1" {
-            return false;
-        }
-        let Some(reference) = self.references.get(key_id) else {
-            return false;
-        };
-        let Ok(key) = self.secrets.resolve(reference) else {
-            return false;
-        };
-        if key.len() < 32 || key.len() > 4_096 {
-            return false;
-        }
-        let Ok(signature) = base64::engine::general_purpose::STANDARD_NO_PAD.decode(signature)
-        else {
-            return false;
-        };
-        hmac::verify(
-            &hmac::Key::new(hmac::HMAC_SHA256, &key),
-            identity.as_bytes(),
-            &signature,
-        )
-        .is_ok()
-    }
 }
 
 struct RejectPackageTrust;
@@ -699,18 +623,19 @@ impl ProductServer {
         )
     }
 
-    fn open_configured(
+    fn open_configured_with_clocks(
         config: ServerConfig,
         store: Arc<dyn PlatformStore>,
         secrets: Arc<MemorySecretResolver>,
         program: Arc<DefaultProgramRouter>,
         package_trust: Arc<dyn PackageSignatureVerifier>,
         artifacts: Arc<ProductArtifactStore>,
-        jes_clock: Option<Arc<dyn JesClock>>,
+        clocks: RuntimeClocks,
     ) -> Result<Arc<Self>, HostProblem> {
         config.validate()?;
         let installed = artifact::preflight_installed(store.as_ref(), artifacts.as_ref())?;
-        let jes_clock: Arc<dyn JesClock> = match jes_clock {
+        let host_clock = clocks.host_clock(InvocationLimits::default())?;
+        let jes_clock: Arc<dyn JesClock> = match clocks.jes {
             Some(clock) => clock,
             None => Arc::new(DurableJesClock::new(store.clone()).map_err(store_error)?),
         };
@@ -763,13 +688,14 @@ impl ProductServer {
         ));
         enterprise_providers.extend(mq_providers(mq.clone(), InvocationLimits::default()));
         let inner_program: Arc<dyn HostProvider> = program.clone();
-        let inner = scoped_host(
+        let inner = scoped_host_with_clock(
             &racf,
             &dataset,
             inner_program,
             enterprise_providers,
             false,
             None,
+            host_clock.clone(),
         )?;
         let cics_work_store: Arc<dyn WorkStore> = store.clone();
         let cics = CicsService::open_with_runtime(
@@ -791,18 +717,20 @@ impl ProductServer {
         ));
         enterprise_providers.extend(mq_providers(mq.clone(), InvocationLimits::default()));
         enterprise_providers.extend(spool_providers(spool.clone(), InvocationLimits::default()));
-        let host = scoped_host(
+        let host = scoped_host_with_clock(
             &racf,
             &dataset,
             program.clone(),
             enterprise_providers,
             true,
             Some(cics_provider(cics.clone(), InvocationLimits::default())),
+            host_clock,
         )?;
         let program_artifacts: Arc<dyn ArtifactStore> = artifacts.clone();
         program.bind_product_runtime(host.clone(), store.clone(), program_artifacts, &cics)?;
         let checkpoint_store: Arc<dyn CheckpointStore> = store.clone();
-        let batch = BatchService::open_with_checkpoint_store(
+        let application_publication = Arc::new(RwLock::new(()));
+        let batch = BatchService::open_with_checkpoint_store_and_publication_exclusion(
             host.clone(),
             provider_store,
             checkpoint_store,
@@ -811,6 +739,7 @@ impl ProductServer {
                 max_active: JES_WORKER_COUNT,
                 ..BatchLimits::default()
             },
+            application_publication.clone(),
         )?;
         let (application_store_version, applications_v2) = match store
             .get_provider_state(APPLICATION_V2_STATE_NAMESPACE, APPLICATION_V2_STATE_KEY)
@@ -927,11 +856,15 @@ impl ProductServer {
                 store_version: application_store_version,
                 verifier: package_trust,
             }),
-            application_publication: Mutex::new(()),
+            application_publication,
             job_submission: Mutex::new(()),
             online_programs: Mutex::new(online_programs),
             online_transactions: Mutex::new(online_transactions),
             online_traces: Mutex::new(BTreeMap::new()),
+            #[cfg(feature = "assurance-observers")]
+            cics_read_copyback: Mutex::new(cics_read_copyback::Registry::default()),
+            #[cfg(feature = "assurance-observers")]
+            db2_copyback: Mutex::new(db2_copyback::Registry::default()),
             sessions: Mutex::new(sessions),
             console: Mutex::new(console),
             sequence: Mutex::new(sequence),
@@ -946,147 +879,23 @@ impl ProductServer {
             jes_worker_failures: AtomicU64::new(0),
             outbox_delivery: Mutex::new(()),
             accepting: AtomicBool::new(true),
+            local_composition_uncertain: AtomicBool::new(false),
             requests: AtomicU64::new(0),
             failures: AtomicU64::new(0),
             active: AtomicUsize::new(0),
             outbox_delivered: AtomicU64::new(0),
         });
+        product.validate_local_compositions()?;
         product.recover_application_publications()?;
         product.recover_local_wakeups()?;
         Ok(product)
-    }
-
-    pub fn install_online_application(
-        &self,
-        definition: OnlineApplicationDefinition,
-    ) -> Result<OnlineInstallReceipt, HostProblem> {
-        if definition.programs.is_empty()
-            || definition.transactions.is_empty()
-            || definition.maps.is_empty()
-            || definition.programs.len() > 4096
-            || definition.transactions.len() > 4096
-        {
-            return Err(HostProblem::Malformed);
-        }
-        let mut programs = BTreeMap::new();
-        let mut artifact_records = Vec::with_capacity(definition.programs.len());
-        let mut identity = Sha256::new();
-        for definition in &definition.programs {
-            let name = normalize_online_name(&definition.name, 128)?;
-            if programs
-                .insert(name.clone(), definition.artifact.clone())
-                .is_some()
-            {
-                return Err(HostProblem::IdempotencyConflict);
-            }
-            let record = artifact::admitted_record(
-                &definition.artifact,
-                &definition.payload,
-                &definition.manifest,
-                &definition.semantic_identity,
-            )?;
-            if let Some(existing) = artifact_records
-                .iter()
-                .find(|existing: &&ArtifactRecord| existing.artifact == record.artifact)
-            {
-                if existing != &record {
-                    return Err(HostProblem::IdempotencyConflict);
-                }
-            } else {
-                artifact_records.push(record);
-            }
-            digest_online_field(&mut identity, name.as_bytes());
-            digest_online_field(&mut identity, definition.artifact.as_str().as_bytes());
-        }
-        for record in artifact_records {
-            self.artifacts.put_artifact(record).map_err(store_error)?;
-        }
-        let mut transactions = BTreeMap::new();
-        for (transaction, program) in &definition.transactions {
-            let transaction = normalize_online_name(transaction, 16)?;
-            let program = normalize_online_name(program, 128)?;
-            if !programs.contains_key(&program)
-                || transactions
-                    .insert(transaction.clone(), program.clone())
-                    .is_some()
-            {
-                return Err(HostProblem::NotFound);
-            }
-            digest_online_field(&mut identity, transaction.as_bytes());
-            digest_online_field(&mut identity, program.as_bytes());
-        }
-        let program_names = programs.keys().cloned().collect::<BTreeSet<_>>();
-        self.cics.register_programs(&program_names)?;
-        for map in &definition.maps {
-            self.cics.register_map(map.clone())?;
-            digest_online_field(&mut identity, map.mapset.as_bytes());
-            digest_online_field(&mut identity, map.map.as_bytes());
-            digest_online_field(&mut identity, &(map.fields.len() as u64).to_be_bytes());
-        }
-        let mut current_programs = self
-            .online_programs
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let mut current_transactions = self
-            .online_transactions
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let mut writes = Vec::new();
-        for (name, artifact) in &programs {
-            if let Some(existing) = current_programs.get(name) {
-                if existing != artifact {
-                    return Err(HostProblem::IdempotencyConflict);
-                }
-            } else {
-                writes.push(ProviderStateWrite {
-                    record: ProviderStateRecord {
-                        namespace: "online-program".into(),
-                        key: name.clone(),
-                        version: 1,
-                        payload: artifact.as_str().as_bytes().to_vec(),
-                    },
-                    expected_version: None,
-                });
-            }
-        }
-        for (transaction, program) in &transactions {
-            if let Some(existing) = current_transactions.get(transaction) {
-                if existing != program {
-                    return Err(HostProblem::IdempotencyConflict);
-                }
-            } else {
-                writes.push(ProviderStateWrite {
-                    record: ProviderStateRecord {
-                        namespace: "online-transaction".into(),
-                        key: transaction.clone(),
-                        version: 1,
-                        payload: program.as_bytes().to_vec(),
-                    },
-                    expected_version: None,
-                });
-            }
-        }
-        let replayed = writes.is_empty();
-        if !replayed {
-            self.store
-                .put_provider_states_atomic(writes)
-                .map_err(store_error)?;
-        }
-        current_programs.extend(programs);
-        current_transactions.extend(transactions);
-        Ok(OnlineInstallReceipt {
-            programs: definition.programs.len(),
-            transactions: definition.transactions.len(),
-            maps: definition.maps.len(),
-            identity: format!("sha256:{:x}", identity.finalize()),
-            replayed,
-        })
     }
 
     pub fn install_batch_programs(
         &self,
         definitions: Vec<BatchProgramDefinition>,
     ) -> Result<BatchInstallReceipt, HostProblem> {
+        let _publication = self.publication_write()?;
         if definitions.is_empty() || definitions.len() > 4096 {
             return Err(HostProblem::Malformed);
         }
@@ -1162,10 +971,8 @@ impl ProductServer {
         &self,
         package: &ApplicationPackageV2,
     ) -> Result<ApplicationGenerationRecord, HostProblem> {
-        let _publication = self
-            .application_publication
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        self.require_local_owner_known()?;
+        let _publication = self.publication_write()?;
         let mut durable = self
             .applications_v2
             .lock()
@@ -1196,27 +1003,50 @@ impl ProductServer {
         &self,
         expected: &ApplicationGenerationRecord,
     ) -> Result<ApplicationPublicationReceipt, HostProblem> {
-        let _publication = self
-            .application_publication
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        self.batch.with_publication_write(|writer| {
+            self.publish_application_generation_locked(expected, writer)
+        })
+    }
+
+    fn publish_application_generation_locked(
+        &self,
+        expected: &ApplicationGenerationRecord,
+        writer: &BatchPublicationWrite<'_>,
+    ) -> Result<ApplicationPublicationReceipt, HostProblem> {
+        self.refuse_local_legacy_selection(&expected.package)?;
         let selected = self.application_generation_v2(expected)?;
+        // A Ready commit retry preserves selection; only explicit retained rollback
+        // can reselect another Ready generation. Refuse before provider publication.
+        if selected.record().state == InstallState::Ready {
+            self.selected_application_v2(expected)?;
+        }
         let package = selected.package().clone();
         let key = package.base.manifest.name.to_ascii_uppercase();
-        let db2_applicable = package
-            .base
-            .manifest
-            .entries
-            .iter()
-            .any(|entry| entry.kind == EntryKind::Data && entry.path == "data/db2/catalog");
         let existing = self
             .store
             .get_provider_state(APPLICATION_PUBLICATION_NAMESPACE, &key)
             .map_err(store_error)?;
+        let completed = existing
+            .as_ref()
+            .map(|row| self.decode_application_publication(row))
+            .transpose()?
+            .is_some_and(|state| {
+                state.action == PublicationAction::Install
+                    && state.matches_complete(
+                        &expected.package,
+                        expected.generation,
+                        &expected.identity,
+                    )
+            });
+        let plan = self.prevalidate_application_publication(
+            &selected,
+            PublicationAction::Install,
+            completed,
+        )?;
+        let db2_applicable = plan.db2.is_some();
         let mut durable = match existing {
             Some(record) => {
-                let state: ApplicationPublicationState = serde_json::from_slice(&record.payload)
-                    .map_err(|_| HostProblem::InfrastructureFailure)?;
+                let state = self.decode_application_publication(&record)?;
                 if state.schema_version != APPLICATION_PUBLICATION_CONTRACT
                     || state.package.to_ascii_uppercase() != key
                 {
@@ -1251,6 +1081,18 @@ impl ProductServer {
             }
         };
         if durable.state.complete {
+            if !durable.state.matches_complete(
+                &expected.package,
+                expected.generation,
+                &expected.identity,
+            ) || db2_applicable && durable.state.db2 != PublicationSectionState::Applied
+                || !package.sections.batch_controllers.is_empty()
+                    && durable.state.controllers != PublicationSectionState::Applied
+                || (package.sections.ims_metadata.is_some() || package.sections.ims_tm.is_some())
+                    && durable.state.ims != PublicationSectionState::Applied
+            {
+                return Err(HostProblem::InfrastructureFailure);
+            }
             self.selected_application_v2(expected)?;
             return Ok(ApplicationPublicationReceipt {
                 package: package.base.manifest.name,
@@ -1268,7 +1110,7 @@ impl ProductServer {
         } else {
             durable.state.controllers = PublicationSectionState::Applying;
             self.persist_application_publication(&mut durable)?;
-            match self.apply_application_batch_controllers(&selected) {
+            match writer.install_controllers(plan.controllers) {
                 Ok(receipt) => {
                     durable.state.controllers = PublicationSectionState::Applied;
                     self.persist_application_publication(&mut durable)?;
@@ -1285,7 +1127,10 @@ impl ProductServer {
         if db2_applicable && durable.state.db2 != PublicationSectionState::Applied {
             durable.state.db2 = PublicationSectionState::Applying;
             self.persist_application_publication(&mut durable)?;
-            if let Err(problem) = self.apply_application_db2_catalog(&selected) {
+            if let Err(problem) = self
+                .db2
+                .install_catalog(plan.db2.ok_or(HostProblem::InfrastructureFailure)?)
+            {
                 durable.state.db2 = PublicationSectionState::Failed;
                 self.persist_application_publication(&mut durable)?;
                 return Err(problem);
@@ -1324,10 +1169,17 @@ impl ProductServer {
         &self,
         expected: &ApplicationGenerationRecord,
     ) -> Result<ApplicationPublicationReceipt, HostProblem> {
-        let _publication = self
-            .application_publication
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        self.batch.with_publication_write(|writer| {
+            self.rollback_application_generation_locked(expected, writer)
+        })
+    }
+
+    fn rollback_application_generation_locked(
+        &self,
+        expected: &ApplicationGenerationRecord,
+        writer: &BatchPublicationWrite<'_>,
+    ) -> Result<ApplicationPublicationReceipt, HostProblem> {
+        self.refuse_local_legacy_selection(&expected.package)?;
         let selected = self
             .applications_v2
             .lock()
@@ -1341,19 +1193,30 @@ impl ProductServer {
         }
         let package = selected.package().clone();
         let key = package.base.manifest.name.to_ascii_uppercase();
-        let db2_applicable = package
-            .base
-            .manifest
-            .entries
-            .iter()
-            .any(|entry| entry.kind == EntryKind::Data && entry.path == "data/db2/catalog");
         let existing = self
             .store
             .get_provider_state(APPLICATION_PUBLICATION_NAMESPACE, &key)
             .map_err(store_error)?;
+        let completed = existing
+            .as_ref()
+            .map(|row| self.decode_application_publication(row))
+            .transpose()?
+            .is_some_and(|state| {
+                state.action == PublicationAction::Rollback
+                    && state.matches_complete(
+                        &expected.package,
+                        expected.generation,
+                        &expected.identity,
+                    )
+            });
+        let plan = self.prevalidate_application_publication(
+            &selected,
+            PublicationAction::Rollback,
+            completed,
+        )?;
+        let db2_applicable = plan.db2.is_some();
         let mut durable = if let Some(record) = existing {
-            let state: ApplicationPublicationState = serde_json::from_slice(&record.payload)
-                .map_err(|_| HostProblem::InfrastructureFailure)?;
+            let state = self.decode_application_publication(&record)?;
             if state.action == PublicationAction::Rollback
                 && state.generation == expected.generation
                 && state.identity == expected.identity
@@ -1375,6 +1238,18 @@ impl ProductServer {
             }
         };
         if durable.state.complete {
+            if !durable.state.matches_complete(
+                &expected.package,
+                expected.generation,
+                &expected.identity,
+            ) || db2_applicable && durable.state.db2 != PublicationSectionState::Applied
+                || !package.sections.batch_controllers.is_empty()
+                    && durable.state.controllers != PublicationSectionState::Applied
+                || (package.sections.ims_metadata.is_some() || package.sections.ims_tm.is_some())
+                    && durable.state.ims != PublicationSectionState::Applied
+            {
+                return Err(HostProblem::InfrastructureFailure);
+            }
             self.selected_application_v2(expected)?;
             return Ok(ApplicationPublicationReceipt {
                 package: package.base.manifest.name,
@@ -1391,9 +1266,8 @@ impl ProductServer {
         if durable.state.controllers != PublicationSectionState::Applied {
             durable.state.controllers = PublicationSectionState::Applying;
             self.persist_application_publication(&mut durable)?;
-            if let Err(problem) = self
-                .batch
-                .rollback_controllers(&package.base.manifest.name, package.generation)
+            if let Err(problem) =
+                writer.rollback_controllers(&package.base.manifest.name, package.generation)
             {
                 durable.state.controllers = PublicationSectionState::Failed;
                 self.persist_application_publication(&mut durable)?;
@@ -1438,107 +1312,6 @@ impl ProductServer {
             db2_catalog: db2_applicable,
             ims_metadata: package.sections.ims_metadata.is_some(),
             replayed: false,
-        })
-    }
-
-    fn apply_application_batch_controllers(
-        &self,
-        selected: &SelectedApplicationGeneration,
-    ) -> Result<BatchControllerInstallReceipt, HostProblem> {
-        let package = selected.package();
-        let controllers = package
-            .sections
-            .batch_controllers
-            .iter()
-            .map(|controller| decode_application_batch_controller(package, controller))
-            .collect::<Result<Vec<_>, _>>()?;
-        self.batch.install_controllers(BatchControllerGeneration {
-            schema_version: BATCH_CONTROLLER_REGISTRY_CONTRACT.into(),
-            application: package.base.manifest.name.clone(),
-            generation: package.generation,
-            identity: selected.record().identity.clone(),
-            controllers,
-        })
-    }
-
-    fn apply_application_db2_catalog(
-        &self,
-        selected: &SelectedApplicationGeneration,
-    ) -> Result<(), HostProblem> {
-        let package = selected.package();
-        let catalog_entry = package
-            .base
-            .manifest
-            .entries
-            .iter()
-            .find(|entry| entry.kind == EntryKind::Data && entry.path == "data/db2/catalog")
-            .ok_or(HostProblem::Malformed)?;
-        let catalog_blob = package
-            .base
-            .blobs
-            .get(&catalog_entry.sha256)
-            .ok_or(HostProblem::Malformed)?;
-        let tables = decode_table_definitions_bounded(catalog_blob, Db2Limits::default())?;
-        let declared = package
-            .sections
-            .sql_tables
-            .iter()
-            .map(|table| {
-                (
-                    table.name.to_ascii_uppercase(),
-                    table
-                        .columns
-                        .iter()
-                        .map(|column| (column.name.to_ascii_uppercase(), column.nullable))
-                        .collect::<Vec<_>>(),
-                    table
-                        .primary_key
-                        .iter()
-                        .map(|column| column.to_ascii_uppercase())
-                        .collect::<Vec<_>>(),
-                )
-            })
-            .collect::<BTreeSet<_>>();
-        let signed = tables
-            .iter()
-            .map(|table| {
-                (
-                    table.name.to_ascii_uppercase(),
-                    table
-                        .columns
-                        .iter()
-                        .map(|column| (column.name.to_ascii_uppercase(), column.nullable))
-                        .collect::<Vec<_>>(),
-                    table
-                        .primary_key
-                        .iter()
-                        .map(|column| column.to_ascii_uppercase())
-                        .collect::<Vec<_>>(),
-                )
-            })
-            .collect::<BTreeSet<_>>();
-        if declared != signed {
-            return Err(HostProblem::Malformed);
-        }
-        let rows = package
-            .sections
-            .sql_rows
-            .iter()
-            .map(|row| Db2SeedRow {
-                table: row.table.clone(),
-                values: row
-                    .values
-                    .iter()
-                    .map(|(name, value)| (name.clone(), value.as_bytes().to_vec()))
-                    .collect(),
-            })
-            .collect();
-        self.db2.install_catalog(Db2CatalogGeneration {
-            application: package.base.manifest.name.clone(),
-            generation: package.generation,
-            identity: selected.record().identity.clone(),
-            tables,
-            rows,
         })
     }
 
@@ -1656,7 +1429,7 @@ impl ProductServer {
     ) -> Result<(), HostProblem> {
         let payload =
             serde_json::to_vec(&durable.state).map_err(|_| HostProblem::InfrastructureFailure)?;
-        if payload.len() > 64 * 1024 {
+        if payload.len() > MAX_APPLICATION_PUBLICATION_BYTES {
             return Err(HostProblem::ResourceExhausted);
         }
         let version = durable
@@ -1679,46 +1452,8 @@ impl ProductServer {
     }
 
     fn recover_application_publications(&self) -> Result<(), HostProblem> {
-        for record in self
-            .store
-            .list_provider_state(APPLICATION_PUBLICATION_NAMESPACE, 1_024)
-            .map_err(store_error)?
-        {
-            if record.payload.len() > 64 * 1024 {
-                return Err(HostProblem::ResourceExhausted);
-            }
-            let state: ApplicationPublicationState = serde_json::from_slice(&record.payload)
-                .map_err(|_| HostProblem::InfrastructureFailure)?;
-            if state.schema_version != APPLICATION_PUBLICATION_CONTRACT
-                || state.package.to_ascii_uppercase() != record.key
-            {
-                return Err(HostProblem::InfrastructureFailure);
-            }
-            let retained = self
-                .applications_v2
-                .lock()
-                .map_err(|_| HostProblem::InfrastructureFailure)?
-                .installer
-                .generation(&state.package, state.generation, &state.identity)
-                .map_err(application_install_problem)?
-                .ok_or(HostProblem::InfrastructureFailure)?;
-            let expected = retained.record().clone();
-            drop(retained);
-            if !state.complete {
-                match state.action {
-                    PublicationAction::Install => {
-                        self.publish_application_generation(&expected)?;
-                    }
-                    PublicationAction::Rollback => {
-                        self.rollback_application_generation(&expected)?;
-                    }
-                }
-            } else {
-                let selected = self.selected_application_v2(&expected)?;
-                self.apply_application_ims_metadata(&selected)?;
-            }
-        }
-        Ok(())
+        self.batch
+            .with_publication_write(|writer| self.recover_application_publications_locked(writer))
     }
 
     fn selected_application_v2(
@@ -1929,409 +1664,6 @@ impl ProductServer {
             result?;
         }
         Ok(())
-    }
-
-    fn run_online_exchange(
-        &self,
-        session: &SessionId,
-        principal: &PrincipalId,
-        program: &str,
-        now_tick: u64,
-    ) -> Result<(), HostProblem> {
-        let mut saved = self.preflight_online_continuation(session, None)?;
-        if saved.is_none() {
-            self.preflight_online_program(program)?;
-        }
-        let mut exchange = self.online_exchange(session)?;
-        self.recover_pending_online_transfer_if_present(
-            session,
-            &mut saved,
-            &mut exchange,
-            now_tick,
-        )?;
-        if let Some(state) = exchange.as_ref() {
-            self.preflight_online_exchange_state(state)?;
-            let expected_program = saved
-                .as_ref()
-                .map_or(program, |continuation| continuation.program.as_str());
-            if state.principal != principal.as_str()
-                || state.program != normalize_online_name(expected_program, 128)?
-            {
-                return Err(HostProblem::Unauthorized);
-            }
-            if let Some(recovered) =
-                self.recover_terminal_online_exchange(session, principal, state, now_tick)?
-            {
-                return match recovered {
-                    TerminalExchangeRecovery::Completed
-                    | TerminalExchangeRecovery::HandoffCompleted => Ok(()),
-                    TerminalExchangeRecovery::Cancelled => Err(HostProblem::Cancelled),
-                    TerminalExchangeRecovery::TimedOut => Err(HostProblem::TimedOut),
-                    TerminalExchangeRecovery::Failed => Err(HostProblem::ProviderFailure),
-                };
-            }
-        }
-        let blocked = exchange
-            .as_ref()
-            .map(|state| self.online_exchange_blocked(state))
-            .transpose()?
-            .unwrap_or(false);
-        if blocked
-            && !self.reconcile_online_exchange(
-                session,
-                exchange
-                    .as_mut()
-                    .ok_or(HostProblem::InfrastructureFailure)?,
-            )?
-        {
-            return Err(HostProblem::UnknownOutcome);
-        }
-        let context = match exchange.as_ref() {
-            Some(state) => {
-                let mut invocation = self.online_exchange_invocation(state)?;
-                self.restore_bridge_binding(&mut invocation)?;
-                continuation::restore_online_machine_priority(&mut invocation, saved.as_ref());
-                self.restore_online_cics_run(state, invocation.clone(), session, now_tick)?;
-                CicsTerminalExecution {
-                    invocation,
-                    transaction: state.transaction.clone(),
-                    commarea: state.commarea.clone(),
-                    aid: state.aid,
-                }
-            }
-            None => {
-                let context = self.cics.terminal_execution(session, principal, now_tick)?;
-                let exchange_program = saved
-                    .as_ref()
-                    .map_or(program, |continuation| continuation.program.as_str());
-                exchange = Some(self.begin_online_exchange(session, exchange_program, &context)?);
-                context
-            }
-        };
-        let mut invocation = context.invocation;
-        if let Some(continuation) = saved.as_ref() {
-            invocation
-                .provider_generations
-                .clone_from(&continuation.provider_generations);
-        }
-        continuation::restore_online_machine_context(&mut invocation, saved.as_ref())?;
-        invocation.bindings.insert(
-            "cics.commarea".into(),
-            BoundedPayload::new(
-                "mainframe-env.cics.commarea@1",
-                context.commarea,
-                InvocationLimits::default(),
-            )
-            .map_err(|_| HostProblem::ResourceExhausted)?,
-        );
-        invocation.bindings.insert(
-            "cics.aid".into(),
-            BoundedPayload::new(
-                "mainframe-env.cics.aid@1",
-                vec![context.aid],
-                InvocationLimits::default(),
-            )
-            .map_err(|_| HostProblem::ResourceExhausted)?,
-        );
-        invocation.bindings.insert(
-            "cics.transaction".into(),
-            BoundedPayload::new(
-                "mainframe-env.cics.transaction@1",
-                context.transaction.into_bytes(),
-                InvocationLimits::default(),
-            )
-            .map_err(|_| HostProblem::ResourceExhausted)?,
-        );
-        bind_compatible_runtime_services(&mut invocation)?;
-        let mut saved_version = saved.as_ref().map(|saved| saved.version);
-        let mut saved_checkpoint = saved.as_ref().map(|saved| saved.checkpoint.clone());
-        let mut current = normalize_online_name(
-            saved
-                .as_ref()
-                .map_or(program, |saved| saved.program.as_str()),
-            128,
-        )?;
-        let mut root_idempotency = invocation.idempotency_key.as_str().to_string();
-        for frame in 0..invocation.limits.max_frames {
-            let artifact = self
-                .online_programs
-                .lock()
-                .map_err(|_| HostProblem::InfrastructureFailure)?
-                .get(&current)
-                .cloned()
-                .ok_or(HostProblem::NotFound)?;
-            let record = self
-                .artifacts
-                .get_artifact(&artifact)
-                .map_err(store_error)?
-                .ok_or(HostProblem::NotFound)?;
-            if frame == 0
-                && saved
-                    .as_ref()
-                    .is_some_and(|continuation| continuation.artifact != artifact)
-            {
-                return Err(HostProblem::InfrastructureFailure);
-            }
-            let executable = admit_executable_artifact(&record)?;
-            invocation.selector =
-                Selector::new(format!("program:{current}"), InvocationLimits::default())
-                    .map_err(|_| HostProblem::InfrastructureFailure)?;
-            invocation.artifact = artifact.clone();
-            invocation.idempotency_key = IdempotencyKey::new(
-                format!("{root_idempotency}:{current}"),
-                InvocationLimits::default(),
-            )
-            .map_err(|_| HostProblem::ResourceExhausted)?;
-            let mut machine = ReferenceMachine::from_binary(
-                executable.payload(),
-                invocation.clone(),
-                CodecLimits::default(),
-            )
-            .map_err(|_| HostProblem::ProviderFailure)?;
-            if let Some(checkpoint) = saved_checkpoint.take() {
-                machine
-                    .restore_checkpoint(&checkpoint)
-                    .map_err(|_| HostProblem::InfrastructureFailure)?;
-            }
-            let coordinator = ExecutionCoordinator::durable(
-                self.host.clone(),
-                self.store.clone(),
-                CoordinatorLimits {
-                    max_quanta: 100,
-                    ..CoordinatorLimits::default()
-                },
-            );
-            match coordinator.execute_resumable_with_control(&mut machine, &invocation, || {
-                self.program.observe_execution_control(&invocation)
-            }) {
-                ExecutionOutcome::Completed(_) => {
-                    self.program.finish_run_unit(&invocation)?;
-                    self.clear_online_machine_continuation(session, saved_version)?;
-                    self.finish_online_machine_run(session, principal, now_tick)?;
-                    self.clear_online_exchange(
-                        session,
-                        exchange
-                            .as_ref()
-                            .ok_or(HostProblem::InfrastructureFailure)?,
-                    )?;
-                    return Ok(());
-                }
-                ExecutionOutcome::Suspended(suspension) => {
-                    return self.finish_online_suspension(
-                        session,
-                        principal,
-                        &current,
-                        &artifact,
-                        &invocation,
-                        &machine,
-                        saved_version,
-                        &suspension,
-                        &coordinator,
-                        exchange
-                            .as_ref()
-                            .ok_or(HostProblem::InfrastructureFailure)?,
-                        now_tick,
-                    );
-                }
-                ExecutionOutcome::Transfer(transfer) if transfer.replace_frame => {
-                    let (next_program, next_artifact) =
-                        self.preflight_online_program(transfer.selector.as_str())?;
-                    let (next, checkpoint, next_version) = self.stage_online_program_transfer(
-                        session,
-                        &next_program,
-                        &next_artifact,
-                        &invocation,
-                        &transfer.payload,
-                        saved_version,
-                        exchange
-                            .as_mut()
-                            .ok_or(HostProblem::InfrastructureFailure)?,
-                        &coordinator,
-                        now_tick,
-                    )?;
-                    self.online_traces
-                        .lock()
-                        .map_err(|_| HostProblem::InfrastructureFailure)?
-                        .entry(session.as_str().into())
-                        .or_default()
-                        .push(CicsTraceEntry {
-                            operation: mainframe_env_host_api::CicsOperation::Retrieve,
-                            outcome: format!("TRANSFER {}", transfer.selector.as_str()),
-                            response: 0,
-                            response2: 0,
-                            payload_bytes: 0,
-                        });
-                    current = next_program;
-                    invocation = next;
-                    root_idempotency = invocation.idempotency_key.as_str().into();
-                    saved_checkpoint = Some(checkpoint);
-                    saved_version = Some(next_version);
-                }
-                ExecutionOutcome::Condition(condition) => {
-                    self.finish_known_online_failure(
-                        session,
-                        principal,
-                        &invocation,
-                        now_tick,
-                        saved_version,
-                        exchange
-                            .as_ref()
-                            .ok_or(HostProblem::InfrastructureFailure)?,
-                    )?;
-                    return Err(HostProblem::Condition {
-                        name: condition.name,
-                        response: condition.response,
-                        response2: condition.response2,
-                    });
-                }
-                ExecutionOutcome::Abend(abend) => {
-                    self.finish_known_online_failure(
-                        session,
-                        principal,
-                        &invocation,
-                        now_tick,
-                        saved_version,
-                        exchange
-                            .as_ref()
-                            .ok_or(HostProblem::InfrastructureFailure)?,
-                    )?;
-                    return Err(HostProblem::Condition {
-                        name: abend.code,
-                        response: -1,
-                        response2: 0,
-                    });
-                }
-                ExecutionOutcome::TimedOut => {
-                    self.finish_known_online_failure(
-                        session,
-                        principal,
-                        &invocation,
-                        now_tick,
-                        saved_version,
-                        exchange
-                            .as_ref()
-                            .ok_or(HostProblem::InfrastructureFailure)?,
-                    )?;
-                    return Err(HostProblem::TimedOut);
-                }
-                ExecutionOutcome::Cancelled => {
-                    self.finish_known_online_failure(
-                        session,
-                        principal,
-                        &invocation,
-                        now_tick,
-                        saved_version,
-                        exchange
-                            .as_ref()
-                            .ok_or(HostProblem::InfrastructureFailure)?,
-                    )?;
-                    return Err(HostProblem::Cancelled);
-                }
-                ExecutionOutcome::ResourceExhausted(problem) => {
-                    self.finish_known_online_failure(
-                        session,
-                        principal,
-                        &invocation,
-                        now_tick,
-                        saved_version,
-                        exchange
-                            .as_ref()
-                            .ok_or(HostProblem::InfrastructureFailure)?,
-                    )?;
-                    return Err(HostProblem::Condition {
-                        name: format!(
-                            "{} at {}",
-                            problem.public_message,
-                            machine.position_summary()
-                        ),
-                        response: -3,
-                        response2: 0,
-                    });
-                }
-                ExecutionOutcome::ProviderFailure(problem) => {
-                    if problem.has_unknown_outcome() {
-                        let key = IdempotencyKey::new(
-                            format!(
-                                "{}:{}",
-                                invocation.idempotency_key,
-                                machine.effect_sequence()
-                            ),
-                            InvocationLimits::default(),
-                        )
-                        .map_err(|_| HostProblem::InfrastructureFailure)?;
-                        if self
-                            .store
-                            .effect(&key)
-                            .map_err(store_error)?
-                            .is_some_and(|effect| {
-                                matches!(
-                                    effect.state,
-                                    EffectState::Intent | EffectState::UnknownOutcome
-                                )
-                            })
-                            && let Some(state) = exchange.as_mut()
-                        {
-                            state.blocking_effect = Some(key.as_str().into());
-                            let _ = self.persist_online_exchange(session, state);
-                        }
-                        return Err(HostProblem::UnknownOutcome);
-                    }
-                    self.finish_known_online_failure(
-                        session,
-                        principal,
-                        &invocation,
-                        now_tick,
-                        saved_version,
-                        exchange
-                            .as_ref()
-                            .ok_or(HostProblem::InfrastructureFailure)?,
-                    )?;
-                    return Err(HostProblem::Condition {
-                        name: problem.public_message,
-                        response: -4,
-                        response2: 0,
-                    });
-                }
-                ExecutionOutcome::InfrastructureFailure(_) => {
-                    return Err(HostProblem::InfrastructureFailure);
-                }
-                ExecutionOutcome::Rejected(problem) => {
-                    self.finish_known_online_failure(
-                        session,
-                        principal,
-                        &invocation,
-                        now_tick,
-                        saved_version,
-                        exchange
-                            .as_ref()
-                            .ok_or(HostProblem::InfrastructureFailure)?,
-                    )?;
-                    return Err(HostProblem::Condition {
-                        name: format!(
-                            "{} at {}",
-                            problem.public_message,
-                            machine.position_summary()
-                        ),
-                        response: -2,
-                        response2: 0,
-                    });
-                }
-                ExecutionOutcome::Invoke(_) | ExecutionOutcome::Transfer(_) => {
-                    self.finish_known_online_failure(
-                        session,
-                        principal,
-                        &invocation,
-                        now_tick,
-                        saved_version,
-                        exchange
-                            .as_ref()
-                            .ok_or(HostProblem::InfrastructureFailure)?,
-                    )?;
-                    return Err(HostProblem::Unsupported);
-                }
-            }
-        }
-        Err(HostProblem::ResourceExhausted)
     }
 
     pub fn bootstrap_user(&self, user: &str, secret: &[u8]) -> Result<(), HostProblem> {
@@ -2935,41 +2267,6 @@ impl ProductServer {
     #[must_use]
     pub fn ready(&self) -> bool {
         self.readiness().ready()
-    }
-
-    #[must_use]
-    pub fn readiness(&self) -> ProductReadiness {
-        let capacity = self
-            .config
-            .retention
-            .policy()
-            .ok()
-            .and_then(|policy| self.store.retention_capacity_health(policy).ok());
-        let retention_capacity = capacity
-            .as_ref()
-            .map_or(ProductCapacityStatus::Unavailable, |health| {
-                health.saturation.into()
-            });
-        ProductReadiness {
-            accepting: self.accepting.load(Ordering::SeqCst),
-            writable_store: capacity.is_some(),
-            retention_capacity,
-            retention_warning: retention_capacity.warning(),
-            bootstrap_identity: self.bootstrap_principal_ready(),
-            host_capabilities: [
-                "host.cics.execute",
-                "host.db2.read",
-                "host.db2.write",
-                "host.ims.read",
-                "host.ims.write",
-                "host.mq.read",
-                "host.mq.write",
-            ]
-            .into_iter()
-            .all(|capability| self.host.capability_ready(capability)),
-            artifact_store: self.artifacts.is_ready(),
-            jes_workers: self.jes_workers_ready(),
-        }
     }
 
     fn bootstrap_principal_ready(&self) -> bool {
@@ -3872,65 +3169,7 @@ impl ProductServer {
             GatewayRequest::CicsResume {
                 session,
                 csrf_token,
-            } => {
-                let session = terminal_session_id(&session)?;
-                let principal_id = terminal_principal(&principal)?;
-                self.preflight_online_continuation(&session, None)
-                    .map_err(gateway_problem)?;
-                let snapshot = self.online_exchange(&session).map_err(gateway_problem)?;
-                let mut start_fresh_task = snapshot.is_none();
-                if let Some(exchange) = snapshot {
-                    self.preflight_online_exchange_state(&exchange)
-                        .map_err(gateway_problem)?;
-                    let tick = current_tick()?;
-                    self.cics
-                        .validate_terminal_resume(&session, &principal_id, &csrf_token, tick)
-                        .map_err(gateway_problem)?;
-                    match self
-                        .recover_terminal_online_exchange(&session, &principal_id, &exchange, tick)
-                        .map_err(gateway_problem)?
-                    {
-                        Some(TerminalExchangeRecovery::HandoffCompleted) => {
-                            start_fresh_task = true;
-                        }
-                        Some(TerminalExchangeRecovery::Completed) => {}
-                        Some(TerminalExchangeRecovery::Cancelled) => {
-                            return Err(gateway_problem(HostProblem::Cancelled));
-                        }
-                        Some(TerminalExchangeRecovery::TimedOut) => {
-                            return Err(gateway_problem(HostProblem::TimedOut));
-                        }
-                        Some(TerminalExchangeRecovery::Failed) => {
-                            return Err(gateway_problem(HostProblem::ProviderFailure));
-                        }
-                        None => {
-                            self.run_online_exchange(
-                                &session,
-                                &principal_id,
-                                &exchange.program,
-                                tick,
-                            )
-                            .map_err(gateway_problem)?;
-                        }
-                    }
-                }
-                if start_fresh_task {
-                    self.resume_fresh_online_task(
-                        &session,
-                        &principal,
-                        &principal_id,
-                        &csrf_token,
-                    )?;
-                }
-                let snapshot = self
-                    .cics
-                    .terminal_snapshot(&session, &principal_id, current_tick()?)
-                    .map_err(gateway_problem)?;
-                Ok(GatewayResponse::json(
-                    StatusCode::OK,
-                    terminal_json(&snapshot),
-                ))
-            }
+            } => self.resume_cics_session(&session, &principal, &csrf_token),
             GatewayRequest::CicsDisconnect {
                 session,
                 csrf_token,
@@ -4317,176 +3556,6 @@ impl ProductServer {
             .ok_or(HostProblem::NotFound)
     }
 
-    fn dataset_call(
-        &self,
-        principal: &str,
-        request: DatasetRequest,
-    ) -> Result<DatasetResult, GatewayProblem> {
-        if let DatasetRequest::ReadConcatenation { datasets, .. } = &request {
-            for dataset in datasets {
-                self.authorize_resource(
-                    principal,
-                    "DATASET",
-                    dataset.as_str(),
-                    AccessIntent::Read,
-                )?;
-            }
-        }
-        if let DatasetRequest::DefineAlias { target, .. } = &request {
-            self.authorize_resource(principal, "DATASET", target.as_str(), AccessIntent::Read)?;
-        }
-        if let DatasetRequest::BuildAlternateIndex { base, .. } = &request {
-            self.authorize_resource(principal, "DATASET", base.as_str(), AccessIntent::Read)?;
-        }
-        if let DatasetRequest::TvsStatus { owner, .. }
-        | DatasetRequest::AcquireLock { owner, .. }
-        | DatasetRequest::ReleaseLock { owner, .. }
-        | DatasetRequest::BeginTvs { owner, .. }
-        | DatasetRequest::StageTvs { owner, .. }
-        | DatasetRequest::CompleteTvs { owner, .. }
-        | DatasetRequest::ReconcileTvs { owner, .. } = &request
-            && owner.as_str() != principal
-        {
-            return Err(gateway_problem(HostProblem::Unauthorized));
-        }
-        let dataset = match &request {
-            DatasetRequest::Capabilities
-            | DatasetRequest::List { .. }
-            | DatasetRequest::TvsStatus { .. }
-            | DatasetRequest::BeginTvs { .. }
-            | DatasetRequest::CompleteTvs { .. }
-            | DatasetRequest::ReconcileTvs { .. } => None,
-            DatasetRequest::ListCatalog { pattern, .. } => Some(pattern.as_str()),
-            DatasetRequest::ListVolumes { .. } => Some("VOLUME.**"),
-            DatasetRequest::ReadConcatenation { .. } => None,
-            DatasetRequest::Rename { from, .. } => Some(from.as_str()),
-            DatasetRequest::ResolveCatalog { name } => Some(name.as_str()),
-            DatasetRequest::DefineCatalog { catalog, .. }
-            | DatasetRequest::SetCatalogConnection { catalog, .. } => Some(catalog.as_str()),
-            DatasetRequest::DefineAlias { alias, .. } => Some(alias.as_str()),
-            DatasetRequest::Attributes { dataset }
-            | DatasetRequest::Describe { dataset }
-            | DatasetRequest::Diagnose { dataset }
-            | DatasetRequest::ListLocks { dataset, .. }
-            | DatasetRequest::ListMembers { dataset, .. }
-            | DatasetRequest::Read { dataset, .. }
-            | DatasetRequest::ReadGeneric { dataset, .. }
-            | DatasetRequest::ReadRelative { dataset, .. }
-            | DatasetRequest::ReadRba { dataset, .. }
-            | DatasetRequest::ReadSequential { dataset, .. }
-            | DatasetRequest::Snapshot { dataset, .. }
-            | DatasetRequest::ReadMemberGeneration { dataset, .. }
-            | DatasetRequest::Create { dataset, .. }
-            | DatasetRequest::Define { dataset, .. }
-            | DatasetRequest::Alter { dataset, .. }
-            | DatasetRequest::SetLifecycle { dataset, .. }
-            | DatasetRequest::RecordBackup { dataset, .. }
-            | DatasetRequest::Restore { dataset, .. }
-            | DatasetRequest::DefineMemberAlias { dataset, .. }
-            | DatasetRequest::WriteMemberGeneration { dataset, .. }
-            | DatasetRequest::DeleteMemberGeneration { dataset, .. }
-            | DatasetRequest::AcquireLock { dataset, .. }
-            | DatasetRequest::ReleaseLock { dataset, .. }
-            | DatasetRequest::Write { dataset, .. }
-            | DatasetRequest::Append { dataset, .. }
-            | DatasetRequest::Truncate { dataset, .. }
-            | DatasetRequest::RewriteRecord { dataset, .. }
-            | DatasetRequest::DeleteRecord { dataset, .. }
-            | DatasetRequest::WriteRelative { dataset, .. }
-            | DatasetRequest::DeleteRelative { dataset, .. }
-            | DatasetRequest::WriteRba { dataset, .. }
-            | DatasetRequest::Delete { dataset, .. }
-            | DatasetRequest::StartBrowse { dataset, .. }
-            | DatasetRequest::ResetBrowse { dataset, .. }
-            | DatasetRequest::ReadNext { dataset, .. }
-            | DatasetRequest::EndBrowse { dataset, .. }
-            | DatasetRequest::Close { dataset, .. } => Some(dataset.as_str()),
-            DatasetRequest::DefinePath { path, .. } => Some(path.as_str()),
-            DatasetRequest::BuildAlternateIndex { index, .. } => Some(index.as_str()),
-            DatasetRequest::StageTvs { operation, .. } => Some(match operation {
-                mainframe_env_host_api::TvsRecordOperation::Insert { dataset, .. }
-                | mainframe_env_host_api::TvsRecordOperation::Rewrite { dataset, .. }
-                | mainframe_env_host_api::TvsRecordOperation::Delete { dataset, .. } => {
-                    dataset.as_str()
-                }
-            }),
-            DatasetRequest::DefineAlternateIndex { base, .. }
-            | DatasetRequest::DefineGenerationGroup { base, .. }
-            | DatasetRequest::CreateGeneration { base, .. }
-            | DatasetRequest::ResolveGeneration { base, .. } => Some(base.as_str()),
-        };
-        if let Some(dataset) = dataset {
-            self.authorize_resource(
-                principal,
-                "DATASET",
-                dataset,
-                if matches!(
-                    request,
-                    DatasetRequest::Attributes { .. }
-                        | DatasetRequest::Describe { .. }
-                        | DatasetRequest::Diagnose { .. }
-                        | DatasetRequest::ListLocks { .. }
-                        | DatasetRequest::TvsStatus { .. }
-                        | DatasetRequest::ListMembers { .. }
-                        | DatasetRequest::Read { .. }
-                        | DatasetRequest::ReadGeneric { .. }
-                        | DatasetRequest::ReadRelative { .. }
-                        | DatasetRequest::ReadRba { .. }
-                        | DatasetRequest::ReadSequential { .. }
-                        | DatasetRequest::Snapshot { .. }
-                        | DatasetRequest::ReadMemberGeneration { .. }
-                        | DatasetRequest::ResolveCatalog { .. }
-                        | DatasetRequest::ResolveGeneration { .. }
-                        | DatasetRequest::ListCatalog { .. }
-                        | DatasetRequest::ListVolumes { .. }
-                        | DatasetRequest::StartBrowse { .. }
-                        | DatasetRequest::ResetBrowse { .. }
-                        | DatasetRequest::ReadNext { .. }
-                        | DatasetRequest::EndBrowse { .. }
-                ) {
-                    AccessIntent::Read
-                } else {
-                    AccessIntent::Update
-                },
-            )?;
-        }
-        let capability = if dataset_mutation(&request).is_some() {
-            "host.dataset.write"
-        } else {
-            "host.dataset.read"
-        };
-        let invocation = self
-            .invocation(
-                principal,
-                "zosmf:dataset",
-                ServiceClass::System,
-                &[capability],
-            )
-            .map_err(gateway_problem)?;
-        let sequence = self.next_sequence().map_err(gateway_problem)?;
-        let mutation = dataset_mutation(&request);
-        let idempotency_key = mutation.map(|mutation| mutation.idempotency_key.clone());
-        let result = self
-            .host
-            .invoke(
-                &invocation,
-                self.jes_tick().map_err(gateway_problem)?,
-                invocation.cancellation_requested(),
-                EffectRequest {
-                    run_unit: invocation.run_unit_id.clone(),
-                    sequence: mutation.map_or(sequence, |mutation| mutation.sequence),
-                    deadline_tick: invocation.deadline_tick,
-                    idempotency_key,
-                    request: HostRequest::Dataset(request),
-                },
-            )
-            .persist_with(|audit| self.store.record_audit(audit).map_err(store_error));
-        match result.outcome.map_err(gateway_problem)? {
-            HostResult::Dataset(result) => Ok(result),
-            _ => Err(gateway_problem(HostProblem::ProviderFailure)),
-        }
-    }
-
     fn jcl_bundle(&self, principal: &str, jcl: Vec<u8>) -> Result<JclBundle, GatewayProblem> {
         let primary =
             String::from_utf8(jcl).map_err(|_| gateway_problem(HostProblem::Malformed))?;
@@ -4846,30 +3915,6 @@ impl ProductServer {
         Ok(invocation)
     }
 
-    fn online_transaction(
-        &self,
-        transaction: &str,
-    ) -> Result<Option<(String, ArtifactRef)>, GatewayProblem> {
-        let transaction = normalize_online_name(transaction, 16).map_err(gateway_problem)?;
-        let Some(program) = self
-            .online_transactions
-            .lock()
-            .map_err(|_| gateway_problem(HostProblem::InfrastructureFailure))?
-            .get(&transaction)
-            .cloned()
-        else {
-            return Ok(None);
-        };
-        let artifact = self
-            .online_programs
-            .lock()
-            .map_err(|_| gateway_problem(HostProblem::InfrastructureFailure))?
-            .get(&program)
-            .cloned()
-            .ok_or_else(|| gateway_problem(HostProblem::InfrastructureFailure))?;
-        Ok(Some((program, artifact)))
-    }
-
     fn ams(&self, principal: &str, control: &[u8]) -> Result<GatewayResponse, GatewayProblem> {
         let text = String::from_utf8(control.to_vec())
             .map_err(|_| gateway_problem(HostProblem::Malformed))?;
@@ -5125,33 +4170,6 @@ impl Drop for ActiveGuard<'_> {
     fn drop(&mut self) {
         self.0.fetch_sub(1, Ordering::SeqCst);
     }
-}
-
-fn scoped_host(
-    racf: &Arc<RacfService>,
-    dataset: &Arc<DatasetService>,
-    program: Arc<dyn HostProvider>,
-    additional: Vec<Arc<dyn HostProvider>>,
-    include_cics: bool,
-    cics: Option<Arc<dyn HostProvider>>,
-) -> Result<Arc<ScopedHostService>, HostProblem> {
-    let limits = InvocationLimits::default();
-    let mut providers = dataset_providers(dataset.clone(), limits);
-    providers.extend(racf_providers(racf.clone(), limits));
-    providers.push(Arc::new(SystemClockProvider::new(limits)) as Arc<dyn HostProvider>);
-    providers.push(Arc::new(BatchTerminalProvider::new(limits)) as Arc<dyn HostProvider>);
-    providers.push(program);
-    providers.extend(additional);
-    if include_cics {
-        providers.push(cics.ok_or(HostProblem::InfrastructureFailure)?);
-    }
-    Ok(Arc::new(ScopedHostService::new(
-        Arc::new(
-            RegistrySnapshot::new(1, providers, limits)
-                .map_err(|_| HostProblem::InfrastructureFailure)?,
-        ),
-        HostLimits::default(),
-    )))
 }
 
 fn dataset_name(value: &str) -> Result<DatasetName, GatewayProblem> {
@@ -5655,10 +4673,16 @@ fn install_publication_state(
 
 #[cfg(test)]
 mod tests {
+    mod local_composition_tests;
+    #[path = "package_state_schema_tests.rs"]
+    mod package_state_schema_tests;
     include!("product/bts_browse.rs");
+    include!("product/cics_first_reverse_tests.rs");
     use super::*;
     #[path = "ims_package_tests.rs"]
     mod ims_package_tests;
+    #[path = "publication_fencing_tests.rs"]
+    mod publication_fencing_tests;
     #[path = "sequential_layout_admission_tests.rs"]
     mod sequential_layout_admission_tests;
     #[path = "shisam_fixed_admission_tests.rs"]
@@ -5702,6 +4726,7 @@ mod tests {
     };
     use mainframe_env_store::{PostgresArtifactStore, PostgresStateStore, SqliteStateStore};
     use mainframe_env_store_api::{RetentionRequest, RetentionStore, WorkStore};
+    use ring::hmac;
     use std::sync::Barrier;
     use tower::ServiceExt;
 
@@ -10128,8 +9153,41 @@ mod tests {
         .unwrap()
     }
 
-    fn sign_test_package_identity(identity: &str) -> String {
-        sign_package_identity_with_key(TEST_PACKAGE_KEY, identity)
+    #[test]
+    fn package_trust_cose_mac0_accepts_independent_vector() {
+        // Independent stdlib HMAC fixture; bytes are not produced by the package codec.
+        let resolver = Arc::new(MemorySecretResolver::default());
+        let reference = SecretRef::new("secret:independent-key", HostLimits::default()).unwrap();
+        resolver.insert(reference.as_str(), (0_u8..32).collect());
+        let trust = HmacSha256PackageTrust::new(
+            BTreeMap::from([("review-key".into(), reference)]),
+            resolver,
+        )
+        .unwrap();
+        assert!(trust.verify(
+            "review-key",
+            "cose-mac0-hmac256@1",
+            "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            concat!(
+                "0YRPogEFBEpyZXZpZXcta2V5oFhHc2hhMjU2OmUzYjBjNDQyOThmYzFjMTQ5YWZiZjRj",
+                "ODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTVYIInc9L64UV87",
+                "fn2kbI1Vc4PWZ1JF0/G+Fe9JLfxR84E8"
+            ),
+        ));
+    }
+
+    fn sign_test_package_identity(identity: &str) -> mainframe_env_application::PackageSignature {
+        mainframe_env_application::encode_package_authentication(
+            "test-production-key",
+            identity,
+            |data| {
+                hmac::sign(&hmac::Key::new(hmac::HMAC_SHA256, TEST_PACKAGE_KEY), data)
+                    .as_ref()
+                    .try_into()
+                    .unwrap()
+            },
+        )
+        .unwrap()
     }
 
     fn sign_package_identity_with_key(key: &[u8], identity: &str) -> String {
@@ -10188,7 +9246,7 @@ mod tests {
         _trust: &HmacSha256PackageTrust,
     ) -> mainframe_env_application::ApplicationPackageV2 {
         use mainframe_env_application::{
-            APPLICATION_PACKAGE_V2_CONTRACT, ApplicationManifest, ApplicationPackage,
+            APPLICATION_PACKAGE_V3_CONTRACT, ApplicationManifest, ApplicationPackage,
             ApplicationSections, BatchController, EntryKind, PackageEntry, PackageSignature,
         };
         let definitions = [
@@ -10228,7 +9286,7 @@ mod tests {
             },
             generation: 1,
             sections: ApplicationSections {
-                schema_version: APPLICATION_PACKAGE_V2_CONTRACT.into(),
+                schema_version: APPLICATION_PACKAGE_V3_CONTRACT.into(),
                 host_abi_libraries: Vec::new(),
                 sql_tables: Vec::new(),
                 sql_rows: Vec::new(),
@@ -10250,13 +9308,13 @@ mod tests {
                 security_resources: Vec::new(),
             },
             signature: PackageSignature {
-                algorithm: "hmac-sha256@1".into(),
+                algorithm: mainframe_env_application::PACKAGE_AUTHENTICATION_ALGORITHM.into(),
                 key_id: "test-production-key".into(),
                 value: "invalid".into(),
             },
         };
-        let identity = mainframe_env_application::package_v2_identity(&package).unwrap();
-        package.signature.value = sign_test_package_identity(&identity);
+        let identity = mainframe_env_application::package_generation_identity(&package).unwrap();
+        package.signature = sign_test_package_identity(&identity);
         package
     }
 
@@ -10264,8 +9322,8 @@ mod tests {
         package: &mut mainframe_env_application::ApplicationPackageV2,
         _trust: &HmacSha256PackageTrust,
     ) {
-        let identity = mainframe_env_application::package_v2_identity(package).unwrap();
-        package.signature.value = sign_test_package_identity(&identity);
+        let identity = mainframe_env_application::package_generation_identity(package).unwrap();
+        package.signature = sign_test_package_identity(&identity);
     }
 
     fn signed_db2_package(
@@ -10367,8 +9425,8 @@ mod tests {
         entry.sha256 = sha256.clone();
         entry.bytes = bytes.len();
         package.base.blobs.insert(sha256, bytes);
-        let identity = mainframe_env_application::package_v2_identity(&package).unwrap();
-        package.signature.value = sign_test_package_identity(&identity);
+        let identity = mainframe_env_application::package_generation_identity(&package).unwrap();
+        package.signature = sign_test_package_identity(&identity);
         (package, definitions)
     }
 
@@ -10461,8 +9519,12 @@ mod tests {
             .install_application_package_v2(&first_package)
             .unwrap();
         let retained = server.application_generation_v2(&first).unwrap();
+        let plan = server
+            .prevalidate_application_publication(&retained, PublicationAction::Install, false)
+            .unwrap();
         server
-            .apply_application_batch_controllers(&retained)
+            .batch
+            .with_publication_write(|writer| writer.install_controllers(plan.controllers))
             .unwrap();
         store
             .put_provider_state(
@@ -14475,11 +13537,13 @@ mod tests {
                 .mutate_process(
                     "TYPE",
                     "ORDER",
-                    uow,
-                    execution,
-                    "IBMUSER",
-                    "activate",
-                    [1; 32],
+                    mainframe_env_cics::bts_lifecycle::BtsReplayContext {
+                        run_unit: uow,
+                        owner_execution: execution,
+                        owner_principal: "IBMUSER",
+                        replay_key: "activate",
+                        request_digest: [1; 32],
+                    },
                     |process| {
                         process.start(&root_id, None, true)?;
                         process.checkpoint(&root_id, 1, 7, "selected-checkpoint")?;
@@ -14499,11 +13563,13 @@ mod tests {
                         transid: "BT01".into(),
                         userid: "IBMUSER".into(),
                     },
-                    uow,
-                    execution,
-                    "IBMUSER",
-                    "child",
-                    [2; 32],
+                    mainframe_env_cics::bts_lifecycle::BtsReplayContext {
+                        run_unit: uow,
+                        owner_execution: execution,
+                        owner_principal: "IBMUSER",
+                        replay_key: "child",
+                        request_digest: [2; 32],
+                    },
                 )
                 .unwrap();
             server
@@ -21415,7 +20481,7 @@ mod tests {
     #[test]
     fn online_link_updates_typed_commarea_through_selected_program_route() {
         let limits = SourceLimits::default();
-        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. LINKER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 LINK-AREA PIC X(160) VALUE X'7B22706172616D65746572223A6E756C6C2C22646473223A5B5D7D'.\n01 LINK-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS LINK PROGRAM('IEFBR14') COMMAREA(LINK-AREA) LENGTH(LENGTH OF LINK-AREA) DATALENGTH(1) END-EXEC.\nMOVE EIBFN TO LINK-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. LINKER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 LINK-AREA PIC X(160) VALUE X'7B22706172616D65746572223A6E756C6C2C22646473223A5B5D7D'.\n01 LINK-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS LINK PROGRAM('LINKCAL') COMMAREA(LINK-AREA) LENGTH(LENGTH OF LINK-AREA) DATALENGTH(1) END-EXEC.\nMOVE EIBFN TO LINK-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
         let path = LogicalPath::new("LINKER.cbl", limits.max_path_bytes).unwrap();
         let bundle = SourceBundle::new(
             &path,
@@ -21446,17 +20512,21 @@ mod tests {
             CompilerResult::Published { artifact, .. } => artifact,
             other => panic!("LINK fixture did not publish: {other:?}"),
         };
+        let child_artifact = published_source_fixture(
+            "LINKCAL",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. LINKCAL.\nDATA DIVISION.\nLINKAGE SECTION.\n01 DFHCOMMAREA PIC X(160).\nPROCEDURE DIVISION USING DFHCOMMAREA.\nMOVE '{\"return_code\":0}' TO DFHCOMMAREA.\nGOBACK.\n",
+        );
         let server = ProductServer::memory(config()).unwrap();
         server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
         server
             .racf
-            .define_profile("FACILITY", "CICS.PROGRAM.IEFBR14", "IBMUSER", None)
+            .define_profile("FACILITY", "CICS.PROGRAM.LINKCAL", "IBMUSER", None)
             .unwrap();
         server
             .racf
             .permit(
                 "FACILITY",
-                "CICS.PROGRAM.IEFBR14",
+                "CICS.PROGRAM.LINKCAL",
                 "IBMUSER",
                 AccessIntent::Execute,
             )
@@ -21466,15 +20536,29 @@ mod tests {
             InvocationLimits::default(),
         )
         .unwrap();
+        let child_artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(child_artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
         server
             .install_online_application(OnlineApplicationDefinition {
-                programs: vec![OnlineProgramDefinition {
-                    name: "LINKER".into(),
-                    artifact: artifact_ref.clone(),
-                    payload: artifact.payload().to_vec(),
-                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
-                    semantic_identity: artifact.semantic_id().to_reference(),
-                }],
+                programs: vec![
+                    OnlineProgramDefinition {
+                        name: "LINKER".into(),
+                        artifact: artifact_ref.clone(),
+                        payload: artifact.payload().to_vec(),
+                        manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                        semantic_identity: artifact.semantic_id().to_reference(),
+                    },
+                    OnlineProgramDefinition {
+                        name: "LINKCAL".into(),
+                        artifact: child_artifact_ref.clone(),
+                        payload: child_artifact.payload().to_vec(),
+                        manifest: VersionedArtifactManifest::V3(child_artifact.manifest().clone()),
+                        semantic_identity: child_artifact.semantic_id().to_reference(),
+                    },
+                ],
                 transactions: BTreeMap::from([("LK00".into(), "LINKER".into())]),
                 maps: vec![BmsMapDefinition {
                     mapset: "LINKER".into(),
@@ -21486,6 +20570,20 @@ mod tests {
                     fields: Vec::new(),
                 }],
             })
+            .unwrap();
+        server
+            .cics
+            .register_program_definitions(&[CicsProgramDefinition {
+                name: "LINKCAL".into(),
+                generation: 1,
+                artifact: child_artifact_ref,
+                semantic_identity: child_artifact.semantic_id().to_reference(),
+                entry_offset: 0,
+                enabled: true,
+                remote: false,
+                reload: false,
+                java_status: CicsJavaStatus::NotJava,
+            }])
             .unwrap();
         let session = SessionId::new("typed-link", 64).unwrap();
         let invocation = server
@@ -25989,10 +25087,12 @@ mod tests {
                 &session,
                 &principal,
                 "partition-receive-selected-csrf",
-                0x7d,
-                "P",
-                b"lower",
-                17,
+                mainframe_env_cics::CicsPartitionInput {
+                    aid: 0x7d,
+                    partition: "P",
+                    data: b"lower",
+                    cursor: 17,
+                },
                 3,
             )
             .unwrap();

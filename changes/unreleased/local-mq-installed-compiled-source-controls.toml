@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add genuine installed compiled local MQ producer controls for exact core, audit, replay and same-store source fencing."

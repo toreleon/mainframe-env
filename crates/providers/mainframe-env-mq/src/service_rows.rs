@@ -9,6 +9,22 @@ pub(super) struct RowChange {
     mutation: ProviderStateMutation,
 }
 
+impl RowChange {
+    // Keep private field admission in the original row-codec owner.
+    pub(super) fn into_prepared_write(self) -> Result<ProviderStateWrite, HostProblem> {
+        let ProviderStateMutation::Put(write) = self.mutation else {
+            return Err(HostProblem::Unsupported);
+        };
+        if self.next_version != Some(write.record.version)
+            || self.namespace != write.record.namespace
+            || self.key != write.record.key
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        Ok(write)
+    }
+}
+
 pub(super) fn load_or_migrate(
     store: &dyn ProviderStateStore,
     limits: MqLimits,

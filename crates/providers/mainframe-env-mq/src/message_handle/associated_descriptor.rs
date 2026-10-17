@@ -209,11 +209,11 @@ impl PropertyStage<'_> {
                     handle: live.expect("prepared create"),
                     owner,
                     connection,
-                    contents: PropertyContents::Reviewed(value),
+                    contents: PropertyContents::Reviewed(Box::new(value)),
                 });
             }
             Change::Replace(i, value) => {
-                self.entries[i].contents = PropertyContents::Reviewed(value)
+                self.entries[i].contents = PropertyContents::Reviewed(Box::new(value))
             }
             Change::Delete(i) => {
                 self.entries.remove(i);
@@ -273,7 +273,7 @@ impl MqHandleKernel {
                         value,
                         ..
                     } => {
-                        let mut next = current.clone();
+                        let mut next = (**current).clone();
                         next.set(name.clone(), descriptor.clone(), value.clone(), self.limits)?;
                         self.check_associated_total(Some(i), &next)?;
                         let pd = if name.descriptor_field().is_some() {
@@ -287,7 +287,7 @@ impl MqHandleKernel {
                         )
                     }
                     MqPropertyRequest::Delete { name, .. } => {
-                        let mut next = current.clone();
+                        let mut next = (**current).clone();
                         let deleted = next.delete(name)?;
                         if !deleted {
                             completion = "MQCC_WARNING";

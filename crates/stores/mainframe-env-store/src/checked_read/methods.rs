@@ -1,4 +1,4 @@
-//! Minimal trait routing to backend-owned physical methods. PostgreSQL refuses.
+//! Minimal trait routing to backend-owned physical methods.
 macro_rules! checked_read_methods {
     () => {
         fn publish_provider_read_audited(

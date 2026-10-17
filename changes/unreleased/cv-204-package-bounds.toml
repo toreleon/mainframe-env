@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Preflight package and retained-state resource bounds before validation and owned recovery decoding, and cap borrowed snapshot serialization while preserving package identities and retained selections."

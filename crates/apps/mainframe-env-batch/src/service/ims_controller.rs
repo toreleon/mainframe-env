@@ -12,9 +12,8 @@ impl BatchService {
     ) -> Result<crate::ProgramOutput, HostProblem> {
         invocation.check()?;
         let selector = ims_controller_selector(input.parameter.as_deref().unwrap_or_default())?;
-        let controller = self
-            .resolve_controller(&selector)?
-            .ok_or(HostProblem::Unsupported)?;
+        let (_publication, controller) = self.admit_controller(&selector)?;
+        let controller = controller.ok_or(HostProblem::Unsupported)?;
         if crate::program::control_source_has_data(input, "SYSIN")
             && !matches!(&controller.plan, BatchControllerPlan::ImsPurge { control_dd, .. } if control_dd == "SYSIN")
         {
@@ -40,18 +39,21 @@ impl BatchService {
             } => {
                 let roots = input_dd_records(input, &root_dd)?;
                 let children = input_dd_records(input, &child_dd)?;
-                let mut hierarchy = roots
-                    .into_iter()
-                    .map(|data| {
-                        if data.len() != root_record_bytes || data.len() < parent_key_bytes {
+                let mut hierarchy = BTreeMap::new();
+                for data in roots {
+                    if data.len() != root_record_bytes || data.len() < parent_key_bytes {
+                        return Err(HostProblem::Malformed);
+                    }
+                    let key = data[..parent_key_bytes].to_vec();
+                    match hierarchy.entry(key) {
+                        std::collections::btree_map::Entry::Vacant(entry) => {
+                            entry.insert((data, Vec::<Vec<u8>>::new()));
+                        }
+                        std::collections::btree_map::Entry::Occupied(_) => {
                             return Err(HostProblem::Malformed);
                         }
-                        Ok((
-                            data[..parent_key_bytes].to_vec(),
-                            (data, Vec::<Vec<u8>>::new()),
-                        ))
-                    })
-                    .collect::<Result<BTreeMap<_, _>, _>>()?;
+                    }
+                }
                 for record in children {
                     if record.len() != child_record_bytes || record.len() < parent_key_bytes {
                         return Err(HostProblem::Malformed);

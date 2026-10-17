@@ -10,19 +10,19 @@ Use this prompt from the repository root. The
 Apply its [hardened slice acceptance](../README.md#hardened-slice-acceptance),
 [early participant contract](../README.md#early-transaction-participant-contract),
 and [licensed-harness preparation](../README.md#licensed-harness-preparation)
-requirements alongside the version-specific boundaries below.
+requirements alongside the phase-specific boundaries below.
 
 ---
 
 You are implementing **mainframe-env certification.licensed: licensed IBM differential
-certification and 1.0 rehearsal**. This minor closes evidence and defects on one
-unchanged candidate; it does not publish 1.0.
+certification and public-distribution rehearsal**. This phase closes evidence and
+defects on one unchanged candidate; it does not publish the framework.
 
 ## Read and verify first
 
 Read `docs/prompts/subsystems/README.md`,
 `docs/delivery/subsystems/certification/licensed-plan.md`, every pinned official baseline and
-coverage ledger, release/security/durability/provenance contracts, and accepted
+coverage ledger, distribution/security/durability/provenance contracts, and accepted
 zosmf.rest plus integration.transactions evidence. Verify the full route/profile/provider closure and
 all migration heads before creating the certification candidate.
 

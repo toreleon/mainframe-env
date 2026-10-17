@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Select exact current CICS replay generations from pinned first-party IMS paging READ requests and canonical audits while retaining terminal and execution/run ownership checks."

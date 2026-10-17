@@ -4,6 +4,7 @@ use super::{HostLimits, HostProblem, Mutation};
 use mainframe_env_execution_api::BoundedPayload;
 use std::collections::BTreeMap;
 
+mod completed_plain_read;
 mod parse;
 
 /// Typed CICS operations admitted at the host request boundary.

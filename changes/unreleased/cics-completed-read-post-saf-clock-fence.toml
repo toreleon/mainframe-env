@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Reobserve the current CICS replay clock after SAF before consuming a completed plain READ, retaining deadline, cancellation, session and atomic row fences."

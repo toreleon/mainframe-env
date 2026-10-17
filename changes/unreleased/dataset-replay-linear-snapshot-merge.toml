@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Classify dataset replay snapshots with a borrowed key merge while preserving complete physical scans, exact payload comparisons, validation order and atomic index updates."

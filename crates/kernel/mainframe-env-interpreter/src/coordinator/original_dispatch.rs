@@ -1,7 +1,7 @@
 //! Sole original HostCall implementation, borrowed only by the actual drive.
 use super::*;
 
-pub(super) struct OriginalDispatch<'borrow, 'native, 'hooks, F> {
+pub(super) struct OriginalDispatch<'borrow, 'native, 'hooks, 'dispatch, F> {
     pub(super) coordinator: &'borrow ExecutionCoordinator,
     pub(super) invocation: &'borrow Invocation,
     pub(super) journal: &'borrow mut Option<JournalCursor<'native, 'hooks>>,
@@ -9,9 +9,10 @@ pub(super) struct OriginalDispatch<'borrow, 'native, 'hooks, F> {
     pub(super) observe: &'borrow mut F,
     pub(super) resumable: bool,
     pub(super) native_child: bool,
+    pub(super) dispatch_hook: &'borrow mut Option<&'dispatch mut dyn DurableEffectDispatchHook>,
 }
 
-impl<F> OriginalDispatch<'_, '_, '_, F>
+impl<F> OriginalDispatch<'_, '_, '_, '_, F>
 where
     F: FnMut() -> Result<ExecutionControl, ExecutionControlError>,
 {
@@ -24,6 +25,7 @@ where
             observe,
             resumable,
             native_child,
+            dispatch_hook,
         } = self;
         let mut control = *control_slot;
         if native_child
@@ -69,7 +71,7 @@ where
             }
         };
         let audit_resource = canonical_audit_resource_digest(&effect.request);
-        let mutating = effect.request.is_mutating();
+        let journaled = effect.idempotency_key.is_some();
         let capability = effect
             .request
             .required_capability(InvocationLimits::default());
@@ -105,16 +107,21 @@ where
                         "durable effect requires reconciliation before resume",
                     )));
                 }
-                control = match observe_checked(
+                control = observe_checked(
                     observe,
                     control,
                     invocation,
                     invocation.deadline_tick.min(effect.deadline_tick),
                     journal,
-                ) {
-                    Ok(control) => control,
-                    Err(outcome) => return Err(outcome),
-                };
+                )?;
+                // These records attest an original call, not a live cursor or its gap.
+                // Repeating even a Completed call can allocate, advance or remove state.
+                if effect.request.is_volatile_dataset_cursor_operation() {
+                    return Err(failed_outcome(problem(
+                        FailureCategory::UnknownOutcome,
+                        "completed dataset cursor dispatch cannot restore volatile cursor state",
+                    )));
+                }
                 let effect_sequence = effect.sequence;
                 if coordinator.checked_inquiry_replay && super::checked_replay::eligible(&effect) {
                     let cursor = journal
@@ -133,12 +140,32 @@ where
                     }
                     return result;
                 }
-                let audited = host.invoke(
-                    invocation,
-                    control.now_tick,
-                    control.cancellation_requested,
-                    effect,
-                );
+                let audited = if let Some(hook) = dispatch_hook.as_deref_mut()
+                    && matches!(&effect.request, mainframe_env_host_api::HostRequest::Cics(request)
+                        if request.is_completed_plain_read_replay())
+                {
+                    super::completed_plain_read::invoke(
+                        hook,
+                        host,
+                        invocation,
+                        &journal
+                            .as_ref()
+                            .ok_or_else(|| {
+                                infrastructure_failure("completed READ requires journal")
+                            })?
+                            .store,
+                        &existing,
+                        control,
+                        effect,
+                    )?
+                } else {
+                    host.invoke(
+                        invocation,
+                        control.now_tick,
+                        control.cancellation_requested,
+                        effect,
+                    )
+                };
                 let (result, audit) = audited.into_transaction_parts();
                 let replay_digest = match canonical_result_digest(&result.outcome) {
                     Ok(digest) => digest,
@@ -215,23 +242,62 @@ where
         {
             return Err(infrastructure_failure("effect intent persistence failed"));
         }
-        control = match observe_checked(
+        control = observe_checked(
             observe,
             control,
             invocation,
             invocation.deadline_tick.min(effect.deadline_tick),
             journal,
-        ) {
-            Ok(control) => control,
-            Err(outcome) => return Err(outcome),
-        };
+        )?;
         let dispatch_deadline = invocation.deadline_tick.min(effect.deadline_tick);
-        let audited = host.invoke(
-            invocation,
-            control.now_tick,
-            control.cancellation_requested,
-            effect,
-        );
+        let protected = journal.as_mut().and_then(|cursor| cursor.storage.take());
+        let (audited, dispatch_uncertain) = if let Some(progress) = protected {
+            let cursor = journal
+                .as_mut()
+                .ok_or_else(|| infrastructure_failure("protected storage journal absent"))?;
+            let result = match intent.as_ref() {
+                Some(actual_intent) => {
+                    progress.dispatch(&cursor.store, actual_intent, host, effect, control)
+                }
+                None => Err(failed_outcome(problem(
+                    FailureCategory::UnknownOutcome,
+                    "protected dispatch requires an original occurrence key",
+                ))),
+            };
+            cursor.storage = Some(progress);
+            result?
+        } else if intent.is_some()
+            && let Some(hook) = dispatch_hook.as_deref_mut()
+        {
+            let cursor = journal.as_ref().ok_or_else(|| {
+                infrastructure_failure("borrowed dispatch requires actual durable journal")
+            })?;
+            let actual_intent = intent.as_ref().ok_or_else(|| {
+                failed_outcome(problem(
+                    FailureCategory::UnknownOutcome,
+                    "borrowed dispatch requires an original occurrence key",
+                ))
+            })?;
+            super::durable_dispatch::invoke(
+                hook,
+                host,
+                invocation,
+                &cursor.store,
+                actual_intent,
+                control,
+                effect,
+            )?
+        } else {
+            (
+                host.invoke(
+                    invocation,
+                    control.now_tick,
+                    control.cancellation_requested,
+                    effect,
+                ),
+                false,
+            )
+        };
         // Dispatch has already happened. Sample the clock again before recording
         // completion so a slow synchronous provider receives its full retention
         // lifetime. A failed or regressed observation must not discard the result or
@@ -240,7 +306,13 @@ where
         let post_dispatch_control = observe()
             .ok()
             .filter(|observed| observed.now_tick >= control.now_tick);
-        let (result, audit) = audited.into_transaction_parts();
+        let (mut result, audit) = audited.into_transaction_parts();
+        if dispatch_uncertain {
+            // The actual host result/audit came from the original scoped call,
+            // but its borrowed owner failed after dispatch. Never expose a
+            // known completion or redispatch this occurrence automatically.
+            result.outcome = Err(HostProblem::UnknownOutcome);
+        }
         let result_digest = match canonical_result_digest(&result.outcome) {
             Ok(digest) => digest,
             // Dispatch already happened; leave the durable intent for reconciliation.
@@ -278,7 +350,7 @@ where
         )
         .is_err()
         {
-            if mutating || matches!(&result.outcome, Err(HostProblem::UnknownOutcome)) {
+            if journaled || matches!(&result.outcome, Err(HostProblem::UnknownOutcome)) {
                 return Err(failed_outcome(problem(
                     FailureCategory::UnknownOutcome,
                     "host dispatch completed but result persistence failed; reconcile the intent",
@@ -317,15 +389,13 @@ where
         };
         let previous_control = control;
         control = observed;
-        if let Err(outcome) = check_control(
+        check_control(
             control,
             Some(previous_control),
             invocation,
             dispatch_deadline,
             journal,
-        ) {
-            return Err(outcome);
-        }
+        )?;
         *control_slot = control;
         Ok(result)
     }

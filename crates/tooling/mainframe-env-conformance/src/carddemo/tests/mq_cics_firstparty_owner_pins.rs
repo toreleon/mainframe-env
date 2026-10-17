@@ -1,0 +1,68 @@
+//! Exact public source and the repository-owned compatibility member.
+const _: () = ();
+pub(super) const PROGRAM_SHA: &str =
+    "92776ed2801da1148839a9ed98b6537de4b41e0c7f050c8dcaae0d4e4ea543b5";
+pub(super) const MQTM_SOURCE_SHA: &str =
+    "35d900d2e5e414ffe095af9656ffdf95b8af06e39b07207b6eeb6ea3c20d93d9";
+pub(super) const SOURCES: &[(&str, &str, usize)] = &[
+    (
+        "app/app-vsam-mq/cbl/CODATE01.cbl",
+        "97fcba3faa272c98778eb7ef50ef87faec7290168e24a9b1714996453d660ddb",
+        42444,
+    ),
+    (
+        "app/app-vsam-mq/cbl/COACCT01.cbl",
+        "92776ed2801da1148839a9ed98b6537de4b41e0c7f050c8dcaae0d4e4ea543b5",
+        50220,
+    ),
+    (
+        "app/app-vsam-mq/csd/CRDDEMOM.csd",
+        "791321f5d1da93bd8453b889e098a2b55ec681b96c81d542a8413c60a63fbd54",
+        2380,
+    ),
+    (
+        "app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl",
+        "224856ce6ef1b7417aefcec033a36a9315c0005decf9f11d21d11e9240e3f8fa",
+        81437,
+    ),
+    (
+        "app/app-authorization-ims-db2-mq/csd/CRDDEMO2.csd",
+        "cbad07ddd49ec3855e3f6ce631c09ef6d6b679a2ac2b594d8e8751211456d249",
+        4840,
+    ),
+    (
+        "app/app-authorization-ims-db2-mq/cpy/CCPAURQY.cpy",
+        "f51a28f11413bde18ca6401a9a627ca722844fbd6c4d4e190b5ca4977e006fec",
+        2448,
+    ),
+    (
+        "app/app-authorization-ims-db2-mq/cpy/CCPAURLY.cpy",
+        "8d661ea459eff6c274f14a4dd93158222ab9700590421eebf30fe9e4edf56bfa",
+        1492,
+    ),
+    (
+        "app/app-authorization-ims-db2-mq/cpy/CIPAUSMY.cpy",
+        "bb6eea3270e29ba465147652faea25923588ff3be57a4fc800fbc4b7a26fff29",
+        2050,
+    ),
+    (
+        "app/app-authorization-ims-db2-mq/cpy/CIPAUDTY.cpy",
+        "5d67c37c828dc2278339cdd1902a14305799a773d999a329e30c0801e9c80077",
+        3887,
+    ),
+    (
+        "app/cpy/CVACT01Y.cpy",
+        "81a08bad15af5664326a6f0af3650f570821c4857ffdec3a6a39f91f07dca728",
+        1125,
+    ),
+    (
+        "app/cpy/CVACT03Y.cpy",
+        "ffc6079e09b28739e154bf6c1e1c36d408209faa91f6cf7008078dc596a1c370",
+        736,
+    ),
+    (
+        "app/cpy/CVCUS01Y.cpy",
+        "944fd9a8eb10a683d0db97b9a87f2151982f649970287eb74358826056af25f8",
+        1588,
+    ),
+];

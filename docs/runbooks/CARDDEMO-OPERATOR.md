@@ -99,6 +99,17 @@ The commands are certification-safe substitutions for the pinned helper
 scripts; they do not invoke the scripts, native runtime archives, Micro Focus,
 UniKix, or a legacy compiler.
 
+The full gate reuses the operator implementations in process. Its J19
+installation and compilation observation requires the same pinned corpus and
+source closure, the online package/resource/seed witnesses, and exact persisted
+batch program rows and artifact bytes before and after restart. It publishes
+the workflow observations only after the mapped authenticated dataset download,
+JES submission identities and full spool comparisons, principal refusal controls,
+server drain and owned artifact cleanup succeed. Public receipt counts and the
+declared command list cannot construct these private witnesses. The command list
+records the equivalent CLI entry points; it does not claim that the full gate
+launched separate CLI processes.
+
 ## FTP/JES substitutions
 
 The repository scripts use `tnftp`, `SITE FILETYPE=JES`, and `PUT *.jcl` only
@@ -156,7 +167,9 @@ export MAINFRAME_ENV_POSTGRES_TEST_URL=postgresql://postgres@127.0.0.1:55432/mai
 target/release/xtask carddemo-full --check
 ```
 
-Use the connection URL for your local test database. The full gate runs 20
-application journeys, memory isolation/overload, SQLite backup and restore, and
-PostgreSQL restart controls. Keep run output outside Git. These local workload
+Use the connection URL for your local test database. The full gate requires
+actual closure of all 20 journeys, 26 transaction requirements and 105 issue
+acceptance requirements before its memory isolation/overload, SQLite backup
+and restore, and PostgreSQL restart controls can establish full acceptance.
+The current candidate still refuses incomplete application observations. Keep run output outside Git. These local workload
 checks do not establish licensed IBM equivalence.

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Move two private MQ Binding-mode construction wrappers beside their existing test fixtures while preserving lifecycle algorithms and all existing controls."

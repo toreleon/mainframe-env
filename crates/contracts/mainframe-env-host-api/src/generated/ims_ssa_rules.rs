@@ -2,7 +2,7 @@
 // Reviewed grammar metadata is not behavioral coverage.
 
 pub const IMS_SSA_RULES_SHA256: &str =
-    "sha256:4c9de7828214df7662a23fc69f89ce608fcc4dd0e2cc5426e0ad42ea98824f29";
+    "sha256:5b6311b197d9804b6b1b8f36946cbd592d33fc655d4a8761a3f32f092c207a7c";
 pub const IMS_SSA_TOPIC_MANIFEST_SHA256: &str =
     "sha256:119dd5e589399cb023f70c7a28fa9a1a937be1fa2c2393679ab65402ac735182";
 pub const IMS_SSA_SEGMENT_NAME_BYTES: usize = 8;

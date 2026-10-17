@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Join official catalog locators to validated baseline topic manifests and supporting receipts in coverage and shared spec compilation, rejecting unlisted or foreign topics and undeclared normalization without changing source pins or pending gates."

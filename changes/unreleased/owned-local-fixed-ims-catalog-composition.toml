@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Prepare fixed IMS catalog metadata and genuine retained selection in owned local application composition."

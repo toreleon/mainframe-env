@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Keep Foundation active and reconcile retained release03 build/test failures, actual CLI outcomes and sealed Python controls; preserve original acceptance floors, producer identities and unavailable-source boundaries."

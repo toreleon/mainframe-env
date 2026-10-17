@@ -98,7 +98,7 @@ Conformance IR defines behavior and binds claimed gates to executable tests.
   registered row/obligation bindings but are not the primary IBM conformance
   model.
 - Provide fast `spec --check`, focused subsystem/gate conformance, and
-  release-only certification entry points. Keep the agent inner loop on the
+  public-distribution certification entry points. Keep the agent inner loop on the
   first two tiers.
 - Design cases with equivalence classes, mandatory boundaries, properties,
   pairwise combinations, and bounded fuzzing instead of a Cartesian-product
@@ -134,7 +134,7 @@ For cics.application-api–certification.licensed, bind each slice to the curren
 [object-row persistence](../../contracts/PROVIDER-ROW-PERSISTENCE-V1.md), and
 [durable storage](../../contracts/DURABLE-STORAGE-PROFILE.md) contracts.
 Preserve the accepted HIR/MIR, coordinator, host ABI and package topology; these
-releases extend their owners rather than introduce another universal IR,
+phases extend their owners rather than introduce another universal IR,
 provider-private coordinator, store, security evaluator, or evidence framework.
 
 Before implementation, declare the slice's exact catalog rows and mandatory
@@ -342,8 +342,8 @@ Use these validation tiers:
    and `git diff --check`. Add restart/rollback/security checks only when the
    change crosses those boundaries. A tooling-only PR runs tooling/schema tests
    and does not rerun application environments.
-3. **Minor integration/exit:** after all work packages are integrated, run the
-   workspace and the target minor's complete affected-subsystem conformance once
+3. **Phase integration/exit:** after all work packages are integrated, run the
+   workspace and the target phase's complete affected-subsystem conformance once
    on one unchanged candidate. Regress prior profiles that consume the changed
    contracts or routes; do not rerun unrelated subsystem matrices.
 4. **Nightly/release certification:** run global CardDemo 20/20, PostgreSQL,
@@ -353,7 +353,7 @@ Use these validation tiers:
    when the changed scope actually affects the corresponding environment.
 
 Unless a target is integration.transactions/certification.licensed or its dossier explicitly marks an environment as
-affected, references to “full validation” in an individual minor prompt mean
+affected, references to “full validation” in an individual phase prompt mean
 tier-3 complete affected-scope validation, not tier-4 global certification.
 These tiers guide local validation; they do not waive unconditional policy
 checks or affected-environment gates selected by the repository CI plan.
@@ -388,6 +388,6 @@ Large scope, failing tests, or incomplete implementation are not blockers.
 At handoff, report completed and remaining work packages, exact validation
 commands/results, evidence paths, coverage numerators/denominators by gate,
 source identity, migrations/rollback status, known limitations, and the next
-smallest action. Never report the minor complete unless every exit condition in
+smallest action. Never report the phase complete unless every exit condition in
 its dossier and prompt is satisfied. When complete, push the assigned branch and
 open the pull request; include its URL in the final response.

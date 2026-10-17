@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Validate legacy coverage row, embedded evidence and ledger summary shapes with their frozen schemas and typed catalog, evidence-history and derived-count owners."

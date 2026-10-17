@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Compare the qualified manual-seed CardDemo financial route against independent pinned-source complete record and DISPLAY hashes, bounded paged statement capture and exact end conditions; bind private observations after restart/drain/cleanup while preserving public receipts and original bounds."

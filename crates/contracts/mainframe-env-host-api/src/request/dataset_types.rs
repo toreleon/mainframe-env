@@ -573,6 +573,16 @@ pub enum DatasetRequest {
         /// Comparison used to select the new position.
         relation: KeyRelation,
     },
+    /// Observe the retained full-key anchor at a browse gap without advancing it.
+    /// The provider binds the owning cursor, snapshot logical key and base identity atomically.
+    ReadBrowsePosition {
+        /// Dataset owning the cursor; this identity grants no access.
+        dataset: DatasetName,
+        /// Existing provider cursor, never reconstructed from an offset.
+        cursor: String,
+        /// Exact nonempty full logical key expected at the retained position.
+        expected_key: Vec<u8>,
+    },
     /// Advance an existing browse and retain read-lock controls.
     ReadNext {
         /// Validated dataset name whose provider state is addressed; the name grants no access.

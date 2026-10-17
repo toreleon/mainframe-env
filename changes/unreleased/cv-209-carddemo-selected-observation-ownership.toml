@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Bind selected CardDemo BMS values, complete card base/index state, user refusals, stored concurrent sessions, JES owner spool and compiled Db2 maintenance to independently pinned expectations and actual owning checks; preserve original guards and mandatory closure requirements, withhold application observations from handwritten MQ/IMS provider controls, and require successful selected owner shutdown and cleanup before returning evidence."

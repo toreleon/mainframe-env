@@ -184,6 +184,14 @@ impl SqliteStateStore {
                         .map_err(|_| StoreError::IncompatibleVersion)?;
                     let document =
                         Document::read(&self.root_row(tx, ROOT_DRIVER_NAMESPACE, root).await?)?;
+                    if document.phase == Phase::Uncertain
+                        && self
+                            .root_optional_row(tx, ROOT_CUSTODY_NAMESPACE, root)
+                            .await?
+                            .is_some()
+                    {
+                        return Err(StoreError::InvalidTransition);
+                    }
                     if document.phase == Phase::Closing
                         || (document.phase == Phase::Uncertain && retained.is_none())
                         || (matches!(document.phase, Phase::Terminal | Phase::Uncertain)

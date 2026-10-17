@@ -81,7 +81,10 @@ impl ExecutionCoordinator {
             false,
             None,
             None,
-            Some(&enrollment),
+            DriveDispatch {
+                child: Some(&enrollment),
+                ..DriveDispatch::default()
+            },
         )
     }
 }

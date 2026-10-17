@@ -85,17 +85,21 @@ pub(in crate::service) fn invoke(
         })
         .transpose()?;
     let record = authority::OperatorMessage::new(
-        run.invocation.execution_id.as_str(),
-        run.invocation.run_unit_id.as_str(),
-        run.invocation.principal.id().as_str(),
+        authority::MessageOwner {
+            execution: run.invocation.execution_id.as_str(),
+            run_unit: run.invocation.run_unit_id.as_str(),
+            principal: run.invocation.principal.id().as_str(),
+        },
         text,
         console,
         routes,
         action,
         maximum_reply,
         deadline_tick,
-        mutation.idempotency_key.as_str(),
-        digest,
+        authority::MessageEffect {
+            key: mutation.idempotency_key.as_str(),
+            request_digest: digest,
+        },
     )?;
     if !with_reply {
         authority::put(service.store.as_ref(), &record)?;

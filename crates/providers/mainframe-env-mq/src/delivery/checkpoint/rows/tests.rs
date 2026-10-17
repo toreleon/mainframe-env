@@ -4,6 +4,30 @@ use mainframe_env_store::{MemoryStore, SqliteStateStore};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+/// A single prefix scan is a backend snapshot across all row families.
+/// `expected` must come from the service's current catalog/lease authority.
+pub(crate) fn load_fixture(
+    store: &dyn ProviderStateStore,
+    catalog: &MqObjectCatalog,
+    expected: DeliveryRowIdentity,
+    limits: DeliveryRowLimits,
+    kernel_limits: MqDeliveryLimits,
+    message_limits: MqMessageLimits,
+    default_persistence: MqPersistence,
+) -> Result<(DeliveryRows, MqDeliveryKernel), DeliveryRowError> {
+    limits.validate()?;
+    let records = store.list_provider_state_prefix(PREFIX, limits.rows + 1)?;
+    DeliveryRows::restore(
+        records,
+        catalog,
+        expected,
+        limits,
+        kernel_limits,
+        message_limits,
+        default_persistence,
+    )
+}
+
 static NEXT_DB: AtomicU64 = AtomicU64::new(1);
 
 struct Backend {
@@ -163,7 +187,7 @@ fn identity(c: &MqObjectCatalog) -> DeliveryRowIdentity {
 }
 
 fn load(b: &Backend, c: &MqObjectCatalog) -> (DeliveryRows, MqDeliveryKernel) {
-    DeliveryRows::load(
+    load_fixture(
         b.store(),
         c,
         identity(c),
@@ -456,7 +480,7 @@ fn memory_and_sqlite_fence_and_exact_catalog_generation_fail_closed() {
             DeliveryRowIdentity::new(&c, 7, 12).unwrap(),
         ] {
             assert!(matches!(
-                DeliveryRows::load(
+                load_fixture(
                     b.store(),
                     &c,
                     expected,
@@ -481,7 +505,7 @@ fn memory_and_sqlite_fence_and_exact_catalog_generation_fail_closed() {
         )
         .unwrap();
         assert!(matches!(
-            DeliveryRows::load(
+            load_fixture(
                 b.store(),
                 &altered,
                 identity(&altered),
@@ -513,7 +537,7 @@ fn memory_and_sqlite_fence_and_exact_catalog_generation_fail_closed() {
         );
         b.reopen();
         assert!(matches!(
-            DeliveryRows::load(
+            load_fixture(
                 b.store(),
                 &c,
                 identity(&c),
@@ -525,7 +549,7 @@ fn memory_and_sqlite_fence_and_exact_catalog_generation_fail_closed() {
             Err(DeliveryRowError::Identity)
         ));
         assert_eq!(
-            DeliveryRows::load(
+            load_fixture(
                 b.store(),
                 &c,
                 new_fence,
@@ -840,7 +864,7 @@ fn memory_and_sqlite_missing_or_corrupt_rows_never_open_as_empty() {
         };
         b.store().put_provider_state(legacy.clone(), None).unwrap();
         assert!(matches!(
-            DeliveryRows::load(
+            load_fixture(
                 b.store(),
                 &c,
                 identity(&c),
@@ -865,7 +889,7 @@ fn memory_and_sqlite_missing_or_corrupt_rows_never_open_as_empty() {
         b.store().put_provider_state(bad, Some(1)).unwrap();
         let before = records(&b);
         assert!(
-            DeliveryRows::load(
+            load_fixture(
                 b.store(),
                 &c,
                 identity(&c),
@@ -896,7 +920,7 @@ fn memory_and_sqlite_missing_or_corrupt_rows_never_open_as_empty() {
             .delete_provider_state(META, META_KEY, meta.version)
             .unwrap();
         assert!(matches!(
-            DeliveryRows::load(
+            load_fixture(
                 b.store(),
                 &c,
                 identity(&c),
@@ -1014,7 +1038,7 @@ fn projection_delta_and_reconstructed_kernel_limits_fail_before_publication() {
         ),
     ] {
         assert!(
-            DeliveryRows::load(
+            load_fixture(
                 b.store(),
                 &c,
                 identity(&c),

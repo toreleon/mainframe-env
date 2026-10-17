@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Enforce bounded canonical COSE_Mac0 package authentication with existing HMAC trust, explicit retained raw verification, exact legacy-profile retry equality, and linked production trust metadata checks."

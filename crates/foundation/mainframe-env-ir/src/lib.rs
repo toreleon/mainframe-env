@@ -8,6 +8,7 @@ mod cics_descriptor;
 mod cics_plan;
 mod cobol_config;
 mod cobol_floating_insertion;
+mod cobol_initialization;
 mod cobol_layout;
 mod cobol_reserved_words;
 mod codec;
@@ -65,6 +66,11 @@ pub use cobol_config::{
     CobolRuntimeConfig, CobolRuntimeConfigProblem, cobol_entry_formals, cobol_runtime_config,
 };
 pub use cobol_floating_insertion::cobol_floating_insertion_prefix;
+pub use cobol_initialization::{
+    cobol_chunked_initialization_attributes, cobol_chunked_initialization_identity,
+    cobol_chunked_initialization_schema, cobol_initialization_bytes,
+    validate_cobol_chunked_initialization,
+};
 pub use cobol_layout::{
     COBOL_MAX_INDEX_NAMES, COBOL_MAX_TABLE_KEY_BYTES, COBOL_MAX_TABLE_KEYS,
     COBOL_MAX_UNBOUNDED_OCCURRENCES, COBOL_MAX_UNBOUNDED_STORAGE_BYTES,

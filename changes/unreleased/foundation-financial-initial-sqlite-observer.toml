@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add a source-bound SQLite initialization observer with complete financial record and key metadata, checked reopen and owned cleanup."

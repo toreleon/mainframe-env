@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Made CardDemo full-receipt counts require exact observed journey and issue closure against unchanged owning inputs; missing workload observations now refuse full success."

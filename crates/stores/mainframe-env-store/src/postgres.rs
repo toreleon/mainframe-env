@@ -11,6 +11,9 @@ use sqlx::{Postgres, Row, Transaction};
 use std::future::Future;
 use tokio::runtime::Builder;
 
+mod audited_publication;
+mod bounded_provider_read;
+mod checked_read;
 mod container_retention;
 mod provider_retention;
 use provider_retention::validate_postgres_provider_dependency;
@@ -143,10 +146,6 @@ impl PostgresStateStore {
         block_on(&self.runtime, future)?.map_err(infrastructure)
     }
 
-    pub(crate) const fn max_rows(&self) -> usize {
-        self.max_rows
-    }
-
     pub(crate) fn retention_writable_probe(&self) -> Result<(), StoreError> {
         block_on(&self.runtime, async {
             let mut transaction = self.pool.begin().await.map_err(infrastructure)?;
@@ -163,10 +162,6 @@ impl PostgresStateStore {
                 .fetch_one(&self.pool),
         )?;
         usize::try_from(used).map_err(|_| StoreError::IncompatibleVersion)
-    }
-
-    pub(crate) const fn max_payload_bytes(&self) -> usize {
-        self.max_payload_bytes
     }
 
     pub(crate) const fn max_archive_rows(&self) -> usize {
@@ -884,6 +879,7 @@ async fn prove_provider_state_writable(
 }
 
 impl ProviderStateStore for PostgresStateStore {
+    crate::checked_read::checked_read_methods!();
     fn advance_logical_clock(&self, observed_floor: u64) -> Result<u64, StoreError> {
         let observed_floor =
             i64::try_from(observed_floor.max(1)).map_err(|_| StoreError::CapacityExceeded)?;
@@ -927,28 +923,16 @@ impl ProviderStateStore for PostgresStateStore {
         namespace: &str,
         max: usize,
     ) -> Result<Vec<ProviderStateRecord>, StoreError> {
-        if max == 0 || max > mainframe_env_store_api::MAX_PROVIDER_STATE_SCAN {
-            return Err(StoreError::CapacityExceeded);
-        }
-        let rows = self.run(
-            sqlx::query(
-                "SELECT key,version,payload FROM provider_state WHERE namespace=$1 ORDER BY key LIMIT $2",
-            )
-            .bind(namespace)
-            .bind(i64::try_from(max).map_err(|_| StoreError::CapacityExceeded)?)
-            .fetch_all(&self.pool),
-        )?;
-        rows.into_iter()
-            .map(|row| {
-                Ok(ProviderStateRecord {
-                    namespace: namespace.into(),
-                    key: row.try_get(0).map_err(infrastructure)?,
-                    version: u64::try_from(row.try_get::<i64, _>(1).map_err(infrastructure)?)
-                        .map_err(|_| StoreError::IncompatibleVersion)?,
-                    payload: row.try_get(2).map_err(infrastructure)?,
-                })
-            })
-            .collect()
+        self.legacy_provider_page(namespace, max)
+    }
+
+    fn list_provider_state_bounded(
+        &self,
+        namespace: &str,
+        max: usize,
+        max_bytes: usize,
+    ) -> Result<Vec<ProviderStateRecord>, StoreError> {
+        self.bounded_provider_page(namespace, max, max_bytes)
     }
 
     fn list_provider_state_prefix(

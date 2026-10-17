@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Require the selected IMS fixture's reopened server to report successful shutdown before removing owned artifacts or returning its local controller/provider receipt."

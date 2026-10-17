@@ -15,6 +15,7 @@ mod recovery_tests;
 mod retention_maintenance;
 
 pub use cobol::{
+    CicsProtectedCompiledDispatch, CicsProtectedCompiledHost, CicsProtectedCompiledProgram,
     ConfiguredInstalledMqHost, DefaultProgramRouter, InstalledBatchAdmission,
     InstalledMqFrameSession, InstalledMqHostBounds, ProgramExecutionControl,
     ProgramMqHostAdmission, compatible_system_services, default_program_router,
@@ -26,9 +27,20 @@ pub use config::{
 pub use environment_secrets::EnvironmentSecretResolver;
 pub use product::{
     ApplicationPublicationReceipt, BatchInstallReceipt, BatchProgramDefinition,
-    HmacSha256PackageTrust, OnlineApplicationDefinition, OnlineInstallReceipt,
+    HmacSha256PackageTrust, LocalApplicationDefinition, LocalApplicationReceipt,
+    LocalSourceCompilation, OnlineApplicationDefinition, OnlineInstallReceipt,
     OnlineProgramDefinition, ProductCapacityStatus, ProductMetrics, ProductReadiness,
     ProductServer,
+};
+#[cfg(feature = "assurance-observers")]
+pub use product::{
+    ArmedDb2CopybackObservation, CompletedDb2Copyback, Db2ObservationProblem, Db2ObserverManager,
+    SourceBoundDb2CopybackProfile,
+};
+#[cfg(feature = "assurance-observers")]
+pub use product::{
+    ArmedReadCopybackObservation, CicsReadObservationProblem, CicsReadObserverManager,
+    CompletedReadCopyback, SourceBoundReadCopybackProfile,
 };
 pub use retention_maintenance::{RetentionMaintenance, RetentionMaintenancePass};
 

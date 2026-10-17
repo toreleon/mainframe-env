@@ -518,9 +518,26 @@ fn load_receipt(
     Ok(Some(receipt))
 }
 
-/// Reclaim only receipts past an operator-supplied safe watermark and absent
-/// from retained checkpoint/effect references. A full scan is an explicit
-/// saturation error rather than an unsafe partial deletion.
+/// Reclaim receipts at or below a trusted embedding's safe watermark, excluding
+/// its complete set of protected effect and checkpoint references.
+///
+/// This is an explicit raw-store maintenance operation. The caller must establish
+/// operator authority, enforce its archive-before-delete policy, and prove that
+/// the applicable retention lifetime has elapsed using a conservative age sampled
+/// at or after persistence in the store's durable logical-clock domain. A receipt's
+/// deadline or `retain_until_tick` alone is not proof of resolution or safe age.
+/// Protect unresolved effects, retained checkpoints, and all other replay/recovery
+/// references, and coordinate their inventory and deletion with concurrent replay
+/// and recovery. This function does not establish those authority, age, archive,
+/// dependency, or concurrency proofs and is not a retention scheduler.
+///
+/// The watermark must be nonzero and the protected set may contain at most 4,096
+/// keys. More than 4,096 stored receipts refuses the scan before any deletion.
+/// Unknown versions, malformed or noncanonical payloads, and key mismatches fail
+/// even for protected receipts. Each eligible row is deleted with its individual
+/// version check. A later corrupt row or store conflict can return an error after
+/// earlier deletions succeeded; the operation is not an atomic whole-scan prune
+/// and an error does not report the number already removed.
 pub fn prune_issue_device_receipts(
     store: &dyn ProviderStateStore,
     safe_watermark_tick: u64,
@@ -807,15 +824,15 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            prune_issue_device_receipts(&store, 119, &BTreeSet::new()),
+            crate::prune_issue_device_receipts(&store, 119, &BTreeSet::new()),
             Ok(0)
         );
         assert_eq!(
-            prune_issue_device_receipts(&store, 120, &BTreeSet::from(["effect-1".into()])),
+            crate::prune_issue_device_receipts(&store, 120, &BTreeSet::from(["effect-1".into()])),
             Ok(0)
         );
         assert_eq!(
-            prune_issue_device_receipts(&store, 120, &BTreeSet::new()),
+            crate::prune_issue_device_receipts(&store, 120, &BTreeSet::new()),
             Ok(1)
         );
         assert!(

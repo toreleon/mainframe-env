@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Retain the installed COPAUS0C readonly owner's probe and HTTP failure metadata, hashed Condition names, signed response codes and only public machine counters/opcodes across teardown without changing requests, assertions, oracles or limits."

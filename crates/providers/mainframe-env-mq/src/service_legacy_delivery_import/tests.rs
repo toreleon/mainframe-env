@@ -334,7 +334,7 @@ fn memory_sqlite_known_fixture_import_preserves_order_ids_topology_and_replay_on
             ));
             drop(s);
             b.reopen();
-            let (loaded, mut restored) = DeliveryRows::load(
+            let (loaded, mut restored) = crate::delivery::checkpoint::rows::load_fixture(
                 b.store(),
                 &c,
                 DeliveryRowIdentity::new(&c, 3, 5).unwrap(),
@@ -697,9 +697,8 @@ fn memory_sqlite_strict_source_fields_and_catalog_trigger_mismatch_fail_closed()
                 r.payload = serde_json::to_vec(&v).unwrap();
             });
             let before = all(&b);
-            match MqService::open(b.arc(), Default::default()) {
-                Ok(s) => assert_plan_error(&s, Default::default()),
-                Err(_) => {}
+            if let Ok(s) = MqService::open(b.arc(), Default::default()) {
+                assert_plan_error(&s, Default::default());
             }
             assert_eq!(all(&b), before);
         }

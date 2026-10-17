@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Prepare the original COPAUS1C and COPAUS2C source pair with its authorization DCL and independent complete fraud-row, child, COMMAREA and BMS comparison controls in a test-only diagnostic namespace. Keep the strict IMS hold boundary and every application observation unchanged."

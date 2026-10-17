@@ -50,10 +50,7 @@ impl ProductServer {
         application: &str,
         execute: impl FnOnce(&ImsService) -> Result<T, HostProblem>,
     ) -> Result<T, HostProblem> {
-        let _publication = self
-            .application_publication
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let _publication = self.publication_write()?;
         let selected = self
             .applications_v2
             .lock()
@@ -78,19 +75,7 @@ impl ProductServer {
         {
             return Err(HostProblem::IdempotencyConflict);
         }
-        let publication = self
-            .store
-            .get_provider_state(
-                APPLICATION_PUBLICATION_NAMESPACE,
-                &selected.record().package.to_ascii_uppercase(),
-            )
-            .map_err(store_error)?
-            .ok_or(HostProblem::NotFound)?;
-        let state: ApplicationPublicationState = serde_json::from_slice(&publication.payload)
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        if !state.complete || state.identity != selected.record().identity {
-            return Err(HostProblem::NotFound);
-        }
+        self.require_complete_application_publication(&selected)?;
         self.ims.install_metadata(published.catalog)?;
         execute(&self.ims)
     }
@@ -101,10 +86,7 @@ impl ProductServer {
         invocation: &Invocation,
         message: TmInputMessage,
     ) -> Result<TmEnqueueReceipt, HostProblem> {
-        let _publication = self
-            .application_publication
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let _publication = self.publication_write()?;
         self.selected_ims_tm_application(application)?;
         self.ims_tm.enqueue(invocation, message)
     }
@@ -117,10 +99,7 @@ impl ProductServer {
         now_tick: u64,
         lease_ticks: u64,
     ) -> Result<Option<WorkRecord>, HostProblem> {
-        let _publication = self
-            .application_publication
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let _publication = self.publication_write()?;
         self.selected_ims_tm_application(application)?;
         self.ims_tm
             .claim(transaction, worker, now_tick, lease_ticks)
@@ -205,19 +184,7 @@ impl ProductServer {
         {
             return Err(HostProblem::NotFound);
         }
-        let publication = self
-            .store
-            .get_provider_state(
-                APPLICATION_PUBLICATION_NAMESPACE,
-                &selected.record().package.to_ascii_uppercase(),
-            )
-            .map_err(store_error)?
-            .ok_or(HostProblem::NotFound)?;
-        let state: ApplicationPublicationState = serde_json::from_slice(&publication.payload)
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        if !state.complete || state.identity != selected.record().identity {
-            return Err(HostProblem::NotFound);
-        }
+        self.require_complete_application_publication(&selected)?;
         Ok(())
     }
 

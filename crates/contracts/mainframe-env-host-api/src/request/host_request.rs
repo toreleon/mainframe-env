@@ -1,6 +1,9 @@
 //! Existing host request capability, mutation and validation authority.
 use super::*;
 
+#[cfg(test)]
+mod readonly_journal_tests;
+
 impl HostRequest {
     #[must_use]
     /// Return the built-in coarse capability identity for this request; this does not perform resource authorization.
@@ -28,6 +31,7 @@ impl HostRequest {
                 | DatasetRequest::ReadSequential { .. }
                 | DatasetRequest::Snapshot { .. }
                 | DatasetRequest::ResolveGeneration { .. }
+                | DatasetRequest::ReadBrowsePosition { .. }
                 | DatasetRequest::ReadNext { .. }
                 | DatasetRequest::StartBrowse { .. }
                 | DatasetRequest::ResetBrowse { .. }
@@ -56,6 +60,33 @@ impl HostRequest {
             Self::Mq(_) | Self::MqMqi(_) => "host.mq.write",
         };
         CapabilityId::new(name, limits).expect("built-in capability identities are valid")
+    }
+
+    #[must_use]
+    /// Select occurrences that retain original dispatch intent/result identity.
+    /// Read records do not change mutation classification or synthesize nested mutations.
+    pub fn requires_dispatch_record(&self) -> bool {
+        self.is_mutating()
+            || matches!(self, Self::Dataset(DatasetRequest::Read { .. }))
+            || matches!(self, Self::Cics(request) if request.operation.is_file_read())
+            || self.is_volatile_dataset_cursor_operation()
+    }
+
+    #[must_use]
+    /// Identify compiled dataset operations that allocate, advance or remove a volatile cursor.
+    /// A completed dispatch record cannot restore that cursor or authorize repeating the operation.
+    pub fn is_volatile_dataset_cursor_operation(&self) -> bool {
+        matches!(
+            self,
+            Self::Dataset(
+                DatasetRequest::StartBrowse { .. }
+                    | DatasetRequest::ReadNext { .. }
+                    | DatasetRequest::Close {
+                        cursor: Some(_),
+                        ..
+                    }
+            )
+        )
     }
 
     #[must_use]

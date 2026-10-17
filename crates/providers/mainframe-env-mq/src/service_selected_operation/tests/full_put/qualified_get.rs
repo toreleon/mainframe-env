@@ -308,7 +308,7 @@ fn qualified_encoder_error_panic_bad_width_reentry_and_last_cas_are_atomic() {
             let result = f.execute(&e);
             assert!(result.is_err(), "case{case}");
             assert_eq!(live(&f), before);
-            if case < 4 || case >= 6 {
+            if !(4..6).contains(&case) {
                 assert_eq!(f.rows(), baseline);
             } else {
                 let after = f.rows();
@@ -440,7 +440,7 @@ fn qualified_real_saf_audit_capacity_original_and_profile_refusals_leave_deliver
                 0 => f.saf.deny.store(true, Ordering::SeqCst),
                 1 => f.saf.error.store(1, Ordering::SeqCst),
                 2 => f.saf.error.store(2, Ordering::SeqCst),
-                4 | 5 | 6 => {
+                4..=6 => {
                     let MqMqiRequest::QualifiedFullGet(g) = &mut r else {
                         panic!()
                     };

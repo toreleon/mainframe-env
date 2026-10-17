@@ -4,6 +4,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 mod binding_closure;
+mod ledger_obligations;
 
 pub const CONFORMANCE_SPEC_DOCUMENT_CONTRACT: &str = "mainframe-env.conformance-spec@1";
 pub const CONFORMANCE_VERDICT_CONTRACT: &str = "mainframe-env.conformance-verdict@1";
@@ -1069,6 +1070,7 @@ impl DerivedConformanceLedger {
                 }
             }
         }
+        let obligations_by_row = ledger_obligations::ObligationsByRow::new(spec);
         let mut rows = BTreeMap::new();
         for catalog in spec.catalog_rows.values() {
             let mut gates = BTreeMap::new();
@@ -1085,14 +1087,7 @@ impl DerivedConformanceLedger {
                     );
                     continue;
                 }
-                let mandatory = spec
-                    .obligations
-                    .values()
-                    .filter(|obligation| {
-                        obligation.row_id == catalog.row_id
-                            && obligation.applicable_gates.contains(&gate)
-                    })
-                    .collect::<Vec<_>>();
+                let mandatory = obligations_by_row.for_gate(&catalog.row_id, gate);
                 let mut bindings = Vec::new();
                 for obligation in &mandatory {
                     let key = BindingKey {
@@ -3830,5 +3825,293 @@ mod conformance_tests {
             DerivedConformanceLedger::derive_complete(&spec, &context(), events),
             Err(SpecProblem::OracleReceiptRequired)
         );
+    }
+
+    #[test]
+    fn row_obligation_index_matches_original_value_scan_and_order() {
+        let mut spec = compile(&document()).unwrap();
+        spec.obligations.clear();
+        // Deliberately decouple private keys from values, interleave rows and repeat value IDs.
+        // The old ledger selects VALUE.row_id in map traversal order, not a tuple-key range.
+        let entries: [(&str, &str, &str, &str, &[CoverageGate]); 5] = [
+            (
+                "key:0001",
+                "a",
+                "official:mock:0002",
+                "same",
+                &[CoverageGate::Recognized],
+            ),
+            (
+                "key:0001",
+                "b",
+                "official:mock:0001",
+                "z-last",
+                &CoverageGate::ALL,
+            ),
+            (
+                "key:0001",
+                "c",
+                "official:mock:9999",
+                "orphan",
+                &[CoverageGate::Validated],
+            ),
+            (
+                "key:0002",
+                "a",
+                "official:mock:0001",
+                "a-first",
+                &[CoverageGate::Recognized],
+            ),
+            (
+                "key:0002",
+                "b",
+                "official:mock:0002",
+                "same",
+                &[CoverageGate::Validated],
+            ),
+        ];
+        for (key_row, key_obligation, row, obligation, gates) in entries {
+            spec.obligations.insert(
+                (
+                    OfficialRowId::new(key_row, limits()).unwrap(),
+                    ObligationId::new(key_obligation, limits()).unwrap(),
+                ),
+                MandatoryObligation {
+                    row_id: OfficialRowId::new(row, limits()).unwrap(),
+                    obligation_id: ObligationId::new(obligation, limits()).unwrap(),
+                    applicable_gates: gates.iter().copied().collect(),
+                    pending_reason: None,
+                },
+            );
+        }
+        let index = ledger_obligations::ObligationsByRow::new(&spec);
+        for row in [
+            "official:mock:0001",
+            "official:mock:0002",
+            "official:mock:0003",
+            "official:mock:9999",
+        ] {
+            let row_id = OfficialRowId::new(row, limits()).unwrap();
+            for gate in CoverageGate::ALL {
+                let original_scan = spec
+                    .obligations
+                    .values()
+                    .filter(|obligation| {
+                        obligation.row_id == row_id && obligation.applicable_gates.contains(&gate)
+                    })
+                    .collect::<Vec<_>>();
+                let indexed = index.for_gate(&row_id, gate);
+                assert_eq!(indexed.len(), original_scan.len(), "{row}/{gate:?}");
+                assert!(
+                    indexed
+                        .iter()
+                        .zip(original_scan)
+                        .all(|(left, right)| std::ptr::eq(*left, right))
+                );
+            }
+        }
+        let row_id = OfficialRowId::new("official:mock:0001", limits()).unwrap();
+        assert_eq!(
+            index
+                .for_gate(&row_id, CoverageGate::Recognized)
+                .iter()
+                .map(|obligation| obligation.obligation_id.as_str())
+                .collect::<Vec<_>>(),
+            ["z-last", "a-first"]
+        );
+    }
+
+    #[test]
+    fn indexed_ledger_keeps_sparse_denominators_states_and_canonical_order() {
+        let mut value = document();
+        value["rows"][0]["obligations"] = json!(["z-pass", "a-pass", "m-fail", "v-missing"]);
+        let template = value["cases"][0].clone();
+        let mut obligations = Vec::new();
+        let mut cases = Vec::new();
+        for (id, gate) in [
+            ("z-pass", "recognized"),
+            ("a-pass", "recognized"),
+            ("m-fail", "recognized"),
+            ("v-missing", "validated"),
+        ] {
+            obligations.push(json!({
+                "row_id": "official:mock:0001", "obligation_id": id, "applicable_gates": [gate]
+            }));
+            let mut case = template.clone();
+            case["obligation_id"] = json!(id);
+            case["gate"] = json!(gate);
+            case["test_id"] = json!(format!("mock.{id}"));
+            cases.push(case);
+        }
+        value["obligations"] = json!(obligations);
+        value["cases"] = json!(cases);
+        let mut catalog = catalog();
+        for (id, gates) in [
+            ("official:mock:0003", vec![CoverageGate::Recognized]),
+            ("official:mock:0002", CoverageGate::ALL.to_vec()),
+        ] {
+            catalog.push(
+                OfficialCatalogRow::new(
+                    id,
+                    "mock",
+                    "family",
+                    "official-page:sparse",
+                    gates,
+                    limits(),
+                )
+                .unwrap(),
+            );
+        }
+        let spec = CompiledSpec::compile_json(
+            CATALOG_DIGEST,
+            catalog,
+            &serde_json::to_vec(&value).unwrap(),
+            limits(),
+        )
+        .unwrap();
+        let report = ConformanceRunner::new(&spec, runtime(&spec, &ECHO), limits())
+            .run(&selection(), &context())
+            .unwrap();
+        let all_events = report
+            .batches
+            .into_iter()
+            .flat_map(|batch| batch.events)
+            .collect::<Vec<_>>();
+        let complete =
+            DerivedConformanceLedger::derive_complete(&spec, &context(), all_events.clone())
+                .unwrap();
+        assert_eq!(complete.rows.len(), 3);
+        let row = OfficialRowId::new("official:mock:0001", limits()).unwrap();
+        assert_eq!(
+            complete.rows[&row].gates[&CoverageGate::Recognized].state,
+            GateState::Passed
+        );
+        assert_eq!(
+            complete.rows[&row].gates[&CoverageGate::Validated].state,
+            GateState::Passed
+        );
+
+        let mut partial_events = all_events
+            .iter()
+            .filter(|event| event.key.gate == CoverageGate::Recognized)
+            .cloned()
+            .collect::<Vec<_>>();
+        partial_events
+            .iter_mut()
+            .find(|event| event.key.obligation_id.as_str() == "m-fail")
+            .unwrap()
+            .verdict = Verdict::Fail;
+        partial_events.reverse();
+        let partial =
+            DerivedConformanceLedger::derive_partial(&spec, &context(), partial_events.clone())
+                .unwrap();
+        let recognized = &partial.rows[&row].gates[&CoverageGate::Recognized];
+        assert_eq!(recognized.state, GateState::Failed);
+        assert_eq!(
+            (
+                recognized.mandatory_obligations,
+                recognized.passed_obligations
+            ),
+            (3, 2)
+        );
+        assert_eq!(
+            recognized
+                .bindings
+                .iter()
+                .map(|binding| binding.obligation_id.as_str())
+                .collect::<Vec<_>>(),
+            ["a-pass", "m-fail", "z-pass"]
+        );
+        let validated = &partial.rows[&row].gates[&CoverageGate::Validated];
+        assert_eq!(validated.state, GateState::Pending);
+        assert_eq!(
+            (
+                validated.mandatory_obligations,
+                validated.passed_obligations
+            ),
+            (1, 0)
+        );
+        let empty = OfficialRowId::new("official:mock:0002", limits()).unwrap();
+        for gate in CoverageGate::ALL {
+            let entry = &partial.rows[&empty].gates[&gate];
+            assert_eq!(entry.state, GateState::Pending);
+            assert_eq!(
+                (entry.mandatory_obligations, entry.passed_obligations),
+                (0, 0)
+            );
+            assert!(entry.bindings.is_empty());
+            let count = &partial.counts[&gate];
+            assert_eq!(
+                count.pass + count.fail + count.pending + count.non_applicable,
+                3
+            );
+        }
+        let sparse = OfficialRowId::new("official:mock:0003", limits()).unwrap();
+        assert_eq!(
+            partial.rows[&sparse].gates[&CoverageGate::Validated].state,
+            GateState::NotApplicable
+        );
+        assert_eq!(
+            partial.counts[&CoverageGate::Recognized],
+            LedgerCount {
+                pass: 0,
+                fail: 1,
+                pending: 2,
+                non_applicable: 0,
+            }
+        );
+        assert_eq!(
+            partial.counts[&CoverageGate::Validated],
+            LedgerCount {
+                pass: 0,
+                fail: 0,
+                pending: 2,
+                non_applicable: 1,
+            }
+        );
+        let encoded: Value = serde_json::from_slice(&partial.canonical_json().unwrap()).unwrap();
+        assert_eq!(
+            encoded["rows"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|row| row["row_id"].as_str().unwrap())
+                .collect::<Vec<_>>(),
+            [
+                "official:mock:0001",
+                "official:mock:0002",
+                "official:mock:0003"
+            ]
+        );
+        assert_eq!(
+            encoded["rows"][0]["gates"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|gate| gate["gate"].as_str().unwrap())
+                .collect::<Vec<_>>(),
+            CoverageGate::ALL.map(CoverageGate::slug)
+        );
+        let mut reordered = partial_events.clone();
+        reordered.reverse();
+        assert_eq!(
+            partial.canonical_json().unwrap(),
+            DerivedConformanceLedger::derive_partial(&spec, &context(), reordered)
+                .unwrap()
+                .canonical_json()
+                .unwrap()
+        );
+        assert!(matches!(
+            DerivedConformanceLedger::derive_complete(&spec, &context(), partial_events),
+            Err(SpecProblem::MissingVerdict(_))
+        ));
+        assert!(matches!(
+            DerivedConformanceLedger::derive_partial(
+                &spec,
+                &context(),
+                vec![all_events[0].clone(), all_events[0].clone()]
+            ),
+            Err(SpecProblem::DuplicateVerdict(_))
+        ));
     }
 }

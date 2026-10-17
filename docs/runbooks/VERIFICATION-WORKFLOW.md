@@ -37,7 +37,11 @@ repair or new evidence justifies retrying. Required gates must not be waived.
 ## CI ownership
 
 The root `Jenkinsfile` owns candidate-bound CI, full assurance gates.
-It refuses dirty or untracked source, records each selected command, and grants no
+The existing command recorder refuses tracked or untracked source changes before
+execution and at command completion. Keep logs outside Git or under an ignored
+build directory; an untracked output directory cannot be credited as a clean
+candidate. These are boundary checks, not continuous source attestation. It
+records each selected command and grants no
 licensed credit without the corresponding protected execution evidence. A later
 prose commit cannot hide an intervening failed code change.
 
@@ -45,8 +49,9 @@ prose commit cannot hide an intervening failed code change.
 
 `ci-checks/plan.json`, per-command JSON/logs, and `summary.json` are archived by
 Jenkins. The summary records actual selected-command time. Failed runs leave later
-gates unrun, and each attempt starts with fresh receipts. The current five-build/two-artifact retention stays
-bounded. Download/compiler caches are reusable computation; test receipts are
+gates unrun, and each attempt starts with fresh receipts. Jenkins retains five build records and one
+artifact set, matching `Jenkinsfile` and the local runbook, so retention stays bounded.
+Download/compiler caches are reusable computation; test receipts are
 evidence and cannot substitute for required candidate checks.
 
 Avoid routine cache deletion, toolchain changes, alternate build flags, or
@@ -55,6 +60,23 @@ pressure; cache and parallelism changes need elapsed-time and peak-storage
 measurements first.
 
 See the [IBM cache guide](IBM-DOCS-CACHE.md).
+
+## Optional finite command recording
+
+For commands needing a deadline, `record --timeout-seconds SECONDS` uses an
+owned Linux process group and closed stdin. `--max-output-bytes BYTES` adds a
+shared output ceiling and requires that deadline. Unsupported Linux wait/procfs
+prerequisites refuse before launch; ordinary no-option callers keep their
+existing streaming behavior. Keep exclusive child-wait ownership and prompt
+output callbacks for the entire invocation.
+
+The bounded owner retains the leader until all group operations finish, then
+waits once. Current partial bytes/exits remain diagnostic on failure; pre-launch
+refusal replaces stale log bytes. Timeout, overflow, cancellation, uncertain
+membership or failed cleanup cannot pass even after a successful summary. The
+conservative procfs census can refuse under process churn. Escaped sessions,
+blocking callbacks and kernel/process-creation delays prevent a universal
+containment or hard wall-clock guarantee; no production subreaper is installed.
 
 ## Effective Conformance IR inspection
 

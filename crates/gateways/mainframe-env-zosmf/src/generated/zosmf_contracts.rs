@@ -2,7 +2,7 @@
 
 pub const ZOSMF_NORMALIZATION_CONTRACT: &str = "mainframe-env.zosmf-normalization@1";
 #[rustfmt::skip]
-pub const ZOSMF_NORMALIZATION_SHA256: &str = "sha256:94a3a8250a5bedf183474b8a163dcd324d0ab115f0d2607a2166ebd14ee35770";
+pub const ZOSMF_NORMALIZATION_SHA256: &str = "sha256:2a76fda53cac8267bf55fe3d0c67e60562cefd802377783de36a3d1f41b28520";
 pub const ZOSMF_NORMALIZED_FAMILY_COUNT: usize = 27;
 pub const ZOSMF_NORMALIZED_HEADING_COUNT: usize = 189;
 pub const ZOSMF_NORMALIZED_OPERATION_COUNT: usize = 278;

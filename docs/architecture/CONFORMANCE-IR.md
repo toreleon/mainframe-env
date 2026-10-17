@@ -224,16 +224,31 @@ The cobol.structure foundation provides these stable entry points:
 
 ```text
 cargo xtask spec --check
-cargo xtask conformance --subsystem <name> [--gate <gate>]
+cargo xtask conformance --subsystem <name> [--gate <gate>] [--output PATH]
 cargo xtask certification --check
 ```
 
 - `spec --check` compiles catalogs, IR, registries, test bindings, and schemas
   without running product environments and should complete in seconds.
 - focused `conformance` runs only the selected subsystem/gates and emits verdict
-  events plus a derived ledger.
+  events followed by the report's existing derived ledger as canonical JSONL.
 - `certification --check` runs global integration, recovery, release, and licensed
   oracle gates according to the risk-tiered validation policy.
+
+Focused stdout contains one JSON record per line, including the terminal ledger;
+human diagnostics and check success go to stderr. `--output PATH` writes those
+same bytes to one file and leaves stdout empty. Relative paths use the invoking
+working directory, parents must already exist, and a literal `-` is a filename.
+An actual failing report is emitted before the command returns nonzero; a refusal
+without a report creates no synthetic evidence. Successful output transport does
+not complete pending product gates.
+
+JCL consumers must migrate from implicit `target/conformance/jcl-jes2/verdicts.json`
+and `ledger.json` files to stdout or an explicit output path, selecting records
+by their existing `schema_version`. File output replaces a regular destination
+only after bounded encoding and temporary-file synchronization. The transport
+has a 64 MiB staged JSONL limit and adds no concurrent-writer or directory
+durability guarantee; see [ADR-0054](../decisions/0054-focused-conformance-output.md).
 
 Cases are deterministically sharded by subsystem, operation family, gate, and
 obligation. Exact results may be cached by candidate SHA, catalog/spec digest,

@@ -123,11 +123,13 @@ mod tests {
                 .mutate_process(
                     "TYPE",
                     "ORDER",
-                    "UOW2",
-                    "EXEC2",
-                    "USER",
-                    "start",
-                    [1; 32],
+                    crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                        run_unit: "UOW2",
+                        owner_execution: "EXEC2",
+                        owner_principal: "USER",
+                        replay_key: "start",
+                        request_digest: [1; 32],
+                    },
                     |process| {
                         process.start(&root, None, true)?;
                         process.checkpoint(&root, 1, 1, "checkpoint")?;
@@ -161,11 +163,13 @@ mod tests {
                         transid: "BTS2".into(),
                         userid: "USER".into(),
                     },
-                    "UOW2",
-                    "EXEC2",
-                    "USER",
-                    "define",
-                    [2; 32],
+                    crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                        run_unit: "UOW2",
+                        owner_execution: "EXEC2",
+                        owner_principal: "USER",
+                        replay_key: "define",
+                        request_digest: [2; 32],
+                    },
                 )
                 .unwrap();
             authority
@@ -205,11 +209,13 @@ mod tests {
                 .remove_subtree(
                     "TYPE",
                     "ORDER",
-                    "UOW2",
-                    "EXEC2",
-                    "USER",
-                    "reset",
-                    [4; 32],
+                    crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                        run_unit: "UOW2",
+                        owner_execution: "EXEC2",
+                        owner_principal: "USER",
+                        replay_key: "reset",
+                        request_digest: [4; 32],
+                    },
                     &super::super::removal::BtsRemoval::Reset { activity_id: child },
                 )
                 .unwrap();

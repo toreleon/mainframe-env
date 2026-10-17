@@ -110,16 +110,15 @@ pub(super) fn write_output(
         "ACTION" | "MESSAGEID" | "RELATESURI" | "RELATESTYPE" | "EPRINTO"
     );
     let decimal = name == "EPRLENGTH";
-    if payload || decimal {
-        if value.schema()
+    if (payload || decimal)
+        && value.schema()
             != if payload {
                 "mainframe-env.cics.payload@1"
             } else {
                 "mainframe-env.cics.decimal@1"
             }
-        {
-            return Err(MachineProblem::UnexpectedHostResult);
-        }
+    {
+        return Err(MachineProblem::UnexpectedHostResult);
     }
     Ok(false)
 }

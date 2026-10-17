@@ -10,14 +10,17 @@ use mainframe_env_store_api::{
     RootClosureSnapshot, RootDriverAdmission, RootDriverClaim, RootProviderRowAdmission,
     RootTerminalCommit, RootTerminalPublication, TerminalRowDependency,
 };
+mod custody;
 mod guards;
 mod preparation;
 mod provider_writer;
+mod successor;
 pub(super) use guards::{
     guard_actor, guard_effect, guard_event, guard_outbox_delivery, guard_provider,
     guard_unenrolled, guard_work, record_audit,
 };
 pub(super) use provider_writer::{guard_writer_scopes, writer_document};
+pub(super) use successor::{guard_successor_identity, guard_successor_mutations};
 
 fn row<'a>(
     state: &'a State,
@@ -846,7 +849,10 @@ impl MemoryStore {
 pub(super) fn terminal_audit_count(state: &State) -> usize {
     state
         .provider_state
-        .keys()
-        .filter(|(namespace, _)| namespace == AUDIT_NAMESPACE)
+        .range((AUDIT_NAMESPACE.to_owned(), String::new())..)
+        .take_while(|((namespace, _), _)| namespace == AUDIT_NAMESPACE)
         .count()
 }
+
+#[cfg(test)]
+mod namespace_query_tests;

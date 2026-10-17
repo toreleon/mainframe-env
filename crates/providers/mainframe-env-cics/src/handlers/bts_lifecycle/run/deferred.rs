@@ -307,11 +307,13 @@ mod tests {
             .mutate_process(
                 "TYPE",
                 "ORDER",
-                "UOW2",
-                "EXEC2",
-                "USER",
-                "dormant",
-                [1; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "dormant",
+                    request_digest: [1; 32],
+                },
                 |process| {
                     process.start(&root, None, true)?;
                     process.finish(&root, 1, 1, BtsCompletion::Incomplete, None, None)?;
@@ -449,11 +451,13 @@ mod tests {
                 .mutate_process(
                     "TYPE",
                     "ORDER",
-                    "UOW2",
-                    "EXEC2",
-                    "USER",
-                    "suspend",
-                    [1; 32],
+                    crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                        run_unit: "UOW2",
+                        owner_execution: "EXEC2",
+                        owner_principal: "USER",
+                        replay_key: "suspend",
+                        request_digest: [1; 32],
+                    },
                     |process| {
                         process.set_suspended(&root, true)?;
                         Ok(BtsReply::normal())
@@ -543,11 +547,13 @@ mod tests {
             .mutate_process(
                 "TYPE",
                 "ORDER",
-                "UOW2",
-                "EXEC2",
-                "USER",
-                "suspend",
-                [1; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "suspend",
+                    request_digest: [1; 32],
+                },
                 |process| {
                     process.set_suspended(&root, true)?;
                     Ok(BtsReply::normal())
@@ -579,11 +585,13 @@ mod tests {
             .remove_subtree(
                 "TYPE",
                 "ORDER",
-                "UOW2",
-                "EXEC2",
-                "USER",
-                "reset-first",
-                [4; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "reset-first",
+                    request_digest: [4; 32],
+                },
                 &super::super::super::removal::BtsRemoval::Reset {
                     activity_id: root.clone(),
                 },
@@ -600,11 +608,13 @@ mod tests {
             .remove_subtree(
                 "TYPE",
                 "ORDER",
-                "UOW2",
-                "EXEC2",
-                "USER",
-                "reset-second",
-                [6; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "reset-second",
+                    request_digest: [6; 32],
+                },
                 &super::super::super::removal::BtsRemoval::Reset { activity_id: root },
             )
             .unwrap();

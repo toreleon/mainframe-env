@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Reused pure schema validator construction for exact immutable test inputs while retaining every existing coverage-wire and typed application state assertion, local reference refusal, fresh document validation, and original gate limits."

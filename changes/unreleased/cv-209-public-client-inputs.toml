@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Validate explicitly selected public client development inputs with retained byte pins and bounded archive/tree checks; preserve required CI tools and strict legacy lock reading without native execution."

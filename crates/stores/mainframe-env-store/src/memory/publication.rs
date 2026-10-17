@@ -124,6 +124,7 @@ impl MemoryStore {
         mutations: Vec<ProviderStateMutation>,
         limits: StoreLimits,
     ) -> Result<(), StoreError> {
+        root_terminal::guard_successor_mutations(state, &mutations)?;
         let staging_limits = StoreLimits {
             max_provider_state: usize::MAX,
             max_total_blob_bytes: usize::MAX,
@@ -133,15 +134,15 @@ impl MemoryStore {
             match mutation {
                 ProviderStateMutation::Put(write) => {
                     let key = (write.record.namespace.clone(), write.record.key.clone());
-                    journal.touch_provider_state(state, &key);
                     journal.touch_blob_bytes(state);
                     journal.touch_provider_epoch(state);
-                    Self::put_provider_state_locked(
+                    let prior = Self::replace_provider_state_locked(
                         state,
                         write.record,
                         write.expected_version,
                         staging_limits,
                     )?;
+                    journal.record_provider_state(key, prior);
                 }
                 ProviderStateMutation::Delete {
                     namespace,

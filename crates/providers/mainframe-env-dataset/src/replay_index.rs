@@ -16,6 +16,10 @@
 //! digest for these small payloads and needs no extra dependency; keeping
 //! `self.entries` in place instead of rebuilding it removes the clone.
 
+//! The complete physical replay snapshot is still read and compared on every
+//! sync. A sorted borrowed-row merge classifies unchanged keys without a fresh
+//! tree lookup per row; decoding and publication retain physical scan order.
+//!
 use crate::service::{
     DatasetLimits, Replay, decode_replay, describe_dataset_replay_row_with_limits, store_error,
 };
@@ -44,6 +48,10 @@ pub(crate) struct ReplayIndex {
     /// touches, clones or rebuilds nothing for rows that didn't change.
     #[cfg(test)]
     applied_count: usize,
+    /// Test-only witness for exact unchanged physical snapshots. No production
+    /// counter or alternate store authority is introduced.
+    #[cfg(test)]
+    unchanged_snapshot_count: usize,
 }
 
 impl ReplayIndex {
@@ -105,23 +113,66 @@ impl ReplayIndex {
             .list_provider_state("dataset-replay", limits.max_idempotency)
             .map_err(store_error)?;
 
-        // Duplicate-key check over borrowed keys: a sort with no per-row
-        // clone or map insertion, instead of probing a map being built.
-        let mut keys: Vec<&str> = rows.iter().map(|row| row.key.as_str()).collect();
-        keys.sort_unstable();
-        if keys.windows(2).any(|pair| pair[0] == pair[1]) {
+        // Exact key-ordered equality proves the complete physical key set is
+        // unchanged, including every payload byte. Keep the physical scan above:
+        // any missing fingerprint, reordered/replaced/duplicate key or changed
+        // bytes falls through to the original fully staged validation below.
+        if rows.len() == self.entries.len()
+            && rows
+                .iter()
+                .zip(&self.entries)
+                .all(|(row, (key, existing))| {
+                    row.key.as_str() == key.as_str()
+                        && existing.seen.as_ref().is_some_and(|(version, payload)| {
+                            *version == row.version
+                                && payload.len() == row.payload.len()
+                                && *payload == row.payload
+                        })
+                })
+        {
+            #[cfg(test)]
+            {
+                self.unchanged_snapshot_count += 1;
+            }
+            return Ok(());
+        }
+
+        // Sort borrowed rows once for duplicate detection and a linear merge
+        // with the committed index. Preserve physical scan order for decoding:
+        // the first invalid changed row must still be the first one observed.
+        let mut ordered: Vec<_> = rows.iter().enumerate().collect();
+        ordered.sort_unstable_by(|(_, left), (_, right)| left.key.cmp(&right.key));
+        if ordered
+            .windows(2)
+            .any(|pair| pair[0].1.key == pair[1].1.key)
+        {
             return Err(HostProblem::InfrastructureFailure);
         }
 
+        let mut unchanged = vec![false; rows.len()];
+        {
+            let mut committed = self.entries.iter().peekable();
+            for (index, row) in &ordered {
+                while committed
+                    .peek()
+                    .is_some_and(|(key, _)| key.as_str() < row.key.as_str())
+                {
+                    committed.next();
+                }
+                if let Some((key, existing)) = committed.peek()
+                    && key.as_str() == row.key.as_str()
+                {
+                    unchanged[*index] = existing.seen.as_ref().is_some_and(|(version, payload)| {
+                        *version == row.version
+                            && payload.len() == row.payload.len()
+                            && *payload == row.payload
+                    });
+                }
+            }
+        }
+
         let mut updates: Vec<(String, Entry)> = Vec::new();
-        for row in &rows {
-            let unchanged = self.entries.get(row.key.as_str()).is_some_and(|existing| {
-                existing.seen.as_ref().is_some_and(|(version, payload)| {
-                    *version == row.version
-                        && payload.len() == row.payload.len()
-                        && *payload == row.payload
-                })
-            });
+        for (row, unchanged) in rows.iter().zip(unchanged) {
             if !unchanged {
                 let entry = self.decode_row(row, limits)?;
                 updates.push((row.key.clone(), entry));
@@ -140,11 +191,14 @@ impl ReplayIndex {
         // `self.entries` can only hold extra (now-unlisted) keys at this
         // point; it can never be short one, since every listed row was
         // either already present or just inserted. So an exact length match
-        // against the duplicate-free `keys` proves nothing was pruned,
+        // against the duplicate-free `ordered` rows proves nothing was pruned,
         // without a scan.
-        if self.entries.len() != keys.len() {
-            self.entries
-                .retain(|key, _| keys.binary_search(&key.as_str()).is_ok());
+        if self.entries.len() != ordered.len() {
+            self.entries.retain(|key, _| {
+                ordered
+                    .binary_search_by(|(_, row)| row.key.cmp(key))
+                    .is_ok()
+            });
         }
         Ok(())
     }
@@ -327,5 +381,478 @@ mod tests {
             "a sync after K new out-of-band rows must decode exactly K more"
         );
         assert_eq!(index.len(), 4);
+    }
+
+    struct SnapshotPage {
+        rows: Vec<ProviderStateRecord>,
+        fail: bool,
+        calls: std::sync::Mutex<Vec<(String, usize)>>,
+    }
+
+    impl SnapshotPage {
+        fn new(rows: Vec<ProviderStateRecord>) -> Self {
+            Self {
+                rows,
+                fail: false,
+                calls: Default::default(),
+            }
+        }
+    }
+
+    impl mainframe_env_store_api::AuditSink for SnapshotPage {
+        fn record_audit(
+            &self,
+            _audit: mainframe_env_execution_api::AuditRecord,
+        ) -> Result<(), mainframe_env_store_api::StoreError> {
+            panic!("replay sync must not write audits");
+        }
+
+        fn audit_records(
+            &self,
+            _execution: &mainframe_env_execution_api::ExecutionId,
+            _start: u64,
+            _max: usize,
+        ) -> Result<
+            Vec<mainframe_env_execution_api::AuditRecord>,
+            mainframe_env_store_api::StoreError,
+        > {
+            panic!("replay sync must not read audit rows");
+        }
+    }
+
+    impl ProviderStateStore for SnapshotPage {
+        fn list_provider_state(
+            &self,
+            namespace: &str,
+            max: usize,
+        ) -> Result<Vec<ProviderStateRecord>, mainframe_env_store_api::StoreError> {
+            self.calls.lock().unwrap().push((namespace.into(), max));
+            if self.fail {
+                return Err(mainframe_env_store_api::StoreError::Conflict);
+            }
+            Ok(self.rows.clone())
+        }
+
+        fn get_provider_state(
+            &self,
+            _namespace: &str,
+            _key: &str,
+        ) -> Result<Option<ProviderStateRecord>, mainframe_env_store_api::StoreError> {
+            panic!("replay sync must not replace the complete physical scan with gets");
+        }
+
+        fn put_provider_state(
+            &self,
+            _record: ProviderStateRecord,
+            _expected: Option<u64>,
+        ) -> Result<(), mainframe_env_store_api::StoreError> {
+            panic!("replay sync must not put rows");
+        }
+
+        fn delete_provider_state(
+            &self,
+            _namespace: &str,
+            _key: &str,
+            _expected: u64,
+        ) -> Result<(), mainframe_env_store_api::StoreError> {
+            panic!("replay sync must not delete physical rows");
+        }
+
+        fn move_provider_state(
+            &self,
+            _record: ProviderStateRecord,
+            _old_key: &str,
+            _expected: u64,
+        ) -> Result<(), mainframe_env_store_api::StoreError> {
+            panic!("replay sync must not move rows");
+        }
+
+        fn put_provider_states_atomic(
+            &self,
+            _writes: Vec<mainframe_env_store_api::ProviderStateWrite>,
+        ) -> Result<(), mainframe_env_store_api::StoreError> {
+            panic!("replay sync must not publish rows");
+        }
+
+        fn mutate_provider_states_atomic(
+            &self,
+            _mutations: Vec<mainframe_env_store_api::ProviderStateMutation>,
+        ) -> Result<(), mainframe_env_store_api::StoreError> {
+            panic!("replay sync must not mutate rows");
+        }
+    }
+
+    type CommittedSnapshot = BTreeMap<String, (Replay, Option<(u64, Vec<u8>)>)>;
+
+    fn committed_snapshot(index: &ReplayIndex) -> CommittedSnapshot {
+        index
+            .entries
+            .iter()
+            .map(|(key, entry)| (key.clone(), (entry.replay.clone(), entry.seen.clone())))
+            .collect()
+    }
+
+    fn pending_record(key: &str, digest: u8) -> ProviderStateRecord {
+        let mut payload = b"MEDR1".to_vec();
+        payload.extend_from_slice(&[digest; 32]);
+        payload.push(0);
+        ProviderStateRecord {
+            namespace: "dataset-replay".into(),
+            key: key.into(),
+            version: 1,
+            payload,
+        }
+    }
+
+    // Independent full-reload oracle: no incremental classification or merge.
+    fn full_reload(rows: &[ProviderStateRecord]) -> BTreeMap<String, Replay> {
+        let mut expected = BTreeMap::new();
+        for row in rows {
+            describe_dataset_replay_row_with_limits(row, limits()).unwrap();
+            assert!(
+                expected
+                    .insert(row.key.clone(), decode_replay(&row.payload).unwrap())
+                    .is_none()
+            );
+        }
+        expected
+    }
+
+    #[test]
+    fn merge_matches_full_reload_for_interleaved_unordered_changes() {
+        let initial: Vec<_> = (0..1_024)
+            .map(|key| pending_record(&format!("replay-{key:04}"), 0))
+            .collect();
+        let mut index = ReplayIndex::default();
+        index
+            .sync(&SnapshotPage::new(initial.clone()), limits())
+            .unwrap();
+        let mut next = initial;
+        next.retain(|row| row.key[7..].parse::<usize>().unwrap() % 7 != 0);
+        for row in &mut next {
+            if row.key[7..].parse::<usize>().unwrap() % 11 == 0 {
+                // Same version and length, different valid digest bytes.
+                row.payload[5] = 7;
+            }
+            if row.key[7..].parse::<usize>().unwrap() % 13 == 0 {
+                // A valid pending-to-resolved version and payload-length change.
+                row.version = 2;
+                row.payload[37] = 1;
+                row.payload.extend_from_slice(&2_u64.to_be_bytes());
+            }
+        }
+        next.extend((1_024..1_055).map(|key| pending_record(&format!("replay-{key:04}"), 9)));
+        next.reverse();
+        next.rotate_left(117);
+        let expected = full_reload(&next);
+        let page = SnapshotPage::new(next);
+        index.sync(&page, limits()).unwrap();
+        assert_eq!(index.snapshot(), expected);
+        assert_eq!(
+            *page.calls.lock().unwrap(),
+            vec![("dataset-replay".into(), limits().max_idempotency)]
+        );
+        // Re-put a physically deleted identity at its old version with new bytes.
+        let mut reinserted = page.rows.clone();
+        reinserted.push(pending_record("replay-0000", 17));
+        let expected = full_reload(&reinserted);
+        index
+            .sync(&SnapshotPage::new(reinserted), limits())
+            .unwrap();
+        assert_eq!(index.snapshot(), expected);
+    }
+
+    #[test]
+    fn merge_unchanged_reverse_page_decodes_and_applies_nothing() {
+        let rows: Vec<_> = (0..17)
+            .map(|key| pending_record(&format!("stable-{key:02}"), key))
+            .collect();
+        let mut index = ReplayIndex::default();
+        index
+            .sync(&SnapshotPage::new(rows.clone()), limits())
+            .unwrap();
+        let before = committed_snapshot(&index);
+        let decodes = index.decode_count();
+        let applied = index.applied_count;
+        let page = SnapshotPage::new(rows.into_iter().rev().collect());
+        index.sync(&page, limits()).unwrap();
+        assert_eq!(committed_snapshot(&index), before);
+        assert_eq!(index.decode_count(), decodes);
+        assert_eq!(index.applied_count, applied);
+        assert_eq!(page.calls.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn merge_duplicate_page_refuses_before_decode_and_keeps_fingerprints() {
+        let mut index = ReplayIndex::default();
+        index
+            .sync(
+                &SnapshotPage::new(vec![pending_record("keep", 1)]),
+                limits(),
+            )
+            .unwrap();
+        let before = committed_snapshot(&index);
+        let decodes = index.decode_count();
+        let applied = index.applied_count;
+        let mut corrupt = pending_record("duplicate", 0);
+        corrupt.payload.push(0);
+        let page = SnapshotPage::new(vec![
+            pending_record("z-valid-first", 2),
+            corrupt,
+            pending_record("duplicate", 3),
+        ]);
+        assert_eq!(
+            index.sync(&page, limits()),
+            Err(HostProblem::InfrastructureFailure)
+        );
+        assert_eq!(committed_snapshot(&index), before);
+        assert_eq!(index.decode_count(), decodes);
+        assert_eq!(index.applied_count, applied);
+    }
+
+    #[test]
+    fn merge_late_error_keeps_physical_decode_order_and_all_prior_state() {
+        let mut index = ReplayIndex::default();
+        index
+            .sync(
+                &SnapshotPage::new(vec![pending_record("retained", 1)]),
+                limits(),
+            )
+            .unwrap();
+        let before = committed_snapshot(&index);
+        let decodes = index.decode_count();
+        let applied = index.applied_count;
+        // Sorting would encounter a-invalid before z-valid; physical order must win.
+        let mut bad = pending_record("a-invalid", 2);
+        bad.namespace = "wrong-namespace".into();
+        let page = SnapshotPage::new(vec![pending_record("z-valid", 3), bad]);
+        assert_eq!(
+            index.sync(&page, limits()),
+            Err(HostProblem::InfrastructureFailure)
+        );
+        assert_eq!(index.decode_count(), decodes + 1);
+        assert_eq!(index.applied_count, applied);
+        assert_eq!(committed_snapshot(&index), before);
+        let retry = SnapshotPage::new(vec![
+            pending_record("z-valid", 3),
+            pending_record("a-invalid", 2),
+        ]);
+        index.sync(&retry, limits()).unwrap();
+        assert_eq!(index.decode_count(), decodes + 3);
+        assert_eq!(index.applied_count, applied + 2);
+        assert_eq!(index.snapshot(), full_reload(&retry.rows));
+    }
+
+    #[test]
+    fn merge_store_error_keeps_index_and_original_single_scan_contract() {
+        let mut index = ReplayIndex::default();
+        index
+            .sync(
+                &SnapshotPage::new(vec![pending_record("retained", 1)]),
+                limits(),
+            )
+            .unwrap();
+        let before = committed_snapshot(&index);
+        let decodes = index.decode_count();
+        let applied = index.applied_count;
+        let mut page = SnapshotPage::new(vec![pending_record("unobserved", 2)]);
+        page.fail = true;
+        assert_eq!(
+            index.sync(&page, limits()),
+            Err(store_error(mainframe_env_store_api::StoreError::Conflict))
+        );
+        assert_eq!(committed_snapshot(&index), before);
+        assert_eq!(index.decode_count(), decodes);
+        assert_eq!(index.applied_count, applied);
+        assert_eq!(
+            *page.calls.lock().unwrap(),
+            vec![("dataset-replay".into(), limits().max_idempotency)]
+        );
+    }
+
+    #[test]
+    fn merge_missing_fingerprint_revalidates_then_empty_page_prunes_all() {
+        let rows = vec![pending_record("one", 1), pending_record("two", 2)];
+        let mut index = ReplayIndex::default();
+        index
+            .sync(&SnapshotPage::new(rows.clone()), limits())
+            .unwrap();
+        index.entries.get_mut("two").unwrap().seen = None;
+        let decodes = index.decode_count();
+        let applied = index.applied_count;
+        index
+            .sync(&SnapshotPage::new(rows.clone()), limits())
+            .unwrap();
+        assert_eq!(index.snapshot(), full_reload(&rows));
+        assert_eq!(index.decode_count(), decodes + 1);
+        assert_eq!(index.applied_count, applied + 1);
+        assert!(index.entries["two"].seen.is_some());
+        index
+            .sync(&SnapshotPage::new(Vec::new()), limits())
+            .unwrap();
+        assert_eq!(index.len(), 0);
+        assert!(committed_snapshot(&index).is_empty());
+    }
+
+    #[test]
+    fn exact_snapshot_unchanged_keeps_authority_and_complete_physical_scan() {
+        let rows = vec![pending_record("one", 1), pending_record("two", 2)];
+        let mut index = ReplayIndex::default();
+        index
+            .sync(&SnapshotPage::new(rows.clone()), limits())
+            .unwrap();
+        let before = committed_snapshot(&index);
+        let decodes = index.decode_count();
+        let applied = index.applied_count;
+        let page = SnapshotPage::new(rows);
+        index.sync(&page, limits()).unwrap();
+        assert_eq!(index.unchanged_snapshot_count, 1);
+        assert_eq!(committed_snapshot(&index), before);
+        assert_eq!(index.snapshot(), full_reload(&page.rows));
+        assert_eq!(index.decode_count(), decodes);
+        assert_eq!(index.applied_count, applied);
+        assert_eq!(
+            *page.calls.lock().unwrap(),
+            vec![("dataset-replay".into(), limits().max_idempotency)]
+        );
+        let mut empty = ReplayIndex::default();
+        let page = SnapshotPage::new(Vec::new());
+        empty.sync(&page, limits()).unwrap();
+        assert_eq!(empty.unchanged_snapshot_count, 1);
+        assert!(committed_snapshot(&empty).is_empty());
+        assert_eq!(page.calls.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn exact_snapshot_same_count_replacement_publishes_new_key_and_prunes_old_key() {
+        let initial = vec![
+            pending_record("a", 1),
+            pending_record("b", 2),
+            pending_record("c", 3),
+        ];
+        let mut index = ReplayIndex::default();
+        index
+            .sync(&SnapshotPage::new(initial.clone()), limits())
+            .unwrap();
+        let decodes = index.decode_count();
+        let applied = index.applied_count;
+        let page = SnapshotPage::new(vec![
+            initial[0].clone(),
+            initial[1].clone(),
+            pending_record("d", 4),
+        ]);
+        index.sync(&page, limits()).unwrap();
+        assert_eq!(index.unchanged_snapshot_count, 0);
+        assert_eq!(index.len(), 3);
+        assert!(index.get("c").is_none());
+        assert!(index.get("d").is_some());
+        assert_eq!(index.snapshot(), full_reload(&page.rows));
+        assert_eq!(index.decode_count(), decodes + 1);
+        assert_eq!(index.applied_count, applied + 1);
+        assert_eq!(page.calls.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn exact_snapshot_late_digest_byte_at_same_version_and_length_is_revalidated() {
+        let rows = vec![pending_record("a", 1), pending_record("z", 2)];
+        let mut index = ReplayIndex::default();
+        index
+            .sync(&SnapshotPage::new(rows.clone()), limits())
+            .unwrap();
+        let before = committed_snapshot(&index);
+        let before_replays = index.snapshot();
+        let decodes = index.decode_count();
+        let applied = index.applied_count;
+        let mut changed = rows;
+        // Byte36 is the last digest byte, not the result tag. Keep version,
+        // length and every earlier byte unchanged in the final physical row.
+        changed[1].payload[36] ^= 0x5a;
+        assert_eq!(changed[1].version, 1);
+        assert_eq!(
+            changed[1].payload.len(),
+            before["z"].1.as_ref().unwrap().1.len()
+        );
+        let page = SnapshotPage::new(changed);
+        index.sync(&page, limits()).unwrap();
+        assert_eq!(index.unchanged_snapshot_count, 0);
+        assert_eq!(index.snapshot(), full_reload(&page.rows));
+        assert_ne!(index.snapshot(), before_replays);
+        assert_eq!(index.decode_count(), decodes + 1);
+        assert_eq!(index.applied_count, applied + 1);
+        assert_ne!(committed_snapshot(&index), before);
+    }
+
+    #[test]
+    fn exact_snapshot_same_count_duplicate_refuses_before_any_physical_decode() {
+        let initial: Vec<_> = (0..4)
+            .map(|key| pending_record(&format!("retained-{key}"), key))
+            .collect();
+        let mut index = ReplayIndex::default();
+        index.sync(&SnapshotPage::new(initial), limits()).unwrap();
+        let before = committed_snapshot(&index);
+        let decodes = index.decode_count();
+        let applied = index.applied_count;
+        let mut malformed = pending_record("duplicate", 0);
+        malformed.payload.push(0);
+        // Both snapshots retain the same count as the committed index. Cover
+        // malformed-first, then valid-first: decoding that valid row before
+        // duplicate refusal would increment the successful decode witness.
+        let malformed_first = vec![
+            malformed.clone(),
+            pending_record("duplicate", 3),
+            pending_record("valid-one", 4),
+            pending_record("valid-two", 5),
+        ];
+        let valid_first = vec![
+            pending_record("valid-one", 4),
+            malformed,
+            pending_record("duplicate", 3),
+            pending_record("valid-two", 5),
+        ];
+        for rows in [malformed_first, valid_first] {
+            let page = SnapshotPage::new(rows);
+            assert_eq!(
+                index.sync(&page, limits()),
+                Err(HostProblem::InfrastructureFailure)
+            );
+            assert_eq!(index.unchanged_snapshot_count, 0);
+            assert_eq!(index.decode_count(), decodes);
+            assert_eq!(index.applied_count, applied);
+            assert_eq!(committed_snapshot(&index), before);
+            assert_eq!(page.calls.lock().unwrap().len(), 1);
+        }
+    }
+
+    #[test]
+    fn exact_snapshot_same_count_late_failure_keeps_physical_order_and_prior_state() {
+        let initial = vec![
+            pending_record("retained-a", 1),
+            pending_record("retained-b", 2),
+        ];
+        let mut index = ReplayIndex::default();
+        index.sync(&SnapshotPage::new(initial), limits()).unwrap();
+        let before = committed_snapshot(&index);
+        let decodes = index.decode_count();
+        let applied = index.applied_count;
+        let mut malformed = pending_record("a-invalid", 3);
+        malformed.namespace = "wrong-namespace".into();
+        let page = SnapshotPage::new(vec![pending_record("z-valid", 4), malformed]);
+        assert_eq!(
+            index.sync(&page, limits()),
+            Err(HostProblem::InfrastructureFailure)
+        );
+        assert_eq!(index.unchanged_snapshot_count, 0);
+        assert_eq!(index.decode_count(), decodes + 1);
+        assert_eq!(index.applied_count, applied);
+        assert_eq!(committed_snapshot(&index), before);
+        let page = SnapshotPage::new(vec![
+            pending_record("z-valid", 4),
+            pending_record("a-invalid", 3),
+        ]);
+        index.sync(&page, limits()).unwrap();
+        assert_eq!(index.unchanged_snapshot_count, 0);
+        assert_eq!(index.snapshot(), full_reload(&page.rows));
+        assert_eq!(index.decode_count(), decodes + 3);
+        assert_eq!(index.applied_count, applied + 2);
     }
 }

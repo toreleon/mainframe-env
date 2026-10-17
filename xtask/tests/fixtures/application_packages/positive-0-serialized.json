@@ -1,0 +1,221 @@
+{
+  "base": {
+    "blobs": {
+      "sha256:2e6709af8dbfe7cd5abb2f716924848e527b4486c30c4509b0e4aa8171987335": [
+        112,
+        97,
+        121,
+        108,
+        111,
+        97,
+        100,
+        45,
+        49
+      ],
+      "sha256:85261d40c625814f4e9eae3aac7948691fbcd76d4e19d85a71e30a665add4d3b": [
+        112,
+        97,
+        121,
+        108,
+        111,
+        97,
+        100,
+        45,
+        52
+      ],
+      "sha256:bddd3a6e5dab59fa05fa8fb0d789a3c2ad3c9982dcc4a368f3d5719f421ffda8": [
+        112,
+        97,
+        121,
+        108,
+        111,
+        97,
+        100,
+        45,
+        50
+      ],
+      "sha256:c97811e4375fda6eb4b46693d20752e6d584a4ec8a7910a25c52f09988c2d4cb": [
+        112,
+        97,
+        121,
+        108,
+        111,
+        97,
+        100,
+        45,
+        51
+      ],
+      "sha256:d449acb92215ed502901c9e6f6a4dc6d28e6856fb6754892becd148dee1b3e85": [
+        112,
+        97,
+        121,
+        108,
+        111,
+        97,
+        100,
+        45,
+        48
+      ],
+      "sha256:ed8a2d8e007008d5582cc9fc8f72c361f32b698dc426c70691072aa18e5be1c8": [
+        112,
+        97,
+        121,
+        108,
+        111,
+        97,
+        100,
+        45,
+        53
+      ]
+    },
+    "manifest": {
+      "entries": [
+        {
+          "bytes": 9,
+          "depends_on": [],
+          "kind": "Source",
+          "path": "source/0",
+          "sha256": "sha256:d449acb92215ed502901c9e6f6a4dc6d28e6856fb6754892becd148dee1b3e85"
+        },
+        {
+          "bytes": 9,
+          "depends_on": [
+            "source/0"
+          ],
+          "kind": "Resource",
+          "path": "resource/1",
+          "sha256": "sha256:2e6709af8dbfe7cd5abb2f716924848e527b4486c30c4509b0e4aa8171987335"
+        },
+        {
+          "bytes": 9,
+          "depends_on": [
+            "source/0"
+          ],
+          "kind": "Program",
+          "path": "program/2",
+          "sha256": "sha256:bddd3a6e5dab59fa05fa8fb0d789a3c2ad3c9982dcc4a368f3d5719f421ffda8"
+        },
+        {
+          "bytes": 9,
+          "depends_on": [
+            "source/0"
+          ],
+          "kind": "Data",
+          "path": "data/3",
+          "sha256": "sha256:c97811e4375fda6eb4b46693d20752e6d584a4ec8a7910a25c52f09988c2d4cb"
+        },
+        {
+          "bytes": 9,
+          "depends_on": [
+            "source/0"
+          ],
+          "kind": "Profile",
+          "path": "profile/4",
+          "sha256": "sha256:85261d40c625814f4e9eae3aac7948691fbcd76d4e19d85a71e30a665add4d3b"
+        },
+        {
+          "bytes": 9,
+          "depends_on": [
+            "source/0"
+          ],
+          "kind": "Migration",
+          "path": "migration/5",
+          "sha256": "sha256:ed8a2d8e007008d5582cc9fc8f72c361f32b698dc426c70691072aa18e5be1c8"
+        }
+      ],
+      "name": "DEMO",
+      "target_product": "0.2.0",
+      "version": "2.0.0"
+    }
+  },
+  "generation": 1,
+  "sections": {
+    "batch_controllers": [
+      {
+        "kind": "CobolProgram",
+        "name": "APP-CONTROLLER",
+        "program": "program/2",
+        "properties": {
+          "commit": "step"
+        }
+      }
+    ],
+    "host_abi_libraries": [
+      {
+        "id": "CICS-ABI",
+        "members": [
+          {
+            "blob_sha256": "sha256:d449acb92215ed502901c9e6f6a4dc6d28e6856fb6754892becd148dee1b3e85",
+            "name": "DFHAID"
+          }
+        ],
+        "subsystem": "Cics",
+        "version": "1"
+      }
+    ],
+    "ims_definitions": [
+      {
+        "name": "APPDB",
+        "segments": [
+          "ROOT"
+        ]
+      }
+    ],
+    "ims_rows": [
+      {
+        "definition": "APPDB",
+        "segment": "ROOT",
+        "values": {
+          "ID": "1"
+        }
+      }
+    ],
+    "mq_resources": [
+      {
+        "controller": "APP-CONTROLLER",
+        "kind": "Queue",
+        "name": "APP.QUEUE",
+        "target": null
+      }
+    ],
+    "schema_version": "mainframe-env.application-package@2",
+    "security_resources": [
+      {
+        "class": "FACILITY",
+        "owner": "APPADMIN",
+        "profile": "APP.EXECUTE"
+      }
+    ],
+    "sql_rows": [
+      {
+        "table": "APP.TABLE",
+        "values": {
+          "ID": "1"
+        }
+      }
+    ],
+    "sql_tables": [
+      {
+        "columns": [
+          {
+            "name": "ID",
+            "nullable": false
+          },
+          {
+            "name": "VALUE",
+            "nullable": true
+          }
+        ],
+        "name": "APP.TABLE",
+        "primary_key": [
+          "ID"
+        ]
+      }
+    ]
+  },
+  "signature": {
+    "algorithm": "test-signature@1",
+    "key_id": "test-key",
+    "value": "signed:sha256:96b699abdbec2a63f449eca91bee5b00bc44a20b08db325e6e752db3207f2710"
+  }
+}

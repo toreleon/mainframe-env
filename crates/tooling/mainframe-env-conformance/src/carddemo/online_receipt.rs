@@ -1,0 +1,186 @@
+use super::*;
+
+pub fn verify_carddemo_base_online_from_env(
+    inventory_path: &Path,
+) -> Result<CardDemoBaseOnlineReceipt, CorpusProblem> {
+    verify_carddemo_base_online_observed(inventory_path).map(|(receipt, _)| receipt)
+}
+
+pub(super) fn verify_carddemo_base_online_observed(
+    inventory_path: &Path,
+) -> Result<(CardDemoBaseOnlineReceipt, RouteObservations), CorpusProblem> {
+    verify_carddemo_base_online_with_operator(inventory_path)
+        .map(|(receipt, observations, _)| (receipt, observations))
+}
+
+pub(super) fn verify_carddemo_base_online_with_operator(
+    inventory_path: &Path,
+) -> Result<
+    (
+        CardDemoBaseOnlineReceipt,
+        RouteObservations,
+        operator_observations::OnlineProof,
+    ),
+    CorpusProblem,
+> {
+    let operator_inputs = operator_observations::Inputs::verify(inventory_path)?;
+    let terminal = verify_carddemo_terminal_from_env(inventory_path)?;
+    let corpus_dir = env::var_os(CORPUS_ENV).ok_or_else(|| {
+        CorpusProblem::new(
+            "carddemo.corpus.environment_missing",
+            "CARDDEMO_CORPUS_DIR is required",
+        )
+    })?;
+    // Verify all selected first-party catalog inputs before owned installation.
+    catalog_observations::verify_pinned_sources(Path::new(&corpus_dir))?;
+    // Preserve the original v1 cohort receipt. The separate private envelope
+    // binds its identity to this selected compile and actual durable installation.
+    let package = verify_carddemo_application_package_from_env(inventory_path)?;
+    let (definition, source_binding) = online_definition::carddemo_base_online_definition_observed(
+        Path::new(&corpus_dir),
+        package,
+    )?;
+    let programs = definition.programs.len();
+    let transactions = definition.transactions.len();
+    let maps = definition.maps.len();
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|error| CorpusProblem::new("carddemo.online.clock", error.to_string()))?
+        .as_nanos();
+    let artifact_root = env::temp_dir().join(format!(
+        "mainframe-env-carddemo-base-online-{}-{nonce}",
+        std::process::id()
+    ));
+    fs::create_dir(&artifact_root)
+        .map_err(|error| CorpusProblem::new("carddemo.online.artifact_owner", error.to_string()))?;
+    let config = ServerConfig {
+        store_profile: StoreProfile::Memory,
+        // Offered FUNCTION CURRENT-DATE input from pinned TRANREPT.jcl's date control.
+        // All same-server COBOL headers use this date; live CICS ASKTIME is independent.
+        cobol_current_date: Some(base_message_oracles::REPORT_CURRENT_DATE.into()),
+        artifact_root: artifact_root.clone(),
+        tls: TlsConfig {
+            enabled: false,
+            certificate_path: None,
+            private_key_reference: None,
+        },
+        ..ServerConfig::default()
+    };
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| CorpusProblem::new("carddemo.online.runtime", error.to_string()))?;
+    let store = Arc::new(MemoryStore::new(Default::default()));
+    let secrets = Arc::new(MemorySecretResolver::default());
+    let result = runtime.block_on(async {
+        let mut exercise = exercise_base_online_smoke(
+            config,
+            store,
+            secrets,
+            Path::new(&corpus_dir).to_path_buf(),
+            definition,
+            source_binding,
+        )
+        .await?;
+        exercise_transaction_observations(&mut exercise.route_observations).await?;
+        exercise_navigation_observations(&mut exercise.route_observations).await?;
+        Ok::<_, CorpusProblem>(exercise)
+    });
+    let mut exercise = result?;
+    if exercise.screen_paths != maps
+        || exercise.dataset_reads == 0
+        || exercise.committed_mutations < 6
+        || exercise.rollback_controls == 0
+        || exercise.denial_controls == 0
+        || exercise.restart_controls == 0
+        || exercise.concurrency_controls == 0
+        || exercise.resource_controls == 0
+    {
+        return Err(CorpusProblem::new(
+            "carddemo.online.coverage_drift",
+            format!(
+                "screens={}; reads={}; mutations={}; rollback={}; denial={}; restart={}; concurrency={}; resources={}",
+                exercise.screen_paths,
+                exercise.dataset_reads,
+                exercise.committed_mutations,
+                exercise.rollback_controls,
+                exercise.denial_controls,
+                exercise.restart_controls,
+                exercise.concurrency_controls,
+                exercise.resource_controls
+            ),
+        ));
+    }
+    fs::remove_dir_all(&artifact_root).map_err(|error| {
+        CorpusProblem::new("carddemo.online.artifact_cleanup", error.to_string())
+    })?;
+    let operator_proof = operator_observations::finish_online(
+        &operator_inputs,
+        exercise.seed_proof,
+        exercise.catalog_proof,
+        exercise.installation_proof,
+        &mut exercise.route_observations,
+    )?;
+    let mut shape = Sha256::new();
+    digest_field(&mut shape, terminal.corpus_commit.as_bytes());
+    digest_field(&mut shape, &(programs as u64).to_be_bytes());
+    digest_field(&mut shape, &(transactions as u64).to_be_bytes());
+    digest_field(&mut shape, &(maps as u64).to_be_bytes());
+    for value in [
+        exercise.initial_screen_bytes,
+        exercise.screen_paths,
+        exercise.dataset_reads,
+        exercise.committed_mutations,
+        exercise.rollback_controls,
+        exercise.denial_controls,
+        exercise.restart_controls,
+        exercise.concurrency_controls,
+        exercise.resource_controls,
+    ] {
+        digest_field(&mut shape, &(value as u64).to_be_bytes());
+    }
+    for observation in &exercise.observations {
+        digest_field(&mut shape, observation.as_bytes());
+    }
+    let route_observations = exercise.route_observations;
+    Ok((
+        CardDemoBaseOnlineReceipt {
+            schema_version: "mainframe-env.carddemo-base-online-receipt@1".into(),
+            status: "pass".into(),
+            corpus_commit: terminal.corpus_commit,
+            journeys_passed: 9,
+            programs_installed: programs,
+            source_backed_transactions: transactions,
+            maps_installed: maps,
+            initial_screen_bytes: exercise.initial_screen_bytes,
+            screen_paths: exercise.screen_paths,
+            dataset_reads: exercise.dataset_reads,
+            committed_mutations: exercise.committed_mutations,
+            rollback_controls: exercise.rollback_controls,
+            denial_controls: exercise.denial_controls,
+            restart_controls: exercise.restart_controls,
+            concurrency_controls: exercise.concurrency_controls,
+            resource_controls: exercise.resource_controls,
+            install_replay: exercise.install_replay,
+            journey_shape_sha256: format!("{:x}", shape.finalize()),
+        },
+        route_observations,
+        operator_proof,
+    ))
+}
+
+/// Selected real transaction comparisons add only their two owned requirements.
+pub(super) async fn exercise_transaction_observations(
+    observations: &mut RouteObservations,
+) -> Result<(), CorpusProblem> {
+    transaction_harness::exercise_transaction_dates(observations).await?;
+    transaction_harness::exercise_transaction_duplicate(observations).await
+}
+
+/// Bind navigation credit only after actual comparisons and owned teardown complete.
+pub(super) async fn exercise_navigation_observations(
+    observations: &mut RouteObservations,
+) -> Result<(), CorpusProblem> {
+    let result = transaction_navigation::compare_navigation().await;
+    transaction_harness::bind_comparison(observations, "screen navigation", result)
+}

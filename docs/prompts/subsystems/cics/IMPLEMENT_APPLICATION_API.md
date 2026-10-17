@@ -11,7 +11,7 @@ Use this prompt from the repository root. The
 Apply its [hardened slice acceptance](../README.md#hardened-slice-acceptance),
 [early participant contract](../README.md#early-transaction-participant-contract),
 and [licensed-harness preparation](../README.md#licensed-harness-preparation)
-requirements alongside the version-specific boundaries below.
+requirements alongside the phase-specific boundaries below.
 
 ---
 
@@ -157,7 +157,7 @@ example, separate file update, file browse, TSQ, and TDQ work under CIC-903;
 split further when a slice exceeds the repository's module review budget.
 
 The sealed CIC-901 contract/registry boundary may remain complete while the
-cics.application-api minor stays in progress. It authorizes incremental CIC-902–CIC-905 family
+cics.application-api phase stays in progress. It authorizes incremental CIC-902–CIC-905 family
 work, not release publication, 263-command execution claims, or early credit
 against CIC-906 and the full-phase completion gate.
 
@@ -166,7 +166,7 @@ before beginning the next dependent slice, and keep the parent in progress
 until its declared scope and integrated gates pass. Slice completion grants
 only its explicit obligation/gate coverage. Keep unfinished new capabilities
 unreachable from the public profile while preserving the accepted pilot and
-prior released behavior.
+prior accepted public behavior.
 
 ## Execution-context and selected-route proof
 
@@ -245,7 +245,7 @@ saturation, deny-before-mutation, stale-owner rejection, deadline/cancellation,
 restart/resume and retention that preserves replay/checkpoint recovery.
 
 The PostgreSQL durable profile is explicitly affected by cics.application-api. Its shared
-artifact, concurrent-owner and restart tests are required at minor integration;
+artifact, concurrent-owner and restart tests are required at phase integration;
 a skipped environment test cannot satisfy them. Memory tests establish
 determinism and invariants but carry no durable process-restart credit.
 

@@ -146,7 +146,7 @@ fn loaded(b: &Backend, fence: u64) -> RichStoredState {
     let StoredAuthority::Rich(r) = read(b.store(), 3, fence, Default::default()).unwrap() else {
         panic!("rich expected")
     };
-    r
+    *r
 }
 fn request(mode: MqGetMode) -> MqGetContract {
     MqGetContract {
@@ -171,7 +171,7 @@ fn rich_from(records: Vec<ProviderStateRecord>, fence: u64) -> RichStoredState {
     else {
         panic!("rich expected")
     };
-    r
+    *r
 }
 fn audit_fixture(b: &Backend) -> AuditedProviderPublication {
     let l = InvocationLimits::default();
@@ -346,7 +346,15 @@ fn memory_sqlite_fence_publication_reopens_and_preserves_all_live_members_and_re
         let p = audit_fixture(&b);
         let before = snapshot(&b, &p);
         let live = current.delivery.encode_live_checkpoint().unwrap();
-        let plan = current.plan_next_fence(Default::default()).unwrap();
+        let plan = current
+            .plan(
+                &current.delivery,
+                true,
+                false,
+                Vec::new(),
+                Default::default(),
+            )
+            .unwrap();
         assert_eq!(plan.mutations().len(), 3);
         assert_eq!(snapshot(&b, &p), before, "planning is read-only");
         assert_eq!(current.marker.identity.generation_and_fence(), (3, 5));
@@ -393,8 +401,12 @@ fn memory_sqlite_ordinary_and_fence_races_in_both_orders_have_exactly_one_winner
             let b = Backend::new(sqlite);
             let r = fixture(&b);
             let p = audit_fixture(&b);
-            let ordinary = r.plan_delivery(&candidate(&r), Default::default()).unwrap();
-            let fence = r.plan_next_fence(Default::default()).unwrap();
+            let ordinary = r
+                .plan_selected_delivery(&candidate(&r), Vec::new(), Default::default())
+                .unwrap();
+            let fence = r
+                .plan(&r.delivery, true, false, Vec::new(), Default::default())
+                .unwrap();
             let (winner, loser) = if fence_first {
                 (fence, ordinary)
             } else {
@@ -432,7 +444,9 @@ fn final_marker_or_catalog_dependency_conflict_rolls_back_earlier_rows_and_audit
             let b = Backend::new(sqlite);
             let r = fixture(&b);
             let p = audit_fixture(&b);
-            let plan = r.plan_delivery(&candidate(&r), Default::default()).unwrap();
+            let plan = r
+                .plan_selected_delivery(&candidate(&r), Vec::new(), Default::default())
+                .unwrap();
             let key = if ns == STATE_NAMESPACE {
                 STATE_KEY
             } else {
@@ -466,7 +480,8 @@ fn actual_audit_saturation_rolls_back_rows_marker_metadata_replay_and_current_au
         let next = publish(
             &b,
             p.clone(),
-            r.plan_next_fence(Default::default()).unwrap(),
+            r.plan(&r.delivery, true, false, Vec::new(), Default::default())
+                .unwrap(),
         );
         if sqlite {
             for i in 0..64 {
@@ -483,7 +498,7 @@ fn actual_audit_saturation_rolls_back_rows_marker_metadata_replay_and_current_au
         }
         let before = snapshot(&b, &p);
         let plan = next
-            .plan_delivery(&candidate(&next), Default::default())
+            .plan_selected_delivery(&candidate(&next), Vec::new(), Default::default())
             .unwrap();
         let (mutations, uncommitted) = plan.into_parts();
         let mut failed = p.clone();
@@ -531,7 +546,10 @@ fn invalid_cached_identity_catalog_versions_and_candidates_fail_planning_without
             }
             _ => unreachable!(),
         }
-        assert!(r.plan_next_fence(Default::default()).is_err());
+        assert!(
+            r.plan(&r.delivery, true, false, Vec::new(), Default::default())
+                .is_err()
+        );
     }
     let r = loaded(&b, 5);
     let foreign = MqObjectCatalog::new(
@@ -550,7 +568,10 @@ fn invalid_cached_identity_catalog_versions_and_candidates_fail_planning_without
         MqPersistence::Persistent,
     )
     .unwrap();
-    assert!(r.plan_delivery(&bad, Default::default()).is_err());
+    assert!(
+        r.plan_selected_delivery(&bad, Vec::new(), Default::default())
+            .is_err()
+    );
     assert_eq!(records(&b), before);
 }
 
@@ -572,7 +593,10 @@ fn exhausted_fence_and_any_dependency_version_reject_without_publication() {
         }
     }
     let r = rich_from(exhausted, i64::MAX as u64);
-    assert!(r.plan_next_fence(Default::default()).is_err());
+    assert!(
+        r.plan(&r.delivery, true, false, Vec::new(), Default::default())
+            .is_err()
+    );
     for ns in [
         STATE_NAMESPACE,
         CATALOG_NAMESPACE,
@@ -585,8 +609,14 @@ fn exhausted_fence_and_any_dependency_version_reject_without_publication() {
             .unwrap()
             .version = i64::MAX as u64;
         let r = rich_from(exhausted, 5);
-        assert!(r.plan_delivery(&candidate(&r), Default::default()).is_err());
-        assert!(r.plan_next_fence(Default::default()).is_err());
+        assert!(
+            r.plan_selected_delivery(&candidate(&r), Vec::new(), Default::default())
+                .is_err()
+        );
+        assert!(
+            r.plan(&r.delivery, true, false, Vec::new(), Default::default())
+                .is_err()
+        );
     }
     assert_eq!(records(&b), original);
 }
@@ -596,7 +626,9 @@ fn quota_accounting_includes_dependencies_and_never_silently_batches() {
     let b = Backend::new(false);
     let r = fixture(&b);
     let before = records(&b);
-    let plan = r.plan_next_fence(Default::default()).unwrap();
+    let plan = r
+        .plan(&r.delivery, true, false, Vec::new(), Default::default())
+        .unwrap();
     let bytes = plan
         .mutations()
         .iter()
@@ -636,14 +668,23 @@ fn quota_accounting_includes_dependencies_and_never_silently_batches() {
             ..Default::default()
         },
     ] {
-        assert!(r.plan_next_fence(limits).is_err());
+        assert!(
+            r.plan(&r.delivery, true, false, Vec::new(), limits)
+                .is_err()
+        );
     }
     assert!(
-        r.plan_next_fence(PublicationLimits {
-            mutations: 3,
-            row_bytes: largest,
-            total_bytes: bytes
-        })
+        r.plan(
+            &r.delivery,
+            true,
+            false,
+            Vec::new(),
+            PublicationLimits {
+                mutations: 3,
+                row_bytes: largest,
+                total_bytes: bytes
+            }
+        )
         .is_ok()
     );
     // A real bounded kernel transition can change more rows than this profile
@@ -664,7 +705,8 @@ fn quota_accounting_includes_dependencies_and_never_silently_batches() {
             .unwrap();
     }
     assert_eq!(
-        r.plan_delivery(&k, Default::default()).err(),
+        r.plan_selected_delivery(&k, Vec::new(), Default::default())
+            .err(),
         Some(PublicationError::Bounds)
     );
     assert!(PublicationLimits::default().mutations < MAX_AUDITED_PROVIDER_MUTATIONS);
@@ -677,7 +719,9 @@ fn stale_or_finalized_core_intent_and_composed_trailing_failure_have_no_partial_
         let b = Backend::new(sqlite);
         let r = fixture(&b);
         let p = audit_fixture(&b);
-        let plan = r.plan_delivery(&candidate(&r), Default::default()).unwrap();
+        let plan = r
+            .plan_selected_delivery(&candidate(&r), Vec::new(), Default::default())
+            .unwrap();
         let (mutations, _) = plan.into_parts();
         let before = snapshot(&b, &p);
         let mut failed = p.clone();
@@ -711,7 +755,7 @@ fn stale_or_finalized_core_intent_and_composed_trailing_failure_have_no_partial_
         let before = snapshot(&b, &p);
         let mut failed = p.clone();
         failed.mutations = r
-            .plan_next_fence(Default::default())
+            .plan(&r.delivery, true, false, Vec::new(), Default::default())
             .unwrap()
             .into_parts()
             .0;

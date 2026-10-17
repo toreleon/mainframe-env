@@ -1,7 +1,8 @@
 //! Owner-relative runtime layout lookup for already-admitted bindings.
 
 use super::{
-    LayoutMetadata, MachineProblem, ReferenceMachine, decode_decimal, is_numeric, normalize,
+    LayoutMetadata, MachineProblem, ReferenceMachine, decode_decimal, is_numeric, matching_close,
+    normalize,
 };
 use mainframe_env_ir::cobol_layout_reference_matches;
 
@@ -75,4 +76,59 @@ impl ReferenceMachine {
             _ => None,
         }
     }
+}
+
+impl ReferenceMachine {
+    // Do not commit a bare receiver prefix when its adjacent modifier is invalid.
+    // Earlier complete receivers retain the original sequential MOVE write order.
+    pub(super) fn invalid_modified_receiver(
+        &self,
+        tokens: &[String],
+        prefix_end: usize,
+    ) -> Option<MachineProblem> {
+        if tokens.get(prefix_end).is_none_or(|token| token != "(") {
+            return None;
+        }
+        let mut end = prefix_end;
+        while tokens.get(end).is_some_and(|token| token == "(") {
+            let Some(close) = matching_close(tokens, end) else {
+                return Some(MachineProblem::InvalidOperation);
+            };
+            end = close + 1;
+        }
+        Some(
+            self.reference(&tokens[..end])
+                .err()
+                .unwrap_or(MachineProblem::InvalidOperation),
+        )
+    }
+}
+
+pub(super) fn split_reference_modification(
+    tokens: &[String],
+) -> Result<(Vec<String>, Vec<String>), MachineProblem> {
+    let mut start = Vec::new();
+    let mut requested = Vec::new();
+    let mut found = false;
+    for token in tokens {
+        if !found {
+            if let Some((before, after)) = token.split_once(':') {
+                if !before.is_empty() {
+                    start.push(before.to_string());
+                }
+                if !after.is_empty() {
+                    requested.push(after.to_string());
+                }
+                found = true;
+            } else {
+                start.push(token.clone());
+            }
+        } else {
+            requested.push(token.clone());
+        }
+    }
+    if !found || start.is_empty() {
+        return Err(MachineProblem::ReferenceModificationError);
+    }
+    Ok((start, requested))
 }

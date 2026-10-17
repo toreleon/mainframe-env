@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Correct the retained cold-reconnect test inputs to use actual native manager custody, a compiled caller and a bounded test-only observation of the unchanged genuine reply, retaining every original acceptance assertion."

@@ -20,6 +20,13 @@ impl MqTrustedBatchRuntime {
     /// Exact modeled namespaces for a genuine native driver's Closing capture.
     /// Structural storage scopes do not attest compilation/topology or confer
     /// mutation, SAF, UOW or terminal permission. No wildcard is returned.
+    /// Exact control + immutable rich manifest/catalog/delivery metadata pins used by the existing
+    /// selected CONNECT publication. This returns no row or settlement authority.
+    pub fn native_custody_handoff_rows(
+        &self,
+    ) -> Vec<mainframe_env_store_api::ProviderStateIdentity> {
+        crate::service::selected_custody_handoff_rows()
+    }
     pub fn native_terminal_namespaces(&self) -> Vec<String> {
         crate::service::selected_terminal_namespaces()
     }
@@ -58,6 +65,21 @@ impl MqTrustedBatchRoot {
         }
     }
 
+    /// Closed privileged custody boundary on this actual original root/service.
+    /// Irreversible atomics only: never wait for a reentrant old service mutex.
+    /// This makes no durable cutoff or MQ disposition claim by itself.
+    pub fn revoke_native_authority(&self) -> Result<(), HostProblem> {
+        self.inner
+            .terminal
+            .compare_exchange(0, 3, Ordering::SeqCst, Ordering::SeqCst)
+            .map_err(|_| HostProblem::UnknownOutcome)?;
+        self.inner.runtime.service.revoke_selected_authority();
+        Ok(())
+    }
+    /// Read-only original shared transport-gate observation.
+    pub fn native_authority_revoked(&self) -> bool {
+        self.inner.terminal.load(Ordering::SeqCst) == 3
+    }
     /// Revoke the shared transport gate and fence the same selected authority.
     /// Unknown is not a source-known abnormal end or durable settlement choice.
     /// This callback is explicit; Drop never invokes it or retires the root.

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add source-pinned CardDemo J18 purge preparation and complete-image comparison controls while keeping unsupported BMP association, persistent-credit writes and application restart explicit and without journey credit."

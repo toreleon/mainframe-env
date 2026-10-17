@@ -111,19 +111,17 @@ fn memory_owned_sqlite_selected_graph_is_read_only_and_survives_reopen() {
         );
         // Optional explicit fixture generation is setup data, not call evidence.
         // The manager resolves its output path outside targets before requesting it.
-        if !sqlite {
-            if let Some(path) = std::env::var_os("MQ_SELECTED_RETENTION_FIXTURE_OUTPUT") {
-                let value: Vec<_> = rows
-                    .iter()
-                    .map(|row| {
-                        json!({
-                            "namespace": row.namespace, "key": row.key,
-                            "version": row.version, "payload": row.payload,
-                        })
+        if !sqlite && let Some(path) = std::env::var_os("MQ_SELECTED_RETENTION_FIXTURE_OUTPUT") {
+            let value: Vec<_> = rows
+                .iter()
+                .map(|row| {
+                    json!({
+                        "namespace": row.namespace, "key": row.key,
+                        "version": row.version, "payload": row.payload,
                     })
-                    .collect();
-                std::fs::write(path, serde_json::to_vec_pretty(&value).unwrap()).unwrap();
-            }
+                })
+                .collect();
+            std::fs::write(path, serde_json::to_vec_pretty(&value).unwrap()).unwrap();
         }
         drop(f);
         backend.reopen();

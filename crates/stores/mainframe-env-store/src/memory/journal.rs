@@ -6,10 +6,10 @@
 //! size), and it runs on every nested `CALL` journal write (#55), which made
 //! `CREASTMT` quadratic in the number of calls.
 //!
-//! Those three methods now mutate the locked `State` in place. Before each
-//! mutation they call one of this module's `touch_*` methods, which records
-//! the prior value (or absence) of exactly the entry about to change. On any
-//! `Err`, [`Journal::rollback`] replays those entries in reverse order,
+//! Those three methods now mutate the locked `State` in place. `touch_*`
+//! records the prior value before mutation; atomic provider puts instead move
+//! the replaced row into the journal after successful validation and insertion.
+//! On any `Err`, [`Journal::rollback`] replays those entries in reverse order,
 //! restoring `State` to what it held before the call. Every `touch_*` call
 //! is O(1) or O(size of the one entry touched), never O(store size).
 //!
@@ -99,6 +99,14 @@ impl Journal {
         ));
     }
 
+    pub(super) fn record_provider_state(
+        &mut self,
+        key: (String, String),
+        prior: Option<ProviderStateRecord>,
+    ) {
+        self.entries.push(Entry::ProviderState(key, prior));
+    }
+
     pub(super) fn touch_blob_bytes(&mut self, state: &State) {
         self.entries.push(Entry::BlobBytes(state.blob_bytes));
     }
@@ -178,6 +186,24 @@ pub(super) fn journaled<T>(
 }
 
 impl JournalStore for MemoryStore {
+    fn root_custody_supported(&self) -> bool {
+        true
+    }
+    fn admit_root_successor(
+        &self,
+        request: mainframe_env_store_api::RootCustodySuccessor,
+    ) -> Result<mainframe_env_store_api::RootDriverClaim, StoreError> {
+        self.root_admit_successor(request)
+    }
+    fn capture_root_custody_cutoff(
+        &self,
+        claim: &mainframe_env_store_api::RootDriverClaim,
+        execution: &ExecutionRecord,
+        tick: u64,
+    ) -> Result<mainframe_env_store_api::RootCustodyCutoff, StoreError> {
+        self.root_capture_cutoff(claim, execution, tick)
+    }
+
     fn commit_checked_replay_refusal(
         &self,
         request: mainframe_env_store_api::CheckedReplayRefusalStep,

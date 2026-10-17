@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Remove a redundant private MQ fence-plan wrapper while retaining the prospective fence algorithm and existing publication controls."

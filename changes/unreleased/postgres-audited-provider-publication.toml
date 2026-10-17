@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Implemented PostgreSQL audited provider publication and nonwriting READ replay with shared identity, quota, dependency and successor-pin fences in backend-owned atomic transactions."

@@ -167,7 +167,7 @@ impl DefaultProgramRouter {
                 fence: mq.fence,
                 mq_limits: &profile,
                 content_digest: admitted.executable.content_id().as_bytes(),
-                semantic_identity: &semantic,
+                semantic_identity: semantic,
                 manifest_payload_digest: &admitted.metadata.manifest_payload_digest,
                 catalog: exact(catalog),
             },
@@ -247,7 +247,20 @@ impl HostProvider for NativeProgramProvider {
     }
     fn invoke(&self, original: &Invocation, effect: EffectRequest) -> EffectResult {
         match self.router.upgrade() {
-            Some(router) => router.invoke(original, effect),
+            Some(router) => {
+                #[cfg(test)]
+                if let Some(observer) = router.cobol.native_root_reply_observer.get() {
+                    let offer = effect.clone();
+                    let returned = router.invoke(original, effect);
+                    // Passive bounded observation only. Even a poisoned/full
+                    // observer cannot replace or change the actual reply.
+                    if let Ok(mut observer) = observer.lock() {
+                        observer.record(original, offer, &returned);
+                    }
+                    return returned;
+                }
+                router.invoke(original, effect)
+            }
             None => EffectResult {
                 sequence: effect.sequence,
                 outcome: Err(HostProblem::UnknownOutcome),
@@ -386,6 +399,30 @@ struct Hooks<'a, 'b> {
 }
 
 impl NativeRootHooks for Hooks<'_, '_> {
+    fn admit_storage(
+        &mut self,
+        store: &Arc<dyn PlatformStore>,
+        admission: mainframe_env_store_api::RootDriverAdmission,
+    ) -> Result<RootDriverClaim, mainframe_env_store_api::StoreError> {
+        let cutoff = self
+            .drive
+            .mq
+            .successor
+            .lock()
+            .map_err(|_| mainframe_env_store_api::StoreError::InvalidTransition)?
+            .take();
+        match cutoff {
+            Some(cutoff) => {
+                store.admit_root_successor(mainframe_env_store_api::RootCustodySuccessor {
+                    cutoff,
+                    admission,
+                    handoff_rows: self.drive.mq.runtime.native_custody_handoff_rows(),
+                })
+            }
+            None => store.admit_root_driver(admission),
+        }
+    }
+
     fn admitted(&mut self, proof: &NativeRootAdmission<'_>) -> Result<(), HostProblem> {
         let d = &mut self.drive;
         if proof.original() != d.original
@@ -467,7 +504,7 @@ impl NativeRootHooks for Hooks<'_, '_> {
                 RootEntry::Retained {
                     root: root.clone(),
                     frame: frame.clone(),
-                    native: Some(proof.claim().clone()),
+                    native: Some(Box::new(proof.claim().clone())),
                 },
             );
         }

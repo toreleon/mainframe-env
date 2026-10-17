@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Kept later production visible to dehardcoding guards by excluding actual Rust test items instead of truncating source at test markers."

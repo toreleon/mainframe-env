@@ -319,6 +319,7 @@ impl SecurityDatabase {
         supplied_tick: u64,
         observations: &[RetentionObservation],
     ) -> Result<RacfRetentionForecast, HostProblem> {
+        self.require_composition_known()?;
         validate_retention_policy(policy)?;
         if supplied_tick == 0 {
             return Err(HostProblem::Malformed);
@@ -436,10 +437,14 @@ impl SecurityDatabase {
     }
 
     fn source_record(&self) -> Result<ProviderStateRecord, HostProblem> {
-        self.store
+        self.require_composition_known()?;
+        let record = self
+            .store
             .get_provider_state(DATABASE_NAMESPACE, DATABASE_KEY)
             .map_err(store_problem)?
-            .ok_or(HostProblem::InfrastructureFailure)
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        self.require_composition_known()?;
+        Ok(record)
     }
 }
 
@@ -475,6 +480,7 @@ impl SecurityDatabase {
         observations: ObservationIndex,
         expected_epoch: Option<u64>,
     ) -> Result<RacfRetentionReceipt, HostProblem> {
+        self.require_composition_known()?;
         validate_retention_policy(policy)?;
         if supplied_tick == 0 {
             return Err(HostProblem::Malformed);
@@ -487,6 +493,7 @@ impl SecurityDatabase {
             .writer
             .lock()
             .map_err(|_| HostProblem::InfrastructureFailure)?;
+        self.require_composition_known()?;
         let mut batch_limit = policy.max_batch_records;
         'conflict: for attempt in 0..MAX_PLAN_ATTEMPTS {
             let current_epoch = self

@@ -5,6 +5,12 @@ pub struct BtsLifecycleStore<'a> {
     pub(super) store: &'a dyn ProviderStateStore,
 }
 
+struct DefineOwner<'a> {
+    run_unit: &'a str,
+    owner_execution: &'a str,
+    owner_principal: &'a str,
+}
+
 impl<'a> BtsLifecycleStore<'a> {
     pub fn new(store: &'a dyn ProviderStateStore) -> Self {
         Self { store }
@@ -202,9 +208,11 @@ impl<'a> BtsLifecycleStore<'a> {
     ) -> Result<(), HostProblem> {
         self.define_process_inner(
             process,
-            run_unit,
-            owner_execution,
-            owner_principal,
+            DefineOwner {
+                run_unit,
+                owner_execution,
+                owner_principal,
+            },
             None,
             None,
             false,
@@ -225,9 +233,11 @@ impl<'a> BtsLifecycleStore<'a> {
         validate_identifier(effect_key, 256)?;
         self.define_process_inner(
             process,
-            run_unit,
-            owner_execution,
-            owner_principal,
+            DefineOwner {
+                run_unit,
+                owner_execution,
+                owner_principal,
+            },
             Some((effect_key, request_digest)),
             None,
             false,
@@ -250,9 +260,11 @@ impl<'a> BtsLifecycleStore<'a> {
         validate_identifier(effect_key, 256)?;
         self.define_process_inner(
             process,
-            run_unit,
-            owner_execution,
-            owner_principal,
+            DefineOwner {
+                run_unit,
+                owner_execution,
+                owner_principal,
+            },
             Some((effect_key, request_digest)),
             Some(repository_resource),
             false,
@@ -275,9 +287,11 @@ impl<'a> BtsLifecycleStore<'a> {
         validate_identifier(effect_key, 256)?;
         self.define_process_inner(
             process,
-            run_unit,
-            owner_execution,
-            owner_principal,
+            DefineOwner {
+                run_unit,
+                owner_execution,
+                owner_principal,
+            },
             Some((effect_key, request_digest)),
             Some(repository_resource),
             true,
@@ -288,14 +302,17 @@ impl<'a> BtsLifecycleStore<'a> {
     fn define_process_inner(
         &self,
         process: BtsProcess,
-        run_unit: &str,
-        owner_execution: &str,
-        owner_principal: &str,
+        owner: DefineOwner<'_>,
         effect: Option<(&str, [u8; 32])>,
         repository_resource: Option<&str>,
         nocheck: bool,
         attempts_left: usize,
     ) -> Result<(), HostProblem> {
+        let DefineOwner {
+            run_unit,
+            owner_execution,
+            owner_principal,
+        } = owner;
         if attempts_left == 0 {
             return Err(HostProblem::UnknownOutcome);
         }
@@ -317,26 +334,25 @@ impl<'a> BtsLifecycleStore<'a> {
         {
             return Err(HostProblem::IdempotencyConflict);
         }
-        if let Some((effect_key, request_digest)) = effect {
-            if acquisition
+        if let Some((effect_key, request_digest)) = effect
+            && acquisition
                 .effect
                 .as_ref()
                 .is_some_and(|saved| saved.key == effect_key)
+        {
+            let saved = acquisition.effect.as_ref().expect("checked effect");
+            return if saved.operation == "DEFINE PROCESS"
+                && saved.request_digest == request_digest
+                && saved.process_type == process.process_type
+                && saved.process_name == process.name
+                && saved.activity_id == process.root_id
+                && saved.repository_resource.as_deref() == repository_resource
+                && saved.nocheck == nocheck
             {
-                let saved = acquisition.effect.as_ref().expect("checked effect");
-                return if saved.operation == "DEFINE PROCESS"
-                    && saved.request_digest == request_digest
-                    && saved.process_type == process.process_type
-                    && saved.process_name == process.name
-                    && saved.activity_id == process.root_id
-                    && saved.repository_resource.as_deref() == repository_resource
-                    && saved.nocheck == nocheck
-                {
-                    Ok(())
-                } else {
-                    Err(HostProblem::IdempotencyConflict)
-                };
-            }
+                Ok(())
+            } else {
+                Err(HostProblem::IdempotencyConflict)
+            };
         }
         if acquisition.is_held() {
             return Err(HostProblem::Condition {
@@ -377,9 +393,11 @@ impl<'a> BtsLifecycleStore<'a> {
                 Ok(()) => Ok(()),
                 Err(StoreError::AlreadyExists | StoreError::Conflict) => self.define_process_inner(
                     process,
-                    run_unit,
-                    owner_execution,
-                    owner_principal,
+                    DefineOwner {
+                        run_unit,
+                        owner_execution,
+                        owner_principal,
+                    },
                     effect,
                     repository_resource,
                     nocheck,
@@ -412,9 +430,11 @@ impl<'a> BtsLifecycleStore<'a> {
                 if nocheck {
                     return self.define_process_inner(
                         process,
-                        run_unit,
-                        owner_execution,
-                        owner_principal,
+                        DefineOwner {
+                            run_unit,
+                            owner_execution,
+                            owner_principal,
+                        },
                         effect,
                         repository_resource,
                         nocheck,
@@ -517,24 +537,23 @@ impl<'a> BtsLifecycleStore<'a> {
             {
                 return Err(HostProblem::IdempotencyConflict);
             }
-            if let Some((operation, effect_key, request_digest)) = effect {
-                if acquisition
+            if let Some((operation, effect_key, request_digest)) = effect
+                && acquisition
                     .effect
                     .as_ref()
                     .is_some_and(|saved| saved.key == effect_key)
+            {
+                let saved = acquisition.effect.as_ref().expect("checked effect");
+                return if saved.operation == operation
+                    && saved.request_digest == request_digest
+                    && saved.process_type == process_type
+                    && saved.process_name == process_name
+                    && saved.activity_id == activity_id
                 {
-                    let saved = acquisition.effect.as_ref().expect("checked effect");
-                    return if saved.operation == operation
-                        && saved.request_digest == request_digest
-                        && saved.process_type == process_type
-                        && saved.process_name == process_name
-                        && saved.activity_id == activity_id
-                    {
-                        Ok(())
-                    } else {
-                        Err(HostProblem::IdempotencyConflict)
-                    };
-                }
+                    Ok(())
+                } else {
+                    Err(HostProblem::IdempotencyConflict)
+                };
             }
             if acquisition.is_held() {
                 return Err(HostProblem::Condition {
@@ -613,13 +632,16 @@ impl<'a> BtsLifecycleStore<'a> {
         &self,
         process_type: &str,
         process_name: &str,
-        run_unit: &str,
-        owner_execution: &str,
-        owner_principal: &str,
-        replay_key: &str,
-        request_digest: [u8; 32],
+        replay: BtsReplayContext<'_>,
         transition: impl Fn(&mut BtsProcess) -> Result<BtsReply, HostProblem>,
     ) -> Result<BtsReply, HostProblem> {
+        let BtsReplayContext {
+            run_unit,
+            owner_execution,
+            owner_principal,
+            replay_key,
+            request_digest,
+        } = replay;
         validate_identifier(run_unit, 256)?;
         validate_identifier(owner_execution, 256)?;
         validate_identifier(owner_principal, 256)?;

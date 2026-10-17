@@ -1,5 +1,43 @@
 use super::*;
+use mainframe_env_application::{
+    APPLICATION_PUBLICATION_CONTRACT, APPLICATION_PUBLICATION_NAMESPACE,
+    ApplicationPublicationState, PublicationAction, PublicationSectionState,
+};
 use mainframe_env_host_api::ImsResult;
+
+// This trusted composition fixture publishes no SQL or optional IMS metadata/TM sections.
+// The existing participant owns its generic utility operations; the exact validated
+// controller receipt is explicitly joined to a complete publication record.
+fn install_complete_controller(service: &BatchService, generation: BatchControllerGeneration) {
+    let receipt = service.install_controllers(generation).unwrap();
+    let state = ApplicationPublicationState {
+        schema_version: APPLICATION_PUBLICATION_CONTRACT.into(),
+        package: receipt.application.clone(),
+        generation: receipt.generation,
+        identity: receipt.identity,
+        action: PublicationAction::Install,
+        controllers: PublicationSectionState::Applied,
+        db2: PublicationSectionState::NotApplicable,
+        ims: PublicationSectionState::NotApplicable,
+        complete: true,
+    };
+    let before = service
+        .store
+        .get_provider_state(APPLICATION_PUBLICATION_NAMESPACE, &receipt.application)
+        .unwrap();
+    service
+        .store
+        .put_provider_state(
+            ProviderStateRecord {
+                namespace: APPLICATION_PUBLICATION_NAMESPACE.into(),
+                key: receipt.application,
+                version: before.as_ref().map_or(1, |row| row.version + 1),
+                payload: serde_json::to_vec(&state).unwrap(),
+            },
+            before.as_ref().map(|row| row.version),
+        )
+        .unwrap();
+}
 
 struct Participant {
     descriptor: CapabilityDescriptor,
@@ -102,7 +140,7 @@ fn fixture(
         child_record_bytes: 4,
         parent_key_bytes: 2,
     };
-    service.install_controllers(generation).unwrap();
+    install_complete_controller(&service, generation);
     let input = ProgramInput {
         parameter: Some("BMP,LOADER,PSB".into()),
         dds: Vec::new(),
@@ -149,6 +187,153 @@ fn loader_failure_never_returns_success_or_commits_rejected_load() {
     assert_eq!(participant.calls.lock().unwrap().len(), 2);
 }
 
+fn assert_duplicate_roots_refused(duplicate: &[u8]) {
+    let (service, participant, invocation, job, mut input) = fixture("  ", false);
+    input.dd_records.insert(
+        "ROOTS".into(),
+        vec![b"01AB".to_vec(), b"02EF".to_vec(), duplicate.to_vec()],
+    );
+    let before = service
+        .controllers
+        .lock()
+        .unwrap()
+        .registry
+        .state_payload()
+        .unwrap();
+    let mut sequence = 7;
+    let result = service.execute_ims_controller(
+        &invocation,
+        &job,
+        &job.plan.steps[0],
+        &input,
+        &mut sequence,
+    );
+    assert!(participant.calls.lock().unwrap().is_empty());
+    assert_eq!(sequence, 7);
+    assert_eq!(result, Err(HostProblem::Malformed));
+    assert_eq!(
+        service
+            .controllers
+            .lock()
+            .unwrap()
+            .registry
+            .state_payload()
+            .unwrap(),
+        before
+    );
+    input
+        .dd_records
+        .insert("ROOTS".into(), vec![b"01AB".to_vec()]);
+    assert_eq!(
+        service
+            .execute_ims_controller(&invocation, &job, &job.plan.steps[0], &input, &mut sequence,)
+            .unwrap()
+            .return_code,
+        0
+    );
+}
+
+#[test]
+fn cv206_duplicate_roots_with_different_payloads_refuse_before_participant_calls() {
+    assert_duplicate_roots_refused(b"01XY");
+}
+
+#[test]
+fn cv206_identical_duplicate_roots_refuse_before_participant_calls() {
+    assert_duplicate_roots_refused(b"01AB");
+}
+
+#[test]
+fn cv206_oversized_root_key_install_preserves_persisted_selection_and_loader() {
+    let (service, participant, invocation, job, input) = fixture("  ", false);
+    let before = service
+        .store
+        .get_provider_state(CONTROLLER_STATE_NAMESPACE, CONTROLLER_STATE_KEY)
+        .unwrap()
+        .unwrap();
+    let mut invalid = controller_generation(2, "LOADER");
+    invalid.controllers[0].selector =
+        BatchControllerSelector::ims("BMP", "LOADER", Some("PSB")).unwrap();
+    invalid.controllers[0].plan = BatchControllerPlan::ImsLoad {
+        database: "DATABASE".into(),
+        root_dd: "ROOTS".into(),
+        child_dd: "CHILDREN".into(),
+        root_record_bytes: 4,
+        child_record_bytes: 8,
+        parent_key_bytes: 5,
+    };
+    assert_eq!(
+        service.install_controllers(invalid),
+        Err(HostProblem::Malformed)
+    );
+    let after = service
+        .store
+        .get_provider_state(CONTROLLER_STATE_NAMESPACE, CONTROLLER_STATE_KEY)
+        .unwrap()
+        .unwrap();
+    assert_eq!(after.version, before.version);
+    assert_eq!(after.payload, before.payload);
+    let durable = service.controllers.lock().unwrap();
+    assert_eq!(durable.store_version, before.version);
+    assert_eq!(durable.registry.state_payload().unwrap(), before.payload);
+    drop(durable);
+    assert!(participant.calls.lock().unwrap().is_empty());
+    let reopened = super::service(service.store.clone(), participant.clone());
+    assert_eq!(
+        reopened
+            .execute_ims_controller(&invocation, &job, &job.plan.steps[0], &input, &mut 0)
+            .unwrap()
+            .return_code,
+        0
+    );
+}
+
+#[test]
+fn cv206_loader_preserves_distinct_roots_children_and_key_width_boundary() {
+    let (service, participant, invocation, job, mut input) = fixture("  ", false);
+    let mut generation = controller_generation(2, "LOADER");
+    generation.controllers[0].selector =
+        BatchControllerSelector::ims("BMP", "LOADER", Some("PSB")).unwrap();
+    generation.controllers[0].plan = BatchControllerPlan::ImsLoad {
+        database: "DATABASE".into(),
+        root_dd: "ROOTS".into(),
+        child_dd: "CHILDREN".into(),
+        root_record_bytes: 2,
+        child_record_bytes: 4,
+        parent_key_bytes: 2,
+    };
+    install_complete_controller(&service, generation);
+    input
+        .dd_records
+        .insert("ROOTS".into(), vec![b"02".to_vec(), b"01".to_vec()]);
+    input.dd_records.insert(
+        "CHILDREN".into(),
+        vec![b"02EF".to_vec(), b"01CD".to_vec(), b"01GH".to_vec()],
+    );
+    assert_eq!(
+        service
+            .execute_ims_controller(&invocation, &job, &job.plan.steps[0], &input, &mut 0)
+            .unwrap()
+            .return_code,
+        0
+    );
+    let calls = participant.calls.lock().unwrap();
+    assert_eq!(calls.len(), 2);
+    assert_eq!(calls[0].1.operation, ImsOperation::Load);
+    assert_eq!(calls[1].1.operation, ImsOperation::Commit);
+    let image: serde_json::Value = serde_json::from_slice(&calls[0].1.data).unwrap();
+    assert_eq!(
+        image,
+        serde_json::json!({
+            "database": "DATABASE",
+            "roots": [
+                {"data": [48, 49], "children": [[67, 68], [71, 72]]},
+                {"data": [48, 50], "children": [[69, 70]]}
+            ]
+        })
+    );
+}
+
 #[test]
 fn loader_rejects_unowned_sysin_before_loading() {
     let (service, participant, invocation, job, mut input) = fixture("  ", false);
@@ -177,7 +362,7 @@ fn purge_rejects_extra_or_unimplemented_controls_before_scheduling() {
         checkpoint_prefix: "DEMO".into(),
         summary_field: "SUMMARY".into(),
     };
-    service.install_controllers(generation).unwrap();
+    install_complete_controller(&service, generation);
     input.parameter = Some("BMP,PURGE,PSB".into());
     for (records, expected) in [
         (
@@ -195,4 +380,57 @@ fn purge_rejects_extra_or_unimplemented_controls_before_scheduling() {
         );
     }
     assert!(participant.calls.lock().unwrap().is_empty());
+}
+
+#[test]
+fn selected_ims_controller_without_complete_publication_never_calls_participant() {
+    let (service, participant, invocation, job, input) = fixture("  ", false);
+    let row = service
+        .store
+        .get_provider_state(APPLICATION_PUBLICATION_NAMESPACE, "RESTART-FIXTURE")
+        .unwrap()
+        .unwrap();
+    service
+        .store
+        .delete_provider_state(APPLICATION_PUBLICATION_NAMESPACE, &row.key, row.version)
+        .unwrap();
+    assert_eq!(
+        service.execute_ims_controller(&invocation, &job, &job.plan.steps[0], &input, &mut 0),
+        Err(HostProblem::NotFound)
+    );
+    assert!(participant.calls.lock().unwrap().is_empty());
+}
+
+#[test]
+fn mismatched_and_partial_ims_publications_never_call_participant() {
+    let (service, participant, invocation, job, input) = fixture("  ", false);
+    let original = service
+        .store
+        .get_provider_state(APPLICATION_PUBLICATION_NAMESPACE, "RESTART-FIXTURE")
+        .unwrap()
+        .unwrap();
+    let valid: ApplicationPublicationState = serde_json::from_slice(&original.payload).unwrap();
+    let mut current = original;
+    for field in [0, 1, 2, 3, 4] {
+        let mut state = valid.clone();
+        match field {
+            0 => state.generation = 2,
+            1 => state.identity = format!("sha256:{:064x}", 999),
+            2 => state.complete = false,
+            3 => state.db2 = PublicationSectionState::Applying,
+            _ => state.controllers = PublicationSectionState::NotApplicable,
+        }
+        let previous = current.version;
+        current.version += 1;
+        current.payload = serde_json::to_vec(&state).unwrap();
+        service
+            .store
+            .put_provider_state(current.clone(), Some(previous))
+            .unwrap();
+        assert_eq!(
+            service.execute_ims_controller(&invocation, &job, &job.plan.steps[0], &input, &mut 0),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        assert!(participant.calls.lock().unwrap().is_empty());
+    }
 }

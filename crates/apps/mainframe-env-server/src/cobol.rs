@@ -40,8 +40,12 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 pub(crate) mod artifact;
 mod mqi;
+mod protected_cics;
 mod runtime;
 mod selected_link;
+pub use protected_cics::{
+    CicsProtectedCompiledDispatch, CicsProtectedCompiledHost, CicsProtectedCompiledProgram,
+};
 mod staged_invocation;
 mod storage_scope;
 use artifact::{AdmittedProgram, admit_published_artifact};
@@ -88,6 +92,12 @@ pub struct DefaultProgramRouter {
 }
 
 impl DefaultProgramRouter {
+    pub(crate) fn has_registered_program(&self, program: &str) -> bool {
+        self.router
+            .supported_programs()
+            .any(|name| name.eq_ignore_ascii_case(program))
+    }
+
     /// Bind at setup, before dispatch. Rebinding cannot change an active clock domain.
     pub fn bind_execution_control(
         &self,
@@ -237,6 +247,23 @@ fn persist_batch_file_cursors(
         .map_err(|_| HostProblem::InfrastructureFailure)
 }
 
+#[cfg(test)]
+#[derive(Default)]
+struct NativeRootReplyObservation {
+    first: Option<(Invocation, EffectRequest, EffectResult)>,
+    overflow: bool,
+}
+#[cfg(test)]
+impl NativeRootReplyObservation {
+    fn record(&mut self, original: &Invocation, offer: EffectRequest, returned: &EffectResult) {
+        if self.first.is_some() {
+            self.overflow = true;
+        } else {
+            self.first = Some((original.clone(), offer, returned.clone()));
+        }
+    }
+}
+
 struct CobolProgram {
     setup: std::sync::Mutex<()>,
     host: OnceLock<Arc<ScopedHostService>>,
@@ -248,6 +275,8 @@ struct CobolProgram {
     mqi_host: OnceLock<Arc<dyn ProgramMqHostAdmission>>,
     native_mq_host: OnceLock<std::sync::Weak<ConfiguredInstalledMqHost>>,
     native_root_program: OnceLock<std::sync::Weak<dyn HostProvider>>,
+    #[cfg(test)]
+    native_root_reply_observer: OnceLock<Arc<std::sync::Mutex<NativeRootReplyObservation>>>,
     clock_start: Instant,
     clock_epoch: Option<u64>,
 }
@@ -265,6 +294,8 @@ impl CobolProgram {
             mqi_host: OnceLock::new(),
             native_mq_host: OnceLock::new(),
             native_root_program: OnceLock::new(),
+            #[cfg(test)]
+            native_root_reply_observer: OnceLock::new(),
             clock_start: Instant::now(),
             clock_epoch: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -1342,5 +1373,14 @@ mod tests {
         );
         assert_eq!(store.events(&execution, 1, 16).unwrap().len(), 5);
         assert_eq!(store.pending_notifications(16).unwrap().len(), 5);
+    }
+
+    #[test]
+    fn publication_queries_the_actual_router_without_a_duplicate_registry() {
+        let router = default_program_router();
+        assert!(router.has_registered_program("IEFBR14"));
+        assert!(router.has_registered_program("iefbr14"));
+        assert!(router.has_registered_program("COBOL"));
+        assert!(!router.has_registered_program("FENCEONE"));
     }
 }

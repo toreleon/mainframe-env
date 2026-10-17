@@ -657,6 +657,7 @@ fn replay_write(
         request_digest,
         result_digest: Some(result_digest),
         binding_digest: None,
+        read_alias: None,
         response: response.clone(),
     };
     replay.binding_digest = Some(cics_effect_replay_binding_digest(&replay));

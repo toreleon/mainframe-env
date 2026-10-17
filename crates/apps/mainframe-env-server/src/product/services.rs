@@ -2,6 +2,68 @@
 use super::*;
 
 impl ProductServer {
+    #[must_use]
+    pub fn readiness(&self) -> ProductReadiness {
+        let capacity = self
+            .config
+            .retention
+            .policy()
+            .ok()
+            .and_then(|policy| self.store.retention_capacity_health(policy).ok());
+        let retention_capacity = capacity
+            .as_ref()
+            .map_or(ProductCapacityStatus::Unavailable, |health| {
+                health.saturation.into()
+            });
+        ProductReadiness {
+            accepting: self.accepting.load(Ordering::SeqCst)
+                && !self.local_composition_uncertain.load(Ordering::SeqCst),
+            writable_store: capacity.is_some(),
+            retention_capacity,
+            retention_warning: retention_capacity.warning(),
+            bootstrap_identity: self.bootstrap_principal_ready(),
+            host_capabilities: [
+                "host.cics.execute",
+                "host.db2.read",
+                "host.db2.write",
+                "host.ims.read",
+                "host.ims.write",
+                "host.mq.read",
+                "host.mq.write",
+            ]
+            .into_iter()
+            .all(|capability| self.host.capability_ready(capability)),
+            artifact_store: self.artifacts.is_ready(),
+            jes_workers: self.jes_workers_ready(),
+        }
+    }
+
+    pub(super) fn online_transaction(
+        &self,
+        transaction: &str,
+    ) -> Result<Option<(String, ArtifactRef)>, GatewayProblem> {
+        self.require_local_owner_known().map_err(gateway_problem)?;
+        let transaction = normalize_online_name(transaction, 16).map_err(gateway_problem)?;
+        let programs = self
+            .online_programs
+            .lock()
+            .map_err(|_| gateway_problem(HostProblem::InfrastructureFailure))?;
+        let transactions = self
+            .online_transactions
+            .lock()
+            .map_err(|_| gateway_problem(HostProblem::InfrastructureFailure))?;
+        // Check after acquiring both owners; an unknown commit cannot leak stale routes.
+        self.require_local_owner_known().map_err(gateway_problem)?;
+        let Some(program) = transactions.get(&transaction).cloned() else {
+            return Ok(None);
+        };
+        let artifact = programs
+            .get(&program)
+            .cloned()
+            .ok_or_else(|| gateway_problem(HostProblem::InfrastructureFailure))?;
+        Ok(Some((program, artifact)))
+    }
+
     pub fn memory(config: ServerConfig) -> Result<Arc<Self>, HostProblem> {
         let store: Arc<dyn PlatformStore> = Arc::new(MemoryStore::new(Default::default()));
         let secrets = Arc::new(MemorySecretResolver::default());

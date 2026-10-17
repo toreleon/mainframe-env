@@ -465,3 +465,117 @@ fn admission_summary_substitution_cannot_replace_the_immutable_original_effect()
         }
     }
 }
+
+fn assert_size_summary_refused(store: &dyn PlatformStore, above_original: bool, with_intent: bool) {
+    let f = Fixture::new();
+    f.seed_execution(store, f.execution());
+    let record = f.intent();
+    if with_intent {
+        store.record_intent(record.clone()).unwrap();
+    }
+    let execution = store.get_execution(&f.invocation.execution_id).unwrap();
+    let epoch = store.provider_state_retention_epoch().unwrap();
+    let original_bytes =
+        canonical_request_size(&f.effect.request, MAX_CANONICAL_EFFECT_BYTES).unwrap();
+    assert!(original_bytes > 0 && original_bytes < MAX_CANONICAL_EFFECT_BYTES);
+    let scope = f.scope();
+    let mut admission = admit_mqi(&scope, &f.invocation, 10).unwrap();
+    if with_intent {
+        assert!(bind_core_intent(&admission, store, 20).is_ok());
+    } else {
+        assert_eq!(
+            bind_core_intent(&admission, store, 20).err(),
+            Some(MqIntentProblem::Store(StoreError::NotFound))
+        );
+    }
+    let MqMqiAdmission::ServiceValidation(identity) = &mut admission else {
+        unreachable!()
+    };
+    let HostRequest::MqMqi(original) = &f.effect.request else {
+        unreachable!()
+    };
+    assert_eq!(identity.host_request_bytes, original_bytes);
+    assert_eq!(identity.host_request_digest, record.request_digest);
+    assert_eq!(
+        identity.host_request_digest,
+        canonical_request_digest(&f.effect.request).unwrap()
+    );
+    assert_eq!(identity.capability, f.provider.capability);
+    assert_eq!(identity.owner, f.owner);
+    assert_eq!(
+        identity.origin,
+        crate::retention::MqReplayOwnerKind::CoreEffect
+    );
+    assert_eq!(identity.outer_effect_key, None);
+    assert!(std::ptr::eq(identity.envelope, &original.envelope));
+    assert!(std::ptr::eq(identity.mutation, &original.mutation));
+    // Only the retained summary changes; the borrowed original remains authoritative.
+    identity.host_request_bytes = if above_original {
+        original_bytes + 1
+    } else {
+        original_bytes - 1
+    };
+    let refusal = bind_core_intent(&admission, store, 20).err();
+    unchanged(store, &f, epoch);
+    assert_eq!(
+        store.get_provider_state("mq-v1-queue", "QUEUE").unwrap(),
+        None
+    );
+    assert_eq!(
+        store.get_execution(&f.invocation.execution_id).unwrap(),
+        execution
+    );
+    assert_eq!(
+        store.effect(&record.key).unwrap(),
+        with_intent.then_some(record)
+    );
+    assert_eq!(refusal, Some(MqIntentProblem::Store(StoreError::Conflict)));
+}
+
+#[test]
+fn memory_admission_size_below_original_is_refused_before_intent_lookup() {
+    let store = MemoryStore::new(StoreLimits {
+        max_blob_bytes: 8192,
+        ..StoreLimits::default()
+    });
+    assert_size_summary_refused(&store, false, true);
+    // A separate fresh probe distinguishes early conflict from missing-intent lookup.
+    let absent = MemoryStore::new(StoreLimits {
+        max_blob_bytes: 8192,
+        ..StoreLimits::default()
+    });
+    assert_size_summary_refused(&absent, false, false);
+}
+
+#[test]
+fn memory_admission_size_above_original_is_refused_before_intent_lookup() {
+    let store = MemoryStore::new(StoreLimits {
+        max_blob_bytes: 8192,
+        ..StoreLimits::default()
+    });
+    assert_size_summary_refused(&store, true, true);
+    // A separate fresh probe distinguishes early conflict from missing-intent lookup.
+    let absent = MemoryStore::new(StoreLimits {
+        max_blob_bytes: 8192,
+        ..StoreLimits::default()
+    });
+    assert_size_summary_refused(&absent, true, false);
+}
+
+#[test]
+fn sqlite_admission_size_below_original_is_refused_before_intent_lookup() {
+    let store = SqliteStateStore::open("sqlite::memory:", 8192, 64).unwrap();
+    assert_size_summary_refused(&store, false, true);
+    // A separate fresh probe distinguishes early conflict from missing-intent lookup.
+    let absent = SqliteStateStore::open("sqlite::memory:", 8192, 64).unwrap();
+    assert_size_summary_refused(&absent, false, false);
+}
+
+#[test]
+fn sqlite_admission_size_above_original_is_refused_before_intent_lookup() {
+    let store = SqliteStateStore::open("sqlite::memory:", 8192, 64).unwrap();
+    assert_size_summary_refused(&store, true, true);
+    // A separate fresh probe distinguishes early conflict from missing-intent lookup.
+    let absent = SqliteStateStore::open("sqlite::memory:", 8192, 64).unwrap();
+    assert_size_summary_refused(&absent, true, false);
+}

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Reuse existing sequential dataset record allocations during append preparation under a rollback guard, preserving complete validation, atomic replay publication and error recovery."

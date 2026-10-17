@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Repair compiler and interpreter lint diagnostics and box private MQI pending targets while preserving ownership, fencing, arithmetic boundaries, and checkpoint bytes."

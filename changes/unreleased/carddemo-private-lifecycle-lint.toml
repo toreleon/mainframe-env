@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Fixed private CardDemo initialization and retained V3 comparison owners to return the awaited result directly and carry selected generation with its expected publication action without changing observations or limits."

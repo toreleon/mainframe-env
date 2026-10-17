@@ -24,7 +24,7 @@ fn real_compiled_selected_call_commits_original_receipts_and_both_audit_layers()
             serde_json::from_slice(payload.bytes()).unwrap();
         assert_eq!(output.records, vec![b"DONE".to_vec()]);
         assert_eq!(f.parent, parent);
-        assert!(parent.bindings.get("mq.host-context").is_none());
+        assert!(!parent.bindings.contains_key("mq.host-context"));
         let children = f.factory.children.lock().unwrap();
         assert_eq!(children.len(), 1);
         let child = children[0].clone();

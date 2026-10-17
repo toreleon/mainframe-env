@@ -19,6 +19,19 @@ Applies from: **mainframe-env current subsystem contracts**
   second semantic authority.
 - Keep every compiler stage deterministic and bounded.
 
+## Bounded initializer representation
+
+`mainframe.core.cobol@1.init` retains its existing singular byte attribute.
+Large already-computed initializers use the separately registered
+`mainframe.core.cobol@2.init` contract described by
+[ADR-0061](../decisions/0061-cobol-chunked-initializer-carrier.md). Each chunk
+stays within the unchanged attribute bound; the shared static validator proves
+canonical coverage and one exact whole target view. The VM assembles the same
+vector before its existing fit/write and retained-entry override rules. Artifact
+manifests derive the actual mixed dialect-major set, and readers/executors require
+the registered operation identity. This representation supplies no IBM language
+semantic authority or runtime acceptance result.
+
 ## Source model
 
 `SourceBundle` owns the complete semantic input closure:

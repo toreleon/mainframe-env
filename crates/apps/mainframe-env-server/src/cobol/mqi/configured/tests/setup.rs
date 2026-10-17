@@ -1,12 +1,10 @@
 use super::*;
 use crate::cobol::*;
 use mainframe_env_compiler::CobolCompiler;
-use mainframe_env_compiler_api::*;
 use mainframe_env_execution_api::*;
 use mainframe_env_host_api::*;
 use mainframe_env_interpreter::{CoordinatorLimits, ExecutionCoordinator};
 use mainframe_env_store::{LocalArtifactStore, MemoryStore, SqliteStateStore};
-use mainframe_env_store_api::*;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
@@ -14,6 +12,9 @@ pub(super) const SOURCE: &str = "IDENTIFICATION DIVISION. PROGRAM-ID. MQFLOW. DA
 
 pub(super) struct Clock(pub AtomicU64, pub Mutex<Option<Box<dyn FnMut() + Send>>>);
 impl MqReplayClock for Clock {
+    fn custody_tick(&self) -> Result<u64, HostProblem> {
+        Ok(self.0.load(Ordering::SeqCst))
+    }
     fn now_tick(&self) -> Result<u64, HostProblem> {
         if let Some(hook) = self.1.lock().unwrap().as_mut() {
             hook();
@@ -46,10 +47,9 @@ impl EnterpriseAuthorizer for Saf {
         }
         if resource.class == EnterpriseResourceClass::MqUnitOfWork
             && resource.name.as_str() == "CURRENT"
+            && let Some(hook) = self.terminal_hook.lock().unwrap().as_mut()
         {
-            if let Some(hook) = self.terminal_hook.lock().unwrap().as_mut() {
-                hook();
-            }
+            hook();
         }
         if self.deny.load(Ordering::SeqCst) {
             Err(HostProblem::Unauthorized)
@@ -137,12 +137,14 @@ impl HostProvider for WeakRouter {
         self.router.upgrade().unwrap().invoke(original, effect)
     }
 }
+type AdmissionHook = Box<dyn FnOnce(&InstalledBatchAdmission<'_>) + Send>;
+
 pub(super) struct RecordingFactory {
     pub host: Arc<ConfiguredInstalledMqHost>,
     pub children: Mutex<Vec<Invocation>>,
     pub observations: Mutex<Vec<Arc<dyn mainframe_env_interpreter::MqMqiProgramFrame>>>,
-    pub hook: Mutex<Option<Box<dyn FnOnce(&InstalledBatchAdmission<'_>) + Send>>>,
-    pub nested_hook: Mutex<Option<Box<dyn FnOnce(&InstalledBatchAdmission<'_>) + Send>>>,
+    pub hook: Mutex<Option<AdmissionHook>>,
+    pub nested_hook: Mutex<Option<AdmissionHook>>,
     pub override_host: Mutex<Option<Arc<ConfiguredInstalledMqHost>>>,
     pub fail_preparation: AtomicBool,
     pub drop_at_admission: AtomicBool,
@@ -223,6 +225,21 @@ impl Fixture {
             capacity,
             false,
             include_bytes!("rich_fixture.json"),
+        )
+    }
+    #[cfg(unix)]
+    pub fn owned_native_points(rows: &[u8]) -> (Self, Arc<SqliteStateStore>) {
+        let mut root = hardening::TestRoot::new();
+        root.0 = root.0.canonicalize().unwrap();
+        let path = root.0.join("configured.db");
+        let concrete =
+            Arc::new(SqliteStateStore::create_owned_file(&path, 64 << 20, 65536).unwrap());
+        let store: Arc<dyn PlatformStore> = concrete.clone();
+        normalize_fixture_bytes(&*store, rows);
+        let url = format!("sqlite://{}?mode=rwc", path.display());
+        (
+            Self::from_normalized(root, store, url, 16, false, false, false, true),
+            concrete,
         )
     }
     pub fn native_points(sqlite: bool, rows: &[u8]) -> Self {

@@ -190,6 +190,34 @@ explicitly names that authority as superseded.
 - [ADR-0029: COBOL storage-entry identity](decisions/0029-cobol-storage-entry-identity.md)
 - [ADR-0030: Common CICS source condition authority](decisions/0030-cics-source-condition-authority.md)
 - [ADR-0050: Boxed shared host-effect payloads](decisions/0050-host-effect-envelope-layout.md)
+- [ADR-0051: Framed package identity and retained compatibility](decisions/0051-package-identity-framing.md)
+- [ADR-0052: Borrowed CICS operation inputs](decisions/0052-cics-operation-contexts.md)
+- [ADR-0053: Selected controller publication fence](decisions/0053-selected-controller-publication-fence.md)
+- [ADR-0054: Canonical focused conformance output](decisions/0054-focused-conformance-output.md)
+- [ADR-0055: Standard package MAC envelope](decisions/0055-standard-package-mac-envelope.md)
+- [ADR-0056: CICS first reverse read at a retained position](decisions/0056-cics-first-reverse-position.md)
+- [ADR-0057: Explicit native MQ root custody cutoff](decisions/0057-native-mq-root-custody-cutoff.md)
+- [ADR-0058: Protected native MQ scope succession](decisions/0058-native-mq-protected-scope-succession.md)
+- [ADR-0059: Serial owned SQLite file custody](decisions/0059-native-mq-serial-owned-sqlite-file-custody.md)
+- [ADR-0060: Passive CICS READ copyback observation](decisions/0060-passive-cics-read-copyback.md)
+- [ADR-0061: Bounded COBOL initializer byte carrier](decisions/0061-cobol-chunked-initializer-carrier.md)
+- [ADR-0062: Provisional passive Db2 machine copyback trace](decisions/0062-passive-db2-copyback.md)
+- [ADR-0063: Actual dispatch ownership for selected readonly effects](decisions/0063-readonly-dispatch-ownership.md)
+- [ADR-0064: Owned local application composition](decisions/0064-local-application-composition.md)
+- [ADR-0065: Local EXEC DLI exact storage copyback](decisions/0065-local-exec-dli-exact-storage-copyback.md)
+- [ADR-0068: Owned local RACF profile composition](decisions/0068-local-racf-profile-composition.md)
+- [ADR-0069: Owned local Db2 catalog composition](decisions/0069-local-db2-catalog-composition.md)
+- [ADR-0071: Owned local fixed IMS catalog composition](decisions/0071-local-fixed-ims-catalog-composition.md)
+- [ADR-0072: Owned local fixed MQ queue catalog composition](decisions/0072-local-fixed-mq-queue-composition.md)
+- [ADR-0073: Owned local TSO ProgramCall controller composition](decisions/0073-local-batch-controller-composition.md)
+- [ADR-0066: Borrowed CICS current-program task custody](decisions/0066-cics-current-program-borrowed-task-custody.md)
+- [ADR-0067: Borrowed durable first-dispatch Intent](decisions/0067-durable-first-dispatch-borrowed-intent.md)
+- [ADR-0070: Compiled CICS first protected dispatch](decisions/0070-compiled-cics-first-protected-dispatch.md)
+- [ADR-0075: Owned initial local Complete publication](decisions/0075-local-complete-owned-publication.md)
+- [ADR-0074: Explicit local MQ process/trigger graph admission](decisions/0074-local-mq-process-trigger-graph.md)
+- [ADR 0076: Explicit local committed MQ controller occurrence](decisions/0076-local-committed-mq-controller-occurrence.md)
+- [ADR 0077: Local completed plain READ result consumption](decisions/0077-local-completed-plain-read-consumption.md)
+- [ADR 0078: CardDemo record-comparison companion](decisions/0078-carddemo-record-comparison-companion.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.
 
@@ -254,16 +282,15 @@ Implementation progress is organized by subsystem and phase. Contract revisions 
 [`documentation-registry.json`](documentation-registry.json) identifies every
 normative document, supplies the generated navigation above, and declares the
 checked manifest location. It also owns subsystem phases, progress records,
-prompts, target releases, and completion dependencies. Subsystem navigation and
+prompts and completion dependencies. Subsystem navigation and
 indexes are generated from that mapping. Each normative document must state its status,
-owner, scope, and first applicable mainframe-env version near its title.
+owner, scope, and applicable subsystem/contract boundary near its title.
 
 Run `cargo xtask docs` after an intentional documentation change, then run
 `cargo xtask docs --check`. The check verifies the generated
 [`documentation-manifest.json`](generated/documentation-manifest.json), relative
 links and anchors, documented xtask subcommands and options, normative metadata,
-navigation, subsystem ownership and dependency consistency, and the
-released/development version authorities.
+navigation, subsystem ownership and dependency consistency.
 
 ## Document status vocabulary
 
@@ -277,5 +304,6 @@ released/development version authorities.
 | Superseded | Replaced by a named newer authority |
 
 Every new normative document should state its status, owner or approving
-authority, scope, and the version from which it applies. Historical records
-should name their candidate and must not be rewritten as current truth.
+authority, scope, and the subsystem/contract boundary from which it applies.
+Retained compatibility and normative decision records must not be rewritten
+as current execution evidence.

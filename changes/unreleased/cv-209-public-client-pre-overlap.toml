@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Overlap independent public-client PRE archive validation on one joined worker while preserving complete fresh input checks, deterministic refusal priority and the original command limits."

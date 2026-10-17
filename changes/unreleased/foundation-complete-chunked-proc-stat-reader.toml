@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Read complete Linux process metadata in fixed chunks through EOF while retaining every original command census and failure bound."

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Compare complete pinned CardDemo seeds, sign-on fields and messages, compiled READ owners, selected insert/payment/account/user record changes, primary card pages and Db2 maintenance rows against independent expectations; preserve all original acceptance requirements, owner boundaries, clocks and resource limits."

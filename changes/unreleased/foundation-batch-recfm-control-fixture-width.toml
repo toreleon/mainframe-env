@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Keep batch RECFM regression fixtures within the existing JCL record width using operand continuations and the eight-byte JOB identifier bound."

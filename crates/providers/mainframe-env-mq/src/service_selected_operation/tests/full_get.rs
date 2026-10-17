@@ -99,7 +99,7 @@ fn rich(store: &dyn PlatformStore) -> rich_state::RichStoredState {
     else {
         panic!("rich authority")
     };
-    state
+    *state
 }
 impl FullFixture {
     fn new(sqlite: bool, version: i32, cp: bool, messages: Vec<MqFullMessage>) -> Self {
@@ -156,7 +156,7 @@ impl FullFixture {
                 .unwrap();
         }
         let (changes, _) = state
-            .plan_delivery(&candidate, Default::default())
+            .plan_selected_delivery(&candidate, Vec::new(), Default::default())
             .unwrap()
             .into_parts();
         store.mutate_provider_states_atomic(changes).unwrap();

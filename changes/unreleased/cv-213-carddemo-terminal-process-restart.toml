@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Add a private source-bound CardDemo two-process terminal restart control that requires genuine inputless RECEIVE suspension, retained SQLite/artifact/security ownership, independently expected resumed card-page values, checked exited and drained children, and exclusive fixture removal before selected restart credit."

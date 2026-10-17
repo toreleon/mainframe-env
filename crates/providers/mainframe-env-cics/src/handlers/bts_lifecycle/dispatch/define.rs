@@ -139,11 +139,13 @@ fn define_activity(
         &context.process_name,
         &context.activity_id,
         &child,
-        context.run_unit.as_str(),
-        context.owner_execution.as_str(),
-        context.owner_principal.as_str(),
-        effect_key,
-        digest,
+        crate::service::handlers::bts_lifecycle::BtsReplayContext {
+            run_unit: context.run_unit.as_str(),
+            owner_execution: context.owner_execution.as_str(),
+            owner_principal: context.owner_principal.as_str(),
+            replay_key: effect_key,
+            request_digest: digest,
+        },
     )?;
     let outputs = if request.arguments.contains_key("ACTIVITYID") {
         BTreeMap::from([(

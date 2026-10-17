@@ -25,31 +25,18 @@ pub(super) fn run_focused_mq(root: &Path, args: &ConformanceArgs) -> TaskResult 
     let events = report
         .batches
         .iter()
-        .flat_map(|b| b.events.clone())
+        .flat_map(|b| &b.events)
         .collect::<Vec<_>>();
     require(
         !events.is_empty(),
         "MQ gate has no executable evidence; mandatory obligations remain pending",
     )?;
-    for event in &events {
-        println!(
-            "{}",
-            String::from_utf8(event.canonical_json().map_err(|e| e.to_string())?)
-                .map_err(|e| e.to_string())?
-        );
-    }
+    conformance_output::emit_report(&report, args.output.as_deref())?;
     require(
         events.iter().all(|e| e.verdict == Verdict::Pass),
         "MQ selected driver produced failing evidence",
     )?;
-    let ledger = DerivedConformanceLedger::derive_partial(&spec, &context, events)
-        .map_err(|e| e.to_string())?;
-    // Emit the existing shared ledger; no subsystem-local verdict file/ledger.
-    println!(
-        "{}",
-        String::from_utf8(ledger.canonical_json().map_err(|e| e.to_string())?)
-            .map_err(|e| e.to_string())?
-    );
+    let ledger = &report.ledger;
     let rows = ledger
         .rows
         .values()
@@ -66,8 +53,8 @@ pub(super) fn run_focused_mq(root: &Path, args: &ConformanceArgs) -> TaskResult 
             "MQ full26 completion refused: complete applicable profiles/security/recovery/installed evidence remain pending",
         )?;
     }
-    println!(
+    conformance_output::diagnostic(format_args!(
         "mq-foundation: finite selected verdicts only; full26 rows pending; no installed/native/licensed credit"
-    );
+    ))?;
     Ok(())
 }

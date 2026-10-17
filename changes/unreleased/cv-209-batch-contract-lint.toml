@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Remove redundant batch service borrows and flatten retirement and running-step guards while preserving evaluation order, ownership, fencing, errors, and durable state."

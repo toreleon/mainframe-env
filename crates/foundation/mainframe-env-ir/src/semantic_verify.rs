@@ -121,6 +121,9 @@ pub fn verify_semantic_contracts(
         };
         let result = match &schema.semantic_contract {
             OperationSemanticContract::Structural => Ok(()),
+            OperationSemanticContract::CobolChunkedInitialization => {
+                crate::validate_cobol_chunked_initialization(module, operation)
+            }
             OperationSemanticContract::CobolLayoutDefinition => {
                 validate_cobol_layout_site(operation, &layouts)
             }
@@ -151,7 +154,8 @@ impl<'a> LayoutIndex<'a> {
                     contract.layout_definition_operation.clone()
                 }
                 OperationSemanticContract::CobolLayoutDefinition => Some(identity.clone()),
-                OperationSemanticContract::Structural => None,
+                OperationSemanticContract::Structural
+                | OperationSemanticContract::CobolChunkedInitialization => None,
             })
             .collect::<BTreeSet<_>>();
         let mut definitions =
@@ -405,6 +409,7 @@ impl<'a> ConditionTopology<'a> {
                 }
                 OperationSemanticContract::Structural
                 | OperationSemanticContract::CobolLayoutDefinition
+                | OperationSemanticContract::CobolChunkedInitialization
                 | OperationSemanticContract::CicsEffect(_) => None,
             })
             .collect::<Vec<_>>();

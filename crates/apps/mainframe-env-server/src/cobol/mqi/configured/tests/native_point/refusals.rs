@@ -4,6 +4,7 @@ use mainframe_env_execution_api::{ExecutionId, IdempotencyKey, RunUnitId};
 use mainframe_env_host_api::EnterpriseResourceClass;
 use mainframe_env_interpreter::MqMqiProgramFrame;
 use std::sync::atomic::AtomicBool;
+mod cold_fixture;
 
 fn unknown(result: &ExecutionOutcome) {
     assert!(
@@ -328,10 +329,18 @@ fn genuine_source_topology_contention_refuses_without_callback_reentry_or_change
 #[test]
 fn physical_reopen_genuine_cold_connect_fences_old_native_points_and_aliases() {
     for sqlite in [false, true] {
-        let f = native(sqlite, 1);
+        let (mut f, source) = cold_fixture::fixture(sqlite);
+        let mut source = Some(source);
         f.install("MQROOT", include_str!("../point.cbl"));
+        cold_fixture::install(&f);
+        let original = super::super::native_root::original(&f);
+        let old = original.clone();
         let store = f.store.clone();
-        let url = f.url.clone();
+        let artifacts = f.artifacts.clone();
+        let old_host = f.mq.clone();
+        let manager = f.mq.install_native_root_manager().unwrap();
+        let completed = Arc::new(Mutex::new(None));
+        let proof_slot = completed.clone();
         let advanced = Arc::new(AtomicBool::new(false));
         let mark = advanced.clone();
         let mut once = false;
@@ -345,31 +354,20 @@ fn physical_reopen_genuine_cold_connect_fences_old_native_points_and_aliases() {
                 return;
             }
             once = true;
-            let physical: Arc<dyn PlatformStore> = if sqlite {
-                Arc::new(
-                    mainframe_env_store::SqliteStateStore::open(&url, 64 << 20, 65536).unwrap(),
-                )
-            } else {
-                store.clone()
-            };
-            // The existing genuine compiled connection-only CALL publishes its
-            // new physical incarnation. No control row/token/table is fabricated;
-            // this cold CONNECT is not claimed as a native point positive.
-            let mut cold = Fixture::same_store(physical, url.clone());
-            cold.parent.execution_id =
-                ExecutionId::new("cold-point-root", Default::default()).unwrap();
-            cold.parent.run_unit_id = RunUnitId::new("cold-point-run", Default::default()).unwrap();
-            cold.parent.idempotency_key =
-                IdempotencyKey::new("cold-point-root-key", Default::default()).unwrap();
-            cold.install("MQCOLD", "IDENTIFICATION DIVISION. PROGRAM-ID. MQCOLD. DATA DIVISION. WORKING-STORAGE SECTION. 01 QM PIC X(48) VALUE SPACES. 01 HC PIC S9(9) BINARY. 01 CC PIC S9(9) BINARY. 01 RC PIC S9(9) BINARY. LINKAGE SECTION. 01 OUTCOME PIC X(8). PROCEDURE DIVISION USING OUTCOME. MOVE 'DONE' TO OUTCOME. CALL 'MQCONN' USING QM HC CC RC. IF CC NOT = 0 OR RC NOT = 0 MOVE 'BAD' TO OUTCOME END-IF. GOBACK.");
-            let mut effect = cold.call_effect(1, "MQCOLD", &[vec![b' '; 8]]);
-            effect.idempotency_key =
-                Some(IdempotencyKey::new("cold-point-original-call", Default::default()).unwrap());
-            let (outcome, reply) = cold.run(effect);
+            let (outcome, reply, proof) = cold_fixture::connect(
+                source
+                    .take()
+                    .expect("one actual originating fixture source"),
+                &manager,
+                &old,
+                &old_host,
+                artifacts.clone(),
+            );
             assert!(
                 matches!(outcome, ExecutionOutcome::Completed(_)),
-                "{outcome:?}"
+                "genuine cold CONNECT coordinator failed before a host reply: {outcome:?}"
             );
+            let reply = reply.expect("completed cold CONNECT must return its original host reply");
             assert_eq!(
                 reply.outcome,
                 Ok(mainframe_env_host_api::HostResult::Program(
@@ -377,14 +375,25 @@ fn physical_reopen_genuine_cold_connect_fences_old_native_points_and_aliases() {
                         .unwrap()
                 ))
             );
+            proof.assert_completed(&outcome, &reply);
             mark.store(true, Ordering::Release);
+            *proof_slot.lock().unwrap() = Some(proof);
         }));
-        let original = super::super::native_root::original(&f);
         unknown(
             &f.router
                 .execute_native_mq_root(&f.mq, &original, "MQROOT")
                 .unwrap(),
         );
+        *f.clock.1.lock().unwrap() = None; // Drop the actual manager/clock hook cycle.
+        let proof = completed
+            .lock()
+            .unwrap()
+            .take()
+            .expect("actual compiled cold proof");
+        proof.assert_retained(&original.execution_id);
+        // This changes only the durable reader. Original host/router/frame
+        // remain the revoked old owners for every unchanged alias/refusal guard.
+        f.store = proof.store.clone();
         assert!(advanced.load(Ordering::Acquire));
         let receipts = f
             .store

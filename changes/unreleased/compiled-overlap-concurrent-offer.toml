@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Offer the actual compiled CardDemo batch and prepared online requests concurrently, retaining all submission joins and the unchanged completed-effect overlap proof."

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Compose explicit signed local RACF profiles with seed, CICS and application selection through one held snapshot participant, preserve unrelated runtime authority on retry and rollback, and fence foreign selected profiles and unknown publication; original Foundation acceptance remains unchanged."

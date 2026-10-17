@@ -10,11 +10,24 @@ pub mod storage64;
 mod value;
 
 pub use coordinator::{
-    CheckedReplayAuditCapture, CheckedReplayObservations, CoordinatorLimits, ExecutionControl,
+    CheckedReplayAuditCapture, CheckedReplayObservations, CoordinatorLimits,
+    DurableCompletedPlainRead, DurableEffectDispatch, DurableEffectDispatchHook, ExecutionControl,
     ExecutionControlError, ExecutionCoordinator, NativeChildEnrollment, NativeRootAdmission,
-    NativeRootConfiguration, NativeRootHooks, NativeRootTermination, WinningRootTerminal,
+    NativeRootConfiguration, NativeRootHooks, NativeRootTermination, ProtectedStorageAdmission,
+    ProtectedStorageConfiguration, ProtectedStorageDispatchHooks, WinningRootTerminal,
 };
 pub use machine::typed_mq::{MqMqiNativePoint, MqMqiNativePointTarget, MqMqiNativeStructure};
+#[cfg(feature = "assurance-observers")]
+pub use machine::{
+    CicsReadCopybackArchive, CicsReadCopybackCell, CicsReadCopybackEffect, CicsReadCopybackOrigin,
+    CicsReadCopybackPlan, CicsReadCopybackProblem, CicsReadCopybackRecord,
+    CicsReadCopybackSelection, CicsReadCopybackSlotSelection, CicsReadCopybackValue,
+};
+#[cfg(feature = "assurance-observers")]
+pub use machine::{
+    Db2CopybackArchive, Db2CopybackCell, Db2CopybackOrigin, Db2CopybackPlan, Db2CopybackProblem,
+    Db2CopybackRecord, Db2CopybackSlot, Db2CopybackValue,
+};
 pub use machine::{
     InstalledProgramReturn, InstalledProgramReturnKind, MachineProblem, MachineSnapshot,
     MqMqiAbiScope, MqMqiConnxProfile, MqMqiProgramFrame, MqMqiProgramProfile, ReferenceMachine,

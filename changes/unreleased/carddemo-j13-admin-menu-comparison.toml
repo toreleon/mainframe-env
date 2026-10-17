@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Compare selected CardDemo Db2 admin-menu labels, actual route actors, and installed program artifacts before recording the bounded J13 integration observation."

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add serial Unix held-file SQLite custody for an actual closed native MQ manager to prepare a separately admitted compiled successor, preserving unknown work and original quotas; include qualified file/driver refusal controls."

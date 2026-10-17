@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Require compiled mixed CardDemo jobs and their actual active owners to finish inside the existing completion loop and deadline, preserving every terminal, overlap, byte, drain and cleanup check."

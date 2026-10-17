@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Compare actual pinned CardDemo menu labels and same-store suspended-menu reopen against independently frozen source identities and unchanged raw datasets; preserve existing card restart guards and require checked drain and cleanup before publishing the selected menu observation."

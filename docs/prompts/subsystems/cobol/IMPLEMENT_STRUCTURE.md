@@ -34,7 +34,7 @@ allowed. Do not merge a new public compiler artifact format or claim coverage.
    executable `(row, obligation, gate)` bindings, replayable verdict events,
    derived coverage ledger, deterministic shard/cache identity, and
    `spec --check`/focused runner interfaces. This is the common foundation
-   reused by every later subsystem minor. Do not bundle COBOL grammar or product
+   reused by every later subsystem phase. Do not bundle COBOL grammar or product
    semantics into CI-300.
 2. Freeze lossless syntax-node, source-span, diagnostic, name, type, layout, and
    executable-blocking contracts.
@@ -115,7 +115,7 @@ registries, schemas, and test bindings quickly without product environments.
 Run focused COBOL recognition/validation conformance during implementation, then
 tier-3 complete compiler/source/IR diagnostics, malformed/boundary/property/fuzz,
 representative harness mutation, cache/shard completeness, artifact round-trip,
-and affected-scope repository validation once on the unchanged minor candidate.
+and affected-scope repository validation once on the unchanged phase candidate.
 Generate the ledger exclusively from obligation verdict events.
 At handoff, report denominators and recognition/validation numerators with exact
 row/obligation/test bindings; leave execution/recovery/differential pending

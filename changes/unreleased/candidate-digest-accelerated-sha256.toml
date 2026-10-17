@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Hash conformance candidate bytes through the existing accelerated SHA-256 implementation while preserving Git selection, length framing and digest identities."

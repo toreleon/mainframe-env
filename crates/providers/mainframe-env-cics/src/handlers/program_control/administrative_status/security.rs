@@ -320,7 +320,8 @@ mod tests {
             cics.register_programs(&BTreeSet::from(["LEGACY".into()]))
                 .unwrap();
             let old = definition(&store, 2, true);
-            cics.register_program_definitions(&[old.clone()]).unwrap();
+            cics.register_program_definitions(std::slice::from_ref(&old))
+                .unwrap();
             let actor = crate::service::tests::invocation();
             // Explicit fixture prerequisite: register_run itself does not perform
             // transaction admission. This is not a selected SPI caller binding.
@@ -492,7 +493,7 @@ mod tests {
                 ),
                 file_updates: format!(
                     "{:?}{:?}",
-                    &self.run.file_updates.current_record_values,
+                    self.run.file_updates.current_record_values,
                     self.run
                         .file_updates
                         .file_tokens

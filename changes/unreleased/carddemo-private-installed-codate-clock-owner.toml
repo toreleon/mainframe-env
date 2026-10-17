@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add private server-unit clock admission and an ignored installed CODATE01 START/legacy MQ owner with independent complete reply bytes, actual clock-input/audit binding, SQLite restarts and six source controls. Keep the system-clock default, public API and original acceptance criteria unchanged; make no timed-wait or journey-credit claim."

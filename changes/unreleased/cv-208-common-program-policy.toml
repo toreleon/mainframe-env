@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Generate typed common-program control declarations from existing catalog roles, preserving control admission and grammar delegation while rejecting unbound builtins, invalid frozen catalog fields and production name dispatch."

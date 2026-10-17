@@ -416,7 +416,9 @@ fn dd_plan(name: &str, statement: &crate::JclStatementNode) -> Result<DdPlan, Ho
                 .then(|| "PO".into())
         });
     let record_format = parameter("RECFM").map(|value| {
-        if value.starts_with('F') {
+        if matches!(value.as_str(), "F" | "V") {
+            value.clone()
+        } else if value.starts_with('F') {
             "FB".to_string()
         } else if value.starts_with('V') {
             "VB".to_string()
@@ -690,6 +692,52 @@ mod tests {
             plan.steps[1].dds[0].disposition,
             vec![Disposition::Old, Disposition::Delete, Disposition::Delete]
         );
+    }
+
+    #[test]
+    fn dd_recfm_preserves_distinct_supported_unblocked_and_blocked_formats() {
+        for recfm in ["F", "FB", "V", "VB"] {
+            let plan = parse_jcl(
+                &JclBundle {
+                    primary: format!(
+                        "//FORMAT JOB\n//S EXEC PGM=IEFBR14\n//OUT DD DSN=USER.REJECTS(+1),DISP=(NEW,CATLG,DELETE),\n//         DCB=(RECFM={recfm},LRECL=430,BLKSIZE=0)\n"
+                    ),
+                    ..Default::default()
+                },
+                JclLimits::default(),
+            )
+            .unwrap();
+            let dd = &plan.steps[0].dds[0];
+            assert_eq!(dd.record_format.as_deref(), Some(recfm));
+            assert_eq!(dd.logical_record_length, Some(430));
+            assert_eq!(dd.dataset.as_deref(), Some("USER.REJECTS"));
+            assert_eq!(dd.generation, Some(1));
+            assert_eq!(dd.ccsid, None);
+            assert_eq!(
+                dd.disposition,
+                [Disposition::New, Disposition::Catalog, Disposition::Delete]
+            );
+        }
+    }
+
+    #[test]
+    fn direct_unblocked_recfm_keeps_existing_precedence_over_dcb_subparameter() {
+        for (direct, nested) in [("F", "FB"), ("V", "VB"), ("FB", "F"), ("VB", "V")] {
+            let plan = parse_jcl(
+                &JclBundle {
+                    primary: format!(
+                        "//FORMAT JOB\n//S EXEC PGM=IEFBR14\n//OUT DD DSN=USER.OUT,DISP=(NEW,CATLG),RECFM={direct},\n//         DCB=(RECFM={nested},LRECL=430),CCSID=1047\n"
+                    ),
+                    ..Default::default()
+                },
+                JclLimits::default(),
+            )
+            .unwrap();
+            let dd = &plan.steps[0].dds[0];
+            assert_eq!(dd.record_format.as_deref(), Some(direct));
+            assert_eq!(dd.logical_record_length, Some(430));
+            assert_eq!(dd.ccsid, Some(1047));
+        }
     }
 
     #[test]

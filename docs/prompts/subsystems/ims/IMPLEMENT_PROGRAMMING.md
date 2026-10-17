@@ -10,7 +10,7 @@ Use this prompt from the repository root. The
 Apply its [hardened slice acceptance](../README.md#hardened-slice-acceptance),
 [early participant contract](../README.md#early-transaction-participant-contract),
 and [licensed-harness preparation](../README.md#licensed-harness-preparation)
-requirements alongside the version-specific boundaries below.
+requirements alongside the phase-specific boundaries below.
 
 ---
 

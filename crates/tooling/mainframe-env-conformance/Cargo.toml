@@ -10,6 +10,9 @@ publish = false
 name = "mainframe-sandbox-runtime"
 path = "src/sandbox_main.rs"
 
+[features]
+assurance-observers = ["mainframe-env-server/assurance-observers", "mainframe-env-interpreter/assurance-observers"]
+
 [dependencies]
 clap.workspace = true
 mainframe-env-coverage.workspace = true

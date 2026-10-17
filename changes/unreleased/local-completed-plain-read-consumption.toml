@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Added an opt-in same-owner completed plain CICS READ delivery path with current task/store/SAF and atomic receipt fences, additive alias-bound receipt codec and ignored pinned account two-process producer; ordinary duplicate and browse replay remain UnknownOutcome and all source/backend/application acceptance is pending."

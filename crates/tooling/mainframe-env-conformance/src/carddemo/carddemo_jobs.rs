@@ -144,9 +144,18 @@ pub(super) fn utility_job_failure(
         })
         .collect()
     });
+    // Separate read-only failure observations; neither is runtime acceptance.
+    let execution = job["jobid"]
+        .as_str()
+        .map(|id| server.batch_service().get(id));
+    let checkpoint = job["jobid"]
+        .as_str()
+        .map(|id| server.batch_service().checkpoint(id));
     Ok(CorpusProblem::new(
         "carddemo.utility.job_failed",
-        format!("utility job did not complete: {job}; spool={detail:?}"),
+        format!(
+            "utility job did not complete: {job}; execution={execution:?}; checkpoint={checkpoint:?}; spool={detail:?}"
+        ),
     ))
 }
 

@@ -11,7 +11,7 @@ pub(super) fn option_value_shape(
     name: &str,
 ) -> Option<CicsApplicationOptionValueShape> {
     (descriptor.label_tokens == ["BIF", "DIGEST"])
-        .then(|| match name {
+        .then_some(match name {
             "HEX" | "BINARY" | "BASE64" => Some(CicsApplicationOptionValueShape::Flag),
             "DIGESTTYPE" => Some(CicsApplicationOptionValueShape::Value),
             _ => None,

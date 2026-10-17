@@ -9,9 +9,20 @@ use std::thread::ThreadId;
 mod lifecycle_tests;
 
 #[cfg(test)]
+#[path = "host_boundary/readonly_journal_tests.rs"]
+mod readonly_journal_tests;
+
+#[cfg(test)]
 #[path = "host_boundary/frame_tests.rs"]
 mod tests;
 
+mod completed_plain_read;
+pub use completed_plain_read::PreparedCicsPlainRead;
+pub(crate) use completed_plain_read::{
+    cics_effect_replay_binding_digest, decode_cics_effect_replay, encode_cics_effect_replay,
+};
+mod current_program_loan;
+pub use current_program_loan::CicsCurrentProgramLoan;
 mod link_entry;
 mod replacement;
 pub use link_entry::{CicsLocalLinkCallAttestation, CicsLocalLinkEntryAttestation};
@@ -217,13 +228,12 @@ fn command_ready(state: &State, run_unit: &RunUnitId) -> Result<(), HostProblem>
             .task_dispatch
             .require_available_session(&task.session)?;
     }
-    if let Some(claim) = state.task_dispatch.claims.get(run_unit) {
-        if claim.thread != std::thread::current().id()
+    if let Some(claim) = state.task_dispatch.claims.get(run_unit)
+        && (claim.thread != std::thread::current().id()
             || claim.commands != claim.loans.len()
-            || claim.loans.last().is_none_or(|loan| loan.actor.is_none())
-        {
-            return Err(HostProblem::Unauthorized);
-        }
+            || claim.loans.last().is_none_or(|loan| loan.actor.is_none()))
+    {
+        return Err(HostProblem::Unauthorized);
     }
     Ok(())
 }
@@ -594,8 +604,7 @@ impl CicsService {
                     .program_occurrence
                     .checked_add(1)
                     .filter(|value| {
-                        *value
-                            <= u64::from(run.current_program.effect_invocation.limits.max_effects)
+                        *value <= run.current_program.effect_invocation.limits.max_effects
                     })
                     .ok_or(HostProblem::ResourceExhausted)?;
                 let sequence = run.current_program.program_occurrence;
@@ -688,6 +697,9 @@ impl CicsService {
         if !request.operation.supported() {
             return Err(HostProblem::Unsupported);
         }
+        let readonly_record = !request.is_mutating()
+            && request.operation.is_file_read()
+            && effect.idempotency_key.is_some();
         let replay_identity = if request.is_mutating() {
             let mutation = request
                 .mutation
@@ -700,6 +712,15 @@ impl CicsService {
             }
             Some((
                 mutation.idempotency_key.clone(),
+                canonical_request_digest(&HostRequest::Cics(request.clone()))
+                    .map_err(|_| HostProblem::ResourceExhausted)?,
+            ))
+        } else if readonly_record {
+            Some((
+                effect
+                    .idempotency_key
+                    .clone()
+                    .ok_or(HostProblem::MissingIdempotency)?,
                 canonical_request_digest(&HostRequest::Cics(request.clone()))
                     .map_err(|_| HostProblem::ResourceExhausted)?,
             ))
@@ -737,6 +758,11 @@ impl CicsService {
                 effect.sequence,
                 *digest,
             )?;
+            if readonly_record {
+                // A retained result does not restore volatile browse state. Never
+                // redispatch or return a cursor reply as proof of a live cursor.
+                return Err(HostProblem::UnknownOutcome);
+            }
             let replay = self
                 .finalize_effect_replay(record, replay, effect.deadline_tick)
                 .map_err(|_| HostProblem::UnknownOutcome)?;
@@ -744,6 +770,31 @@ impl CicsService {
         }
         let mut run =
             CommandLease::acquire_with_origin(self, &effect.run_unit, Some(request.operation))?;
+        if readonly_record
+            && (run.current_program.effect_invocation.execution_id.as_str() != replay_owner
+                || run.invocation.run_unit_id.as_str() != replay_run_unit)
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        if readonly_record
+            && let Some((key, digest)) = replay_identity.as_ref()
+            && let Some(record) = self
+                .store
+                .get_provider_state("cics-effect-replay-v1", key.as_str())
+                .map_err(store_error)?
+        {
+            let replay = decode_cics_effect_replay(&record.payload, self.limits)?;
+            validate_cics_effect_replay_identity(
+                &replay,
+                key.as_str(),
+                &replay_owner,
+                &replay_run_unit,
+                effect.sequence,
+                *digest,
+            )?;
+            return Err(HostProblem::UnknownOutcome);
+        }
+        let read_alias = completed_plain_read::read_alias(self, &request)?;
         run.outer_effect_key = effect.idempotency_key.as_ref().map(ToString::to_string);
         run.current_program.program_occurrence = 0;
         let operation = request.operation;
@@ -764,7 +815,14 @@ impl CicsService {
             // A waiting CONVERSE has no result to replay until its peer frame arrives.
             (Ok(response), Some(_)) if handlers::deferred_converse(operation, response) => result,
             (Ok(response), Some((key, digest))) => {
-                let result_digest = handlers::cics_result_digest(response)?;
+                completed_plain_read::confirm_alias(self, read_alias.as_ref())?;
+                let result_digest = handlers::cics_result_digest(response).map_err(|problem| {
+                    if readonly_record {
+                        HostProblem::UnknownOutcome
+                    } else {
+                        problem
+                    }
+                })?;
                 let mut replay = CicsEffectReplay {
                     effect_key: Some(key.as_str().into()),
                     owner_execution: Some(replay_owner.clone()),
@@ -775,10 +833,17 @@ impl CicsService {
                     request_digest: *digest,
                     result_digest: Some(result_digest),
                     binding_digest: None,
+                    read_alias,
                     response: response.clone(),
                 };
                 replay.binding_digest = Some(cics_effect_replay_binding_digest(&replay));
-                let payload = encode_cics_effect_replay(&replay)?;
+                let payload = encode_cics_effect_replay(&replay).map_err(|problem| {
+                    if readonly_record {
+                        HostProblem::UnknownOutcome
+                    } else {
+                        problem
+                    }
+                })?;
                 match self.store.put_provider_state(
                     ProviderStateRecord {
                         namespace: "cics-effect-replay-v1".into(),
@@ -800,7 +865,15 @@ impl CicsService {
                                     namespace: "cics-effect-replay-v1".into(),
                                     key: key.as_str().into(),
                                     version: 1,
-                                    payload: encode_cics_effect_replay(&replay)?,
+                                    payload: encode_cics_effect_replay(&replay).map_err(
+                                        |problem| {
+                                            if readonly_record {
+                                                HostProblem::UnknownOutcome
+                                            } else {
+                                                problem
+                                            }
+                                        },
+                                    )?,
                                 },
                                 replay,
                                 retention_tick,
@@ -808,6 +881,9 @@ impl CicsService {
                             .map(|_| result)
                             .unwrap_or(Err(HostProblem::UnknownOutcome))
                         }
+                    }
+                    Err(StoreError::AlreadyExists | StoreError::Conflict) if readonly_record => {
+                        Err(HostProblem::UnknownOutcome)
                     }
                     Err(StoreError::AlreadyExists | StoreError::Conflict) => {
                         match self

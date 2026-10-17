@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Preserve declared BMS macro operands, explicit COLOR/HILIGHT precedence and quoted literal continuations; compare complete source metadata without claiming terminal capability or IBM assembler parity."

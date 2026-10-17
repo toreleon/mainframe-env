@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Correct the PostgreSQL signed-generation oracle to retain Application-owned ONE alongside newly seeded TWO, preserving the original retry, rollback and reopen checks."

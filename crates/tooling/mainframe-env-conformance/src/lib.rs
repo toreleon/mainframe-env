@@ -27,12 +27,17 @@ mod cobol_registers;
 mod cobol_runtime;
 mod cobol_statements;
 mod dataset;
+#[cfg(test)]
+mod dataset_cursor_journal_tests;
 mod dataset_reference;
 mod db2_syntax;
 mod db2_syntax_fixtures;
 mod decimal_adapter;
 mod framework;
 mod ims_candidate;
+#[cfg(all(test, target_os = "linux"))]
+#[path = "carddemo/j10_source_controls.rs"]
+mod j10_source_controls;
 mod jcl;
 mod licensed_harness;
 mod mq_selected;
@@ -50,3 +55,6 @@ pub use licensed_harness::{
     OracleHarnessValidationKind, validate_oracle_harness_receipt, validate_oracle_harness_registry,
 };
 pub use mq_selected::bind_mq_selected;
+
+#[cfg(test)]
+mod public_client_compatibility;

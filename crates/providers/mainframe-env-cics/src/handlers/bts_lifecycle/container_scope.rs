@@ -162,11 +162,13 @@ mod tests {
             .mutate_process(
                 "TYPE",
                 "ORDER",
-                "UOW2",
-                "EXEC2",
-                "USER",
-                "start",
-                [1; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "start",
+                    request_digest: [1; 32],
+                },
                 |process| {
                     process.start(&root, None, true)?;
                     Ok(BtsReply::normal())
@@ -185,11 +187,13 @@ mod tests {
                     transid: "BTS2".into(),
                     userid: "USER".into(),
                 },
-                "UOW2",
-                "EXEC2",
-                "USER",
-                "define-child",
-                [2; 32],
+                crate::service::handlers::bts_lifecycle::BtsReplayContext {
+                    run_unit: "UOW2",
+                    owner_execution: "EXEC2",
+                    owner_principal: "USER",
+                    replay_key: "define-child",
+                    request_digest: [2; 32],
+                },
             )
             .unwrap();
         authority.finish_uow("UOW2", "EXEC2", "USER", true).unwrap();

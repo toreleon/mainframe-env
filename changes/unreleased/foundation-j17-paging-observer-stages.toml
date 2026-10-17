@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Retain bounded technical attribution stages for the first-party IMS paging owner without changing its source, field, request, audit or cleanup acceptance predicates."

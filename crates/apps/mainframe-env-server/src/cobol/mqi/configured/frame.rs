@@ -31,6 +31,9 @@ pub(super) struct CompiledFrame {
     pub(super) content: [u8; 32],
 }
 impl ClosedFrame {
+    pub(super) fn revoke_for_custody(&self) {
+        self.active.store(false, Ordering::SeqCst);
+    }
     pub(super) fn original(&self) -> &Invocation {
         &self.original
     }

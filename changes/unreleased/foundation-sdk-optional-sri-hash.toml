@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Avoid computing unused SHA512 digests during public client input validation while preserving every SHA256, required SRI, byte bound and current input identity check."

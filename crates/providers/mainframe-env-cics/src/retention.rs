@@ -200,6 +200,8 @@ pub enum CicsReplayCodecVersion {
     AttributionV2,
     /// Full owner, run, sequence, result, and resolution bindings.
     RetentionV3,
+    /// Terminal READ receipt additionally binds its original configured file alias.
+    PlainReadV4,
 }
 
 /// Fail-closed age classification of an outer CICS replay.
@@ -316,9 +318,13 @@ pub fn describe_cics_replay_row(
         Some(b"MECER001") => CicsReplayCodecVersion::LegacyV1,
         Some(b"MECER002") => CicsReplayCodecVersion::AttributionV2,
         Some(b"MECER003") => CicsReplayCodecVersion::RetentionV3,
+        Some(b"MECER004") => CicsReplayCodecVersion::PlainReadV4,
         _ => return Err(CicsReplayValidationError::CorruptPayload),
     };
-    let current = codec == CicsReplayCodecVersion::RetentionV3;
+    let current = matches!(
+        codec,
+        CicsReplayCodecVersion::RetentionV3 | CicsReplayCodecVersion::PlainReadV4
+    );
     if current {
         if replay.effect_key.as_deref() != Some(row.key.as_str())
             || replay.result_digest != Some(result_digest)

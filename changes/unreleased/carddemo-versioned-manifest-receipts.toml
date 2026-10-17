@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Fixed private CardDemo financial and retained V3 publisher receipts to preserve complete versioned compiler manifests through explicit V2/V3 field projections without expanding serialization contracts."
