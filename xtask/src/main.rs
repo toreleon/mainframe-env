@@ -6017,16 +6017,22 @@ fn candidate_digest(root: &Path) -> TaskResult<String> {
         .map(|path| String::from_utf8(path.to_vec()).map_err(|error| error.to_string()))
         .collect::<TaskResult<Vec<_>>>()?;
     files.sort();
-    let mut digest = Sha256::new();
+    let mut digest = ring::digest::Context::new(&ring::digest::SHA256);
     for relative in files {
         let bytes = fs::read(root.join(&relative))
             .map_err(|error| format!("candidate file {relative}: {error}"))?;
-        digest.update((relative.len() as u64).to_be_bytes());
+        digest.update(&(relative.len() as u64).to_be_bytes());
         digest.update(relative.as_bytes());
-        digest.update((bytes.len() as u64).to_be_bytes());
-        digest.update(bytes);
+        digest.update(&(bytes.len() as u64).to_be_bytes());
+        digest.update(&bytes);
     }
-    Ok(format!("sha256:{:x}", digest.finalize()))
+    let hex = digest
+        .finish()
+        .as_ref()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    Ok(format!("sha256:{hex}"))
 }
 
 fn check_jcl_exit(root: &Path) -> TaskResult {
@@ -11382,6 +11388,48 @@ mod tests {
                 .success()
         );
         command_text(root, "git", &["rev-parse", "HEAD"]).expect("commit identity")
+    }
+
+    #[test]
+    fn candidate_digest_matches_known_git_file_set_bytes() {
+        let root = temporary_git_repository("candidate-digest-known-bytes");
+        assert_eq!(
+            candidate_digest(&root).expect("empty candidate"),
+            "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        fs::create_dir_all(root.join("nested")).expect("nested tracked directory");
+        for (relative, bytes) in [
+            (".gitignore", b"ignored.bin\nignored/\n".as_slice()),
+            ("empty.txt", b"".as_slice()),
+            ("binary.bin", b"\0\xff\n\x80".as_slice()),
+            ("nested/é漢.txt", "Tiếng Việt\n".as_bytes()),
+        ] {
+            fs::write(root.join(relative), bytes).expect("tracked fixture bytes");
+        }
+        commit_all(&root, "known candidate files");
+        fs::write(root.join("untracked.bin"), b"\xff\0untracked\n")
+            .expect("untracked fixture bytes");
+        fs::write(root.join("ignored.bin"), b"excluded bytes").expect("ignored file");
+        fs::create_dir_all(root.join("ignored")).expect("ignored directory");
+        fs::write(root.join("ignored/hidden.bin"), b"excluded nested bytes")
+            .expect("ignored nested file");
+        // Independently computed SHA-256 of the five sorted UTF-8 paths and
+        // contents, each framed by its original unsigned 64-bit big-endian length.
+        const EXPECTED: &str =
+            "sha256:2ff0f655a0a16a226dd66eec4627f5a37a51014f187a5536f807702b08468502";
+        assert_eq!(candidate_digest(&root).expect("known candidate"), EXPECTED);
+        fs::write(root.join("ignored.bin"), b"changed ignored bytes").expect("ignored update");
+        assert_eq!(
+            candidate_digest(&root).expect("ignored-insensitive candidate"),
+            EXPECTED
+        );
+        fs::write(root.join("untracked.bin"), b"changed untracked\0\xff")
+            .expect("untracked update");
+        assert_eq!(
+            candidate_digest(&root).expect("untracked-sensitive candidate"),
+            "sha256:5d18b9d8c311bfaaf68f33bc859df21f4c501cc1e24009b6989e33e9acb7f653"
+        );
+        fs::remove_dir_all(root).expect("temporary repository cleanup");
     }
 
     #[test]
